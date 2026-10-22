@@ -60,13 +60,23 @@ APP.ready.then(async () => {
       <p class="sub">${cx.ultima_sync ? 'Última sincronización ' + fmt.fechaHora(cx.ultima_sync) : 'Todavía no se sincronizó'}${cx.ultimo_error ? ' · <span style="color:var(--error)">' + esc(cx.ultimo_error) + '</span>' : ''}</p>
       <div class="datos"><div class="dato"><b>${fmt.num(res.items || 0)}</b><span>variantes publicadas</span></div><div class="dato ${res.sin_cruzar ? 'mal' : 'bien'}"><b>${fmt.num(res.sin_cruzar || 0)}</b><span>sin cruzar con el local</span></div><div class="dato ${res.stock_distinto ? 'mal' : 'bien'}"><b>${fmt.num(res.stock_distinto || 0)}</b><span>con stock distinto</span></div></div>
       <label style="display:flex;gap:10px;align-items:center;margin:4px 0 12px;font-size:13.5px"><input type="checkbox" id="chk-empujar" ${cx.empujar_stock ? 'checked' : ''} style="width:18px;height:18px"> <span><b>El local manda el stock a Tienda Nube.</b> Cada venta, compra o ajuste en el local actualiza la tienda online al instante. <small class="sub">Solo para lo que está cruzado.</small></span></label>
-      <div class="acciones"><button class="btn primario" id="btn-sync">Sincronizar catálogo</button><a class="btn" href="cruce.html?c=${cx.id}">Ver cruce de productos</a><button class="btn" id="btn-todo" title="Manda a Tienda Nube el stock del local de todo lo cruzado">Enviar todo el stock a Tienda Nube</button><button class="btn" id="btn-pedidos">Pedidos recientes</button><button class="btn peligro" id="btn-desconectar">Desconectar</button></div>`;
+      <div class="acciones"><button class="btn primario" id="btn-sync">Sincronizar catálogo</button><a class="btn" href="cruce.html?c=${cx.id}">Ver cruce de productos</a><button class="btn" id="btn-tomar" title="Hasta el corte: el local toma de Tienda Nube el stock, el nombre y las variantes de todo lo cruzado, y crea lo que falte">Tomar todo de Tienda Nube</button><button class="btn" id="btn-todo" title="Manda a Tienda Nube el stock del local de todo lo cruzado">Enviar todo el stock a Tienda Nube</button><button class="btn" id="btn-pedidos">Pedidos recientes</button><button class="btn peligro" id="btn-desconectar">Desconectar</button></div>`;
     $('#chk-empujar').onchange = async ev => { const r = await sb.from('conexiones').update({ empujar_stock: ev.target.checked }).eq('id', cx.id); toast(r.error ? mensajeError(r.error) : (ev.target.checked ? 'El local manda el stock a Tienda Nube' : 'Empuje desactivado'), r.error ? 'error' : ''); cx.empujar_stock = ev.target.checked; };
     $('#btn-todo').onclick = async () => {
       if (!cx.empujar_stock) { toast('Primero activá "El local manda el stock"', 'error'); return; }
       if (!await confirmar(`Se va a escribir en Tienda Nube el stock del local de las ${fmt.num(res.cruzados || 0)} variantes cruzadas. Lo que diga Tienda Nube hoy se pisa. ¿Seguimos?`, 'Enviar todo')) return;
       const { data: n, error } = await sb.rpc('encolar_todo', { p_conexion: cx.id }); if (error) { toast(mensajeError(error), 'error'); return; }
       toast(`${fmt.num(n)} variantes en cola: se envían en un minuto`); llamar('tn-push', {}).catch(() => {});
+    };
+    $('#btn-tomar').onclick = async () => {
+      if (!await confirmar('Tienda Nube manda: el local toma de la tienda el stock, el nombre y las variantes de todo lo cruzado, y se crean los productos que falten. Queda todo registrado como ajustes. ¿Seguimos?', 'Tomar todo')) return;
+      const b = $('#btn-tomar'); b.disabled = true; b.textContent = 'Tomando…';
+      try {
+        const { data: r1, error: e1 } = await sb.rpc('canal_tomar_todo', { p_conexion: cx.id }); if (e1) throw e1;
+        const { data: r2, error: e2 } = await sb.rpc('canal_crear_todos', { p_conexion: cx.id }); if (e2) throw e2;
+        toast(`Stock ajustado en ${fmt.num(r1.stock_ajustados)} variantes · ${fmt.num(r1.nombres_cambiados)} nombres · ${fmt.num(r1.variantes_apagadas)} variantes apagadas · ${fmt.num((r2.creados || []).length)} productos creados`);
+      } catch (err) { toast(mensajeError(err), 'error'); }
+      cargarTN();
     };
     $('#btn-pedidos').onclick = async () => {
       const m = APP.modal('<h2>Pedidos recientes de Tienda Nube</h2><p class="sub">Cargando…</p>');
