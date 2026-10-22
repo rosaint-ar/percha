@@ -54,7 +54,9 @@ begin
   select min(precio) into pre from canal_items where conexion_id = p_conexion and producto_ext = p_producto_ext and precio > 0;
   -- la "bolsa": la variante única a la que hoy apuntan (si apuntan a alguna)
   select v.* into bolsa from canal_items ci join variantes v on v.id = ci.variante_id where ci.conexion_id = p_conexion and ci.producto_ext = p_producto_ext limit 1;
-  cat := coalesce((select categoria_id from productos where id = bolsa.producto_id), (select categoria_id from productos where empresa_id = e and codigo = base limit 1));
+  cat := coalesce((select categoria_id from productos where id = bolsa.producto_id), (select categoria_id from productos where empresa_id = e and codigo = base limit 1),
+                  -- sin pista por código: la familia más común de los productos que empiezan igual ("LESS …" → Bombachas, "CONJUNTO …" → Conjuntos)
+                  (select categoria_id from productos where empresa_id = e and categoria_id is not null and upper(split_part(nombre, ' ', 1)) = upper(split_part(nom, ' ', 1)) group by categoria_id order by count(*) desc limit 1));
   dep := (select id from depositos where empresa_id = e and principal limit 1);
   -- si en el local ya existe un producto con ese mismo nombre (p.ej. CULOTTELESS «SEAMLESS» 100183), se usa ese: no se duplica
   select id, codigo into prod_id, cod from productos where empresa_id = e and activo and tipo = 'prenda' and id is distinct from bolsa.producto_id
