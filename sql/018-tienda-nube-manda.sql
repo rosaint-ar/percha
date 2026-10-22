@@ -22,29 +22,7 @@ begin
       n_stock := n_stock + 1;
     end if;
   end loop;
-  -- 2) nombres: si el canal tiene un solo nombre para el producto, se toma entero; si tiene varios (uno por color), lo común hasta «»
-  for r in
-    select p.id, p.nombre, array_agg(distinct ci.nombre) nombres
-    from canal_items ci join variantes v on v.id = ci.variante_id join productos p on p.id = v.producto_id
-    where ci.conexion_id = p_conexion and p.tipo <> 'kit' and ci.nombre is not null
-    group by p.id, p.nombre
-  loop
-    if array_length(r.nombres, 1) = 1 then
-      nuevo_nombre := r.nombres[1];
-      -- "CONJUNTO «CHARO» NEGRO": si lo que sigue a «» es el color de la variante, el color es variante, no nombre
-      if exists (select 1 from canal_items ci join variantes v on v.id = ci.variante_id where ci.conexion_id = p_conexion and v.producto_id = r.id and ci.color_canal is not null
-                 and lower(nuevo_nombre) = lower(regexp_replace(nuevo_nombre, '»\s*.*$', '»') || ' ' || ci.color_canal)) then
-        nuevo_nombre := regexp_replace(nuevo_nombre, '»\s*.*$', '»');
-      end if;
-    else nuevo_nombre := regexp_replace(r.nombres[1], '»\s*.*$', '»');
-      if nuevo_nombre !~ '»' or exists (select 1 from unnest(r.nombres) x where regexp_replace(x, '»\s*.*$', '»') <> nuevo_nombre) then nuevo_nombre := null; end if;
-    end if;
-    if nuevo_nombre is not null and btrim(nuevo_nombre) <> '' and nuevo_nombre <> r.nombre
-       and not exists (select 1 from productos q where q.empresa_id = e and q.id <> r.id and lower(q.nombre) = lower(nuevo_nombre)) then
-      update productos set nombre = nuevo_nombre, descripcion = coalesce(descripcion || E'\n', '') || 'Antes: ' || r.nombre || ' (' || marca || ')', modificado = now() where id = r.id;
-      n_nombres := n_nombres + 1;
-    end if;
-  end loop;
+  -- 2) nombres: NO se tocan (feedback 22/10: los nombres son de Emi; se corrigen a mano, por tandas)
   -- 3) variantes del local que el canal no tiene y están en 0: se apagan (quedan para reactivar si hace falta)
   update variantes v set activa = false
   from productos p
