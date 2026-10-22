@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inicio · Percha</title>
+<meta name="app-root" content="./">
+<link rel="stylesheet" href="shell/shell.css">
+<style>
+  .accesos{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px}
+  .acceso{background:var(--papel);border:1px solid var(--borde);padding:18px 20px;text-decoration:none;color:var(--tinta);display:block}
+  .acceso:hover{border-color:var(--lavanda);background:var(--lila-suave)}
+  .acceso h3{margin-bottom:4px}
+  .acceso.prox{opacity:.55;cursor:default}
+  .acceso .sub{font-size:14px}
+  @media (max-width:800px){.accesos{grid-template-columns:1fr}}
+</style>
+</head>
+<body data-page="inicio" data-etq="Percha" data-title="Hola, <em>¿qué hacemos hoy?</em>">
+<main class="app">
+  <section class="tiles" id="tiles">
+    <div class="tile"><div class="t">Productos activos</div><div class="n">…</div><div class="d"></div></div>
+    <div class="tile"><div class="t">Prendas en stock</div><div class="n">…</div><div class="d"></div></div>
+    <div class="tile"><div class="t">Stock valorizado a costo</div><div class="n">…</div><div class="d"></div></div>
+    <div class="tile destacada"><div class="t">Sin stock</div><div class="n">…</div><div class="d"></div></div>
+  </section>
+
+  <section class="accesos">
+    <a class="acceso" href="catalogo/productos.html"><h3>Catálogo</h3><p class="sub">Productos, talles, colores, stock y precios.</p></a>
+    <a class="acceso" href="catalogo/etiquetas.html"><h3>Etiquetas</h3><p class="sub">Imprimir códigos de barras en la Brother.</p></a>
+    <a class="acceso prox" href="#" title="Próximamente: fase 2"><h3>Caja</h3><p class="sub">Vender, cambios, señas y cierre de caja. Próximamente.</p></a>
+  </section>
+
+  <div class="card">
+    <div class="card-cab"><div><h2>Últimos movimientos de stock</h2><p class="sub">Entradas, salidas y ajustes más recientes</p></div></div>
+    <table class="lista" id="tb-mov"><tr><th>Cuándo</th><th>Producto</th><th>Variante</th><th class="num">Cantidad</th><th>Motivo</th></tr></table>
+  </div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="shared/supabase.js"></script>
+<script src="shell/shell.js"></script>
+<script>
+APP.ready.then(async () => {
+  const { fmt, esc, $ } = APP, e = APP.empresa.id;
+  // Los totales los calcula la base (resumen_inicio): el navegador nunca suma listas largas
+  const [res, mov] = await Promise.all([
+    sb.rpc('resumen_inicio', { e }),
+    sb.from('stock_movimientos').select('fecha,cantidad,tipo,nota,variante_id').eq('empresa_id', e).order('fecha', { ascending: false }).limit(12)
+  ]);
+  if (res.error) APP.toast(APP.mensajeError(res.error), 'error');
+  const r = res.data || {};
+  const tiles = APP.$$('#tiles .tile');
+  tiles[0].querySelector('.n').textContent = fmt.num(r.productos_activos); tiles[0].querySelector('.d').textContent = `${fmt.num(r.productos_con_stock)} con stock`;
+  tiles[1].querySelector('.n').textContent = fmt.num(r.unidades); tiles[1].querySelector('.d').textContent = 'unidades de prendas, sin envíos ni señas';
+  tiles[2].querySelector('.n').textContent = fmt.pesos(r.valor_costo); tiles[2].querySelector('.d').textContent = 'lo que costó la mercadería que hay';
+  tiles[3].querySelector('.n').textContent = fmt.num(r.productos_sin_stock); tiles[3].querySelector('.d').textContent = `prendas activas sin unidades · ${fmt.num(r.variantes_sin_ean)} variantes sin código de barras`;
+
+  const ids = [...new Set((mov.data || []).map(m => m.variante_id))];
+  const { data: vinfo } = ids.length ? await sb.from('v_variantes').select('id,producto_nombre,talle,color_nombre').in('id', ids) : { data: [] };
+  const vmap = Object.fromEntries((vinfo || []).map(x => [x.id, x]));
+  const motivo = { inicial: 'Carga inicial', compra: 'Compra', venta: 'Venta', devolucion: 'Devolución', ajuste: 'Ajuste', transferencia: 'Transferencia' };
+  const tb = $('#tb-mov');
+  if (!(mov.data || []).length) tb.insertAdjacentHTML('beforeend', '<tr><td colspan="5" class="vacio">Todavía no hay movimientos.</td></tr>');
+  (mov.data || []).forEach(m => { const x = vmap[m.variante_id] || {};
+    tb.insertAdjacentHTML('beforeend', `<tr><td>${fmt.fechaHora(m.fecha)}</td><td>${esc(x.producto_nombre || '')}</td><td>${esc([x.talle, x.color_nombre].filter(Boolean).join(' · '))}</td><td class="num ${+m.cantidad < 0 ? '' : 'num-f'}">${+m.cantidad > 0 ? '+' : ''}${fmt.dec(m.cantidad)}</td><td>${esc(motivo[m.tipo] || m.tipo)}${m.nota ? ' · <small>' + esc(m.nota) + '</small>' : ''}</td></tr>`); });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Configuración · Percha</title>
+<meta name="app-root" content="../">
+<link rel="stylesheet" href="../shell/shell.css">
+<style>
+  .pestanas{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
+  .pestanas a{font:600 14px var(--f-ui);color:var(--tinta);text-decoration:none;padding:8px 14px;border:1px solid var(--borde);background:var(--papel)}
+  .pestanas a.on{background:var(--lila);border-color:var(--lila);color:var(--violeta)}
+  table.lista input,table.lista select{border:1px solid var(--borde);padding:5px 8px;border-radius:2px;width:100%}
+  table.lista td.num input{text-align:right;width:90px}
+</style>
+</head>
+<body data-page="configuracion" data-etq="Configuración" data-title="Empresa" data-subtitle="Datos fiscales, listas de precios, formas de pago y depósitos">
+<main class="app">
+  <div class="pestanas"><a class="on" href="empresa.html">Empresa</a><a href="atributos.html">Talles, colores y familias</a><a href="usuarios.html">Usuarios</a></div>
+
+  <div class="card">
+    <div class="card-cab"><div><h2>Datos de la empresa</h2><p class="sub">Salen en facturas, tickets y etiquetas</p></div><div class="acciones"><button class="btn primario" id="btn-guardar">Guardar</button></div></div>
+    <form id="form" autocomplete="off">
+      <div class="fila c3">
+        <div class="campo"><label>Nombre comercial</label><input name="nombre" required></div>
+        <div class="campo"><label>Razón social</label><input name="razon_social"></div>
+        <div class="campo"><label>CUIT</label><input name="cuit" placeholder="00-00000000-0"></div>
+      </div>
+      <div class="fila c3">
+        <div class="campo"><label>Condición frente al IVA</label><select name="condicion_iva"><option value="monotributo">Monotributo</option><option value="responsable_inscripto">Responsable inscripto</option><option value="exento">Exento</option></select></div>
+        <div class="campo"><label>Ingresos brutos</label><input name="iibb"></div>
+        <div class="campo"><label>Inicio de actividades</label><input name="inicio_actividades" type="date"></div>
+      </div>
+      <div class="fila c4">
+        <div class="campo" style="grid-column:span 2"><label>Domicilio</label><input name="domicilio"></div>
+        <div class="campo"><label>Localidad</label><input name="localidad"></div>
+        <div class="campo"><label>Provincia</label><input name="provincia"></div>
+      </div>
+      <div class="fila c4">
+        <div class="campo"><label>Código postal</label><input name="codigo_postal"></div>
+        <div class="campo"><label>Teléfono</label><input name="telefono"></div>
+        <div class="campo"><label>Correo</label><input name="email" type="email"></div>
+        <div class="campo"><label>Web</label><input name="web"></div>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="card-cab"><div><h2>Listas de precios</h2><p class="sub">Cada lista es un porcentaje del precio de lista base. Contado al 80% significa 20% de descuento.</p></div><div class="acciones"><button class="btn" id="btn-nueva-lista">+ Lista</button></div></div>
+    <table class="lista" id="tb-listas"><tr><th>Nombre</th><th class="num">Porcentaje</th><th>Base</th><th>Activa</th><th></th></tr></table>
+  </div>
+
+  <div class="card">
+    <div class="card-cab"><div><h2>Formas de pago</h2><p class="sub">Con qué se cobra en la caja y qué lista de precios aplica cada una</p></div><div class="acciones"><button class="btn" id="btn-nueva-fp">+ Forma de pago</button></div></div>
+    <table class="lista" id="tb-fp"><tr><th>Nombre</th><th>Tipo</th><th class="num">Cuotas</th><th>Lista que aplica</th><th>Activa</th><th></th></tr></table>
+  </div>
+
+  <div class="card">
+    <div class="card-cab"><div><h2>Depósitos</h2><p class="sub">Dónde está la mercadería</p></div><div class="acciones"><button class="btn" id="btn-nuevo-dep">+ Depósito</button></div></div>
+    <table class="lista" id="tb-dep"><tr><th>Código</th><th>Nombre</th><th>Principal</th><th>Activo</th><th></th></tr></table>
+  </div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../shared/supabase.js"></script>
+<script src="../shell/shell.js"></script>
+<script>
+APP.ready.then(async () => {
+  const { esc, $, $$, toast, mensajeError, fmt } = APP, e = APP.empresa.id;
+  if (!APP.esAdmin) { document.querySelector('main').innerHTML = '<div class="card"><p>Esta sección es solo para administración.</p></div>'; return; }
+  const form = $('#form');
+  ['nombre', 'razon_social', 'cuit', 'condicion_iva', 'iibb', 'inicio_actividades', 'domicilio', 'localidad', 'provincia', 'codigo_postal', 'telefono', 'email', 'web'].forEach(k => form[k].value = APP.empresa[k] ?? '');
+  $('#btn-guardar').onclick = async () => {
+    const d = {}; [...form.elements].forEach(el => { if (el.name) d[el.name] = el.value.trim() || null; });
+    const r = await sb.from('empresas').update(d).eq('id', e);
+    toast(r.error ? mensajeError(r.error) : 'Guardado', r.error ? 'error' : '');
+  };
+
+  // ---- tablas editables genéricas ----
+  const TIPOS = { efectivo: 'Efectivo', transferencia: 'Transferencia', debito: 'Débito', credito: 'Crédito / cuotas', mercadopago: 'Mercado Pago', online: 'Online', otro: 'Otro' };
+  let listas = [];
+  async function cargarListas() {
+    listas = (await sb.from('listas_precios').select('*').eq('empresa_id', e).order('orden')).data || [];
+    const tb = $('#tb-listas'); tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());
+    listas.forEach(l => tb.insertAdjacentHTML('beforeend', `<tr data-id="${l.id}"><td><input data-k="nombre" value="${esc(l.nombre)}"></td><td class="num"><input data-k="porcentaje" type="number" step="0.5" value="${l.porcentaje}"></td><td>${l.predeterminada ? '<span class="chip">base</span>' : ''}</td><td><select data-k="activa"><option value="true" ${l.activa ? 'selected' : ''}>Sí</option><option value="false" ${!l.activa ? 'selected' : ''}>No</option></select></td><td><button class="btn chico" data-guardar>Guardar</button></td></tr>`));
+    $$('[data-guardar]', tb).forEach(b => b.onclick = () => guardarFila(b, 'listas_precios', cargarListas));
+  }
+  async function cargarFP() {
+    const fps = (await sb.from('formas_pago').select('*').eq('empresa_id', e).order('orden')).data || [];
+    const tb = $('#tb-fp'); tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());
+    fps.forEach(f => tb.insertAdjacentHTML('beforeend', `<tr data-id="${f.id}"><td><input data-k="nombre" value="${esc(f.nombre)}"></td>
+      <td><select data-k="tipo">${Object.entries(TIPOS).map(([k, v]) => `<option value="${k}" ${f.tipo === k ? 'selected' : ''}>${v}</option>`).join('')}</select></td>
+      <td class="num"><input data-k="cuotas" type="number" min="1" value="${f.cuotas}"></td>
+      <td><select data-k="lista_id"><option value="">La del cliente</option>${listas.map(l => `<option value="${l.id}" ${f.lista_id === l.id ? 'selected' : ''}>${esc(l.nombre)}</option>`).join('')}</select></td>
+      <td><select data-k="activa"><option value="true" ${f.activa ? 'selected' : ''}>Sí</option><option value="false" ${!f.activa ? 'selected' : ''}>No</option></select></td><td><button class="btn chico" data-guardar>Guardar</button></td></tr>`));
+    $$('[data-guardar]', tb).forEach(b => b.onclick = () => guardarFila(b, 'formas_pago', cargarFP));
+  }
+  async function cargarDep() {
+    const deps = (await sb.from('depositos').select('*').eq('empresa_id', e).order('principal', { ascending: false })).data || [];
+    const tb = $('#tb-dep'); tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());
+    deps.forEach(d => tb.insertAdjacentHTML('beforeend', `<tr data-id="${d.id}"><td><input data-k="codigo" value="${esc(d.codigo)}"></td><td><input data-k="nombre" value="${esc(d.nombre)}"></td><td><select data-k="principal"><option value="true" ${d.principal ? 'selected' : ''}>Sí</option><option value="false" ${!d.principal ? 'selected' : ''}>No</option></select></td><td><select data-k="activo"><option value="true" ${d.activo ? 'selected' : ''}>Sí</option><option value="false" ${!d.activo ? 'selected' : ''}>No</option></select></td><td><button class="btn chico" data-guardar>Guardar</button></td></tr>`));
+    $$('[data-guardar]', tb).forEach(b => b.onclick = () => guardarFila(b, 'depositos', cargarDep));
+  }
+  async function guardarFila(btn, tabla, recargar) {
+    const tr = btn.closest('tr'), d = {};
+    $$('[data-k]', tr).forEach(el => { let v = el.value; if (v === 'true') v = true; else if (v === 'false') v = false; else if (el.type === 'number') v = +v; else if (v === '') v = null; d[el.dataset.k] = v; });
+    const r = await sb.from(tabla).update(d).eq('id', tr.dataset.id);
+    toast(r.error ? mensajeError(r.error) : 'Guardado', r.error ? 'error' : ''); if (!r.error) recargar();
+  }
+  $('#btn-nueva-lista').onclick = async () => { const r = await sb.from('listas_precios').insert(APP.conEmpresa({ nombre: 'Nueva lista', porcentaje: 100, orden: listas.length + 1 })); if (r.error) toast(mensajeError(r.error), 'error'); cargarListas(); };
+  $('#btn-nueva-fp').onclick = async () => { const r = await sb.from('formas_pago').insert(APP.conEmpresa({ nombre: 'Nueva forma de pago', tipo: 'otro', orden: 99 })); if (r.error) toast(mensajeError(r.error), 'error'); cargarFP(); };
+  $('#btn-nuevo-dep').onclick = async () => { const r = await sb.from('depositos').insert(APP.conEmpresa({ codigo: 'NUEVO', nombre: 'Nuevo depósito' })); if (r.error) toast(mensajeError(r.error), 'error'); cargarDep(); };
+  await cargarListas(); await Promise.all([cargarFP(), cargarDep()]);
+});
+</script>
+</body>
+</html>

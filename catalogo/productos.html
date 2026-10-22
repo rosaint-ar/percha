@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Catálogo · Percha</title>
+<meta name="app-root" content="../">
+<link rel="stylesheet" href="../shell/shell.css">
+<style>
+  .filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+  .filtros select{border:1px solid var(--borde);background:var(--papel);padding:9px 11px;border-radius:2px}
+  .filtros label.chk{display:flex;align-items:center;gap:6px;font:600 14px var(--f-ui);color:var(--tinta)}
+  .resumen{font-size:14px;color:var(--suave);margin-left:auto}
+  td .cod{font:600 12px var(--f-ui);color:var(--suave);letter-spacing:.04em}
+  .inactivo td{opacity:.5}
+</style>
+</head>
+<body data-page="productos" data-etq="Catálogo" data-title="Productos" data-subtitle="Prendas, talles, colores, stock y precios">
+<main class="app">
+  <div class="filtros">
+    <div class="buscador"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" placeholder="Buscar por nombre, código o código de barras" autofocus></div>
+    <select id="f-cat"><option value="">Todas las familias</option></select>
+    <label class="chk"><input type="checkbox" id="f-stock"> Solo con stock</label>
+    <label class="chk"><input type="checkbox" id="f-inactivos"> Ver inactivos</label>
+    <span class="resumen" id="resumen"></span>
+  </div>
+  <div class="card" style="padding:0">
+    <table class="lista" id="tabla">
+      <thead><tr><th>Producto</th><th>Familia</th><th class="num">Variantes</th><th class="num">Stock</th><th class="num">Precio lista</th><th class="num solo-admin">Costo</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div id="mas" style="padding:12px;text-align:center;display:none"><button class="btn" id="btn-mas">Ver más</button></div>
+  </div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../shared/supabase.js"></script>
+<script src="../shell/shell.js"></script>
+<script>
+APP.ready.then(async () => {
+  const { fmt, esc, $, $$ } = APP, e = APP.empresa.id, PAG = 100;
+  if (!APP.esAdmin) $$('.solo-admin').forEach(x => x.style.display = 'none');
+  else $('#acciones-pagina').innerHTML = `<a class="btn primario" href="producto.html?nuevo=1">+ Nuevo producto</a>`;
+
+  const { data: cats } = await sb.from('categorias').select('id,nombre').eq('empresa_id', e).order('nombre');
+  (cats || []).forEach(c => $('#f-cat').insertAdjacentHTML('beforeend', `<option value="${c.id}">${esc(c.nombre)}</option>`));
+
+  let desde = 0, ultimaConsulta = 0;
+  async function cargar(reiniciar) {
+    const id = ++ultimaConsulta;
+    if (reiniciar) { desde = 0; $('#tabla tbody').innerHTML = ''; }
+    const q = $('#q').value.trim();
+    // Un número largo es un código de barras: abre directo la variante
+    if (reiniciar && /^\d{8,14}$/.test(q)) {
+      const { data: v } = await sb.from('variantes').select('producto_id').eq('empresa_id', e).eq('ean', q).maybeSingle();
+      if (v) { location.href = `producto.html?id=${v.producto_id}&ean=${q}`; return; }
+    }
+    let c = sb.from('v_productos').select('*').eq('empresa_id', e).order('nombre').range(desde, desde + PAG - 1);
+    // cada palabra tiene que aparecer en el nombre o en el código ("pijama clara" encuentra PIJAMA «CLARA»)
+    q.split(/\s+/).filter(Boolean).forEach(w => { const s = w.replace(/[%,()]/g, ''); if (s) c = c.or(`nombre.ilike.%${s}%,codigo.ilike.%${s}%`); });
+    if ($('#f-cat').value) c = c.eq('categoria_id', $('#f-cat').value);
+    if ($('#f-stock').checked) c = c.gt('stock', 0);
+    if (!$('#f-inactivos').checked) c = c.eq('activo', true);
+    const { data, error } = await c;
+    if (id !== ultimaConsulta) return;
+    if (error) { APP.toast(APP.mensajeError(error), 'error'); return; }
+    const tb = $('#tabla tbody');
+    (data || []).forEach(p => {
+      const st = +p.stock || 0;
+      tb.insertAdjacentHTML('beforeend', `<tr class="clic ${p.activo ? '' : 'inactivo'}" data-id="${p.id}">
+        <td><div>${esc(p.nombre)}</div><span class="cod">${esc(p.codigo)}${p.tipo !== 'prenda' ? ' · ' + esc(p.tipo) : ''}</span></td>
+        <td>${esc(p.categoria || '')}</td>
+        <td class="num">${p.tiene_variantes ? fmt.num(p.variantes) : '<span class="chip gris">único</span>'}</td>
+        <td class="num ${st > 0 ? 'num-f' : ''}">${st > 0 ? fmt.num(st) : (st < 0 ? '<span class="chip error">' + fmt.num(st) + '</span>' : '<span class="chip gris">sin stock</span>')}</td>
+        <td class="num">${fmt.pesos(p.precio)}</td>
+        <td class="num solo-admin" ${APP.esAdmin ? '' : 'style="display:none"'}>${fmt.pesos(p.costo)}</td>
+        <td>${p.activo ? '' : '<span class="chip gris">inactivo</span>'}</td></tr>`);
+    });
+    if (!tb.children.length) tb.innerHTML = '<tr><td colspan="7" class="vacio">No hay productos con ese filtro.</td></tr>';
+    $('#mas').style.display = (data || []).length === PAG ? 'block' : 'none';
+    desde += (data || []).length;
+    $('#resumen').textContent = `${fmt.num(tb.querySelectorAll('tr[data-id]').length)} productos`;
+  }
+  $('#tabla').addEventListener('click', ev => { const tr = ev.target.closest('tr[data-id]'); if (tr) location.href = `producto.html?id=${tr.dataset.id}`; });
+  let t; $('#q').addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => cargar(true), 250); });
+  $('#q').addEventListener('keydown', ev => { if (ev.key === 'Enter') { clearTimeout(t); cargar(true); } });
+  ['#f-cat', '#f-stock', '#f-inactivos'].forEach(s => $(s).addEventListener('change', () => cargar(true)));
+  $('#btn-mas').onclick = () => cargar(false);
+  cargar(true);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Etiquetas · Percha</title>
+<meta name="app-root" content="../">
+<link rel="stylesheet" href="../shell/shell.css">
+<style>
+  .cola td input{width:70px;text-align:right;border:1px solid var(--borde);padding:4px 6px;border-radius:2px}
+  .opciones{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px}
+  .opciones .campo{margin:0;min-width:120px}
+  /* Vista previa en pantalla */
+  #hoja{display:flex;flex-wrap:wrap;gap:6px;background:var(--grilla);padding:10px}
+  .etiqueta{background:#fff;color:#000;overflow:hidden;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:1mm 1.5mm;box-sizing:border-box;font-family:var(--f-ui),Arial,sans-serif;text-align:center;page-break-after:always;break-after:page}
+  .etiqueta .nom{font-weight:600;line-height:1.1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:100%}
+  .etiqueta .var{font-size:.85em;line-height:1.1}
+  .etiqueta .pre{font-family:var(--f-mono);font-weight:600;line-height:1.1}
+  .etiqueta svg{max-width:100%;height:auto;display:block}
+  @media print{
+    body{background:#fff}main.app{padding:0}.card,.opciones,.cab-pagina,h2,.sub,#tabla-cola{display:none!important}
+    #hoja{display:block;background:none;padding:0;gap:0}
+    .etiqueta{margin:0;border:0}
+  }
+</style>
+</head>
+<body data-page="etiquetas" data-etq="Catálogo" data-title="Etiquetas" data-subtitle="Códigos de barras para la impresora Brother">
+<main class="app">
+  <div class="card" id="tabla-cola">
+    <div class="card-cab"><div><h2>Para imprimir</h2><p class="sub">Lo que fuiste agregando desde las fichas. Podés cambiar cantidades.</p></div>
+      <div class="acciones"><button class="btn" id="btn-vaciar">Vaciar</button><button class="btn primario" id="btn-imprimir">Imprimir</button></div></div>
+    <div class="opciones">
+      <div class="campo"><label>Ancho (mm)</label><input id="o-ancho" type="number" min="20" max="120"></div>
+      <div class="campo"><label>Alto (mm)</label><input id="o-alto" type="number" min="10" max="120"></div>
+      <div class="campo"><label>Mostrar precio</label><select id="o-precio"><option value="si">Sí, precio de lista</option><option value="no">No</option></select></div>
+      <div class="campo"><label>Mostrar nombre</label><select id="o-nombre"><option value="si">Sí</option><option value="no">No</option></select></div>
+      <button class="btn" id="btn-guardar-opciones">Guardar como predeterminado</button>
+    </div>
+    <table class="lista cola" id="cola"><tr><th>Producto</th><th>Variante</th><th>Código</th><th class="num">Cantidad</th><th></th></tr></table>
+  </div>
+  <div class="card" style="margin-top:14px"><div class="card-cab"><div><h2>Vista previa</h2><p class="sub">Así salen. En el diálogo de impresión elegí la Brother y el tamaño de etiqueta que coincida.</p></div></div>
+    <div id="hoja"></div></div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../shared/supabase.js"></script>
+<script src="../shell/shell.js"></script>
+<script>
+APP.ready.then(async () => {
+  const { fmt, esc, $, $$, toast, confirmar } = APP, e = APP.empresa.id;
+  const cfg = Object.assign({ ancho_mm: 62, alto_mm: 29, precio: 'si', nombre: 'si' }, (APP.empresa.config || {}).etiquetas || {});
+  $('#o-ancho').value = cfg.ancho_mm; $('#o-alto').value = cfg.alto_mm; $('#o-precio').value = cfg.precio; $('#o-nombre').value = cfg.nombre;
+  let cola = JSON.parse(localStorage.getItem('augusta_etiquetas') || '[]'), info = {};
+  const guardarCola = () => localStorage.setItem('augusta_etiquetas', JSON.stringify(cola));
+
+  async function cargarInfo() {
+    const ids = cola.map(c => c.variante_id); if (!ids.length) { info = {}; return; }
+    const { data } = await sb.from('v_variantes').select('*').in('id', ids);
+    info = Object.fromEntries((data || []).map(v => [v.id, v]));
+    cola = cola.filter(c => info[c.variante_id]); guardarCola();
+  }
+  function eanValido(s) { if (!/^\d{13}$/.test(s)) return false; const d = s.split('').map(Number); const sum = d.slice(0, 12).reduce((a, n, i) => a + n * (i % 2 ? 3 : 1), 0); return (10 - sum % 10) % 10 === d[12]; }
+
+  function pintarCola() {
+    const tb = $('#cola'); tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());
+    if (!cola.length) { tb.insertAdjacentHTML('beforeend', '<tr><td colspan="5" class="vacio">No hay nada para imprimir. Desde la ficha de un producto, tocá un talle y color y elegí "Agregar a etiquetas".</td></tr>'); }
+    cola.forEach((c, i) => { const v = info[c.variante_id];
+      tb.insertAdjacentHTML('beforeend', `<tr><td>${esc(v.producto_nombre)}</td><td>${esc([v.talle_nombre, v.color_nombre].filter(Boolean).join(' · ') || 'único')}</td><td>${v.ean ? esc(v.ean) : '<span class="chip aviso">sin código: usa el SKU</span>'}</td><td class="num"><input type="number" min="0" value="${c.cantidad}" data-i="${i}"></td><td><button class="btn chico" data-quitar="${i}">Quitar</button></td></tr>`); });
+    $$('input[data-i]', tb).forEach(inp => inp.onchange = () => { cola[+inp.dataset.i].cantidad = Math.max(0, +inp.value || 0); guardarCola(); pintarHoja(); });
+    $$('[data-quitar]', tb).forEach(b => b.onclick = () => { cola.splice(+b.dataset.quitar, 1); guardarCola(); pintarCola(); pintarHoja(); });
+  }
+  function pintarHoja() {
+    const w = +$('#o-ancho').value || 62, h = +$('#o-alto').value || 29, conPrecio = $('#o-precio').value === 'si', conNombre = $('#o-nombre').value === 'si';
+    let css = document.getElementById('css-etq'); if (!css) { css = document.createElement('style'); css.id = 'css-etq'; document.head.appendChild(css); }
+    css.textContent = `@page{size:${w}mm ${h}mm;margin:0}.etiqueta{width:${w}mm;height:${h}mm;font-size:${Math.max(7, Math.min(11, h / 3.2))}pt}`;
+    const hoja = $('#hoja'); hoja.innerHTML = '';
+    let n = 0;
+    cola.forEach(c => { const v = info[c.variante_id]; if (!v) return;
+      const codigo = v.ean || v.sku || v.producto_codigo, formato = eanValido(codigo) ? 'EAN13' : 'CODE128';
+      for (let k = 0; k < c.cantidad && n < 600; k++, n++) {
+        const el = document.createElement('div'); el.className = 'etiqueta';
+        el.innerHTML = `${conNombre ? `<div class="nom">${esc(v.producto_nombre)}</div>` : ''}<div class="var">${esc([v.talle_nombre, v.color_nombre].filter(Boolean).join(' · '))}${conPrecio ? ` · <span class="pre">${fmt.pesos(v.precio)}</span>` : ''}</div><svg class="cb"></svg>`;
+        hoja.appendChild(el);
+        try { JsBarcode(el.querySelector('svg'), codigo, { format: formato, width: 1.4, height: Math.max(18, h * 1.6), fontSize: 11, margin: 0, displayValue: true }); }
+        catch (err) { el.querySelector('svg').outerHTML = `<div style="font-size:9pt">${esc(codigo)}</div>`; }
+      }
+    });
+    if (n >= 600) toast('Vista previa limitada a 600 etiquetas', 'error');
+  }
+  ['#o-ancho', '#o-alto', '#o-precio', '#o-nombre'].forEach(s => $(s).addEventListener('change', pintarHoja));
+  $('#btn-guardar-opciones').onclick = async () => {
+    if (!APP.esAdmin) { toast('Solo administración puede cambiar el predeterminado', 'error'); return; }
+    const config = Object.assign({}, APP.empresa.config || {}, { etiquetas: { ancho_mm: +$('#o-ancho').value, alto_mm: +$('#o-alto').value, precio: $('#o-precio').value, nombre: $('#o-nombre').value, impresora: 'Brother' } });
+    const r = await sb.from('empresas').update({ config }).eq('id', e); toast(r.error ? APP.mensajeError(r.error) : 'Guardado', r.error ? 'error' : '');
+  };
+  $('#btn-vaciar').onclick = async () => { if (await confirmar('¿Vaciar la cola de etiquetas?', 'Vaciar')) { cola = []; guardarCola(); pintarCola(); pintarHoja(); } };
+  $('#btn-imprimir').onclick = () => { if (!cola.length) { toast('No hay etiquetas', 'error'); return; } window.print(); };
+  await cargarInfo(); pintarCola(); pintarHoja();
+});
+</script>
+</body>
+</html>

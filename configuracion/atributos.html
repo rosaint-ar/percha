@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Talles, colores y familias · Percha</title>
+<meta name="app-root" content="../">
+<link rel="stylesheet" href="../shell/shell.css">
+<style>
+  .pestanas{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
+  .pestanas a{font:600 14px var(--f-ui);color:var(--tinta);text-decoration:none;padding:8px 14px;border:1px solid var(--borde);background:var(--papel)}
+  .pestanas a.on{background:var(--lila);border-color:var(--lila);color:var(--violeta)}
+  .tres{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;align-items:start}
+  table.lista input{border:1px solid var(--borde);padding:4px 7px;border-radius:2px;width:100%}
+  table.lista td.num input{width:60px;text-align:right}
+  input[type=color]{width:34px;height:28px;padding:0;border:1px solid var(--borde)}
+  .alta{display:flex;gap:6px;margin-top:10px}
+  .alta input{flex:1;border:1px solid var(--borde);padding:7px 9px;border-radius:2px}
+  @media (max-width:1000px){.tres{grid-template-columns:1fr}}
+</style>
+</head>
+<body data-page="configuracion" data-etq="Configuración" data-title="Talles, colores y familias" data-subtitle="Los ejes con los que se arman las variantes">
+<main class="app">
+  <div class="pestanas"><a href="empresa.html">Empresa</a><a class="on" href="atributos.html">Talles, colores y familias</a><a href="usuarios.html">Usuarios</a></div>
+  <div class="tres">
+    <div class="card"><div class="card-cab"><div><h2>Talles</h2><p class="sub">El orden es el de la matriz</p></div></div>
+      <table class="lista" id="tb-talle"><tr><th class="num">Orden</th><th>Código</th><th>Nombre</th><th></th></tr></table>
+      <div class="alta"><input id="n-talle-cod" placeholder="Código (ej. M)"><input id="n-talle-nom" placeholder="Nombre (ej. Medium)"><button class="btn" id="btn-talle">+</button></div></div>
+    <div class="card"><div class="card-cab"><div><h2>Colores y estampas</h2><p class="sub">Con un color de referencia</p></div></div>
+      <table class="lista" id="tb-color"><tr><th>Código</th><th>Nombre</th><th>Color</th><th></th></tr></table>
+      <div class="alta"><input id="n-color-cod" placeholder="Código (ej. ROS)"><input id="n-color-nom" placeholder="Nombre (ej. Rosa)"><button class="btn" id="btn-color">+</button></div></div>
+    <div class="card"><div class="card-cab"><div><h2>Familias</h2><p class="sub">Para agrupar y filtrar</p></div></div>
+      <table class="lista" id="tb-cat"><tr><th class="num">Orden</th><th>Nombre</th><th></th></tr></table>
+      <div class="alta"><input id="n-cat-nom" placeholder="Nombre de la familia"><button class="btn" id="btn-cat">+</button></div></div>
+  </div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../shared/supabase.js"></script>
+<script src="../shell/shell.js"></script>
+<script>
+APP.ready.then(async () => {
+  const { esc, $, $$, toast, mensajeError, confirmar } = APP, e = APP.empresa.id;
+  if (!APP.esAdmin) { document.querySelector('main').innerHTML = '<div class="card"><p>Esta sección es solo para administración.</p></div>'; return; }
+  async function cargarAtr(tipo, tb) {
+    const data = (await sb.from('atributos').select('*').eq('empresa_id', e).eq('tipo', tipo).order('orden').order('nombre')).data || [];
+    tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());
+    data.forEach(a => tb.insertAdjacentHTML('beforeend', tipo === 'talle'
+      ? `<tr data-id="${a.id}"><td class="num"><input data-k="orden" type="number" value="${a.orden}"></td><td><input data-k="codigo" value="${esc(a.codigo)}"></td><td><input data-k="nombre" value="${esc(a.nombre)}"></td><td><button class="btn chico" data-guardar>✓</button> <button class="btn chico peligro" data-borrar title="Desactivar">×</button></td></tr>`
+      : `<tr data-id="${a.id}"><td><input data-k="codigo" value="${esc(a.codigo)}"></td><td><input data-k="nombre" value="${esc(a.nombre)}"></td><td><input data-k="hex" type="color" value="${a.hex || '#E6DEF0'}"></td><td><button class="btn chico" data-guardar>✓</button> <button class="btn chico peligro" data-borrar title="Desactivar">×</button></td></tr>`));
+    enganchar(tb, 'atributos', () => cargarAtr(tipo, tb));
+  }
+  async function cargarCat() {
+    const tb = $('#tb-cat'), data = (await sb.from('categorias').select('*').eq('empresa_id', e).eq('activa', true).order('orden').order('nombre')).data || [];
+    tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());
+    data.forEach(c => tb.insertAdjacentHTML('beforeend', `<tr data-id="${c.id}"><td class="num"><input data-k="orden" type="number" value="${c.orden}"></td><td><input data-k="nombre" value="${esc(c.nombre)}"></td><td><button class="btn chico" data-guardar>✓</button> <button class="btn chico peligro" data-borrar title="Desactivar">×</button></td></tr>`));
+    enganchar(tb, 'categorias', cargarCat);
+  }
+  function enganchar(tb, tabla, recargar) {
+    $$('[data-guardar]', tb).forEach(b => b.onclick = async () => {
+      const tr = b.closest('tr'), d = {}; $$('[data-k]', tr).forEach(el => d[el.dataset.k] = el.type === 'number' ? +el.value : el.value.trim());
+      const r = await sb.from(tabla).update(d).eq('id', tr.dataset.id); toast(r.error ? mensajeError(r.error) : 'Guardado', r.error ? 'error' : ''); if (!r.error) recargar();
+    });
+    $$('[data-borrar]', tb).forEach(b => b.onclick = async () => {
+      if (!await confirmar('¿Desactivar este valor? Las variantes que ya lo usan no se tocan.', 'Desactivar')) return;
+      const campo = tabla === 'categorias' ? 'activa' : 'activo';
+      const r = await sb.from(tabla).update({ [campo]: false }).eq('id', b.closest('tr').dataset.id); toast(r.error ? mensajeError(r.error) : 'Desactivado', r.error ? 'error' : ''); if (!r.error) recargar();
+    });
+  }
+  async function alta(tabla, d, recargar) { const r = await sb.from(tabla).insert(APP.conEmpresa(d)); toast(r.error ? mensajeError(r.error) : 'Agregado', r.error ? 'error' : ''); if (!r.error) recargar(); }
+  $('#btn-talle').onclick = () => { const c = $('#n-talle-cod').value.trim(), n = $('#n-talle-nom').value.trim() || c; if (!c) return; alta('atributos', { tipo: 'talle', codigo: c, nombre: n, orden: 999 }, () => { $('#n-talle-cod').value = $('#n-talle-nom').value = ''; cargarAtr('talle', $('#tb-talle')); }); };
+  $('#btn-color').onclick = () => { const c = $('#n-color-cod').value.trim(), n = $('#n-color-nom').value.trim() || c; if (!c) return; alta('atributos', { tipo: 'color', codigo: c.toUpperCase(), nombre: n, orden: 999 }, () => { $('#n-color-cod').value = $('#n-color-nom').value = ''; cargarAtr('color', $('#tb-color')); }); };
+  $('#btn-cat').onclick = () => { const n = $('#n-cat-nom').value.trim(); if (!n) return; alta('categorias', { nombre: n, orden: 999 }, () => { $('#n-cat-nom').value = ''; cargarCat(); }); };
+  await Promise.all([cargarAtr('talle', $('#tb-talle')), cargarAtr('color', $('#tb-color')), cargarCat()]);
+});
+</script>
+</body>
+</html>

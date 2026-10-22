@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Usuarios · Percha</title>
+<meta name="app-root" content="../">
+<link rel="stylesheet" href="../shell/shell.css">
+<style>
+  .pestanas{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
+  .pestanas a{font:600 14px var(--f-ui);color:var(--tinta);text-decoration:none;padding:8px 14px;border:1px solid var(--borde);background:var(--papel)}
+  .pestanas a.on{background:var(--lila);border-color:var(--lila);color:var(--violeta)}
+  table.lista select{border:1px solid var(--borde);padding:5px 8px;border-radius:2px}
+  .clave{font:600 18px var(--f-ui);letter-spacing:.04em;background:var(--lila);padding:8px 12px;display:inline-block;margin:8px 0}
+</style>
+</head>
+<body data-page="configuracion" data-etq="Configuración" data-title="Usuarios" data-subtitle="Quién entra al sistema y qué puede hacer">
+<main class="app">
+  <div class="pestanas"><a href="empresa.html">Empresa</a><a href="atributos.html">Talles, colores y familias</a><a class="on" href="usuarios.html">Usuarios</a></div>
+  <div class="card">
+    <div class="card-cab"><div><h2>Equipo</h2><p class="sub">Dueña y administración ven todo; vendedora vende y ajusta stock; visor solo mira.</p></div><div class="acciones"><button class="btn primario" id="btn-nuevo">+ Agregar usuario</button></div></div>
+    <table class="lista" id="tb"><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Activo</th><th></th></tr></table>
+  </div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../shared/supabase.js"></script>
+<script src="../shell/shell.js"></script>
+<script>
+APP.ready.then(async () => {
+  const { esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
+  if (!APP.esAdmin) { document.querySelector('main').innerHTML = '<div class="card"><p>Esta sección es solo para administración.</p></div>'; return; }
+  const ROLES = { duenio: 'Dueña', admin: 'Administración', vendedora: 'Vendedora', visor: 'Solo ver' };
+  async function llamar(body) {
+    const { data: { session } } = await sb.auth.getSession();
+    const r = await fetch(`${SUPABASE_URL}/functions/v1/usuarios-admin`, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SUPABASE_KEY, Authorization: `Bearer ${session.access_token}` }, body: JSON.stringify(Object.assign({ empresa_id: e }, body)) });
+    const j = await r.json().catch(() => ({ error: 'Respuesta inválida' }));
+    if (!r.ok || j.error) throw new Error(j.error || 'Error ' + r.status);
+    return j;
+  }
+  async function cargar() {
+    const { data } = await sb.from('empresa_usuarios').select('*').eq('empresa_id', e).order('nombre');
+    const tb = $('#tb'); tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());
+    (data || []).forEach(u => tb.insertAdjacentHTML('beforeend', `<tr data-id="${u.user_id}"><td>${esc(u.nombre)}${u.user_id === APP.user.id ? ' <span class="chip">vos</span>' : ''}</td><td>${u.user_id === APP.user.id ? esc(APP.user.email) : '<small style="color:var(--suave)">—</small>'}</td>
+      <td><select data-rol ${u.user_id === APP.user.id ? 'disabled' : ''}>${Object.entries(ROLES).map(([k, v]) => `<option value="${k}" ${u.rol === k ? 'selected' : ''}>${v}</option>`).join('')}</select></td>
+      <td><select data-activo ${u.user_id === APP.user.id ? 'disabled' : ''}><option value="true" ${u.activo ? 'selected' : ''}>Sí</option><option value="false" ${!u.activo ? 'selected' : ''}>No</option></select></td>
+      <td><button class="btn chico" data-clave>Nueva contraseña</button></td></tr>`));
+    $$('[data-rol],[data-activo]', tb).forEach(sel => sel.onchange = async () => {
+      const tr = sel.closest('tr'); const r = await sb.from('empresa_usuarios').update({ rol: $('[data-rol]', tr).value, activo: $('[data-activo]', tr).value === 'true' }).eq('empresa_id', e).eq('user_id', tr.dataset.id);
+      toast(r.error ? mensajeError(r.error) : 'Guardado', r.error ? 'error' : '');
+    });
+    $$('[data-clave]', tb).forEach(b => b.onclick = async () => {
+      const tr = b.closest('tr'); if (!await confirmar('Se genera una contraseña nueva y la anterior deja de servir. ¿Seguimos?', 'Generar')) return;
+      try { const j = await llamar({ accion: 'resetear', user_id: tr.dataset.id }); mostrarClave($('td', tr).textContent, j.password); } catch (err) { toast(err.message, 'error'); }
+    });
+  }
+  function mostrarClave(nombre, clave) {
+    modal(`<h2>Contraseña de ${esc(nombre)}</h2><p>Pasásela por un canal seguro. No se vuelve a mostrar.</p><div class="clave">${esc(clave)}</div><div class="pie"><button class="btn primario" onclick="this.closest('.modal-fondo').remove()">Listo</button></div>`, { fijo: true });
+  }
+  $('#btn-nuevo').onclick = () => {
+    const m = modal(`<h2>Agregar usuario</h2>
+      <div class="campo"><label>Nombre</label><input id="n-nombre" placeholder="Como la llaman en el local"></div>
+      <div class="campo"><label>Correo</label><input id="n-email" type="email" placeholder="Con este correo ingresa"></div>
+      <div class="campo"><label>Rol</label><select id="n-rol">${Object.entries(ROLES).map(([k, v]) => `<option value="${k}" ${k === 'vendedora' ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
+      <div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Crear</button></div>`);
+    $('[data-no]', m).onclick = () => m.cerrar();
+    $('[data-si]', m).onclick = async () => {
+      const b = $('[data-si]', m); b.disabled = true;
+      try { const j = await llamar({ accion: 'crear', email: $('#n-email', m).value, nombre: $('#n-nombre', m).value, rol: $('#n-rol', m).value }); m.cerrar(); await cargar();
+        if (j.password) mostrarClave($('#n-nombre', m).value, j.password); else toast('Ese correo ya tenía usuario: se lo vinculó a la empresa con su contraseña de siempre'); }
+      catch (err) { toast(err.message, 'error'); b.disabled = false; }
+    };
+  };
+  await cargar();
+});
+</script>
+</body>
+</html>

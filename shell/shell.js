@@ -1,0 +1,190 @@
+/* Percha · shell común: sesión, empresa activa, barra lateral, tema por empresa, utilidades.
+   Cada página declara <meta name="app-root" content="../"> y <body data-page="id" data-title="…" data-subtitle="…">.
+   Carga: shell.css, supabase-js (CDN), shared/supabase.js y después este archivo. */
+(function () {
+  const ROOT = (document.querySelector('meta[name="app-root"]') || {}).content || './';
+  const body = document.body;
+  const SISTEMA = 'Percha';
+
+  // ---------- tipografías e ícono ----------
+  (function cabecera() {
+    const add = (tag, attrs) => { const el = document.createElement(tag); Object.assign(el, attrs); document.head.appendChild(el); return el; };
+    add('link', { rel: 'preconnect', href: 'https://fonts.googleapis.com' });
+    const pc = add('link', { rel: 'preconnect', href: 'https://fonts.gstatic.com' }); pc.crossOrigin = 'anonymous';
+    add('link', { rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap' });
+    if (!document.querySelector('link[rel="icon"]')) add('link', { rel: 'icon', type: 'image/svg+xml', href: ROOT + 'shell/percha.svg' });
+  })();
+
+  // ---------- íconos (trazo, 24x24) ----------
+  const I = {
+    percha: '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><path d="M32 24c-5 0-8-3-8-7s3.5-7 8-7 8 3 8 7c0 3-2 5-5 6.5"/><path d="M32 24v5"/><path d="M32 29 8 44c-2 1.3-1.2 4.5 1.3 4.5h45.4c2.5 0 3.3-3.2 1.3-4.5L32 29z"/></svg>',
+    inicio: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>',
+    catalogo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.3"/></svg>',
+    etiquetas: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 5v14M8 5v14M11 5v14M15 5v14M18 5v14M20 5v14"/></svg>',
+    caja: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M7 12h.01M17 12h.01"/></svg>',
+    compras: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.4 11.2a1 1 0 0 0 1 .8h8.8a1 1 0 0 0 1-.8L20 8H6.5"/><circle cx="9.5" cy="20" r="1.2"/><circle cx="16.5" cy="20" r="1.2"/></svg>',
+    informes: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
+    config: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
+    salir: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17l5-5-5-5M15 12H3M13 4h6v16h-6"/></svg>',
+    menu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>',
+    buscar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>'
+  };
+
+  // ---------- utilidades ----------
+  const fmtPesos = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 });
+  const fmtNum = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 });
+  const fmtDec = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 });
+  const fmt = {
+    pesos: n => fmtPesos.format(Math.round(+n || 0)),
+    num: n => fmtNum.format(+n || 0),
+    dec: n => fmtDec.format(+n || 0),
+    pct: n => (Math.round((+n || 0) * 10) / 10).toLocaleString('es-AR', { minimumFractionDigits: 1 }) + '%',
+    fecha: d => d ? new Date(d).toLocaleDateString('es-AR') : '',
+    fechaHora: d => d ? new Date(d).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).replace(',', ' ·') : ''
+  };
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const $ = (sel, el) => (el || document).querySelector(sel);
+  const $$ = (sel, el) => Array.from((el || document).querySelectorAll(sel));
+
+  let toastTimer;
+  function toast(msg, tipo) {
+    let t = $('#toast'); if (!t) { t = document.createElement('div'); t.id = 'toast'; body.appendChild(t); }
+    t.textContent = msg; t.className = 'ver' + (tipo === 'error' ? ' error' : '');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.className = '', tipo === 'error' ? 5000 : 2600);
+  }
+  function modal(html, opciones) {
+    const fondo = document.createElement('div'); fondo.className = 'modal-fondo';
+    fondo.innerHTML = `<div class="modal" role="dialog">${html}</div>`;
+    fondo.cerrar = () => fondo.remove();
+    fondo.addEventListener('click', e => { if (e.target === fondo && !(opciones && opciones.fijo)) fondo.cerrar(); });
+    document.addEventListener('keydown', function esc(e) { if (e.key === 'Escape') { fondo.cerrar(); document.removeEventListener('keydown', esc); } });
+    body.appendChild(fondo);
+    const primero = fondo.querySelector('input,select,textarea,button'); if (primero) primero.focus();
+    return fondo;
+  }
+  function confirmar(texto, botonOk) {
+    return new Promise(res => {
+      const m = modal(`<p style="margin:0 0 4px">${esc(texto)}</p><div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>${esc(botonOk || 'Confirmar')}</button></div>`);
+      $('[data-no]', m).onclick = () => { m.cerrar(); res(false); };
+      $('[data-si]', m).onclick = () => { m.cerrar(); res(true); };
+    });
+  }
+  function mensajeError(err) {
+    const m = (err && (err.message || err.error_description || err.msg)) || String(err);
+    if (/Invalid login credentials/i.test(m)) return 'El correo o la contraseña no son correctos.';
+    if (/Email not confirmed/i.test(m)) return 'El correo todavía no está confirmado.';
+    if (/duplicate key|already exists/i.test(m)) return 'Ya existe un registro con ese dato.';
+    if (/row-level security|permission denied/i.test(m)) return 'No tenés permiso para hacer eso.';
+    if (/Failed to fetch|NetworkError/i.test(m)) return 'Sin conexión. Revisá internet e intentá de nuevo.';
+    return m;
+  }
+  const iniciales = s => String(s || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('');
+
+  const APP = { root: ROOT, sistema: SISTEMA, iconos: I, fmt, esc, $, $$, toast, modal, confirmar, mensajeError, iniciales, empresa: null, empresas: [], rol: null, user: null };
+  window.APP = APP;
+
+  // ---------- sesión y empresa ----------
+  async function requireSession() {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) { location.replace(ROOT + 'login.html?next=' + encodeURIComponent(location.pathname + location.search)); return null; }
+    return session;
+  }
+  async function cargarEmpresas() {
+    const { data, error } = await sb.rpc('mis_empresas');
+    if (error) { toast(mensajeError(error), 'error'); return []; }
+    return data || [];
+  }
+  function elegirEmpresa(empresas) {
+    const guardada = localStorage.getItem('percha_empresa') || localStorage.getItem('augusta_empresa');
+    return empresas.find(e => e.id === guardada) || empresas[0] || null;
+  }
+  async function cargarRol(empresaId) {
+    const { data } = await sb.from('empresa_usuarios').select('rol,nombre').eq('empresa_id', empresaId).eq('user_id', APP.user.id).maybeSingle();
+    return data || { rol: 'visor', nombre: APP.user.email };
+  }
+
+  // ---------- tema por empresa (solo colores; el logo nunca va en el sistema) ----------
+  function hexARgb(hex) { const m = /^#?([0-9a-f]{6})$/i.exec(hex || ''); if (!m) return null; const n = parseInt(m[1], 16); return `${n >> 16},${(n >> 8) & 255},${n & 255}`; }
+  function aplicarTema() {
+    const tema = (APP.empresa.config || {}).tema || {};
+    if (hexARgb(tema.color)) { document.documentElement.style.setProperty('--acento', tema.color); document.documentElement.style.setProperty('--acento-rgb', hexARgb(tema.color)); }
+    APP.tema = tema;
+  }
+
+  // ---------- barra lateral ----------
+  const MENU = [
+    { grupo: 'Operación' },
+    { id: 'inicio', label: 'Inicio', href: 'index.html', icono: 'inicio' },
+    { id: 'caja', label: 'Caja', href: '#', icono: 'caja', prox: true },
+    { id: 'productos', label: 'Catálogo', href: 'catalogo/productos.html', icono: 'catalogo' },
+    { id: 'etiquetas', label: 'Etiquetas', href: 'catalogo/etiquetas.html', icono: 'etiquetas' },
+    { id: 'compras', label: 'Compras', href: '#', icono: 'compras', prox: true },
+    { grupo: 'Análisis' },
+    { id: 'informes', label: 'Informes', href: '#', icono: 'informes', prox: true },
+    { grupo: 'Sistema', admin: true },
+    { id: 'configuracion', label: 'Configuración', href: 'configuracion/empresa.html', icono: 'config', admin: true }
+  ];
+  function pintarLateral() {
+    const pagina = body.dataset.page, esAdmin = APP.esAdmin;
+    const items = MENU.filter(m => !m.admin || esAdmin).map(m => {
+      if (m.grupo) return `<div class="grupo">${m.grupo}</div>`;
+      const cls = [m.id === pagina ? 'on' : '', m.prox ? 'prox' : ''].join(' ').trim();
+      return `<a class="${cls}" href="${m.prox ? '#' : ROOT + m.href}" ${m.prox ? 'title="Próximamente" onclick="return false"' : ''}>${I[m.icono]}<span>${m.label}</span>${m.prox ? '<span class="pronto">PRONTO</span>' : ''}</a>`;
+    }).join('');
+    const selector = APP.empresas.length > 1
+      ? `<select id="sel-empresa" title="Cambiar de empresa">${APP.empresas.map(e => `<option value="${e.id}" ${e.id === APP.empresa.id ? 'selected' : ''}>${esc(e.nombre)}</option>`).join('')}</select>`
+      : `<b>${esc(APP.empresa.nombre)}</b>`;
+    const lateral = document.createElement('aside');
+    lateral.className = 'lateral';
+    lateral.innerHTML = `
+      <a class="producto" href="${ROOT}index.html"><span class="icono">${I.percha}</span><span><b>${SISTEMA}</b><small>sistema de gestión</small></span></a>
+      <nav>${items}</nav>
+      <div class="pie">
+        <div class="cuenta"><span class="avatar">${esc(iniciales(APP.empresa.nombre))}</span><div class="datos">${selector}<span>${esc(APP.miembro.nombre || APP.user.email)} · ${esc(rolNombre(APP.rol))}</span></div><button class="salir" id="btn-salir" title="Cerrar sesión">${I.salir}</button></div>
+      </div>`;
+    const telon = document.createElement('div'); telon.className = 'telon'; telon.onclick = () => body.classList.remove('lateral-abierta');
+    // contenido: barra superior + main existente
+    const main = $('main.app') || (() => { const m = document.createElement('main'); m.className = 'app'; body.appendChild(m); return m; })();
+    const contenido = document.createElement('div'); contenido.className = 'contenido';
+    const tituloPlano = (body.dataset.title || '').replace(/<[^>]+>/g, '');
+    const barra = document.createElement('div'); barra.className = 'barra-superior';
+    barra.innerHTML = `<button class="menu" id="btn-menu" title="Menú">${I.menu}</button><div class="miga"><span>${esc(APP.empresa.nombre)}</span><span>/</span><b>${esc(tituloPlano || 'Inicio')}</b></div><div class="reloj" id="reloj"></div>`;
+    body.insertBefore(contenido, main); contenido.appendChild(barra); contenido.appendChild(main);
+    body.prepend(lateral); body.appendChild(telon); body.classList.add('con-lateral');
+    $('#btn-menu').onclick = () => body.classList.toggle('lateral-abierta');
+    const sel = $('#sel-empresa'); if (sel) sel.onchange = () => { localStorage.setItem('percha_empresa', sel.value); location.reload(); };
+    $('#btn-salir').onclick = async () => { await sb.auth.signOut(); location.href = ROOT + 'login.html'; };
+    const reloj = () => { $('#reloj').textContent = new Date().toLocaleString('es-AR', { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).replace(/\./g, ''); };
+    reloj(); setInterval(reloj, 30000);
+    if (body.dataset.title && !$('.cab-pagina', main)) {
+      const cab = document.createElement('div'); cab.className = 'cab-pagina';
+      cab.innerHTML = `<div>${body.dataset.etq ? `<p class="etq">${esc(body.dataset.etq)}</p>` : ''}<h1>${body.dataset.title}</h1>${body.dataset.subtitle ? `<p class="sub">${esc(body.dataset.subtitle)}</p>` : ''}</div><div class="acciones" id="acciones-pagina"></div>`;
+      main.prepend(cab);
+    }
+  }
+  function rolNombre(r) { return { duenio: 'Dueña', admin: 'Administración', vendedora: 'Vendedora', visor: 'Solo ver' }[r] || r; }
+
+  // ---------- arranque ----------
+  APP.ready = (async () => {
+    const session = await requireSession();
+    if (!session) return new Promise(() => {});
+    APP.user = session.user;
+    APP.empresas = await cargarEmpresas();
+    APP.empresa = elegirEmpresa(APP.empresas);
+    if (!APP.empresa) {
+      body.innerHTML = `<main class="app"><div class="card"><h2>Sin empresa asignada</h2><p>Tu usuario (${esc(APP.user.email)}) todavía no pertenece a ninguna empresa. Pedile a quien administra el sistema que te agregue.</p><p><button class="btn" onclick="sb.auth.signOut().then(()=>location.href='${ROOT}login.html')">Salir</button></p></div></main>`;
+      return new Promise(() => {});
+    }
+    localStorage.setItem('percha_empresa', APP.empresa.id);
+    APP.miembro = await cargarRol(APP.empresa.id);
+    APP.rol = APP.miembro.rol;
+    APP.esAdmin = ['duenio', 'admin'].includes(APP.rol);
+    aplicarTema();
+    pintarLateral();
+    document.title = ((body.dataset.title || '').replace(/<[^>]+>/g, '') || 'Inicio') + ' · ' + APP.empresa.nombre + ' · ' + SISTEMA;
+    return APP;
+  })();
+
+  APP.de = tabla => sb.from(tabla).select('*').eq('empresa_id', APP.empresa.id);
+  APP.conEmpresa = obj => Object.assign({ empresa_id: APP.empresa.id }, obj);
+})();

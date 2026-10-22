@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Producto · Percha</title>
+<meta name="app-root" content="../">
+<link rel="stylesheet" href="../shell/shell.css">
+<style>
+  .dos{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+  .precios-lista td,.precios-lista th{padding:7px 8px}
+  .precios-lista input{width:120px;text-align:right;border:1px solid var(--borde);padding:5px 8px;border-radius:2px}
+  .leyenda-matriz{display:flex;gap:14px;font-size:13px;color:var(--suave);margin-top:8px;flex-wrap:wrap}
+  .leyenda-matriz i{display:inline-block;width:12px;height:12px;vertical-align:-1px;margin-right:5px;border-radius:2px}
+  .mov-tabla td{padding:6px 8px}
+  .volver{font:600 14px var(--f-ui);text-decoration:none;color:var(--suave)}
+  .campo input[readonly]{background:var(--blanco);color:var(--suave)}
+  @media (max-width:900px){.dos{grid-template-columns:1fr}}
+</style>
+</head>
+<body data-page="productos" data-etq="Catálogo" data-title="Producto">
+<main class="app">
+  <div class="card" id="ficha">
+    <div class="card-cab"><div><h2>Ficha</h2></div><div class="acciones" id="acc-ficha"></div></div>
+    <form id="form" autocomplete="off">
+      <div class="fila c4">
+        <div class="campo"><label>Código</label><input name="codigo" required></div>
+        <div class="campo" style="grid-column:span 2"><label>Nombre</label><input name="nombre" required></div>
+        <div class="campo"><label>Tipo</label><select name="tipo"><option value="prenda">Prenda</option><option value="varios">Varios</option><option value="servicio">Servicio</option><option value="sena">Seña</option><option value="gift_card">Gift card</option></select></div>
+      </div>
+      <div class="fila c4">
+        <div class="campo"><label>Familia</label><select name="categoria_id"><option value="">—</option></select></div>
+        <div class="campo"><label>Proveedor</label><select name="proveedor_id"><option value="">—</option></select></div>
+        <div class="campo"><label>Costo</label><input name="costo" type="number" step="0.01" min="0"></div>
+        <div class="campo"><label>Precio de lista</label><input name="precio" type="number" step="0.01" min="0" required></div>
+      </div>
+      <div class="fila c4">
+        <div class="campo"><label>Código de barras</label><input name="ean" placeholder="Solo si no tiene variantes"><span class="ayuda" id="ayuda-ean"></span></div>
+        <div class="campo"><label>Variantes</label><select name="tiene_variantes"><option value="false">No, es un artículo único</option><option value="true">Sí, por talle y color</option></select></div>
+        <div class="campo"><label>Estado</label><select name="activo"><option value="true">Activo</option><option value="false">Inactivo</option></select></div>
+        <div class="campo"><label>Stock total</label><input id="stock-total" readonly></div>
+      </div>
+      <div class="campo"><label>Descripción</label><textarea name="descripcion" rows="2"></textarea></div>
+    </form>
+  </div>
+
+  <div class="dos" style="margin-top:14px">
+    <div class="card">
+      <div class="card-cab"><div><h2>Precios por lista</h2><p class="sub">Se calculan desde el precio de lista; se puede fijar uno distinto</p></div></div>
+      <table class="lista precios-lista" id="tb-precios"><tr><th>Lista</th><th class="num">Porcentaje</th><th class="num">Precio</th><th></th></tr></table>
+    </div>
+    <div class="card">
+      <div class="card-cab"><div><h2>Movimientos de stock</h2><p class="sub">Los últimos 15 de este producto</p></div></div>
+      <table class="lista mov-tabla" id="tb-mov"><tr><th>Cuándo</th><th>Variante</th><th class="num">Cant.</th><th>Motivo</th></tr></table>
+    </div>
+  </div>
+
+  <div class="card" id="card-matriz" style="margin-top:14px">
+    <div class="card-cab"><div><h2>Talles y colores</h2><p class="sub">Stock de cada combinación. Tocá una celda para ajustar stock, cargar el código de barras o imprimir etiquetas.</p></div>
+      <div class="acciones"><button class="btn" id="btn-etiquetas-todas">Etiquetas de todo el stock</button><button class="btn primario solo-admin" id="btn-agregar-variantes">+ Agregar talles / colores</button></div></div>
+    <div class="matriz" id="matriz"></div>
+    <div class="leyenda-matriz"><span><i style="background:var(--lila-suave)"></i>con stock</span><span><i style="background:var(--papel);border:1px solid var(--grilla)"></i>sin stock</span><span><i style="background:var(--error-fondo)"></i>negativo</span></div>
+  </div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../shared/supabase.js"></script>
+<script src="../shell/shell.js"></script>
+<script>
+APP.ready.then(async () => {
+  const { fmt, esc, $, $$ , toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
+  const params = new URLSearchParams(location.search);
+  let id = params.get('id'), producto = null, variantes = [], listas = [], precios = [], depositos = [], talles = [], colores = [];
+  const form = $('#form');
+  if (!APP.esAdmin) { $$('#form input, #form select, #form textarea').forEach(x => x.disabled = true); $$('.solo-admin').forEach(x => x.style.display = 'none'); }
+
+  // ---------- catálogos de apoyo ----------
+  const [c1, c2, c3, c4, c5] = await Promise.all([
+    sb.from('categorias').select('id,nombre').eq('empresa_id', e).eq('activa', true).order('nombre'),
+    sb.from('proveedores').select('id,nombre').eq('empresa_id', e).eq('activo', true).order('nombre'),
+    sb.from('listas_precios').select('*').eq('empresa_id', e).eq('activa', true).order('orden'),
+    sb.from('depositos').select('*').eq('empresa_id', e).eq('activo', true).order('principal', { ascending: false }),
+    sb.from('atributos').select('*').eq('empresa_id', e).eq('activo', true).order('orden')
+  ]);
+  (c1.data || []).forEach(c => form.categoria_id.insertAdjacentHTML('beforeend', `<option value="${c.id}">${esc(c.nombre)}</option>`));
+  (c2.data || []).forEach(c => form.proveedor_id.insertAdjacentHTML('beforeend', `<option value="${c.id}">${esc(c.nombre)}</option>`));
+  listas = c3.data || []; depositos = c4.data || [];
+  talles = (c5.data || []).filter(a => a.tipo === 'talle'); colores = (c5.data || []).filter(a => a.tipo === 'color');
+  const depPrincipal = depositos.find(d => d.principal) || depositos[0];
+
+  // ---------- carga ----------
+  async function cargar() {
+    if (!id) { // nuevo
+      $('h1').innerHTML = 'Nuevo <em>producto</em>'; form.tiene_variantes.value = 'true'; form.activo.value = 'true';
+      $('#card-matriz').style.display = 'none'; $('#tb-mov').parentElement.style.display = 'none';
+      pintarPrecios(); pintarAcciones(); return;
+    }
+    const [p, v, pr] = await Promise.all([
+      sb.from('productos').select('*').eq('id', id).single(),
+      sb.from('v_variantes').select('*').eq('producto_id', id).order('talle_orden').order('color_nombre'),
+      sb.from('precios').select('*').eq('producto_id', id)
+    ]);
+    if (p.error) { toast('No se encontró el producto', 'error'); return; }
+    producto = p.data; variantes = v.data || []; precios = pr.data || [];
+    const mv = variantes.length ? await sb.from('stock_movimientos').select('*').in('variante_id', variantes.map(x => x.id)).order('fecha', { ascending: false }).limit(15) : { data: [] };
+    $('h1').innerHTML = `${esc(producto.nombre)}`;
+    document.title = producto.nombre + ' · ' + APP.empresa.nombre;
+    ['codigo', 'nombre', 'tipo', 'categoria_id', 'proveedor_id', 'costo', 'precio', 'ean', 'descripcion'].forEach(k => form[k].value = producto[k] ?? '');
+    form.tiene_variantes.value = String(producto.tiene_variantes); form.activo.value = String(producto.activo);
+    $('#stock-total').value = fmt.num(variantes.reduce((s, x) => s + (+x.stock || 0), 0));
+    $('#ayuda-ean').textContent = producto.tiene_variantes ? 'Con variantes, el código de barras va en cada talle y color.' : '';
+    pintarPrecios(); pintarMatriz(); pintarAcciones();
+    pintarMovimientos(mv.data || []);
+    const ean = params.get('ean'); if (ean) { const vv = variantes.find(x => x.ean === ean); if (vv) abrirVariante(vv); }
+  }
+
+  function pintarAcciones() {
+    const a = $('#acc-ficha'); a.innerHTML = `<a class="volver" href="productos.html">← Volver al catálogo</a>`;
+    if (APP.esAdmin) a.insertAdjacentHTML('beforeend', ` <button class="btn primario" id="btn-guardar">Guardar</button>`);
+    const g = $('#btn-guardar'); if (g) g.onclick = guardar;
+  }
+
+  async function guardar() {
+    const d = {
+      codigo: form.codigo.value.trim(), nombre: form.nombre.value.trim(), tipo: form.tipo.value,
+      categoria_id: form.categoria_id.value || null, proveedor_id: form.proveedor_id.value || null,
+      costo: +form.costo.value || 0, precio: +form.precio.value || 0, ean: form.ean.value.trim() || null,
+      tiene_variantes: form.tiene_variantes.value === 'true', activo: form.activo.value === 'true', descripcion: form.descripcion.value.trim() || null
+    };
+    if (!d.codigo || !d.nombre) { toast('Completá código y nombre', 'error'); return; }
+    let r;
+    if (id) r = await sb.from('productos').update(d).eq('id', id).select().single();
+    else r = await sb.from('productos').insert(APP.conEmpresa(d)).select().single();
+    if (r.error) { toast(mensajeError(r.error), 'error'); return; }
+    if (!id) {
+      id = r.data.id;
+      // artículo único: su variante "sin talle ni color" para que el stock tenga dónde colgar
+      if (!d.tiene_variantes) await sb.from('variantes').insert(APP.conEmpresa({ producto_id: id, sku: d.codigo, ean: d.ean }));
+      history.replaceState(null, '', `producto.html?id=${id}`);
+      toast('Producto creado'); $('#card-matriz').style.display = ''; $('#tb-mov').parentElement.style.display = '';
+    } else {
+      toast('Guardado');
+      // si es único, el EAN del producto es el de su variante
+      if (!d.tiene_variantes && variantes.length === 1) await sb.from('variantes').update({ ean: d.ean, sku: d.codigo }).eq('id', variantes[0].id);
+    }
+    await cargar();
+  }
+
+  // ---------- precios ----------
+  function precioDe(lista, variante) {
+    const base = +(variante && variante.precio != null ? variante.precio : (+form.precio.value || (producto && producto.precio) || 0));
+    const fijo = precios.find(p => p.lista_id === lista.id && (variante ? p.variante_id === variante.id : !p.variante_id));
+    return fijo ? +fijo.precio : Math.round(base * (+lista.porcentaje) / 100);
+  }
+  function pintarPrecios() {
+    const tb = $('#tb-precios'); tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());
+    listas.forEach(l => {
+      const fijo = precios.find(p => p.lista_id === l.id && !p.variante_id);
+      tb.insertAdjacentHTML('beforeend', `<tr><td>${esc(l.nombre)}${l.predeterminada ? ' <span class="chip">base</span>' : ''}</td><td class="num">${fmt.dec(l.porcentaje)}%</td>
+        <td class="num num-f">${fmt.pesos(precioDe(l))}${fijo ? ' <span class="chip aviso" title="Precio fijado a mano">fijo</span>' : ''}</td>
+        <td>${APP.esAdmin && id ? `<button class="btn chico" data-fijar="${l.id}">${fijo ? 'Quitar fijo' : 'Fijar'}</button>` : ''}</td></tr>`);
+    });
+    $$('[data-fijar]', tb).forEach(b => b.onclick = async () => {
+      const l = listas.find(x => x.id === b.dataset.fijar), fijo = precios.find(p => p.lista_id === l.id && !p.variante_id);
+      if (fijo) { await sb.from('precios').delete().eq('lista_id', l.id).eq('producto_id', id).is('variante_id', null); }
+      else {
+        const m = modal(`<h2>Fijar precio · ${esc(l.nombre)}</h2><div class="campo"><label>Precio</label><input id="p-fijo" type="number" step="1" value="${precioDe(l)}"></div><div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Fijar</button></div>`);
+        await new Promise(res => { $('[data-no]', m).onclick = () => { m.cerrar(); res(); }; $('[data-si]', m).onclick = async () => { const r = await sb.from('precios').insert(APP.conEmpresa({ lista_id: l.id, producto_id: id, precio: +$('#p-fijo', m).value || 0 })); if (r.error) toast(mensajeError(r.error), 'error'); m.cerrar(); res(); }; });
+      }
+      precios = (await sb.from('precios').select('*').eq('producto_id', id)).data || []; pintarPrecios();
+    });
+  }
+  form.precio.addEventListener('input', pintarPrecios);
+
+  // ---------- matriz ----------
+  function pintarMatriz() {
+    const m = $('#matriz');
+    if (!producto.tiene_variantes) {
+      const v = variantes[0];
+      m.innerHTML = v ? `<p>Artículo único · stock <b>${fmt.num(v.stock)}</b> · código de barras <b>${esc(v.ean || '—')}</b> <button class="btn chico" id="btn-unico">Ajustar stock / etiquetas</button></p>` : '<p class="vacio">Este producto no tiene su variante única. Guardalo de nuevo para crearla.</p>';
+      const b = $('#btn-unico'); if (b) b.onclick = () => abrirVariante(v);
+      $('#btn-agregar-variantes').style.display = 'none'; return;
+    }
+    if (!variantes.length) { m.innerHTML = '<p class="vacio">Todavía no tiene talles ni colores. Agregalos con el botón de arriba.</p>'; return; }
+    const ts = [...new Map(variantes.map(v => [v.talle || '', { c: v.talle || '', n: v.talle_nombre || 'Sin talle', o: v.talle_orden ?? 999 }])).values()].sort((a, b) => a.o - b.o);
+    const cs = [...new Map(variantes.map(v => [v.color || '', { c: v.color || '', n: v.color_nombre || 'Sin color', hex: v.color_hex }])).values()].sort((a, b) => a.n.localeCompare(b.n));
+    let h = `<table><tr><th class="fila">Talle \\ Color</th>${cs.map(c => `<th>${c.hex ? `<span class="muestra-color" style="background:${c.hex}"></span>` : ''}${esc(c.n)}</th>`).join('')}<th>Total</th></tr>`;
+    ts.forEach(t => {
+      let tot = 0;
+      h += `<tr><th class="fila">${esc(t.n)}</th>`;
+      cs.forEach(c => {
+        const v = variantes.find(x => (x.talle || '') === t.c && (x.color || '') === c.c);
+        if (!v) { h += '<td></td>'; return; }
+        const s = +v.stock || 0; tot += s;
+        h += `<td><span class="celda ${s === 0 ? 'cero' : (s < 0 ? 'neg' : '')}" data-v="${v.id}" title="${esc(v.sku || '')}">${fmt.num(s)}${!v.ean ? '<small>sin código</small>' : ''}</span></td>`;
+      });
+      h += `<td><b>${fmt.num(tot)}</b></td></tr>`;
+    });
+    h += `<tr><th class="fila">Total</th>${cs.map(c => `<th>${fmt.num(variantes.filter(x => (x.color || '') === c.c).reduce((s, x) => s + (+x.stock || 0), 0))}</th>`).join('')}<th>${fmt.num(variantes.reduce((s, x) => s + (+x.stock || 0), 0))}</th></tr></table>`;
+    m.innerHTML = h;
+    $$('.celda', m).forEach(c => c.onclick = () => abrirVariante(variantes.find(x => x.id === c.dataset.v)));
+  }
+
+  // ---------- variante: ajustar stock, EAN, etiquetas ----------
+  async function abrirVariante(v) {
+    if (!v) return;
+    const { data: st } = await sb.from('stock').select('deposito_id,cantidad').eq('variante_id', v.id);
+    const porDep = depositos.map(d => ({ d, c: +((st || []).find(s => s.deposito_id === d.id) || {}).cantidad || 0 }));
+    const nombre = [producto.nombre, v.talle_nombre, v.color_nombre].filter(Boolean).join(' · ');
+    const m = modal(`<h2>${esc(nombre)}</h2>
+      <p class="sub">SKU ${esc(v.sku || '—')}</p>
+      <div class="fila c2" style="margin-top:12px">
+        <div class="campo"><label>Código de barras</label><input id="v-ean" value="${esc(v.ean || '')}" ${APP.esAdmin ? '' : 'disabled'}><span class="ayuda">13 dígitos (EAN) o el que venga en la etiqueta del proveedor</span></div>
+        <div class="campo"><label>Precio propio</label><input id="v-precio" type="number" step="0.01" value="${v.precio != null && +v.precio !== +producto.precio ? v.precio : ''}" placeholder="igual al producto" ${APP.esAdmin ? '' : 'disabled'}></div>
+      </div>
+      <table class="lista" style="margin-bottom:12px"><tr><th>Depósito</th><th class="num">Stock</th></tr>${porDep.map(x => `<tr><td>${esc(x.d.nombre)}</td><td class="num num-f">${fmt.num(x.c)}</td></tr>`).join('')}</table>
+      ${APP.rol !== 'visor' ? `<div class="fila c3">
+        <div class="campo"><label>Ajustar stock</label><input id="v-cant" type="number" step="1" placeholder="+5 entra · -2 sale"></div>
+        <div class="campo"><label>Depósito</label><select id="v-dep">${depositos.map(d => `<option value="${d.id}" ${d.id === depPrincipal.id ? 'selected' : ''}>${esc(d.nombre)}</option>`).join('')}</select></div>
+        <div class="campo"><label>Motivo</label><select id="v-tipo"><option value="ajuste">Ajuste / recuento</option><option value="compra">Compra</option><option value="devolucion">Devolución</option><option value="venta">Venta (sin caja)</option></select></div>
+      </div><div class="campo"><label>Nota</label><input id="v-nota" placeholder="Opcional"></div>` : ''}
+      <div class="fila c2"><div class="campo"><label>Etiquetas a imprimir</label><input id="v-etq" type="number" min="1" value="${Math.max(1, porDep.reduce((s, x) => s + x.c, 0))}"></div></div>
+      <div class="pie"><button class="btn" data-cerrar>Cerrar</button><button class="btn suave" data-etq>Agregar a etiquetas</button>${APP.rol !== 'visor' ? '<button class="btn primario" data-guardar>Guardar</button>' : ''}</div>`);
+    $('[data-cerrar]', m).onclick = () => m.cerrar();
+    $('[data-etq]', m).onclick = () => { agregarEtiquetas([{ variante_id: v.id, cantidad: +$('#v-etq', m).value || 1 }]); toast('Agregado a la cola de etiquetas'); };
+    const g = $('[data-guardar]', m); if (g) g.onclick = async () => {
+      g.disabled = true;
+      if (APP.esAdmin) {
+        const ean = $('#v-ean', m).value.trim() || null, precio = $('#v-precio', m).value === '' ? null : +$('#v-precio', m).value;
+        if (ean !== (v.ean || null) || precio !== (v.precio != null && +v.precio !== +producto.precio ? +v.precio : null)) {
+          const r = await sb.from('variantes').update({ ean, precio }).eq('id', v.id);
+          if (r.error) { toast(mensajeError(r.error), 'error'); g.disabled = false; return; }
+        }
+      }
+      const cant = +$('#v-cant', m).value || 0;
+      if (cant) {
+        const r = await sb.from('stock_movimientos').insert(APP.conEmpresa({ variante_id: v.id, deposito_id: $('#v-dep', m).value, cantidad: cant, tipo: $('#v-tipo', m).value, nota: $('#v-nota', m).value.trim() || null }));
+        if (r.error) { toast(mensajeError(r.error), 'error'); g.disabled = false; return; }
+      }
+      m.cerrar(); toast('Guardado'); await cargar();
+    };
+  }
+
+  function agregarEtiquetas(items) {
+    const cola = JSON.parse(localStorage.getItem('augusta_etiquetas') || '[]');
+    items.forEach(it => { const ya = cola.find(c => c.variante_id === it.variante_id); if (ya) ya.cantidad = it.cantidad; else cola.push(it); });
+    localStorage.setItem('augusta_etiquetas', JSON.stringify(cola));
+  }
+  $('#btn-etiquetas-todas').onclick = () => {
+    const con = variantes.filter(v => +v.stock > 0).map(v => ({ variante_id: v.id, cantidad: Math.round(+v.stock) }));
+    if (!con.length) { toast('No hay stock para etiquetar', 'error'); return; }
+    agregarEtiquetas(con); toast(`${con.length} variantes agregadas a etiquetas`); setTimeout(() => location.href = 'etiquetas.html', 600);
+  };
+
+  // ---------- agregar variantes ----------
+  $('#btn-agregar-variantes').onclick = () => {
+    const tSel = new Set(variantes.map(v => v.talle)), cSel = new Set(variantes.map(v => v.color));
+    const m = modal(`<h2>Agregar talles y colores</h2><p class="sub">Se crean las combinaciones que falten.</p>
+      <div class="fila c2" style="margin-top:12px">
+        <div class="campo"><label>Talles</label><select id="a-t" multiple size="12">${talles.map(t => `<option value="${t.id}" ${tSel.has(t.codigo) ? 'selected' : ''}>${esc(t.nombre)}</option>`).join('')}</select></div>
+        <div class="campo"><label>Colores / estampas</label><select id="a-c" multiple size="12">${colores.map(c => `<option value="${c.id}" ${cSel.has(c.codigo) ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}</select></div>
+      </div><span class="ayuda">Mantené Ctrl apretado para elegir varios.</span>
+      <div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Crear combinaciones</button></div>`);
+    $('[data-no]', m).onclick = () => m.cerrar();
+    $('[data-si]', m).onclick = async () => {
+      const ts = [...$('#a-t', m).selectedOptions].map(o => o.value), cs = [...$('#a-c', m).selectedOptions].map(o => o.value);
+      if (!ts.length || !cs.length) { toast('Elegí al menos un talle y un color', 'error'); return; }
+      const existentes = new Set(variantes.map(v => `${v.talle}|${v.color}`));
+      const nuevas = [];
+      ts.forEach(t => cs.forEach(c => { const T = talles.find(x => x.id === t), C = colores.find(x => x.id === c); if (!existentes.has(`${T.codigo}|${C.codigo}`)) nuevas.push(APP.conEmpresa({ producto_id: id, talle_id: t, color_id: c, sku: `${producto.codigo}-${T.codigo}-${C.codigo}` })); }));
+      if (!nuevas.length) { toast('Esas combinaciones ya existen'); m.cerrar(); return; }
+      const r = await sb.from('variantes').insert(nuevas);
+      if (r.error) { toast(mensajeError(r.error), 'error'); return; }
+      if (!producto.tiene_variantes) await sb.from('productos').update({ tiene_variantes: true }).eq('id', id);
+      m.cerrar(); toast(`${nuevas.length} combinaciones creadas`); await cargar();
+    };
+  };
+
+  function pintarMovimientos(movs) {
+    const tb = $('#tb-mov'); tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());
+    const motivo = { inicial: 'Carga inicial', compra: 'Compra', venta: 'Venta', devolucion: 'Devolución', ajuste: 'Ajuste', transferencia: 'Transferencia' };
+    if (!movs.length) { tb.insertAdjacentHTML('beforeend', '<tr><td colspan="4" class="vacio">Sin movimientos todavía.</td></tr>'); return; }
+    movs.forEach(mv => { const v = variantes.find(x => x.id === mv.variante_id) || {};
+      tb.insertAdjacentHTML('beforeend', `<tr><td>${fmt.fechaHora(mv.fecha)}</td><td>${esc([v.talle_nombre, v.color_nombre].filter(Boolean).join(' · ') || 'único')}</td><td class="num">${+mv.cantidad > 0 ? '+' : ''}${fmt.dec(mv.cantidad)}</td><td>${esc(motivo[mv.tipo] || mv.tipo)}${mv.nota ? ' · <small>' + esc(mv.nota) + '</small>' : ''}</td></tr>`); });
+  }
+
+  await cargar();
+});
+</script>
+</body>
+</html>
