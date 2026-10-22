@@ -74,7 +74,8 @@ Estado: ✅ hecho · 🔧 en curso · F2…F6 fase prevista · ★ diferencial d
 - Facturar varias ventas juntas o una venta parcial; facturación automática de pedidos online pagos (Control Comercio).
 - Libro IVA ventas exportable; reporte mensual para la contadora.
 
-## 7. Online: Tiendanube y Mercado Libre (F5)
+## 7. Online: Tiendanube y Mercado Libre
+- ✅ Módulo Conexiones: Tienda Nube se conecta en un clic (OAuth) y se sincroniza el catálogo; cruce automático por SKU + talle + color, y manual para lo que no coincide; vista de stock canal vs Percha.
 - Stock único: cada venta en el local baja el stock online y viceversa (Dragonfish, Shopify).
 - Pedidos online entran solos con sus variantes, cliente y medio de pago; se preparan y despachan desde Percha.
 - Precios sincronizados desde las listas.
