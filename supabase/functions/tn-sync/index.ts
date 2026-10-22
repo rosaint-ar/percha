@@ -98,6 +98,7 @@ Deno.serve(async (req) => {
           }
         }
         items.push({ empresa_id: e, conexion_id: cx.id, producto_ext: String(p.id), variante_ext: String(v.id), nombre: es(p.name), valores: vals.join(" / "), sku: v.sku || null, barcode: v.barcode || null, mpn: v.mpn || null,
+          talle_canal: talleTN || null, color_canal: colorTN || colorDelNombre(es(p.name)) || null,
           precio: v.price != null ? +v.price : null, precio_promo: v.promotional_price != null ? +v.promotional_price : null, stock: v.stock_management === false ? null : (v.stock != null ? +v.stock : null),
           publicado: !!p.published, url: p.canonical_url || null, imagen: img, variante_id, cruce, actualizado: new Date().toISOString() });
       }

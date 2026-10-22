@@ -84,7 +84,7 @@ declare
   v_estado text := coalesce(p->>'estado', 'completada'); v_tipo text := coalesce(p->>'tipo', 'venta');
   dep uuid; cred creditos%rowtype; codigo text; creditos_out jsonb := '[]'::jsonb; existente uuid; tipo_prod text;
 begin
-  if not es_miembro(e) or rol_en(e) = 'visor' then raise exception 'Sin permiso para vender'; end if;
+  if not es_servicio() and (not es_miembro(e) or rol_en(e) = 'visor') then raise exception 'Sin permiso para vender'; end if;
   if p->>'offline_id' is not null then
     select id into existente from ventas where empresa_id = e and offline_id = (p->>'offline_id')::uuid;
     if existente is not null then return jsonb_build_object('id', existente, 'numero', (select numero from ventas where id = existente), 'repetida', true); end if;
