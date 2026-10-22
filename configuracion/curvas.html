@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Curvas de talle · Percha</title>
+<meta name="app-root" content="../">
+<link rel="stylesheet" href="../shell/shell.css">
+<style>
+  .pestanas{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
+  .pestanas a{font:600 13px var(--f-ui);color:var(--tinta);text-decoration:none;padding:8px 14px;border:1px solid var(--linea);background:var(--superficie-2);border-radius:10px}
+  .pestanas a.on{background:var(--lila);border-color:transparent;color:var(--acento)}
+  .reparto{display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:6px;margin-top:8px}
+  .reparto label{font:600 11px var(--f-mono);color:var(--tinta-3);display:block;text-align:center}
+  .reparto input{width:100%;text-align:center;font-family:var(--f-mono);border:1px solid var(--linea);border-radius:7px;padding:5px}
+</style>
+</head>
+<body data-page="configuracion" data-etq="Configuración" data-title="Curvas de talle" data-subtitle="Cuántas unidades de cada talle entran por color al comprar">
+<main class="app">
+  <div class="pestanas"><a href="empresa.html">Empresa</a><a href="atributos.html">Talles, colores y familias</a><a class="on" href="curvas.html">Curvas de talle</a><a href="promociones.html">Promociones</a><a href="usuarios.html">Usuarios</a></div>
+  <div class="card"><div class="card-cab"><div><h2>Curvas</h2><p class="sub">Ejemplo: "Adulto 1-2-2-1" = S 1, M 2, L 2, XL 1. En la orden de compra se elige la curva y se reparte solo.</p></div><div class="acciones"><button class="btn primario" id="btn-nueva">+ Nueva curva</button></div></div>
+    <table class="lista" id="tb"><tr><th>Nombre</th><th>Reparto</th><th class="num">Total por color</th><th></th></tr></table></div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../shared/supabase.js"></script>
+<script src="../shell/shell.js"></script>
+<script>
+APP.ready.then(async () => {
+  const { esc, $, $$, toast, modal, confirmar, mensajeError, fmt } = APP, e = APP.empresa.id;
+  if (!APP.esAdmin) { $('main').innerHTML = '<div class="card"><p>Esta sección es solo para administración.</p></div>'; return; }
+  const talles = (await sb.from('atributos').select('id,codigo,nombre,orden').eq('empresa_id', e).eq('tipo', 'talle').eq('activo', true).order('orden')).data || [];
+  const nombreT = id => (talles.find(t => t.id === id) || {}).nombre || '?';
+  async function cargar() {
+    const { data } = await sb.from('curvas').select('*').eq('empresa_id', e).eq('activa', true).order('nombre');
+    const tb = $('#tb'); tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());
+    (data || []).forEach(c => tb.insertAdjacentHTML('beforeend', `<tr><td><b>${esc(c.nombre)}</b></td><td><small class="mono">${(c.reparto || []).filter(r => r.cantidad > 0).map(r => `${esc(nombreT(r.talle_id))}:${r.cantidad}`).join('  ')}</small></td><td class="num">${fmt.num((c.reparto || []).reduce((s, r) => s + (+r.cantidad || 0), 0))}</td><td><button class="btn chico" data-e="${c.id}">Editar</button></td></tr>`));
+    if (!(data || []).length) tb.insertAdjacentHTML('beforeend', '<tr><td colspan="4" class="vacio">Sin curvas. Creá una con los talles que más compran.</td></tr>');
+    $$('[data-e]', tb).forEach(b => b.onclick = () => editar(data.find(c => c.id === b.dataset.e)));
+  }
+  function editar(c) {
+    c = c || { nombre: '', reparto: [] };
+    const m = modal(`<h2>${c.id ? 'Editar' : 'Nueva'} curva</h2>
+      <div class="campo" style="margin-top:12px"><label>Nombre</label><input id="c-nombre" value="${esc(c.nombre)}" placeholder="Ej. Adulto 1-2-2-1"></div>
+      <div class="campo"><label>Unidades por talle</label><div class="reparto">${talles.map(t => `<div><label>${esc(t.nombre)}</label><input type="number" min="0" value="${((c.reparto || []).find(r => r.talle_id === t.id) || {}).cantidad || 0}" data-t="${t.id}"></div>`).join('')}</div></div>
+      <div class="pie">${c.id ? '<button class="btn peligro" data-del style="margin-right:auto">Borrar</button>' : ''}<button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Guardar</button></div>`);
+    $('[data-no]', m).onclick = () => m.cerrar();
+    const del = $('[data-del]', m); if (del) del.onclick = async () => { if (await confirmar('¿Borrar la curva?', 'Borrar')) { await sb.from('curvas').update({ activa: false }).eq('id', c.id); m.cerrar(); cargar(); } };
+    $('[data-si]', m).onclick = async () => {
+      const d = { nombre: $('#c-nombre', m).value.trim(), reparto: $$('.reparto input', m).map(i => ({ talle_id: i.dataset.t, cantidad: +i.value || 0 })).filter(r => r.cantidad > 0) };
+      if (!d.nombre || !d.reparto.length) { toast('Poné nombre y al menos un talle', 'error'); return; }
+      const r = c.id ? await sb.from('curvas').update(d).eq('id', c.id) : await sb.from('curvas').insert(APP.conEmpresa(d));
+      if (r.error) { toast(mensajeError(r.error), 'error'); return; } m.cerrar(); toast('Guardada'); cargar();
+    };
+  }
+  $('#btn-nueva').onclick = () => editar(null); await cargar();
+});
+</script>
+</body>
+</html>

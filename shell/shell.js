@@ -119,7 +119,7 @@
     { id: 'ventas', label: 'Ventas', href: 'caja/ventas.html', icono: 'informes' },
     { id: 'productos', label: 'Catálogo', href: 'catalogo/productos.html', icono: 'catalogo' },
     { id: 'etiquetas', label: 'Etiquetas', href: 'catalogo/etiquetas.html', icono: 'etiquetas' },
-    { id: 'compras', label: 'Compras', href: '#', icono: 'compras', prox: true },
+    { id: 'compras', label: 'Compras', href: 'compras/compras.html', icono: 'compras', admin: true },
     { grupo: 'Análisis' },
     { id: 'informes', label: 'Informes', href: '#', icono: 'informes', prox: true },
     { grupo: 'Sistema', admin: true },

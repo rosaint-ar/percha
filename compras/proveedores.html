@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Proveedores · Percha</title>
+<meta name="app-root" content="../">
+<link rel="stylesheet" href="../shell/shell.css">
+<style>
+  .filtros{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+  td.deuda{color:var(--error);font-weight:700}
+  .mov td{padding:6px 8px}
+</style>
+</head>
+<body data-page="compras" data-etq="Compras" data-title="Proveedores" data-subtitle="A quién le compran, cuánto se le debe y qué se le pagó">
+<main class="app">
+  <div class="filtros"><div class="buscador"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" placeholder="Buscar proveedor"></div><label style="display:flex;gap:6px;align-items:center;font:600 13px var(--f-ui)"><input type="checkbox" id="f-deuda"> Solo con deuda</label><span class="sub" id="resumen" style="margin-left:auto"></span></div>
+  <div class="card" style="padding:0"><table class="lista" id="tb"><thead><tr><th>Proveedor</th><th>Contacto</th><th>Última compra</th><th class="num">Saldo</th><th></th></tr></thead><tbody></tbody></table></div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../shared/supabase.js"></script>
+<script src="../shell/shell.js"></script>
+<script>
+APP.ready.then(async () => {
+  const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
+  if (!APP.esAdmin) { $('main').innerHTML = '<div class="card"><p>Los proveedores los maneja administración.</p></div>'; return; }
+  $('#acciones-pagina').innerHTML = `<a class="btn" href="compras.html">Órdenes de compra</a><button class="btn primario" id="btn-nuevo">+ Proveedor</button>`;
+  let lista = [], formas = [];
+  formas = (await sb.from('formas_pago').select('id,nombre').eq('empresa_id', e).eq('activa', true).order('orden')).data || [];
+  async function cargar() {
+    lista = (await sb.from('v_proveedores').select('*').eq('empresa_id', e).eq('activo', true).order('nombre')).data || [];
+    pintar();
+  }
+  function pintar() {
+    const q = ($('#q').value || '').toLowerCase(); const soloDeuda = $('#f-deuda').checked;
+    const f = lista.filter(p => (!q || (p.nombre + ' ' + (p.cuit || '')).toLowerCase().includes(q)) && (!soloDeuda || +p.saldo > 0.5));
+    $('#tb tbody').innerHTML = f.map(p => `<tr class="clic" data-id="${p.id}"><td><b>${esc(p.nombre)}</b>${p.cuit ? ` <small class="mono">${esc(p.cuit)}</small>` : ''}</td><td><small>${esc([p.telefono, p.email].filter(Boolean).join(' · '))}</small></td><td>${p.ultima_compra ? fmt.fecha(p.ultima_compra) : '—'}</td><td class="num ${+p.saldo > 0.5 ? 'deuda' : ''}">${+p.saldo ? fmt.pesos(p.saldo) : '—'}</td><td><button class="btn chico" data-ver="${p.id}">Ver cuenta</button></td></tr>`).join('') || '<tr><td colspan="5" class="vacio">Sin proveedores.</td></tr>';
+    $$('[data-ver]').forEach(b => b.onclick = () => verCuenta(lista.find(p => p.id === b.dataset.ver)));
+    $('#resumen').textContent = `${f.length} proveedores · deuda total ${fmt.pesos(f.reduce((s, p) => s + Math.max(0, +p.saldo), 0))}`;
+  }
+  $('#q').addEventListener('input', pintar); $('#f-deuda').addEventListener('change', pintar);
+
+  function ficha(p) {
+    p = p || {};
+    const m = modal(`<h2>${p.id ? 'Editar proveedor' : 'Nuevo proveedor'}</h2>
+      <div class="campo" style="margin-top:12px"><label>Nombre</label><input id="p-nombre" value="${esc(p.nombre || '')}"></div>
+      <div class="fila c2"><div class="campo"><label>CUIT</label><input id="p-cuit" value="${esc(p.cuit || '')}"></div><div class="campo"><label>Teléfono</label><input id="p-tel" value="${esc(p.telefono || '')}"></div></div>
+      <div class="fila c2"><div class="campo"><label>Correo</label><input id="p-email" value="${esc(p.email || '')}"></div><div class="campo"><label>Localidad</label><input id="p-loc" value="${esc(p.localidad || '')}"></div></div>
+      <div class="campo"><label>Dirección</label><input id="p-dir" value="${esc(p.direccion || '')}"></div>
+      <div class="campo"><label>Notas (condiciones, contacto, mínimos de compra)</label><textarea id="p-notas" rows="2">${esc(p.notas || '')}</textarea></div>
+      <div class="pie">${p.id ? '<button class="btn peligro" data-baja style="margin-right:auto">Dar de baja</button>' : ''}<button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Guardar</button></div>`);
+    $('[data-no]', m).onclick = () => m.cerrar();
+    const baja = $('[data-baja]', m); if (baja) baja.onclick = async () => { if (await confirmar('¿Dar de baja este proveedor?', 'Dar de baja')) { await sb.from('proveedores').update({ activo: false }).eq('id', p.id); m.cerrar(); cargar(); } };
+    $('[data-si]', m).onclick = async () => {
+      const d = { nombre: $('#p-nombre', m).value.trim(), cuit: $('#p-cuit', m).value.trim() || null, telefono: $('#p-tel', m).value.trim() || null, email: $('#p-email', m).value.trim() || null, localidad: $('#p-loc', m).value.trim() || null, direccion: $('#p-dir', m).value.trim() || null, notas: $('#p-notas', m).value.trim() || null };
+      if (!d.nombre) { toast('Falta el nombre', 'error'); return; }
+      const r = p.id ? await sb.from('proveedores').update(d).eq('id', p.id) : await sb.from('proveedores').insert(APP.conEmpresa(d));
+      if (r.error) { toast(mensajeError(r.error), 'error'); return; } m.cerrar(); toast('Guardado'); cargar();
+    };
+  }
+  $('#btn-nuevo').onclick = () => ficha(null);
+
+  async function verCuenta(p) {
+    const { data: movs } = await sb.from('proveedor_movimientos').select('*, formas_pago(nombre), compras(numero)').eq('proveedor_id', p.id).order('fecha', { ascending: false }).order('id', { ascending: false }).limit(100);
+    const TIPO = { compra: 'Compra', pago: 'Pago', nota_credito: 'Nota de crédito', ajuste: 'Ajuste' };
+    const m = modal(`<h2>${esc(p.nombre)} <span class="mono" style="float:right;color:${+p.saldo > 0.5 ? 'var(--error)' : 'var(--ok)'}">${fmt.pesos(p.saldo)}</span></h2><p class="sub">${+p.saldo > 0.5 ? 'Saldo a favor del proveedor (se le debe)' : 'Sin deuda'}</p>
+      <div style="display:flex;gap:6px;margin:10px 0"><button class="btn chico primario" data-pago>Registrar pago</button><button class="btn chico" data-ajuste>Nota de crédito / ajuste</button><button class="btn chico" data-editar>Editar datos</button></div>
+      <table class="lista mov"><tr><th>Fecha</th><th>Detalle</th><th class="num">Debe</th><th class="num">Haber</th></tr>${(movs || []).map(x => `<tr><td>${fmt.fecha(x.fecha)}</td><td>${TIPO[x.tipo]}${x.compras ? ' #' + String(x.compras.numero).padStart(5, '0') : ''}${x.formas_pago ? ' · ' + esc(x.formas_pago.nombre) : ''}${x.referencia ? ' · ' + esc(x.referencia) : ''}${x.nota ? ' · <small>' + esc(x.nota) + '</small>' : ''}</td><td class="num">${+x.monto > 0 ? fmt.pesos(x.monto) : ''}</td><td class="num">${+x.monto < 0 ? fmt.pesos(-x.monto) : ''}</td></tr>`).join('') || '<tr><td colspan="4" class="vacio">Sin movimientos.</td></tr>'}</table>
+      <div class="pie"><button class="btn" data-no>Cerrar</button></div>`);
+    $('[data-no]', m).onclick = () => m.cerrar();
+    $('[data-editar]', m).onclick = () => { m.cerrar(); ficha(p); };
+    const movimiento = (tipo) => {
+      const m2 = modal(`<h2>${tipo === 'pago' ? 'Registrar pago a ' : 'Nota de crédito / ajuste de '}${esc(p.nombre)}</h2>
+        <div class="fila c2" style="margin-top:12px"><div class="campo"><label>Monto</label><input id="m-monto" type="number" min="0" step="0.01" value="${tipo === 'pago' ? Math.max(0, +p.saldo) : 0}"></div>
+        ${tipo === 'pago' ? `<div class="campo"><label>Medio de pago</label><select id="m-forma">${formas.map(f => `<option value="${f.id}">${esc(f.nombre)}</option>`).join('')}</select></div>` : `<div class="campo"><label>Tipo</label><select id="m-tipo"><option value="nota_credito">Nota de crédito (nos descuenta)</option><option value="ajuste_mas">Ajuste: debemos más</option><option value="ajuste_menos">Ajuste: debemos menos</option></select></div>`}</div>
+        <div class="fila c2"><div class="campo"><label>Fecha</label><input id="m-fecha" type="date" value="${new Date().toISOString().slice(0, 10)}"></div><div class="campo"><label>Referencia</label><input id="m-ref" placeholder="Nº de recibo, transferencia…"></div></div>
+        <div class="campo"><label>Nota</label><input id="m-nota"></div>
+        <div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Registrar</button></div>`);
+      $('[data-no]', m2).onclick = () => m2.cerrar();
+      $('[data-si]', m2).onclick = async () => {
+        const monto = +$('#m-monto', m2).value || 0; if (monto <= 0) { toast('Poné un monto', 'error'); return; }
+        let d = { proveedor_id: p.id, fecha: $('#m-fecha', m2).value, referencia: $('#m-ref', m2).value.trim() || null, nota: $('#m-nota', m2).value.trim() || null };
+        if (tipo === 'pago') Object.assign(d, { tipo: 'pago', monto: -monto, forma_pago_id: $('#m-forma', m2).value });
+        else { const t = $('#m-tipo', m2).value; Object.assign(d, { tipo: t === 'nota_credito' ? 'nota_credito' : 'ajuste', monto: t === 'ajuste_mas' ? monto : -monto }); }
+        const r = await sb.from('proveedor_movimientos').insert(APP.conEmpresa(d));
+        if (r.error) { toast(mensajeError(r.error), 'error'); return; } m2.cerrar(); m.cerrar(); toast('Registrado'); await cargar(); verCuenta(lista.find(x => x.id === p.id));
+      };
+    };
+    $('[data-pago]', m).onclick = () => movimiento('pago'); $('[data-ajuste]', m).onclick = () => movimiento('ajuste');
+  }
+  await cargar();
+});
+</script>
+</body>
+</html>

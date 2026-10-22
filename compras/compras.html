@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Compras · Percha</title>
+<meta name="app-root" content="../">
+<link rel="stylesheet" href="../shell/shell.css">
+<style>
+  .filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+  .filtros select{border:1px solid var(--linea);background:var(--superficie-2);padding:8px 10px;border-radius:var(--radio-mini)}
+  .barra-rec{height:5px;background:var(--relleno);border-radius:3px;margin-top:5px;overflow:hidden}.barra-rec i{display:block;height:100%;background:var(--acento)}
+</style>
+</head>
+<body data-page="compras" data-etq="Compras" data-title="Órdenes de compra" data-subtitle="Lo pedido a cada proveedor y lo que ya entró al stock">
+<main class="app">
+  <div class="filtros"><select id="f-estado"><option value="">Todas</option><option value="borrador">Borradores</option><option value="pedida">Pedidas</option><option value="parcial">Recibidas en parte</option><option value="recibida">Recibidas</option><option value="anulada">Anuladas</option></select><span class="sub" id="resumen" style="margin-left:auto"></span></div>
+  <div class="card" style="padding:0"><table class="lista" id="tb"><thead><tr><th>Orden</th><th>Fecha</th><th>Proveedor</th><th>Referencia</th><th class="num">Unidades</th><th class="num">Total</th><th>Estado</th></tr></thead><tbody></tbody></table></div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../shared/supabase.js"></script>
+<script src="../shell/shell.js"></script>
+<script>
+APP.ready.then(async () => {
+  const { fmt, esc, $, $$, toast, mensajeError } = APP, e = APP.empresa.id;
+  if (!APP.esAdmin) { $('main').innerHTML = '<div class="card"><p>Las compras las maneja administración.</p></div>'; return; }
+  $('#acciones-pagina').innerHTML = `<a class="btn" href="proveedores.html">Proveedores</a><a class="btn primario" href="compra.html?nueva=1">+ Nueva orden</a>`;
+  const ESTADO = { borrador: '<span class="chip gris">borrador</span>', pedida: '<span class="chip">pedida</span>', parcial: '<span class="chip aviso">en parte</span>', recibida: '<span class="chip ok">recibida</span>', anulada: '<span class="chip error">anulada</span>' };
+  async function cargar() {
+    let c = sb.from('v_compras').select('*').eq('empresa_id', e).order('numero', { ascending: false }).limit(300);
+    if ($('#f-estado').value) c = c.eq('estado', $('#f-estado').value);
+    const { data, error } = await c; if (error) { toast(mensajeError(error), 'error'); return; }
+    const tb = $('#tb tbody'); tb.innerHTML = (data || []).map(x => { const pct = +x.unidades ? Math.round(100 * x.unidades_recibidas / x.unidades) : 0;
+      return `<tr class="clic" data-id="${x.id}"><td class="mono">#${String(x.numero).padStart(5, '0')}</td><td>${fmt.fecha(x.fecha)}</td><td>${esc(x.proveedor || '—')}</td><td><small>${esc(x.referencia || '')}</small></td><td class="num">${fmt.num(x.unidades_recibidas)} / ${fmt.num(x.unidades)}<div class="barra-rec"><i style="width:${pct}%"></i></div></td><td class="num num-f">${fmt.pesos(x.total)}</td><td>${ESTADO[x.estado] || x.estado}</td></tr>`; }).join('') || '<tr><td colspan="7" class="vacio">Todavía no hay órdenes de compra. Creá la primera con "+ Nueva orden".</td></tr>';
+    $$('tr[data-id]', tb).forEach(tr => tr.onclick = () => location.href = `compra.html?id=${tr.dataset.id}`);
+    $('#resumen').textContent = `${(data || []).length} órdenes`;
+  }
+  $('#f-estado').onchange = cargar; await cargar();
+});
+</script>
+</body>
+</html>
