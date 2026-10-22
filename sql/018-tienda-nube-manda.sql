@@ -14,7 +14,7 @@ begin
   for r in
     select ci.variante_id, sum(ci.stock) canal, coalesce((select sum(s.cantidad) from stock s where s.variante_id = ci.variante_id), 0) local
     from canal_items ci join variantes v on v.id = ci.variante_id join productos p on p.id = v.producto_id
-    where ci.conexion_id = p_conexion and ci.stock is not null and p.tipo <> 'kit'
+    where ci.conexion_id = p_conexion and ci.stock is not null and p.tipo <> 'kit' and not p.es_generico   -- las bolsas (BOMBIS VARIAS) son solo del local: nunca toman el stock del canal
     group by ci.variante_id
   loop
     if r.canal <> r.local then
