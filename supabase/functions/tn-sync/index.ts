@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
   // ---- catálogo de Percha para cruzar ----
   const e = cx.empresa_id;
   const pag = async (tabla: string, sel: string, filtro: (q: any) => any) => { let desde = 0, todo: any[] = []; while (true) { const { data, error } = await filtro(admin.from(tabla).select(sel)).range(desde, desde + 999); if (error) throw error; todo = todo.concat(data || []); if (!data || data.length < 1000) break; desde += 1000; } return todo; };
-  const productos = await pag("productos", "id,codigo,tiene_variantes", (q: any) => q.eq("empresa_id", e));
+  const productos = await pag("productos", "id,codigo,nombre,tiene_variantes", (q: any) => q.eq("empresa_id", e));
   const variantes = await pag("variantes", "id,producto_id,sku,ean,talle_id,color_id", (q: any) => q.eq("empresa_id", e).eq("activa", true));
   const atributos = await pag("atributos", "id,tipo,codigo,nombre", (q: any) => q.eq("empresa_id", e));
   const porCodigo = new Map(productos.map((p: any) => [norm(p.codigo), p]));
@@ -52,6 +52,10 @@ Deno.serve(async (req) => {
     return 0;
   };
   const colorDelNombre = (nombre: string) => { const m = /»\s*(.+)$/.exec(nombre || ""); return m ? m[1].trim() : ""; };
+  // Un BOX/COMBO/PACK del canal nunca se cruza solo con un producto suelto de Percha (comparten SKU pero no son lo mismo)
+  const esCombo = (nombre: string) => /\b(box|combo|pack|kit|set)\b/i.test(nombre || "");
+  // (el nombre NO se compara: en el canal los nombres son comerciales y cambian; manda el SKU, y lo que no corresponda se corrige a mano)
+  const nombresProd = new Map(productos.map((p: any) => [p.id, p.nombre]));
 
   // ---- traer todo el catálogo del canal ----
   const headers = { Authentication: `bearer ${sec.access_token}`, "User-Agent": UA, "Content-Type": "application/json" };
@@ -75,7 +79,8 @@ Deno.serve(async (req) => {
         // cruce
         let variante_id: string | null = null, cruce = "ninguno";
         const codigoV = norm(v.sku || v.mpn || "");
-        const prodV = porCodigo.get(codigoV) || prodPercha;
+        let prodV = porCodigo.get(codigoV) || prodPercha;
+        if (prodV && esCombo(es(p.name)) !== esCombo(nombresProd.get(prodV.id) || "")) prodV = null;
         if (v.barcode && porEan.has(norm(v.barcode))) { variante_id = porEan.get(norm(v.barcode)).id; cruce = "barcode"; }
         else if (prodV) {
           const vs = varsPorProducto.get(prodV.id) || [];
