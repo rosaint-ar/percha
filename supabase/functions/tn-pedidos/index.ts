@@ -34,7 +34,7 @@ Deno.serve(async (req) => {
     const headers = { Authentication: `bearer ${sec.access_token}`, "User-Agent": UA, "Content-Type": "application/json" };
     const base = `https://api.tiendanube.com/2025-03/${cx.externo_id}`;
     // desde la última vez (con margen de 2 h); la primera vez, solo desde que se activó la conexión (no importa el pasado)
-    const desde = new Date(new Date(cx.ultima_sync_pedidos || cx.creada).getTime() - 2 * 3600 * 1000).toISOString();
+    const desde = body.desde ? new Date(body.desde).toISOString() : new Date(new Date(cx.ultima_sync_pedidos || cx.creada).getTime() - 2 * 3600 * 1000).toISOString();
     const ahora = new Date().toISOString();
     let pedidos: any[] = [], page = 1;
     while (page <= 20) {
@@ -45,16 +45,17 @@ Deno.serve(async (req) => {
       pedidos = pedidos.concat(lote); if (lote.length < 100) break; page++;
     }
     // catálogos de apoyo
-    const { data: items } = await admin.from("canal_items").select("variante_ext,variante_id,producto_ext").eq("conexion_id", cx.id);
-    const porExt = new Map((items || []).map((i: any) => [i.variante_ext, i]));
+    // todas las variantes del canal (PostgREST corta en 1000: se pagina)
+    let items: any[] = []; for (let d = 0; ; d += 1000) { const { data } = await admin.from("canal_items").select("variante_ext,variante_id,producto_ext").eq("conexion_id", cx.id).range(d, d + 999); items = items.concat(data || []); if (!data || data.length < 1000) break; }
+    const porExt = new Map(items.map((i: any) => [i.variante_ext, i]));
     const { data: formas } = await admin.from("formas_pago").select("id,nombre,tipo").eq("empresa_id", e).eq("activa", true);
     const { data: listas } = await admin.from("listas_precios").select("id,predeterminada").eq("empresa_id", e).eq("activa", true);
     const listaBase = (listas || []).find((l: any) => l.predeterminada)?.id || (listas || [])[0]?.id || null;
+    // cada medio de pago del canal tiene su forma de pago propia en Percha: "Tienda Nube · Pago Nube", "Tienda Nube · Transferencia bancaria"…
     const formaPara = async (gateway: string) => {
-      const g = (gateway || "").toLowerCase();
-      let f = (formas || []).find((x: any) => x.nombre.toLowerCase().includes("online") && (g.includes("mercado") ? x.nombre.toLowerCase().includes("mercado") : g.includes("pago nube") || g.includes("nuvem") ? x.nombre.toLowerCase().includes("nube") : g.includes("transfer") ? x.nombre.toLowerCase().includes("transfer") : false));
-      if (!f) f = (formas || []).find((x: any) => x.nombre.toLowerCase() === "online");
-      if (!f) { const ins = await admin.from("formas_pago").insert({ empresa_id: e, nombre: "Online", tipo: "online", orden: 50 }).select().single(); f = ins.data; (formas || []).push(f); }
+      const nombre = `Tienda Nube · ${(gateway || "Otro").trim()}`;
+      let f = (formas || []).find((x: any) => x.nombre.toLowerCase() === nombre.toLowerCase());
+      if (!f) { const ins = await admin.from("formas_pago").insert({ empresa_id: e, nombre, tipo: "online", orden: 60 }).select().single(); f = ins.data; (formas || []).push(f); }
       return f.id;
     };
     let nuevos = 0, anulados = 0, conProblema = 0;
@@ -69,6 +70,7 @@ Deno.serve(async (req) => {
       resumen.push({ conexion: cx.id, desde, pedidos: vista }); continue;
     }
     for (const o of pedidos) {
+      if (body.solo_pedido && String(o.number) !== String(body.solo_pedido)) continue;   // importar uno solo (pruebas / reintentos)
       const pedidoExt = String(o.id);
       const { data: ya } = await admin.from("canal_pedidos").select("*").eq("conexion_id", cx.id).eq("pedido_ext", pedidoExt).maybeSingle();
       const pagado = o.payment_status === "paid", cancelado = o.status === "cancelled" || o.payment_status === "refunded" || o.payment_status === "voided";
@@ -89,11 +91,14 @@ Deno.serve(async (req) => {
         else problemas.push(`${pr.name} (${pr.sku || "sin sku"}) no está cruzado: no descontó stock`);
         lineas.push({ variante_id: it?.variante_id || null, producto_id, descripcion: pr.name, talle: pr.variant_values?.[0] || null, color: pr.variant_values?.[1] || null, cantidad: cant, precio_lista: precio, precio_unit: precio, descuento_pct: 0, total: r2(precio * cant), costo_unit: costo });
       }
-      const envio = +o.shipping_cost_customer || 0;
-      if (envio > 0) lineas.push({ variante_id: null, producto_id: null, descripcion: "Envío", cantidad: 1, precio_lista: envio, precio_unit: envio, descuento_pct: 0, total: envio, costo_unit: 0 });
-      const subtotal = r2(lineas.reduce((s, l) => s + l.total, 0)), descuento = r2(+o.discount || 0);
+      // el envío que pagó la clienta = total − (subtotal − descuento); la API de pedidos no lo trae como campo aparte
+      const descuento = r2(+o.discount || 0);
+      const prendas = r2(lineas.reduce((s, l) => s + l.total, 0));
+      const envio = r2(Math.max(0, (+o.total || 0) - (prendas - descuento)));
+      if (envio > 0) lineas.push({ variante_id: null, producto_id: null, descripcion: "Envío", talle: null, color: null, cantidad: 1, precio_lista: envio, precio_unit: envio, descuento_pct: 0, total: envio, costo_unit: 0 });
+      const subtotal = r2(prendas + envio);
       const total = r2(subtotal - descuento);
-      const ajuste = r2((+o.total || total) - total);   // redondeos del canal
+      const ajuste = r2((+o.total || total) - total);   // redondeos del canal (normalmente 0)
       const payload = { empresa_id: e, offline_id: crypto.randomUUID(), tipo: "venta", estado: "completada", caja_id: null, turno_id: null, cliente_id: null, vendedora_id: null, lista_id: listaBase,
         descuento_pct: 0, descuento, recargo: ajuste, nota: `Tienda Nube #${o.number}` + (o.note ? " · " + o.note : ""), origen: "tiendanube", referencia: String(o.number ?? o.id),
         lineas, pagos: [{ forma_pago_id: await formaPara(o.gateway_name || o.gateway), credito_id: null, monto: r2(total + ajuste), cuotas: +o.payment_details?.installments || 1, recargo_pct: 0, referencia: o.gateway_name || null }], creditos_a_emitir: [] };
@@ -107,7 +112,7 @@ Deno.serve(async (req) => {
       nuevos++; if (problemas.length) conProblema++;
       await admin.from("canal_pedidos").upsert({ ...datosPedido, venta_id: venta.id, problema: problemas.length ? problemas.join(" · ") : null }, { onConflict: "conexion_id,pedido_ext" });
     }
-    await admin.from("conexiones").update({ ultima_sync_pedidos: ahora }).eq("id", cx.id);
+    if (!body.solo_pedido && !body.desde) await admin.from("conexiones").update({ ultima_sync_pedidos: ahora }).eq("id", cx.id);
     resumen.push({ conexion: cx.id, pedidos_leidos: pedidos.length, nuevos, anulados, con_problema: conProblema });
   }
   return json({ ok: true, resumen });
