@@ -29,7 +29,7 @@ APP.ready.then(async () => {
     try {
       const [vars, prods] = await Promise.all([
         paginar(() => sb.from('v_variantes').select('id,producto_id,producto_codigo,producto_nombre,producto_tipo,sku,ean,talle,talle_nombre,talle_orden,color,color_nombre,color_hex,precio,costo,stock,activa').eq('empresa_id', e).eq('activa', true).order('producto_nombre').order('talle_orden')),
-        paginar(() => sb.from('productos').select('id,categoria_id,tipo,activo,imagen_url').eq('empresa_id', e).eq('activo', true))
+        paginar(() => sb.from('productos').select('id,categoria_id,tipo,activo,imagen_url,es_generico').eq('empresa_id', e).eq('activo', true))
       ]);
       productos = Object.fromEntries(prods.map(x => [x.id, x]));
       catalogo = vars.filter(x => productos[x.id === undefined ? '' : x.producto_id]);
@@ -146,7 +146,7 @@ APP.ready.then(async () => {
   });
   document.addEventListener('keydown', ev => {
     if (ev.key === '/' && document.activeElement !== q && !ev.target.closest('.modal')) { ev.preventDefault(); q.focus(); }
-    if (ev.key === 'Enter' && ev.ctrlKey && !ev.target.closest('.modal')) { ev.preventDefault(); cobrar(); }
+    if (ev.key === 'Enter' && ev.ctrlKey && !ev.target.closest('.modal')) { ev.preventDefault(); $('#btn-cobrar').click(); }   // por el botón: el POS puede interceptarlo
   });
 
   // ================= Carrito =================

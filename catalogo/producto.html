@@ -38,6 +38,7 @@
         <div class="campo"><label>Código de barras</label><input name="ean" placeholder="Solo si no tiene variantes"><span class="ayuda" id="ayuda-ean"></span></div>
         <div class="campo"><label>Variantes</label><select name="tiene_variantes"><option value="false">No, es un artículo único</option><option value="true">Sí, por talle y color</option></select></div>
         <div class="campo"><label>Estado</label><select name="activo"><option value="true">Activo</option><option value="false">Inactivo</option></select></div>
+        <div class="campo"><label>Genérico</label><select name="es_generico" title="Se vende rápido como «varias» y al cobrar el POS pregunta qué modelos se lleva"><option value="false">No</option><option value="true">Sí: al cobrar pregunta el modelo</option></select></div>
         <div class="campo"><label>Stock total</label><input id="stock-total" readonly></div>
       </div>
       <div class="campo"><label>Descripción</label><textarea name="descripcion" rows="2"></textarea></div>
@@ -111,7 +112,7 @@ APP.ready.then(async () => {
     $('h1').innerHTML = `${esc(producto.nombre)}`;
     document.title = producto.nombre + ' · ' + APP.empresa.nombre;
     ['codigo', 'nombre', 'tipo', 'categoria_id', 'proveedor_id', 'costo', 'precio', 'ean', 'descripcion'].forEach(k => form[k].value = producto[k] ?? '');
-    form.tiene_variantes.value = String(producto.tiene_variantes); form.activo.value = String(producto.activo);
+    form.tiene_variantes.value = String(producto.tiene_variantes); form.activo.value = String(producto.activo); form.es_generico.value = String(!!producto.es_generico);
     $('#stock-total').value = fmt.num(variantes.reduce((s, x) => s + (+x.stock || 0), 0));
     $('#ayuda-ean').textContent = producto.tiene_variantes ? 'Con variantes, el código de barras va en cada talle y color.' : '';
     pintarPrecios(); pintarAcciones();
@@ -132,7 +133,7 @@ APP.ready.then(async () => {
       codigo: form.codigo.value.trim(), nombre: form.nombre.value.trim(), tipo: form.tipo.value,
       categoria_id: form.categoria_id.value || null, proveedor_id: form.proveedor_id.value || null,
       costo: +form.costo.value || 0, precio: +form.precio.value || 0, ean: form.ean.value.trim() || null,
-      tiene_variantes: form.tiene_variantes.value === 'true', activo: form.activo.value === 'true', descripcion: form.descripcion.value.trim() || null
+      tiene_variantes: form.tiene_variantes.value === 'true', activo: form.activo.value === 'true', es_generico: form.es_generico.value === 'true', descripcion: form.descripcion.value.trim() || null
     };
     if (d.tipo === 'kit') { d.tiene_variantes = false; form.tiene_variantes.value = 'false'; }
     if (!d.codigo || !d.nombre) { toast('Completá código y nombre', 'error'); return; }
