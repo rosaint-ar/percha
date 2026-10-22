@@ -67,7 +67,7 @@ APP.ready.then(async () => {
     (data || []).forEach(p => {
       const st = +p.stock || 0;
       tb.insertAdjacentHTML('beforeend', `<tr class="clic ${p.activo ? '' : 'inactivo'}" data-id="${p.id}">
-        <td><div>${esc(p.nombre)}</div><span class="cod">${esc(p.codigo)}${p.tipo !== 'prenda' ? ' · ' + esc(p.tipo) : ''}</span></td>
+        <td><div>${esc(p.nombre)}${p.tipo === 'kit' ? ' <span class="chip">kit</span>' : ''}</div><span class="cod">${esc(p.codigo)}${p.tipo !== 'prenda' && p.tipo !== 'kit' ? ' · ' + esc(p.tipo) : ''}</span></td>
         <td>${esc(p.categoria || '')}</td>
         <td class="num">${p.tiene_variantes ? fmt.num(p.variantes) : '<span class="chip gris">único</span>'}</td>
         <td class="num ${st > 0 ? 'num-f' : ''}">${st > 0 ? fmt.num(st) : (st < 0 ? '<span class="chip error">' + fmt.num(st) + '</span>' : '<span class="chip gris">sin stock</span>')}</td>

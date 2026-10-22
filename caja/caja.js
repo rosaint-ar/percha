@@ -28,7 +28,7 @@ APP.ready.then(async () => {
     carrito.lista = carrito.lista || (listas.find(x => x.predeterminada) || listas[0] || {}).id;
     try {
       const [vars, prods] = await Promise.all([
-        paginar(() => sb.from('v_variantes').select('id,producto_id,producto_codigo,producto_nombre,sku,ean,talle,talle_nombre,talle_orden,color,color_nombre,color_hex,precio,costo,stock,activa').eq('empresa_id', e).eq('activa', true).order('producto_nombre').order('talle_orden')),
+        paginar(() => sb.from('v_variantes').select('id,producto_id,producto_codigo,producto_nombre,producto_tipo,sku,ean,talle,talle_nombre,talle_orden,color,color_nombre,color_hex,precio,costo,stock,activa').eq('empresa_id', e).eq('activa', true).order('producto_nombre').order('talle_orden')),
         paginar(() => sb.from('productos').select('id,categoria_id,tipo,activo').eq('empresa_id', e).eq('activo', true))
       ]);
       productos = Object.fromEntries(prods.map(x => [x.id, x]));
@@ -311,7 +311,8 @@ APP.ready.then(async () => {
       carrito.lineas = []; carrito.cambio = null; carrito.descPct = 0; $('#desc-general').value = 0; $('#nota').value = ''; $('#sel-cliente').value = '';
       carrito.lista = (listas.find(x => x.predeterminada) || listas[0] || {}).id;   // la próxima venta arranca con la lista base
       // el stock del catálogo en memoria
-      payload.lineas.forEach(l => { const v = catalogo.find(x => x.id === l.variante_id); if (v) v.stock = (+v.stock || 0) - l.cantidad; });
+      payload.lineas.forEach(l => { const v = catalogo.find(x => x.id === l.variante_id); if (v && v.producto_tipo !== 'kit') v.stock = (+v.stock || 0) - l.cantidad; });
+      if (payload.lineas.some(l => (catalogo.find(x => x.id === l.variante_id) || {}).producto_tipo === 'kit')) cargarBase();   // los kits y sus componentes se recalculan en la base
       pintar(); pintarRecientes();
     };
   }
