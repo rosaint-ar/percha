@@ -250,6 +250,9 @@ APP.ready.then(async () => {
       const r = $('#cb-resto', m), efectivo = pagos.filter(p => p.tipo === 'efectivo').reduce((s, p) => s + p.monto, 0);
       let ok;
       if (modoSena) { ok = pagado > 0 && pagado < t.aPagar; r.className = 'resto ' + (ok ? 'ok' : 'falta'); r.innerHTML = `<span>Seña</span><span>${fmt.pesos(pagado)} · saldo ${fmt.pesos(resto)}</span>`; }
+      else if (t.aPagar < 0 && !pagos.length) { ok = true; r.className = 'resto ok'; r.innerHTML = `<span>Se emite nota de crédito</span><span>${fmt.pesos(-t.aPagar)}</span>`; }
+      else if (t.aPagar < 0 && Math.abs(resto) < 0.5) { ok = true; r.className = 'resto ok'; r.innerHTML = '<span>Dinero devuelto</span><span>✓</span>'; }
+      else if (t.aPagar < 0) { ok = false; r.className = 'resto falta'; r.innerHTML = `<span>Falta devolver</span><span>${fmt.pesos(-resto)}</span>`; }
       else if (Math.abs(resto) < 0.5) { ok = true; r.className = 'resto ok'; r.innerHTML = '<span>Completo</span><span>✓</span>'; }
       else if (resto < 0 && efectivo >= -resto) { ok = true; r.className = 'resto vuelto'; r.innerHTML = `<span>Vuelto</span><span>${fmt.pesos(-resto)}</span>`; }
       else if (resto < 0) { ok = false; r.className = 'resto falta'; r.innerHTML = `<span>Sobra ${fmt.pesos(-resto)}: solo hay vuelto en efectivo</span><span></span>`; }
@@ -263,7 +266,7 @@ APP.ready.then(async () => {
       const t = total(); const pagado = pagos.reduce((s, p) => s + p.monto, 0);
       let monto = r2(t.aPagar - pagado); if (f.recargo_pct) monto = r2((t.total + pagos.reduce((s, p) => s + r2(p.monto * (p.recargo_pct || 0) / 100), 0) - pagado) / (1 + f.recargo_pct / 100));
       if (modoSena && !pagos.length) monto = r2(Math.round(t.aPagar / 2 / 100) * 100);
-      pagos.push({ forma_pago_id: f.id, nombre: f.nombre, tipo: f.tipo, cuotas: f.cuotas, recargo_pct: +f.recargo_pct || 0, monto: Math.max(0, monto) }); pintarPagos();
+      pagos.push({ forma_pago_id: f.id, nombre: f.nombre, tipo: f.tipo, cuotas: f.cuotas, recargo_pct: +f.recargo_pct || 0, monto: t.aPagar < 0 ? Math.min(0, monto) : Math.max(0, monto) }); pintarPagos();
     });
     $('[data-cred]', m).onclick = () => {
       const m2 = modal(`<h2>Pagar con crédito</h2><div class="campo" style="margin-top:12px"><label>Código de la nota de crédito o gift card</label><input id="cr-cod" placeholder="8 letras y números" style="text-transform:uppercase;font-family:var(--f-mono)"></div><div class="pie"><button class="btn" data-no>Volver</button><button class="btn primario" data-si>Aplicar</button></div>`);
@@ -284,7 +287,7 @@ APP.ready.then(async () => {
       $('[data-si]', m).disabled = true;
       const t = total(); const pagado = r2(pagos.reduce((s, p) => s + p.monto, 0));
       // el vuelto se descuenta del efectivo
-      const pagosFinal = pagos.map(p => ({ ...p })); const vuelto = r2(pagado - t.aPagar);
+      const pagosFinal = pagos.map(p => ({ ...p })); const vuelto = t.aPagar > 0 ? r2(pagado - t.aPagar) : 0;
       if (!modoSena && vuelto > 0) { const ef = pagosFinal.find(p => p.tipo === 'efectivo'); ef.monto = r2(ef.monto - vuelto); }
       const creditos_a_emitir = [];
       if (!modoSena && t.aPagar < 0) {
@@ -306,6 +309,7 @@ APP.ready.then(async () => {
       const res = await enviarVenta(payload);
       mostrarTicket(payload, res, { vuelto: vuelto > 0 ? vuelto : 0, pagos: pagosFinal, total: t });
       carrito.lineas = []; carrito.cambio = null; carrito.descPct = 0; $('#desc-general').value = 0; $('#nota').value = ''; $('#sel-cliente').value = '';
+      carrito.lista = (listas.find(x => x.predeterminada) || listas[0] || {}).id;   // la próxima venta arranca con la lista base
       // el stock del catálogo en memoria
       payload.lineas.forEach(l => { const v = catalogo.find(x => x.id === l.variante_id); if (v) v.stock = (+v.stock || 0) - l.cantidad; });
       pintar(); pintarRecientes();

@@ -214,6 +214,10 @@ begin
   v_rec := coalesce((p->>'recargo')::numeric, 0);
   v_total := round(v_sub - v_desc + v_rec, 2);
   for pg in select * from jsonb_array_elements(coalesce(p->'pagos', '[]'::jsonb)) loop v_pagado := v_pagado + (pg->>'monto')::numeric; end loop;
+  -- una nota de crédito emitida es plata que se le devuelve a la clienta: cuenta como pago negativo
+  for cr in select * from jsonb_array_elements(coalesce(p->'creditos_a_emitir', '[]'::jsonb)) loop
+    if cr->>'tipo' = 'nota_credito' then v_pagado := v_pagado - (cr->>'monto')::numeric; end if;
+  end loop;
   if v_estado = 'completada' and abs(v_pagado - v_total) > 0.5 then
     raise exception 'Los pagos (%) no coinciden con el total (%)', v_pagado, v_total;
   end if;
@@ -264,18 +268,18 @@ end $$;
 -- ---------- Completar una seña (retiro) ----------
 create or replace function caja_completar_sena(p jsonb) returns jsonb
 language plpgsql security definer set search_path = public as $$
-declare e uuid := (p->>'empresa_id')::uuid; v ventas%rowtype; pg jsonb; pagado numeric := 0;
+declare e uuid := (p->>'empresa_id')::uuid; v ventas%rowtype; pg jsonb; v_pagado numeric := 0;
 begin
   if not es_miembro(e) or rol_en(e) = 'visor' then raise exception 'Sin permiso'; end if;
   select * into v from ventas where id = (p->>'venta_id')::uuid and empresa_id = e for update;
   if v.id is null or v.estado <> 'senada' then raise exception 'La seña no existe o ya fue retirada'; end if;
   for pg in select * from jsonb_array_elements(coalesce(p->'pagos', '[]'::jsonb)) loop
-    pagado := pagado + (pg->>'monto')::numeric;
+    v_pagado := v_pagado + (pg->>'monto')::numeric;
     insert into venta_pagos (venta_id, empresa_id, turno_id, forma_pago_id, credito_id, monto, cuotas, recargo_pct, referencia)
     values (v.id, e, (p->>'turno_id')::uuid, (pg->>'forma_pago_id')::uuid, (pg->>'credito_id')::uuid, (pg->>'monto')::numeric, coalesce((pg->>'cuotas')::int, 1), coalesce((pg->>'recargo_pct')::numeric, 0), pg->>'referencia');
   end loop;
-  if abs((v.pagado + pagado) - v.total) > 0.5 then raise exception 'Falta pagar % para completar', v.total - v.pagado - pagado; end if;
-  update ventas set pagado = v.pagado + pagado, saldo = 0, estado = 'completada', turno_id = coalesce((p->>'turno_id')::uuid, turno_id) where id = v.id;
+  if abs((v.pagado + v_pagado) - v.total) > 0.5 then raise exception 'Falta pagar % para completar', v.total - v.pagado - v_pagado; end if;
+  update ventas set pagado = v.pagado + v_pagado, saldo = 0, estado = 'completada', turno_id = coalesce((p->>'turno_id')::uuid, ventas.turno_id) where id = v.id;
   return jsonb_build_object('id', v.id, 'numero', v.numero);
 end $$;
 
