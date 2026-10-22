@@ -115,7 +115,8 @@
   const MENU = [
     { grupo: 'Operación' },
     { id: 'inicio', label: 'Inicio', href: 'index.html', icono: 'inicio' },
-    { id: 'caja', label: 'Caja', href: '#', icono: 'caja', prox: true },
+    { id: 'caja', label: 'Caja', href: 'caja/caja.html', icono: 'caja' },
+    { id: 'ventas', label: 'Ventas', href: 'caja/ventas.html', icono: 'informes' },
     { id: 'productos', label: 'Catálogo', href: 'catalogo/productos.html', icono: 'catalogo' },
     { id: 'etiquetas', label: 'Etiquetas', href: 'catalogo/etiquetas.html', icono: 'etiquetas' },
     { id: 'compras', label: 'Compras', href: '#', icono: 'compras', prox: true },

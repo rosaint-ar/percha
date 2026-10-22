@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Promociones · Percha</title>
+<meta name="app-root" content="../">
+<link rel="stylesheet" href="../shell/shell.css">
+<style>
+  .pestanas{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
+  .pestanas a{font:600 13px var(--f-ui);color:var(--tinta);text-decoration:none;padding:8px 14px;border:1px solid var(--linea);background:var(--superficie-2);border-radius:10px}
+  .pestanas a.on{background:var(--lila);border-color:transparent;color:var(--acento)}
+  .dias{display:flex;gap:4px}.dias label{border:1px solid var(--linea);border-radius:8px;padding:5px 8px;font:600 12px var(--f-ui);cursor:pointer}.dias input{display:none}.dias input:checked+span{color:var(--acento)}.dias label:has(input:checked){background:var(--lila);border-color:transparent}
+</style>
+</head>
+<body data-page="configuracion" data-etq="Configuración" data-title="Promociones" data-subtitle="Se aplican solas en la caja; cada prenda toma la mejor promo que le corresponda">
+<main class="app">
+  <div class="pestanas"><a href="empresa.html">Empresa</a><a href="atributos.html">Talles, colores y familias</a><a class="on" href="promociones.html">Promociones</a><a href="usuarios.html">Usuarios</a></div>
+  <div class="card"><div class="card-cab"><div><h2>Promociones</h2></div><div class="acciones"><button class="btn primario" id="btn-nueva">+ Nueva promoción</button></div></div>
+    <table class="lista" id="tb"><tr><th>Nombre</th><th>Regla</th><th>Alcance</th><th>Vigencia</th><th>Activa</th><th></th></tr></table></div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../shared/supabase.js"></script>
+<script src="../shell/shell.js"></script>
+<script>
+APP.ready.then(async () => {
+  const { esc, $, $$, toast, modal, confirmar, mensajeError, fmt } = APP, e = APP.empresa.id;
+  if (!APP.esAdmin) { document.querySelector('main').innerHTML = '<div class="card"><p>Esta sección es solo para administración.</p></div>'; return; }
+  const [{ data: cats }, { data: prods }] = await Promise.all([sb.from('categorias').select('id,nombre').eq('empresa_id', e).eq('activa', true).order('nombre'), sb.from('productos').select('id,nombre,codigo').eq('empresa_id', e).eq('activo', true).order('nombre')]);
+  const DIAS = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá', 'Do'];
+  const regla = p => ({ porcentaje: `${p.valor}% de descuento`, monto: `${fmt.pesos(p.valor)} menos por unidad`, nxm: `Lleva ${p.n}, paga ${p.m}`, cantidad: `${p.valor}% llevando ${p.n} o más` })[p.tipo];
+  const alcance = p => p.alcance === 'todo' ? 'Todas las prendas' : p.alcance === 'familias' ? (p.familia_ids || []).map(id => (cats.find(c => c.id === id) || {}).nombre).filter(Boolean).join(', ') : `${(p.producto_ids || []).length} productos`;
+  async function cargar() {
+    const { data } = await sb.from('promociones').select('*').eq('empresa_id', e).order('creada', { ascending: false });
+    const tb = $('#tb'); tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());
+    (data || []).forEach(p => tb.insertAdjacentHTML('beforeend', `<tr><td><b>${esc(p.nombre)}</b></td><td>${regla(p)}</td><td>${esc(alcance(p))}</td><td><small>${p.desde ? fmt.fecha(p.desde) : 'siempre'}${p.hasta ? ' → ' + fmt.fecha(p.hasta) : ''} · ${(p.dias_semana || []).length === 7 ? 'todos los días' : (p.dias_semana || []).map(d => DIAS[d - 1]).join(' ')}</small></td><td>${p.activa ? '<span class="chip ok">activa</span>' : '<span class="chip gris">pausada</span>'}</td><td><button class="btn chico" data-e="${p.id}">Editar</button> <button class="btn chico" data-p="${p.id}">${p.activa ? 'Pausar' : 'Activar'}</button></td></tr>`));
+    if (!(data || []).length) tb.insertAdjacentHTML('beforeend', '<tr><td colspan="6" class="vacio">Sin promociones. Creá la primera: por ejemplo "3 bombachas, paga 2".</td></tr>');
+    $$('[data-e]', tb).forEach(b => b.onclick = () => editar(data.find(p => p.id === b.dataset.e)));
+    $$('[data-p]', tb).forEach(b => b.onclick = async () => { const p = data.find(x => x.id === b.dataset.p); await sb.from('promociones').update({ activa: !p.activa }).eq('id', p.id); cargar(); });
+  }
+  function editar(p) {
+    p = p || { nombre: '', tipo: 'nxm', valor: 0, n: 3, m: 2, alcance: 'todo', familia_ids: [], producto_ids: [], dias_semana: [1, 2, 3, 4, 5, 6, 7], activa: true };
+    const m = modal(`<h2>${p.id ? 'Editar' : 'Nueva'} promoción</h2>
+      <div class="campo" style="margin-top:12px"><label>Nombre (sale en el ticket)</label><input id="p-nombre" value="${esc(p.nombre)}" placeholder="Ej. 3 bombachas pagás 2"></div>
+      <div class="fila c2"><div class="campo"><label>Tipo</label><select id="p-tipo"><option value="nxm">Lleva N, paga M</option><option value="porcentaje">% de descuento</option><option value="cantidad">% llevando N o más</option><option value="monto">$ menos por unidad</option></select></div>
+        <div class="campo" id="p-params"></div></div>
+      <div class="fila c2"><div class="campo"><label>Alcance</label><select id="p-alc"><option value="todo">Todas las prendas</option><option value="familias">Algunas familias</option><option value="productos">Algunos productos</option></select></div>
+        <div class="campo" id="p-alc-sel"></div></div>
+      <div class="fila c2"><div class="campo"><label>Desde</label><input id="p-desde" type="date" value="${p.desde || ''}"></div><div class="campo"><label>Hasta</label><input id="p-hasta" type="date" value="${p.hasta || ''}"></div></div>
+      <div class="campo"><label>Días</label><div class="dias">${DIAS.map((d, i) => `<label><input type="checkbox" value="${i + 1}" ${(p.dias_semana || []).includes(i + 1) ? 'checked' : ''}><span>${d}</span></label>`).join('')}</div></div>
+      <div class="pie">${p.id ? '<button class="btn peligro" data-del style="margin-right:auto">Borrar</button>' : ''}<button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Guardar</button></div>`);
+    const tipo = $('#p-tipo', m), alc = $('#p-alc', m); tipo.value = p.tipo; alc.value = p.alcance;
+    const pintarParams = () => { $('#p-params', m).innerHTML = tipo.value === 'nxm' ? `<label>Lleva / paga</label><div style="display:flex;gap:6px"><input id="p-n" type="number" min="2" value="${p.n || 3}"><input id="p-m" type="number" min="1" value="${p.m || 2}"></div>` : tipo.value === 'cantidad' ? `<label>Desde cuántas · % off</label><div style="display:flex;gap:6px"><input id="p-n" type="number" min="2" value="${p.n || 2}"><input id="p-valor" type="number" min="0" value="${p.valor || 10}"></div>` : tipo.value === 'porcentaje' ? `<label>% de descuento</label><input id="p-valor" type="number" min="0" max="100" value="${p.valor || 10}">` : `<label>$ menos por unidad</label><input id="p-valor" type="number" min="0" value="${p.valor || 1000}">`; };
+    const pintarAlc = () => { $('#p-alc-sel', m).innerHTML = alc.value === 'familias' ? `<label>Familias</label><select id="p-fam" multiple size="5">${cats.map(c => `<option value="${c.id}" ${(p.familia_ids || []).includes(c.id) ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}</select>` : alc.value === 'productos' ? `<label>Productos</label><select id="p-prod" multiple size="5">${prods.map(c => `<option value="${c.id}" ${(p.producto_ids || []).includes(c.id) ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}</select>` : ''; };
+    tipo.onchange = pintarParams; alc.onchange = pintarAlc; pintarParams(); pintarAlc();
+    $('[data-no]', m).onclick = () => m.cerrar();
+    const del = $('[data-del]', m); if (del) del.onclick = async () => { if (await confirmar('¿Borrar la promoción?', 'Borrar')) { await sb.from('promociones').delete().eq('id', p.id); m.cerrar(); cargar(); } };
+    $('[data-si]', m).onclick = async () => {
+      const d = { nombre: $('#p-nombre', m).value.trim(), tipo: tipo.value, valor: +(($('#p-valor', m) || {}).value || 0), n: +(($('#p-n', m) || {}).value || 0), m: +(($('#p-m', m) || {}).value || 0), alcance: alc.value,
+        familia_ids: [...($('#p-fam', m) ? $('#p-fam', m).selectedOptions : [])].map(o => o.value), producto_ids: [...($('#p-prod', m) ? $('#p-prod', m).selectedOptions : [])].map(o => o.value),
+        desde: $('#p-desde', m).value || null, hasta: $('#p-hasta', m).value || null, dias_semana: $$('.dias input:checked', m).map(i => +i.value) };
+      if (!d.nombre) { toast('Ponele un nombre', 'error'); return; }
+      if (d.tipo === 'nxm' && !(d.n > d.m && d.m > 0)) { toast('"Lleva" tiene que ser mayor que "paga"', 'error'); return; }
+      const r = p.id ? await sb.from('promociones').update(d).eq('id', p.id) : await sb.from('promociones').insert(APP.conEmpresa(d));
+      if (r.error) { toast(mensajeError(r.error), 'error'); return; } m.cerrar(); toast('Guardada'); cargar();
+    };
+  }
+  $('#btn-nueva').onclick = () => editar(null);
+  await cargar();
+});
+</script>
+</body>
+</html>

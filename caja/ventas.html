@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ventas · Percha</title>
+<meta name="app-root" content="../">
+<link rel="stylesheet" href="../shell/shell.css">
+<style>
+  .filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+  .filtros input[type=date],.filtros select{border:1px solid var(--linea);background:var(--superficie-2);padding:8px 10px;border-radius:var(--radio-mini)}
+  .pestanas{display:flex;gap:4px;background:var(--relleno);padding:3px;border-radius:10px;width:max-content;margin-bottom:14px}
+  .pestanas button{border:0;background:transparent;padding:7px 14px;border-radius:8px;font:600 13px var(--f-ui);color:var(--tinta-2);cursor:pointer}
+  .pestanas button.on{background:var(--superficie-2);color:var(--tinta);box-shadow:0 1px 2px rgba(21,23,28,.08)}
+  .detalle td{padding:5px 8px}
+  #impresion{display:none}
+  @media print{body.con-lateral>*{display:none!important}#impresion{display:block!important;font:12px/1.35 var(--f-mono);color:#000;width:72mm;padding:2mm}#impresion h2{font:700 15px var(--f-ui);margin:0 0 2px}#impresion .c{text-align:center}#impresion .r{text-align:right}#impresion table{width:100%;border-collapse:collapse}#impresion td{padding:2px 0;vertical-align:top}#impresion hr{border:0;border-top:1px dashed #000;margin:6px 0}@page{size:80mm auto;margin:0}}
+</style>
+</head>
+<body data-page="ventas" data-etq="Caja" data-title="Ventas" data-subtitle="Tickets, señas, cambios y cierres de caja">
+<main class="app">
+  <div class="pestanas"><button class="on" data-t="ventas">Ventas</button><button data-t="senas">Señas pendientes</button><button data-t="cierres">Cierres de caja</button><button data-t="creditos">Créditos y gift cards</button></div>
+  <section id="t-ventas">
+    <div class="filtros"><input type="date" id="f-desde"><span class="sub">a</span><input type="date" id="f-hasta"><select id="f-estado"><option value="">Todas</option><option value="completada">Completadas</option><option value="senada">Señadas</option><option value="anulada">Anuladas</option></select><span class="sub" id="resumen" style="margin-left:auto"></span></div>
+    <section class="tiles" id="tiles"></section>
+    <div class="card" style="padding:0"><table class="lista" id="tb"><thead><tr><th>Ticket</th><th>Fecha</th><th>Clienta</th><th>Atendió</th><th>Pago</th><th class="num">Total</th><th>Estado</th><th></th></tr></thead><tbody></tbody></table></div>
+  </section>
+  <section id="t-senas" style="display:none"><div class="card" style="padding:0"><table class="lista" id="tb-senas"><thead><tr><th>Ticket</th><th>Fecha</th><th>Clienta</th><th class="num">Total</th><th class="num">Pagado</th><th class="num">Saldo</th><th></th></tr></thead><tbody></tbody></table></div></section>
+  <section id="t-cierres" style="display:none"><div class="card" style="padding:0"><table class="lista" id="tb-cierres"><thead><tr><th>Caja</th><th>Abierta</th><th>Cerrada</th><th class="num">Ventas</th><th class="num">Diferencia</th><th></th></tr></thead><tbody></tbody></table></div></section>
+  <section id="t-creditos" style="display:none"><div class="card" style="padding:0"><table class="lista" id="tb-creditos"><thead><tr><th>Código</th><th>Tipo</th><th>Clienta</th><th>Emitido</th><th class="num">Monto</th><th class="num">Saldo</th><th>Estado</th></tr></thead><tbody></tbody></table></div></section>
+</main>
+<div id="impresion"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../shared/supabase.js"></script>
+<script src="../shell/shell.js"></script>
+<script>
+APP.ready.then(async () => {
+  const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
+  const hoy = new Date().toISOString().slice(0, 10);
+  $('#f-desde').value = hoy; $('#f-hasta').value = hoy;
+  const ESTADO = { completada: '<span class="chip ok">completada</span>', senada: '<span class="chip aviso">señada</span>', anulada: '<span class="chip error">anulada</span>' };
+  const TIPO = { venta: '', cambio: ' <span class="chip">cambio</span>', devolucion: ' <span class="chip">devolución</span>' };
+  $$('.pestanas button').forEach(b => b.onclick = () => { $$('.pestanas button').forEach(x => x.classList.toggle('on', x === b)); ['ventas', 'senas', 'cierres', 'creditos'].forEach(t => $('#t-' + t).style.display = t === b.dataset.t ? '' : 'none'); ({ ventas: cargar, senas: cargarSenas, cierres: cargarCierres, creditos: cargarCreditos })[b.dataset.t](); });
+
+  async function cargar() {
+    let c = sb.from('v_ventas').select('*').eq('empresa_id', e).gte('fecha', $('#f-desde').value + 'T00:00:00').lte('fecha', $('#f-hasta').value + 'T23:59:59').order('fecha', { ascending: false }).limit(500);
+    if ($('#f-estado').value) c = c.eq('estado', $('#f-estado').value);
+    const { data, error } = await c; if (error) { toast(mensajeError(error), 'error'); return; }
+    const v = data || [], ok = v.filter(x => x.estado === 'completada');
+    const total = ok.reduce((s, x) => s + +x.total, 0), costo = ok.reduce((s, x) => s + +x.costo, 0);
+    $('#tiles').innerHTML = `<div class="tile"><div class="t">Ventas</div><div class="n">${ok.length}</div><div class="d">${v.filter(x => x.estado === 'anulada').length} anuladas · ${v.filter(x => x.estado === 'senada').length} señadas</div></div>
+      <div class="tile destacada"><div class="t">Vendido</div><div class="n">${fmt.pesos(total)}</div><div class="d">ticket promedio ${fmt.pesos(ok.length ? total / ok.length : 0)}</div></div>
+      <div class="tile"><div class="t">Prendas</div><div class="n">${fmt.num(ok.reduce((s, x) => s + +x.lineas, 0))}</div><div class="d">líneas vendidas</div></div>
+      <div class="tile"><div class="t">Margen bruto</div><div class="n">${total ? fmt.pct(100 * (total - costo) / total) : '—'}</div><div class="d">${fmt.pesos(total - costo)} de ganancia</div></div>`;
+    const tb = $('#tb tbody'); tb.innerHTML = v.map(x => `<tr class="clic" data-id="${x.id}"><td class="mono">#${String(x.numero).padStart(6, '0')}${TIPO[x.tipo] || ''}</td><td>${fmt.fechaHora(x.fecha)}</td><td>${esc(x.cliente_nombre || '—')}</td><td>${esc(x.vendedora_nombre || '')}</td><td><small>${esc(x.pagos || '')}</small></td><td class="num num-f">${fmt.pesos(x.total)}</td><td>${ESTADO[x.estado] || x.estado}</td><td><button class="btn chico" data-ver="${x.id}">Ver</button></td></tr>`).join('') || '<tr><td colspan="8" class="vacio">Sin ventas en ese período.</td></tr>';
+    $$('[data-ver]', tb).forEach(b => b.onclick = () => verVenta(b.dataset.ver));
+    $('#resumen').textContent = `${v.length} tickets`;
+  }
+  async function verVenta(id) {
+    const [{ data: v }, { data: ls }, { data: ps }] = await Promise.all([sb.from('v_ventas').select('*').eq('id', id).single(), sb.from('venta_lineas').select('*').eq('venta_id', id).order('id'), sb.from('venta_pagos').select('*, formas_pago(nombre), creditos(codigo,tipo)').eq('venta_id', id)]);
+    const m = modal(`<h2>Ticket #${String(v.numero).padStart(6, '0')} ${ESTADO[v.estado]}</h2><p class="sub">${fmt.fechaHora(v.fecha)} · ${esc(v.vendedora_nombre || '')}${v.cliente_nombre ? ' · ' + esc(v.cliente_nombre) : ''}${v.nota ? ' · ' + esc(v.nota) : ''}${v.anulada_motivo ? ' · anulada: ' + esc(v.anulada_motivo) : ''}</p>
+      <table class="lista detalle" style="margin-top:10px">${ls.map(l => `<tr><td>${l.cantidad}× ${esc(l.descripcion)}<br><small>${esc([l.talle, l.color].filter(Boolean).join(' · '))}${l.promocion_nombre ? ' · ★ ' + esc(l.promocion_nombre) : ''}${l.descuento_pct ? ' · −' + l.descuento_pct + '%' : ''}</small></td><td class="num">${fmt.pesos(l.total)}</td></tr>`).join('')}
+      ${+v.descuento ? `<tr><td>Descuento ${v.descuento_pct}%</td><td class="num">−${fmt.pesos(v.descuento)}</td></tr>` : ''}${+v.recargo ? `<tr><td>Recargo</td><td class="num">${fmt.pesos(v.recargo)}</td></tr>` : ''}
+      <tr><td><b>Total</b></td><td class="num num-f">${fmt.pesos(v.total)}</td></tr>
+      ${ps.map(p => `<tr><td><small>${esc(p.formas_pago ? p.formas_pago.nombre : (p.creditos ? (p.creditos.tipo === 'gift_card' ? 'Gift card ' : 'Nota de crédito ') + p.creditos.codigo : ''))}${p.cuotas > 1 ? ' · ' + p.cuotas + ' cuotas' : ''}</small></td><td class="num"><small>${fmt.pesos(p.monto)}</small></td></tr>`).join('')}
+      ${+v.saldo ? `<tr><td><b>Saldo pendiente</b></td><td class="num" style="color:var(--aviso)"><b>${fmt.pesos(v.saldo)}</b></td></tr>` : ''}</table>
+      <div class="pie" style="justify-content:space-between"><div style="display:flex;gap:6px"><button class="btn" data-print>Reimprimir</button>${v.estado !== 'anulada' ? `<a class="btn" href="caja.html?cambio=${v.numero}">Cambio / devolución</a>` : ''}</div>
+      ${v.estado !== 'anulada' ? '<button class="btn peligro" data-anular>Anular</button>' : ''}</div>`);
+    $('[data-print]', m).onclick = () => { imprimir(v, ls, ps); window.print(); };
+    const a = $('[data-anular]', m); if (a) a.onclick = () => {
+      const m2 = modal(`<h2>Anular ticket #${String(v.numero).padStart(6, '0')}</h2><p class="sub">El stock vuelve y los pagos quedan sin efecto. No se puede deshacer.</p>
+        <div class="campo" style="margin-top:12px"><label>Motivo</label><input id="an-motivo" placeholder="Ej. se cargó mal, la clienta se arrepintió"></div>
+        <div class="pie"><button class="btn" data-no>Volver</button><button class="btn peligro" data-si>Anular</button></div>`);
+      $('[data-no]', m2).onclick = () => m2.cerrar();
+      $('[data-si]', m2).onclick = async () => {
+        const { error } = await sb.rpc('caja_anular_venta', { p_venta: v.id, p_motivo: $('#an-motivo', m2).value.trim() || 'sin motivo' });
+        if (error) { toast(mensajeError(error), 'error'); return; } m2.cerrar(); m.cerrar(); toast('Venta anulada, stock devuelto'); cargar();
+      };
+    };
+  }
+  function imprimir(v, ls, ps) {
+    const emp = APP.empresa;
+    $('#impresion').innerHTML = `<h2 class="c">${esc(emp.nombre)}</h2><div class="c">${esc([emp.domicilio, emp.localidad].filter(Boolean).join(' · '))}</div><hr><div>Ticket #${String(v.numero).padStart(6, '0')} · ${fmt.fechaHora(v.fecha)} (reimpresión)</div><hr>
+      <table>${ls.map(l => `<tr><td>${l.cantidad}× ${esc(l.descripcion)}<br><small>${esc([l.talle, l.color].filter(Boolean).join(' · '))}</small></td><td class="r">${fmt.pesos(l.total)}</td></tr>`).join('')}</table><hr>
+      <table><tr><td><b>TOTAL</b></td><td class="r"><b>${fmt.pesos(v.total)}</b></td></tr>${ps.map(p => `<tr><td>${esc(p.formas_pago ? p.formas_pago.nombre : 'Crédito')}</td><td class="r">${fmt.pesos(p.monto)}</td></tr>`).join('')}${+v.saldo ? `<tr><td><b>SALDO</b></td><td class="r"><b>${fmt.pesos(v.saldo)}</b></td></tr>` : ''}</table><hr><div class="c">Cambios con este ticket dentro de los 30 días.</div>`;
+  }
+  async function cargarSenas() {
+    const { data } = await sb.from('v_ventas').select('*').eq('empresa_id', e).eq('estado', 'senada').order('fecha');
+    const tb = $('#tb-senas tbody'); tb.innerHTML = (data || []).map(x => `<tr><td class="mono">#${String(x.numero).padStart(6, '0')}</td><td>${fmt.fechaHora(x.fecha)}</td><td>${esc(x.cliente_nombre || '—')}</td><td class="num">${fmt.pesos(x.total)}</td><td class="num">${fmt.pesos(x.pagado)}</td><td class="num num-f">${fmt.pesos(x.saldo)}</td><td><button class="btn chico primario" data-ret="${x.id}">Cobrar saldo y entregar</button> <button class="btn chico" data-ver="${x.id}">Ver</button></td></tr>`).join('') || '<tr><td colspan="7" class="vacio">No hay señas pendientes.</td></tr>';
+    $$('[data-ver]', tb).forEach(b => b.onclick = () => verVenta(b.dataset.ver));
+    $$('[data-ret]', tb).forEach(b => b.onclick = () => retirarSena((data || []).find(x => x.id === b.dataset.ret)));
+  }
+  async function retirarSena(v) {
+    const { data: formas } = await sb.from('formas_pago').select('*').eq('empresa_id', e).eq('activa', true).order('orden');
+    const { data: turnos } = await sb.from('caja_turnos').select('id').eq('empresa_id', e).eq('estado', 'abierto').limit(1);
+    if (!(turnos || []).length) { toast('Abrí la caja antes de cobrar', 'error'); return; }
+    const m = modal(`<h2>Entregar seña #${String(v.numero).padStart(6, '0')}</h2><p class="sub">Saldo a cobrar: <b class="mono">${fmt.pesos(v.saldo)}</b></p>
+      <div class="campo" style="margin-top:12px"><label>Medio de pago</label><select id="s-forma">${formas.map(f => `<option value="${f.id}">${esc(f.nombre)}</option>`).join('')}</select></div>
+      <div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Cobrar ${fmt.pesos(v.saldo)}</button></div>`);
+    $('[data-no]', m).onclick = () => m.cerrar();
+    $('[data-si]', m).onclick = async () => {
+      const { error } = await sb.rpc('caja_completar_sena', { p: { empresa_id: e, venta_id: v.id, turno_id: turnos[0].id, pagos: [{ forma_pago_id: $('#s-forma', m).value, monto: +v.saldo }] } });
+      if (error) { toast(mensajeError(error), 'error'); return; } m.cerrar(); toast('Seña completada'); cargarSenas();
+    };
+  }
+  async function cargarCierres() {
+    const { data } = await sb.from('caja_turnos').select('*, cajas(nombre)').eq('empresa_id', e).order('abierto', { ascending: false }).limit(60);
+    const tb = $('#tb-cierres tbody'); tb.innerHTML = (data || []).map(t => { const dif = (t.arqueo || []).reduce((s, a) => s + (+a.diferencia || 0), 0);
+      return `<tr><td>${esc(t.cajas ? t.cajas.nombre : '')} ${t.estado === 'abierto' ? '<span class="chip ok">abierta</span>' : ''}</td><td>${fmt.fechaHora(t.abierto)}</td><td>${t.cerrado ? fmt.fechaHora(t.cerrado) : '—'}</td><td class="num">${t.arqueo ? fmt.num((t.arqueo || []).reduce((s, a) => s + 0, 0)) : ''}</td><td class="num" style="color:${Math.abs(dif) < 1 ? 'var(--ok)' : 'var(--error)'}">${t.arqueo ? (dif > 0 ? '+' : '') + fmt.pesos(dif) : '—'}</td><td>${t.arqueo ? `<button class="btn chico" data-arq="${t.id}">Ver arqueo</button>` : ''}</td></tr>`; }).join('') || '<tr><td colspan="6" class="vacio">Todavía no hay cierres.</td></tr>';
+    $$('[data-arq]', tb).forEach(b => b.onclick = () => { const t = data.find(x => x.id === b.dataset.arq);
+      modal(`<h2>Arqueo · ${fmt.fechaHora(t.abierto)} → ${fmt.fechaHora(t.cerrado)}</h2><table class="lista" style="margin-top:10px"><tr><th>Medio</th><th class="num">Esperado</th><th class="num">Contado</th><th class="num">Dif.</th></tr>${t.arqueo.map(a => `<tr><td>${esc(a.nombre)}</td><td class="num">${fmt.pesos(a.esperado)}</td><td class="num">${fmt.pesos(a.declarado)}</td><td class="num" style="color:${Math.abs(a.diferencia) < 1 ? 'var(--ok)' : 'var(--error)'}">${a.diferencia > 0 ? '+' : ''}${fmt.pesos(a.diferencia)}</td></tr>`).join('')}</table>${t.notas ? `<p class="sub" style="margin-top:8px">${esc(t.notas)}</p>` : ''}<div class="pie"><button class="btn" onclick="this.closest('.modal-fondo').remove()">Cerrar</button></div>`); });
+  }
+  async function cargarCreditos() {
+    const { data } = await sb.from('creditos').select('*, clientes(nombre)').eq('empresa_id', e).order('creado', { ascending: false }).limit(200);
+    const tb = $('#tb-creditos tbody'); tb.innerHTML = (data || []).map(c => `<tr><td class="mono">${esc(c.codigo)}</td><td>${c.tipo === 'gift_card' ? 'Gift card' : 'Nota de crédito'}</td><td>${esc(c.clientes ? c.clientes.nombre : '—')}</td><td>${fmt.fecha(c.creado)}</td><td class="num">${fmt.pesos(c.monto)}</td><td class="num num-f">${fmt.pesos(c.saldo)}</td><td><span class="chip ${c.estado === 'vigente' ? 'ok' : 'gris'}">${c.estado}</span></td></tr>`).join('') || '<tr><td colspan="7" class="vacio">No hay créditos emitidos.</td></tr>';
+  }
+  ['#f-desde', '#f-hasta', '#f-estado'].forEach(s => $(s).addEventListener('change', cargar));
+  await cargar();
+});
+</script>
+</body>
+</html>

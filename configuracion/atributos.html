@@ -8,8 +8,8 @@
 <link rel="stylesheet" href="../shell/shell.css">
 <style>
   .pestanas{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
-  .pestanas a{font:600 14px var(--f-ui);color:var(--tinta);text-decoration:none;padding:8px 14px;border:1px solid var(--borde);background:var(--papel)}
-  .pestanas a.on{background:var(--lila);border-color:var(--lila);color:var(--violeta)}
+  .pestanas a{font:600 13px var(--f-ui);color:var(--tinta);text-decoration:none;padding:8px 14px;border:1px solid var(--linea);background:var(--superficie-2);border-radius:10px}
+  .pestanas a.on{background:var(--lila);border-color:transparent;color:var(--acento)}
   .tres{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;align-items:start}
   table.lista input{border:1px solid var(--borde);padding:4px 7px;border-radius:2px;width:100%}
   table.lista td.num input{width:60px;text-align:right}
@@ -21,7 +21,7 @@
 </head>
 <body data-page="configuracion" data-etq="Configuración" data-title="Talles, colores y familias" data-subtitle="Los ejes con los que se arman las variantes">
 <main class="app">
-  <div class="pestanas"><a href="empresa.html">Empresa</a><a class="on" href="atributos.html">Talles, colores y familias</a><a href="usuarios.html">Usuarios</a></div>
+  <div class="pestanas"><a href="empresa.html">Empresa</a><a class="on" href="atributos.html">Talles, colores y familias</a><a href="promociones.html">Promociones</a><a href="usuarios.html">Usuarios</a></div>
   <div class="tres">
     <div class="card"><div class="card-cab"><div><h2>Talles</h2><p class="sub">El orden es el de la matriz</p></div></div>
       <table class="lista" id="tb-talle"><tr><th class="num">Orden</th><th>Código</th><th>Nombre</th><th></th></tr></table>
