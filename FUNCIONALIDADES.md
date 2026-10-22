@@ -29,25 +29,25 @@ Estado: ✅ hecho · 🔧 en curso · F2…F6 fase prevista · ★ diferencial d
 - F4 Mercadería parada: lo que no se vende hace X días, valorizado (ya está medido para Augusta).
 - ★ Stock "vendible" vs "comprometido": lo que está en pedidos online o señado no se vende dos veces.
 
-## 3. Caja y ventas (F2)
-- Vender con lector, buscando o tocando la matriz; varias ventas abiertas a la vez (Odoo "parallel orders").
-- Varios medios de pago en una venta (efectivo + tarjeta + transferencia) (todos).
-- Descuento por línea o por venta, en % o $; descuentos solo con permiso (Dragonfish, Shopify "manager approvals").
-- Listas de precios automáticas según medio de pago y cliente (Contado, Débito, Mayorista).
-- Promociones automáticas: 2x1, 3x2, % por familia, "llevando 3 bombachas", descuento por cantidad, vigencia por fechas (Dragonfish, Lightspeed).
-- Cuotas con recargo o sin interés por medio de pago; el recargo se muestra antes de cobrar.
-- **Señas y reservas**: prenda apartada con saldo pendiente, vence a X días (Control Comercio, Lightspeed "layaway").
-- **Cambios y devoluciones** con ticket de cambio o nota de crédito interna; devuelve el stock a la variante correcta (todos).
-- Gift cards: venta, saldo, uso parcial (Shopify, Odoo).
-- Clienta en la venta (opcional): historial, cumpleaños, lo que compró y en qué talle.
-- Vendedora en cada venta; comisiones por vendedora (Control Comercio, Lightspeed).
-- Ticket impreso (80 mm), por WhatsApp o por correo; sin impresora de tickets también funciona (Augusta hoy no tiene).
-- Nota en la venta ("cambiar antes del 30", "regalo").
+## 3. Caja y ventas
+- ✅ Vender con lector, buscando o tocando la matriz; varias ventas abiertas a la vez (Odoo "parallel orders").
+- ✅ Varios medios de pago en una venta (efectivo + tarjeta + transferencia) (todos).
+- ✅ Descuento por línea o por venta, en % o $; descuentos solo con permiso (Dragonfish, Shopify "manager approvals").
+- ✅ Listas de precios automáticas según medio de pago y cliente (Contado, Débito, Mayorista).
+- ✅ Promociones automáticas: 2x1, 3x2, % por familia, "llevando 3 bombachas", descuento por cantidad, vigencia por fechas (Dragonfish, Lightspeed).
+- ✅ Cuotas con recargo o sin interés por medio de pago; el recargo se muestra antes de cobrar.
+- ✅ **Señas y reservas**: prenda apartada con saldo pendiente, vence a X días (Control Comercio, Lightspeed "layaway").
+- ✅ **Cambios y devoluciones** con ticket de cambio o nota de crédito interna; devuelve el stock a la variante correcta (todos).
+- ✅ Gift cards (créditos con código): venta, saldo, uso parcial (Shopify, Odoo).
+- ✅ Clienta en la venta (opcional): historial, cumpleaños, lo que compró y en qué talle.
+- ✅ Vendedora en cada venta; comisiones por vendedora (Control Comercio, Lightspeed).
+- ✅ Ticket impreso (80 mm), por WhatsApp o por correo; sin impresora de tickets también funciona (Augusta hoy no tiene).
+- ✅ Nota en la venta ("cambiar antes del 30", "regalo").
 - Presupuestos / cotizaciones que se convierten en venta (Lightspeed "quotes").
 - Pedidos especiales: vender algo sin stock y encargarlo (Lightspeed "special orders").
-- **Funciona sin internet**: la caja sigue vendiendo y sube las ventas al volver la conexión (Odoo, Lightspeed).
-- Cierre de caja por turno: arqueo por medio de pago, diferencias, retiros e ingresos (Dragonfish, Shopify).
-- Anulación de venta con motivo y permiso.
+- ✅ **Funciona sin internet**: la caja sigue vendiendo y sube las ventas al volver la conexión (Odoo, Lightspeed).
+- ✅ Cierre de caja por turno: arqueo por medio de pago, diferencias, retiros e ingresos (Dragonfish, Shopify).
+- ✅ Anulación de venta con motivo y permiso.
 - ★ Caja en el celular: vender y cobrar desde el teléfono en el local o en un evento (Dragonfish Mobile).
 
 ## 4. Clientas y fidelización (F2 básico, F5 completo)
