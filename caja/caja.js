@@ -29,7 +29,7 @@ APP.ready.then(async () => {
     try {
       const [vars, prods] = await Promise.all([
         paginar(() => sb.from('v_variantes').select('id,producto_id,producto_codigo,producto_nombre,producto_tipo,sku,ean,talle,talle_nombre,talle_orden,color,color_nombre,color_hex,precio,costo,stock,activa').eq('empresa_id', e).eq('activa', true).order('producto_nombre').order('talle_orden')),
-        paginar(() => sb.from('productos').select('id,categoria_id,tipo,activo').eq('empresa_id', e).eq('activo', true))
+        paginar(() => sb.from('productos').select('id,categoria_id,tipo,activo,imagen_url').eq('empresa_id', e).eq('activo', true))
       ]);
       productos = Object.fromEntries(prods.map(x => [x.id, x]));
       catalogo = vars.filter(x => productos[x.id === undefined ? '' : x.producto_id]);
@@ -154,8 +154,9 @@ APP.ready.then(async () => {
     const l = listas.find(x => x.id === (listaId || carrito.lista)) || { porcentaje: 100 };
     return Math.round((+v.precio || 0) * (+l.porcentaje) / 100);
   }
-  function agregar(v, cantidad = 1) {
+  function agregar(v, cantidad) {
     if (!v) return;
+    if (cantidad == null) cantidad = (APP.caja && APP.caja.tomarCantidad && APP.caja.tomarCantidad()) || 1;   // el teclado del POS puede dejar una cantidad lista
     const ya = carrito.lineas.find(l => l.variante.id === v.id && !l.devuelta);
     if (ya) ya.cantidad += cantidad; else carrito.lineas.push({ variante: v, cantidad, descPct: 0 });
     recientes(v); pintar(); $('#q').focus();
@@ -411,6 +412,10 @@ APP.ready.then(async () => {
     c.subtotal = r2(subtotal); c.descuento = r2(subtotal * (carrito.descPct || 0) / 100); c.total = r2(c.subtotal - c.descuento); c.costo = r2(costo); return c; };
 
   // ================= Arranque =================
+  // lo que el POS (pos.js) necesita de la caja: catálogo en memoria, carrito y acciones
+  APP.caja = { get catalogo() { return catalogo; }, get productos() { return productos; }, get carrito() { return carrito; }, get turno() { return turno; }, get listas() { return listas; },
+    agregar, elegirProducto, pintar, precioLista, cobrar, calcular: () => calcular(), buscar, abrirTurno, cerrarTurno, movimientoCaja, pintarEstado, colaPendiente, sincronizar };
   await cargarBase(); await cargarTurno(); pintar(); pintarRecientes(); sincronizar();
+  if (APP.caja.alCargar) APP.caja.alCargar();
   const params = new URLSearchParams(location.search); if (params.get('cambio')) { $('#btn-cambio').click(); }
 });

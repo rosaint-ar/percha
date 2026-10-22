@@ -42,6 +42,7 @@
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $ } = APP, e = APP.empresa.id;
+  if (APP.rol === 'vendedora') { location.replace('caja/pos.html'); return; }   // la vendedora entra directo a vender
   // Los totales los calcula la base (resumen_inicio): el navegador nunca suma listas largas
   const [res, mov] = await Promise.all([
     sb.rpc('resumen_inicio', { e }),
