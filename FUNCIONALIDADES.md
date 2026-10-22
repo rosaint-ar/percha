@@ -10,7 +10,7 @@ Estado: ✅ hecho · 🔧 en curso · F2…F6 fase prevista · ★ diferencial d
 - ✅ Código de barras por variante; se reutilizan los del proveedor (Dragonfish).
 - ✅ Artículos únicos (sin talle ni color), servicios, señas, gift cards, envíos.
 - ✅ Familias, proveedores, costo, precio de lista.
-- F2 **Curvas de talle** por familia o proveedor (ej. "curva adulto: S M L XL = 1 2 2 1"): al comprar o cargar, se reparte por talle solo.
+- ✅ **Curvas de talle** por familia o proveedor (ej. "curva adulto: S M L XL = 1 2 2 1"): al comprar o cargar, se reparte por talle solo.
 - F2 Paleta de colores con muestra y agrupación (familia de color) para filtrar.
 - F2 Fotos del producto y de cada color (sirven en caja, en etiquetas y en la tienda online).
 - F2 Productos compuestos / packs (pack x3 bombachas descuenta las 3 unidades) (Lightspeed "composite").
@@ -57,12 +57,12 @@ Estado: ✅ hecho · 🔧 en curso · F2…F6 fase prevista · ★ diferencial d
 - F5 Avisos por WhatsApp: cumpleaños, "llegó tu talle", seña por vencer (★ con el bot que ya existe en EyG).
 - F5 Segmentos: quién compró qué, quién no vuelve hace 90 días.
 
-## 5. Compras y proveedores (F4)
-- Orden de compra al proveedor por curva de talles; recepción total o parcial con lector.
-- Ingreso de mercadería actualiza stock y costo; costo promedio o último.
+## 5. Compras y proveedores
+- ✅ Orden de compra al proveedor por curva de talles; recepción total o parcial con lector.
+- ✅ Ingreso de mercadería actualiza stock y costo; costo promedio o último.
 - Devolución al proveedor.
-- Cuenta corriente de proveedores, pagos y vencimientos.
-- Etiquetas de lo recibido en un clic.
+- ✅ Cuenta corriente de proveedores, pagos y vencimientos.
+- ✅ Etiquetas de lo recibido en un clic.
 - ★ Comparar lo pedido vs lo recibido vs lo facturado.
 
 ## 6. Facturación ARCA (F3)
