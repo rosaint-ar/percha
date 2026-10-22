@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cruce de productos · Percha</title>
+<meta name="app-root" content="../">
+<link rel="stylesheet" href="../shell/shell.css">
+<style>
+  .filtros{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+  .pestanas{display:flex;gap:4px;background:var(--relleno);padding:3px;border-radius:10px}
+  .pestanas button{border:0;background:transparent;padding:7px 12px;border-radius:8px;font:600 13px var(--f-ui);color:var(--tinta-2);cursor:pointer}
+  .pestanas button.on{background:var(--superficie-2);color:var(--tinta);box-shadow:0 1px 2px rgba(21,23,28,.08)}
+  .pestanas button b{font-family:var(--f-mono);font-weight:600;margin-left:4px;color:var(--tinta-3)}
+  td img{width:34px;height:34px;object-fit:cover;border-radius:8px;vertical-align:middle;margin-right:8px;background:var(--relleno)}
+  td .dif{font-family:var(--f-mono);font-weight:700}
+  td .dif.mas{color:var(--ok)}td .dif.menos{color:var(--error)}
+  .sugerencias{position:absolute;z-index:5;background:var(--superficie-2);border:1px solid var(--linea);border-radius:var(--radio-chico);box-shadow:var(--sombra-flotante);max-height:260px;overflow:auto;width:min(480px,90vw)}
+  .sugerencias div{padding:8px 12px;cursor:pointer;font-size:13px}.sugerencias div:hover{background:var(--lila)}.sugerencias small{font-family:var(--f-mono);color:var(--tinta-3)}
+</style>
+</head>
+<body data-page="conexiones" data-etq="Conexiones" data-title="Cruce de productos" data-subtitle="Lo que está publicado en el canal contra lo que hay en Percha">
+<main class="app">
+  <div class="filtros">
+    <div class="pestanas" id="pestanas"><button class="on" data-f="todo">Todo</button><button data-f="distinto">Stock distinto<b id="n-distinto"></b></button><button data-f="sin_cruzar">Sin cruzar<b id="n-sin"></b></button><button data-f="sin_publicar">En Percha pero no en el canal<b id="n-nopub"></b></button></div>
+    <div class="buscador" style="min-width:240px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" placeholder="Buscar"></div>
+    <span class="sub" id="resumen" style="margin-left:auto"></span>
+  </div>
+  <div class="card" style="padding:0"><table class="lista" id="tb"><thead></thead><tbody></tbody></table><div id="mas" style="padding:12px;text-align:center;display:none"><button class="btn" id="btn-mas">Ver más</button></div></div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../shared/supabase.js"></script>
+<script src="../shell/shell.js"></script>
+<script>
+APP.ready.then(async () => {
+  const { fmt, esc, $, $$, toast, modal, mensajeError } = APP, e = APP.empresa.id;
+  const params = new URLSearchParams(location.search); let cxId = params.get('c');
+  if (!cxId) { const { data } = await sb.from('conexiones').select('id').eq('empresa_id', e).limit(1).maybeSingle(); cxId = data && data.id; }
+  if (!cxId) { $('main').innerHTML = '<div class="card"><p>No hay ningún canal conectado todavía. <a href="conexiones.html">Conectar</a></p></div>'; return; }
+  $('#acciones-pagina').innerHTML = `<a class="btn" href="conexiones.html">← Conexiones</a>`;
+  let filtro = 'todo', pagina = 0, filas = [], variantesPercha = null;
+  const PAG = 150;
+  async function contar() {
+    const { data: r } = await sb.rpc('resumen_conexion', { c: cxId }); const x = r || {};
+    $('#n-distinto').textContent = fmt.num(x.stock_distinto || 0); $('#n-sin').textContent = fmt.num(x.sin_cruzar || 0); $('#n-nopub').textContent = fmt.num(x.percha_sin_publicar || 0);
+  }
+  async function cargar(reiniciar) {
+    if (reiniciar) { pagina = 0; filas = []; }
+    const q = $('#q').value.trim();
+    let data;
+    if (filtro === 'sin_publicar') {
+      let c = sb.from('v_variantes_sin_canal').select('*').eq('conexion_id', cxId).order('producto_nombre').range(pagina * PAG, pagina * PAG + PAG - 1);
+      if (q) c = c.or(`producto_nombre.ilike.%${q}%,sku.ilike.%${q}%`);
+      ({ data } = await c);
+      $('#tb thead').innerHTML = '<tr><th>Prenda en Percha</th><th>Talle · color</th><th>SKU</th><th class="num">Stock Percha</th><th class="num">Precio</th></tr>';
+      filas = filas.concat(data || []);
+      $('#tb tbody').innerHTML = filas.map(v => `<tr><td>${esc(v.producto_nombre)}</td><td>${esc([v.talle_nombre, v.color_nombre].filter(Boolean).join(' · ') || 'único')}</td><td class="mono">${esc(v.sku || '')}</td><td class="num">${fmt.num(v.stock)}</td><td class="num">${fmt.pesos(v.precio)}</td></tr>`).join('') || '<tr><td colspan="5" class="vacio">Todo lo de Percha está en el canal.</td></tr>';
+    } else {
+      let c = sb.from('v_cruce_canal').select('*').eq('conexion_id', cxId).order('nombre').order('valores').range(pagina * PAG, pagina * PAG + PAG - 1);
+      if (filtro === 'distinto') c = c.eq('estado_stock', 'distinto'); if (filtro === 'sin_cruzar') c = c.is('variante_id', null);
+      if (q) c = c.or(`nombre.ilike.%${q}%,sku.ilike.%${q}%,valores.ilike.%${q}%`);
+      ({ data } = await c);
+      $('#tb thead').innerHTML = '<tr><th>En el canal</th><th>SKU</th><th class="num">Stock canal</th><th>En Percha</th><th class="num">Stock Percha</th><th class="num">Dif.</th><th class="num">Precio canal</th><th></th></tr>';
+      filas = filas.concat(data || []);
+      $('#tb tbody').innerHTML = filas.map(x => { const dif = x.variante_id && x.stock != null ? (+x.stock_percha - +x.stock) : null;
+        return `<tr><td>${x.imagen ? `<img src="${esc(x.imagen)}" alt="">` : ''}${esc(x.nombre)}<br><small style="color:var(--tinta-3)">${esc(x.valores || '')}${x.publicado === false ? ' · <span class="chip gris">oculto</span>' : ''}</small></td><td class="mono">${esc(x.sku || x.mpn || '')}</td><td class="num">${x.stock == null ? '<span class="chip gris">sin control</span>' : fmt.num(x.stock)}</td>
+          <td>${x.variante_id ? `${esc(x.producto_percha)}<br><small style="color:var(--tinta-3)">${esc([x.talle_nombre, x.color_nombre].filter(Boolean).join(' · ') || 'único')} · <span class="chip ${x.cruce === 'manual' ? '' : 'ok'}">${x.cruce}</span></small>` : '<span class="chip error">sin cruzar</span>'}</td>
+          <td class="num">${x.variante_id ? fmt.num(x.stock_percha) : ''}</td><td class="num">${dif == null ? '' : `<span class="dif ${dif > 0 ? 'mas' : dif < 0 ? 'menos' : ''}">${dif > 0 ? '+' : ''}${fmt.num(dif)}</span>`}</td><td class="num">${fmt.pesos(x.precio)}${x.precio_promo ? `<br><small style="color:var(--ok)">${fmt.pesos(x.precio_promo)}</small>` : ''}</td>
+          <td>${APP.esAdmin ? `<button class="btn chico" data-cruzar="${x.id}">${x.variante_id ? 'Cambiar' : 'Cruzar'}</button>` : ''}</td></tr>`; }).join('') || '<tr><td colspan="8" class="vacio">Nada en esta vista.</td></tr>';
+      $$('[data-cruzar]').forEach(b => b.onclick = () => cruzar(filas.find(x => String(x.id) === b.dataset.cruzar)));
+    }
+    $('#mas').style.display = (data || []).length === PAG ? 'block' : 'none';
+    $('#resumen').textContent = `${fmt.num(filas.length)} filas`;
+  }
+  async function cruzar(item) {
+    if (!variantesPercha) { let d = 0, t = []; while (true) { const { data } = await sb.from('v_variantes').select('id,producto_nombre,producto_codigo,sku,talle_nombre,color_nombre,stock').eq('empresa_id', e).eq('activa', true).order('producto_nombre').range(d, d + 999); t = t.concat(data || []); if (!data || data.length < 1000) break; d += 1000; } variantesPercha = t; }
+    const m = modal(`<h2>Cruzar con una variante de Percha</h2><p class="sub">${esc(item.nombre)} · ${esc(item.valores || '')} · SKU ${esc(item.sku || item.mpn || '—')}</p>
+      <div class="campo" style="margin-top:12px;position:relative"><label>Buscar en Percha</label><input id="cz-q" placeholder="Nombre o código" value="${esc(item.sku || '')}"><div class="sugerencias" id="cz-sug" style="display:none"></div></div>
+      <div class="pie">${item.variante_id ? '<button class="btn" data-quitar style="margin-right:auto">Quitar cruce</button>' : ''}<button class="btn" data-no>Cancelar</button></div>`);
+    const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    const buscar = () => { const t = norm($('#cz-q', m).value.trim()); const pal = t.split(/\s+/).filter(Boolean); const res = pal.length ? variantesPercha.filter(v => pal.every(w => norm(`${v.producto_nombre} ${v.producto_codigo} ${v.sku} ${v.talle_nombre} ${v.color_nombre}`).includes(w))).slice(0, 30) : [];
+      const s = $('#cz-sug', m); s.innerHTML = res.map(v => `<div data-v="${v.id}">${esc(v.producto_nombre)} · ${esc([v.talle_nombre, v.color_nombre].filter(Boolean).join(' · ') || 'único')} <small>${esc(v.sku || '')} · stock ${fmt.num(v.stock)}</small></div>`).join('') || '<div class="vacio">Nada</div>'; s.style.display = 'block';
+      $$('[data-v]', s).forEach(d => d.onclick = async () => { const r = await sb.from('canal_items').update({ variante_id: d.dataset.v, cruce: 'manual' }).eq('id', item.id); if (r.error) { toast(mensajeError(r.error), 'error'); return; } m.cerrar(); toast('Cruzado'); contar(); cargar(true); }); };
+    $('#cz-q', m).addEventListener('input', buscar); buscar();
+    $('[data-no]', m).onclick = () => m.cerrar();
+    const qt = $('[data-quitar]', m); if (qt) qt.onclick = async () => { await sb.from('canal_items').update({ variante_id: null, cruce: 'ninguno' }).eq('id', item.id); m.cerrar(); contar(); cargar(true); };
+  }
+  $$('#pestanas button').forEach(b => b.onclick = () => { $$('#pestanas button').forEach(x => x.classList.toggle('on', x === b)); filtro = b.dataset.f; cargar(true); });
+  let t; $('#q').addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => cargar(true), 250); });
+  $('#btn-mas').onclick = () => { pagina++; cargar(false); };
+  await contar(); await cargar(true);
+});
+</script>
+</body>
+</html>
