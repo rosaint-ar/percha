@@ -30,7 +30,7 @@
 <body data-page="conexiones" data-etq="Conexiones" data-title="Cruce de productos" data-subtitle="Lo que hay en el local contra lo publicado en el canal">
 <main class="app">
   <div class="filtros">
-    <div class="pestanas" id="pestanas"><button class="on" data-f="todo">Todo</button><button data-f="distinto">Stock distinto<b id="n-distinto"></b></button><button data-f="sin_cruzar">Sin cruzar<b id="n-sin"></b></button><button data-f="sin_publicar">En el local pero no en <span id="nopub-canal">el canal</span><b id="n-nopub"></b></button></div>
+    <div class="pestanas" id="pestanas"><button class="on" data-f="todo">Todo</button><button data-f="distinto">Stock distinto<b id="n-distinto"></b></button><button data-f="sin_cruzar">Sin cruzar<b id="n-sin"></b></button><button data-f="sin_publicar">En el local pero no en <span id="nopub-canal">el canal</span><b id="n-nopub"></b></button><button data-f="nuevos">Nuevos en <span id="nuevos-canal">el canal</span><b id="n-nuevos"></b></button></div>
     <div class="buscador" style="min-width:240px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" placeholder="Buscar"></div>
     <span class="sub" id="resumen" style="margin-left:auto"></span>
   </div>
@@ -41,14 +41,14 @@
 <script src="../shell/shell.js"></script>
 <script>
 APP.ready.then(async () => {
-  const { fmt, esc, $, $$, toast, modal, mensajeError } = APP, e = APP.empresa.id;
+  const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
   const params = new URLSearchParams(location.search); let cxId = params.get('c');
   if (!cxId) { const { data } = await sb.from('conexiones').select('id').eq('empresa_id', e).limit(1).maybeSingle(); cxId = data && data.id; }
   if (!cxId) { $('main').innerHTML = '<div class="card"><p>No hay ningún canal conectado todavía. <a href="conexiones.html">Conectar</a></p></div>'; return; }
   const { data: cx } = await sb.from('conexiones').select('canal,nombre').eq('id', cxId).maybeSingle();
   const CANAL = { tiendanube: 'Tienda Nube', mercadolibre: 'Mercado Libre' }[(cx || {}).canal] || 'el canal';
   $('.cab-pagina .sub').textContent = `Lo que hay en el local contra lo publicado en ${CANAL}. El stock local es el que manda.`;
-  $('#nopub-canal').textContent = CANAL;
+  $('#nopub-canal').textContent = CANAL; $('#nuevos-canal').textContent = CANAL;
   $('#acciones-pagina').innerHTML = `<a class="btn" href="conexiones.html">← Conexiones</a>`;
   let filtro = 'todo', pagina = 0, filas = [], variantesPercha = null;
   const PAG = 150, puedeEditar = APP.rol !== 'visor';
@@ -56,16 +56,42 @@ APP.ready.then(async () => {
   async function empujar() { try { const { data: { session } } = await sb.auth.getSession(); fetch(`${SUPABASE_URL}/functions/v1/tn-push`, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SUPABASE_KEY, Authorization: `Bearer ${session.access_token}` }, body: JSON.stringify({ empresa_id: e }) }); } catch (_) {} }
   async function contar() {
     const { data: r } = await sb.rpc('resumen_conexion', { c: cxId }); const x = r || {};
-    $('#n-distinto').textContent = fmt.num(x.stock_distinto || 0); $('#n-sin').textContent = fmt.num(x.sin_cruzar || 0); $('#n-nopub').textContent = fmt.num(x.percha_sin_publicar || 0);
+    $('#n-distinto').textContent = fmt.num(x.stock_distinto || 0); $('#n-sin').textContent = fmt.num(x.sin_cruzar || 0); $('#n-nopub').textContent = fmt.num(x.percha_sin_publicar || 0); $('#n-nuevos').textContent = fmt.num(x.nuevos || 0);
   }
+  let pedido = 0;
   async function cargar(reiniciar) {
     if (reiniciar) { pagina = 0; filas = []; }
-    const q = $('#q').value.trim();
+    const q = $('#q').value.trim(), mio = ++pedido;   // si llega otra carga mientras tanto, esta se descarta (evita filas duplicadas)
     let data;
-    if (filtro === 'sin_publicar') {
+    if (filtro === 'nuevos') {
+      // productos del canal que no tienen producto propio en el local: se crean tal cual (nombre, foto, precio, variantes) con código automático
+      let c = sb.from('v_canal_nuevos').select('*').eq('conexion_id', cxId).order('sku').order('nombre').range(pagina * PAG, pagina * PAG + PAG - 1);
+      if (q) c = c.or(`nombre.ilike.%${q}%,sku.ilike.%${q}%`);
+      ({ data } = await c); if (mio !== pedido) return;
+      $('#tb thead').innerHTML = `<tr><th>Producto en ${esc(CANAL)}</th><th>SKU</th><th class="num">Variantes</th><th class="num">Stock ${esc(CANAL)}</th><th class="num">Precio</th><th>Hoy en el local</th><th></th></tr>`;
+      filas = filas.concat(data || []);
+      const creables = filas.filter(x => !x.es_pack && x.publicado !== false);   // los ocultos del canal se crean uno por uno, si hace falta
+      $('#tb tbody').innerHTML = filas.map(x => `<tr><td>${x.imagen ? `<img src="${esc(x.imagen)}" alt="">` : ''}${esc(x.nombre)}${x.publicado === false ? ' <span class="chip gris">oculto</span>' : ''}</td><td class="mono">${esc(x.sku || '')}</td><td class="num">${fmt.num(x.variantes)}</td><td class="num stock-canal">${x.stock == null ? '—' : fmt.num(x.stock)}</td><td class="num">${fmt.pesos(x.precio)}</td>
+          <td>${x.estado === 'bolsa' ? `<span class="chip aviso">en la bolsa</span> <small style="color:var(--tinta-3)">${esc(x.bolsa_codigo || '')} ${esc(x.bolsa_nombre || '')} · ${fmt.num(x.bolsa_modelos)} modelos</small>` : '<span class="chip error">sin cruzar</span>'}</td>
+          <td style="white-space:nowrap">${APP.esAdmin ? (x.es_pack ? '<span class="chip gris" title="Los packs van como kits, después de las prendas sueltas">pack</span>' : `<button class="btn chico primario" data-crear-prod="${esc(x.producto_ext)}">Crear en el local</button>`) : ''}</td></tr>`).join('') || `<tr><td colspan="7" class="vacio">Todo lo de ${esc(CANAL)} tiene su producto en el local.</td></tr>`;
+      if (APP.esAdmin && creables.length) $('#tb tbody').insertAdjacentHTML('afterbegin', `<tr><td colspan="7" style="background:var(--lila)"><b>${fmt.num(creables.length)}</b> productos publicados en esta vista se pueden crear en el local de una vez (los packs y los ocultos quedan para después). Cada uno sale con código automático, foto, precio y variantes de ${esc(CANAL)}; si hoy apuntan a una bolsa, se llevan el stock que ${esc(CANAL)} tenía publicado. <button class="btn chico primario" id="btn-crear-todos" style="margin-left:8px">Crear los ${fmt.num(creables.length)}</button></td></tr>`);
+      const crearVarios = async (exts) => {
+        let creados = 0, errores = [];
+        for (let i = 0; i < exts.length; i += 20) {
+          toast(`Creando… ${fmt.num(Math.min(i + 20, exts.length))} de ${fmt.num(exts.length)}`);
+          const { data: r, error } = await sb.rpc('canal_crear_productos', { p_conexion: cxId, p_exts: exts.slice(i, i + 20) });
+          if (error) { errores.push(mensajeError(error)); break; }
+          creados += (r.creados || []).length; errores = errores.concat((r.errores || []).map(x => x.error));
+        }
+        toast(`${fmt.num(creados)} productos creados en el local${errores.length ? ' · ' + errores.length + ' con error: ' + errores[0] : ''}`, errores.length ? 'error' : '');
+        empujar(); contar(); cargar(true);
+      };
+      $$('[data-crear-prod]').forEach(b => b.onclick = () => { b.disabled = true; crearVarios([b.dataset.crearProd]); });
+      const bt = $('#btn-crear-todos'); if (bt) bt.onclick = async () => { if (!await confirmar(`Se crean ${fmt.num(creables.length)} productos en el local con código automático. ¿Seguimos?`, 'Crear')) return; bt.disabled = true; crearVarios(creables.map(x => x.producto_ext)); };
+    } else if (filtro === 'sin_publicar') {
       let c = sb.from('v_variantes_sin_canal').select('*').eq('conexion_id', cxId).order('producto_nombre').range(pagina * PAG, pagina * PAG + PAG - 1);
       if (q) c = c.or(`producto_nombre.ilike.%${q}%,sku.ilike.%${q}%`);
-      ({ data } = await c);
+      ({ data } = await c); if (mio !== pedido) return;
       $('#tb thead').innerHTML = '<tr><th>Prenda en el local</th><th>Talle · color</th><th>SKU</th><th class="num">Stock local</th><th class="num">Precio</th></tr>';
       filas = filas.concat(data || []);
       $('#tb tbody').innerHTML = filas.map(v => `<tr><td>${esc(v.producto_nombre)}</td><td>${esc([v.talle_nombre, v.color_nombre].filter(Boolean).join(' · ') || 'único')}</td><td class="mono">${esc(v.sku || '')}</td><td class="num stock-local"><span class="n">${fmt.num(v.stock)}</span></td><td class="num">${fmt.pesos(v.precio)}</td></tr>`).join('') || `<tr><td colspan="5" class="vacio">Todo lo del local está en ${esc(CANAL)}.</td></tr>`;
@@ -73,7 +99,7 @@ APP.ready.then(async () => {
       let c = sb.from('v_cruce_canal').select('*').eq('conexion_id', cxId).order('nombre').order('valores').range(pagina * PAG, pagina * PAG + PAG - 1);
       if (filtro === 'distinto') c = c.eq('estado_stock', 'distinto'); if (filtro === 'sin_cruzar') c = c.is('variante_id', null);
       if (q) c = c.or(`nombre.ilike.%${q}%,sku.ilike.%${q}%,valores.ilike.%${q}%`);
-      ({ data } = await c);
+      ({ data } = await c); if (mio !== pedido) return;
       $('#tb thead').innerHTML = `<tr class="grupos"><th colspan="2">En el local</th><th colspan="4" class="canal ini fin">En ${esc(CANAL)}</th><th colspan="2"></th></tr>
         <tr><th>Prenda</th><th class="num">Stock local</th><th class="canal ini">Publicación</th><th class="canal">SKU</th><th class="num canal">Stock ${esc(CANAL)}</th><th class="num canal fin">Precio</th><th class="num" title="Local menos ${esc(CANAL)}">Dif.</th><th></th></tr>`;
       filas = filas.concat(data || []);

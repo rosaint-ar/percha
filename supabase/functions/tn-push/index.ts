@@ -56,8 +56,10 @@ Deno.serve(async (req) => {
         if (!r.ok) { fallo = `${r.status} ${(await r.text()).slice(0, 200)}`; break; }
         await admin.from("canal_items").update({ stock: valor, actualizado: new Date().toISOString() }).eq("id", d.id);
       }
+      // memoria: qué decía el canal antes y qué se mandó (para poder volver atrás)
+      const anterior = destinos.length ? +destinos[0].stock : null;
       if (fallo) { err++; await admin.from("canal_cola").update({ intentos: (fila as any).intentos + 1 || 1, error: fallo, estado: ((fila as any).intentos || 0) + 1 >= 5 ? "error" : "pendiente" }).eq("id", fila.id); }
-      else { ok++; await admin.from("canal_cola").update({ estado: "hecho", hecho: new Date().toISOString(), error: null }).eq("id", fila.id); }
+      else { ok++; await admin.from("canal_cola").update({ estado: "hecho", hecho: new Date().toISOString(), error: null, stock_anterior: anterior, stock_enviado: nuevo }).eq("id", fila.id); }
     }
     resumen.push({ conexion: cx.id, actualizadas: ok, errores: err });
   }

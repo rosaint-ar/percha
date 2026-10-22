@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conteo · Percha</title>
+<meta name="app-root" content="../">
+<link rel="stylesheet" href="../shell/shell.css">
+<style>
+  .origen{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center}
+  .origen select{border:1px solid var(--linea);background:var(--superficie-2);border-radius:10px;padding:10px 12px;font-size:14px;width:100%}
+  .queda{text-align:right}.queda b{display:block;font:800 30px/1 var(--f-titulo);letter-spacing:-.04em;font-variant-numeric:tabular-nums}.queda span{font-size:12px;color:var(--tinta-3)}
+  .familias{display:flex;gap:6px;overflow-x:auto;padding:12px 0 4px;scrollbar-width:thin}
+  .familias button{flex:none;border:1px solid var(--linea);background:var(--superficie-2);border-radius:999px;padding:8px 14px;font:600 13px var(--f-ui);color:var(--tinta-2);cursor:pointer;white-space:nowrap}
+  .familias button b{font:500 11px var(--f-mono);color:var(--tinta-4);margin-left:5px}
+  .familias button.on{background:var(--acento);border-color:var(--acento);color:#fff}.familias button.on b{color:rgba(255,255,255,.7)}
+  .grilla{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:10px}
+  .tile-p{background:var(--superficie-2);border:1px solid var(--linea);border-radius:14px;overflow:hidden;cursor:pointer;display:flex;flex-direction:column;position:relative;user-select:none;transition:transform .08s,box-shadow .12s}
+  .tile-p:hover{transform:translateY(-1px);box-shadow:0 8px 20px rgba(21,23,28,.1);border-color:rgba(var(--acento-rgb),.5)}
+  .tile-p .foto{aspect-ratio:1/1;background:var(--relleno) center/cover no-repeat;display:grid;place-items:center;color:var(--tinta-4);font:700 20px var(--f-titulo)}
+  .tile-p .foto.sinfoto{aspect-ratio:auto;height:50px;background:linear-gradient(145deg,rgba(var(--acento-rgb),.14),rgba(var(--acento-rgb),.04));color:var(--acento)}
+  .tile-p .txt{padding:8px 10px 10px}.tile-p .nom{font:600 12.5px/1.25 var(--f-ui);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .tile-p .cod{font:500 10px var(--f-mono);color:var(--tinta-4)}
+  .tile-p .st{position:absolute;top:8px;right:8px;font:700 11px var(--f-mono);padding:3px 7px;border-radius:7px;background:rgba(255,255,255,.92);color:var(--ok);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+  .tile-p .st.cero{color:var(--tinta-3)}
+  .vars{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin-top:12px}
+  .vars button{border:1px solid var(--linea);background:var(--superficie-2);border-radius:11px;padding:12px 6px;cursor:pointer;text-align:center;font:700 13px var(--f-ui);min-height:60px}
+  .vars button small{display:block;font:500 11px var(--f-mono);color:var(--tinta-3);margin-top:2px}
+  .vars button:hover{border-color:var(--acento);background:var(--lila)}
+  .cant{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:12px}
+  .cant button{height:48px;border:1px solid var(--linea);background:var(--superficie-2);border-radius:10px;font:700 16px var(--f-mono);cursor:pointer}
+  .cant button.on{background:var(--acento);color:#fff;border-color:var(--acento)}
+  .cant-input{font:800 36px var(--f-mono);text-align:center;width:100%;border:1px solid var(--linea);border-radius:12px;padding:8px;margin-top:12px;letter-spacing:-.03em}
+  .hoy td{font-size:13px}
+</style>
+</head>
+<body data-page="conteo" data-etq="Catálogo" data-title="Conteo" data-subtitle="Contá lo que hay y pasalo de la bolsa al modelo real. Cada conteo queda registrado como ajuste y se refleja en la tienda online.">
+<main class="app">
+  <div class="card">
+    <div class="origen">
+      <div><label class="etq">De dónde salen las unidades</label><select id="sel-bolsa"></select></div>
+      <div class="queda"><b id="queda">—</b><span id="queda-txt">en la bolsa</span></div>
+    </div>
+    <div class="familias" id="familias"></div>
+    <div class="buscador" style="min-width:0;width:100%;margin-top:8px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" placeholder="Buscar el modelo (fru fru, vedetina, cherry…)" autocomplete="off"></div>
+    <div class="grilla" id="grilla"></div>
+  </div>
+  <div class="card" id="card-hoy" style="display:none"><div class="card-cab"><h2>Contado en esta sesión</h2><span class="sub" id="hoy-total"></span></div><table class="lista hoy" id="tb-hoy"></table></div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../shared/supabase.js"></script>
+<script src="../shell/shell.js"></script>
+<script>
+APP.ready.then(async () => {
+  const { fmt, esc, $, $$, toast, modal, mensajeError } = APP, e = APP.empresa.id;
+  if (APP.rol === 'visor') { $('main').innerHTML = '<div class="card"><p>Tu usuario es de solo lectura.</p></div>'; return; }
+  const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  async function paginar(consulta) { let d = 0, t = []; while (true) { const { data, error } = await consulta().range(d, d + 999); if (error) throw error; t = t.concat(data || []); if (!data || data.length < 1000) break; d += 1000; } return t; }
+  let catalogo = [], productos = {}, categorias = [], porProducto = new Map(), familia = 'todo', bolsa = null, hoy = [];
+  async function cargar() {
+    const [vars, prods, cats] = await Promise.all([
+      paginar(() => sb.from('v_variantes').select('id,producto_id,producto_codigo,producto_nombre,producto_tipo,talle,talle_nombre,talle_orden,color,color_nombre,stock,activa').eq('empresa_id', e).eq('activa', true).order('producto_nombre').order('talle_orden')),
+      paginar(() => sb.from('productos').select('id,categoria_id,tipo,imagen_url').eq('empresa_id', e).eq('activo', true)),
+      sb.from('categorias').select('id,nombre,orden').eq('empresa_id', e).eq('activa', true).order('orden').order('nombre')
+    ]);
+    productos = Object.fromEntries(prods.map(x => [x.id, x])); categorias = cats.data || [];
+    catalogo = vars.filter(v => productos[v.producto_id] && v.producto_tipo !== 'kit');
+    porProducto = new Map(); catalogo.forEach(v => { if (!porProducto.has(v.producto_id)) porProducto.set(v.producto_id, []); porProducto.get(v.producto_id).push(v); });
+    pintarBolsas(); pintarFamilias(); pintarGrilla();
+  }
+  // bolsas: artículos únicos (sin talle ni color) con stock — el típico "BOMBIS VARIAS"
+  function pintarBolsas() {
+    // solo prendas: envíos, señas, gift cards y "artículos varios" no son bolsas de las que contar
+    const unicas = catalogo.filter(v => !v.talle && !v.color && +v.stock > 0 && porProducto.get(v.producto_id).length === 1 && (productos[v.producto_id] || {}).tipo === 'prenda' && !/varios|art[ií]culos/i.test(v.producto_nombre.replace(/«|»/g, '')) || /BOMBIS|MEDIAS/i.test(v.producto_nombre) && !v.talle && !v.color && +v.stock > 0).sort((a, b) => +b.stock - +a.stock);
+    const sel = $('#sel-bolsa'); const actual = bolsa && bolsa.id;
+    sel.innerHTML = `<option value="">Sin bolsa: solo sumar lo contado</option>` + unicas.map(v => `<option value="${v.id}" ${v.id === actual ? 'selected' : ''}>${esc(v.producto_codigo)} · ${esc(v.producto_nombre)} (${fmt.num(v.stock)} u.)</option>`).join('');
+    if (!actual && unicas.length) { sel.value = unicas[0].id; }
+    bolsa = catalogo.find(v => v.id === sel.value) || null; pintarQueda();
+    sel.onchange = () => { bolsa = catalogo.find(v => v.id === sel.value) || null; pintarQueda(); pintarGrilla(); };
+  }
+  function pintarQueda() { $('#queda').textContent = bolsa ? fmt.num(bolsa.stock) : '—'; $('#queda-txt').textContent = bolsa ? 'quedan en la bolsa' : 'sin bolsa'; }
+  function pintarFamilias() {
+    const cuenta = {}; porProducto.forEach((vars, pid) => { const c = (productos[pid] || {}).categoria_id || 'sin'; cuenta[c] = (cuenta[c] || 0) + 1; });
+    const items = [{ id: 'todo', nombre: 'Todo', n: porProducto.size }, ...categorias.filter(c => cuenta[c.id]).map(c => ({ id: c.id, nombre: c.nombre, n: cuenta[c.id] }))];
+    $('#familias').innerHTML = items.map(c => `<button class="${c.id === familia ? 'on' : ''}" data-f="${c.id}">${esc(c.nombre)}<b>${fmt.num(c.n)}</b></button>`).join('');
+    $$('#familias button').forEach(b => b.onclick = () => { familia = b.dataset.f; pintarFamilias(); pintarGrilla(); });
+    // si hay bolsa, arranca en su familia
+    if (bolsa && familia === 'todo') { const c = (productos[bolsa.producto_id] || {}).categoria_id; if (c && cuenta[c]) { familia = c; pintarFamilias(); } }
+  }
+  const sumaStock = vars => vars.reduce((s, v) => s + (+v.stock || 0), 0);
+  function pintarGrilla() {
+    const palabras = norm($('#q').value.trim()).split(/\s+/).filter(Boolean);
+    let lista = [...porProducto.entries()].filter(([pid]) => !bolsa || pid !== bolsa.producto_id);
+    if (palabras.length) lista = lista.filter(([pid, vars]) => { const t = norm(`${vars[0].producto_nombre} ${vars[0].producto_codigo} ${vars.map(v => v.color_nombre || '').join(' ')}`); return palabras.every(w => t.includes(w)); });
+    else if (familia !== 'todo') lista = lista.filter(([pid]) => (productos[pid] || {}).categoria_id === familia);
+    lista.sort((a, b) => a[1][0].producto_nombre.localeCompare(b[1][0].producto_nombre));
+    const max = 300;
+    $('#grilla').innerHTML = lista.slice(0, max).map(([pid, vars]) => { const v0 = vars[0], st = sumaStock(vars), foto = (productos[pid] || {}).imagen_url;
+      return `<div class="tile-p" data-pid="${pid}">${foto ? `<div class="foto" style="background-image:url('${esc(foto)}')"></div>` : `<div class="foto sinfoto">${esc(APP.iniciales(v0.producto_nombre.replace(/[«»]/g, '')))}</div>`}<span class="st ${st > 0 ? '' : 'cero'}">${fmt.num(st)}</span><div class="txt"><div class="nom">${esc(v0.producto_nombre)}</div><div class="cod">${esc(v0.producto_codigo)} · ${vars.length === 1 && !v0.talle && !v0.color ? 'único' : vars.length + ' variantes'}</div></div></div>`; }).join('') || '<div class="vacio" style="grid-column:1/-1">Nada con ese nombre.</div>';
+    if (lista.length > max) $('#grilla').insertAdjacentHTML('beforeend', `<div class="vacio" style="grid-column:1/-1">Hay ${fmt.num(lista.length - max)} más: afiná la búsqueda.</div>`);
+    $$('.tile-p', $('#grilla')).forEach(t => t.onclick = () => elegirModelo(t.dataset.pid));
+  }
+  let tq; $('#q').addEventListener('input', () => { clearTimeout(tq); tq = setTimeout(pintarGrilla, 150); });
+  function elegirModelo(pid) {
+    const vars = porProducto.get(pid).slice().sort((a, b) => (a.talle_orden ?? 999) - (b.talle_orden ?? 999) || String(a.color_nombre || '').localeCompare(b.color_nombre || ''));
+    if (vars.length === 1 && !vars[0].talle && !vars[0].color) { pedirCantidad(vars[0]); return; }
+    const m = modal(`<h2>${esc(vars[0].producto_nombre)}</h2><p class="sub">¿Qué talle y color contaste?</p><div class="vars">${vars.map(v => `<button data-v="${v.id}">${esc([v.talle_nombre, v.color_nombre].filter(Boolean).join(' · ') || 'único')}<small>hoy ${fmt.num(v.stock)} u.</small></button>`).join('')}</div>`);
+    $$('[data-v]', m).forEach(b => b.onclick = () => { m.cerrar(); pedirCantidad(catalogo.find(v => v.id === b.dataset.v)); });
+  }
+  function pedirCantidad(v) {
+    const m = modal(`<h2>${esc(v.producto_nombre)}</h2><p class="sub">${esc([v.talle_nombre, v.color_nombre].filter(Boolean).join(' · ') || 'único')} · hoy ${fmt.num(v.stock)} u.${bolsa ? ` · salen de ${esc(bolsa.producto_nombre)} (${fmt.num(bolsa.stock)} u.)` : ''}</p>
+      <div class="cant">${[1, 2, 3, 5, 10].map(n => `<button data-n="${n}" class="${n === 1 ? 'on' : ''}">${n}</button>`).join('')}</div>
+      <input class="cant-input" id="c-n" type="number" min="1" step="1" value="1">
+      <div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si style="padding:12px 22px;font-size:15px">Confirmar</button></div>`, { fijo: true });
+    const inp = $('#c-n', m); inp.focus(); inp.select();
+    $$('[data-n]', m).forEach(b => b.onclick = () => { inp.value = b.dataset.n; $$('[data-n]', m).forEach(x => x.classList.toggle('on', x === b)); });
+    inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); $('[data-si]', m).click(); } });
+    $('[data-no]', m).onclick = () => m.cerrar();
+    $('[data-si]', m).onclick = async () => {
+      const n = parseInt(inp.value) || 0; if (n <= 0) return;
+      if (bolsa && n > +bolsa.stock) { toast(`En la bolsa quedan ${fmt.num(bolsa.stock)}: no se puede pasar ${n}`, 'error'); return; }
+      $('[data-si]', m).disabled = true;
+      const { data, error } = await sb.rpc('stock_mover', { p_desde: bolsa ? bolsa.id : null, p_hacia: v.id, p_cantidad: n, p_nota: bolsa ? `Conteo: de ${bolsa.producto_codigo} ${bolsa.producto_nombre}` : 'Conteo' });
+      if (error) { toast(mensajeError(error), 'error'); $('[data-si]', m).disabled = false; return; }
+      v.stock = +data.destino; if (bolsa) bolsa.stock = +data.queda_en_origen;
+      hoy.unshift({ v, n, hora: new Date() }); m.cerrar(); toast(`+${n} ${v.producto_nombre}`);
+      pintarQueda(); pintarGrilla(); pintarHoy(); $('#q').focus(); $('#q').select();
+      // lo contado sale a la tienda online (si el empuje está activo)
+      try { const { data: { session } } = await sb.auth.getSession(); fetch(`${SUPABASE_URL}/functions/v1/tn-push`, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SUPABASE_KEY, Authorization: `Bearer ${session.access_token}` }, body: JSON.stringify({ empresa_id: e }) }); } catch (_) {}
+    };
+  }
+  function pintarHoy() {
+    $('#card-hoy').style.display = hoy.length ? '' : 'none';
+    $('#hoy-total').textContent = `${fmt.num(hoy.reduce((s, x) => s + x.n, 0))} unidades en ${hoy.length} conteos`;
+    $('#tb-hoy').innerHTML = hoy.map(x => `<tr><td class="mono">${x.hora.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</td><td>${esc(x.v.producto_nombre)} <small style="color:var(--tinta-3)">${esc([x.v.talle_nombre, x.v.color_nombre].filter(Boolean).join(' · '))}</small></td><td class="num">+${x.n}</td><td class="num">ahora ${fmt.num(x.v.stock)}</td></tr>`).join('');
+  }
+  await cargar();
+});
+</script>
+</body>
+</html>
