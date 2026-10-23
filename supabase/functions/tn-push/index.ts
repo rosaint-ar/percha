@@ -3,6 +3,7 @@
 // Auth: sesión de un miembro de la empresa  o  header x-cron-key = secreto CRON_KEY.
 // Kits (box/pack): cada variante del box en TN (L / Celeste) recibe el stock del componente en ese talle/color
 //   = mín( stock de cada componente resuelto por talle/color ÷ cantidad ); los filtros cuentan todo lo que cumple el filtro.
+// Prendas con falla (variantes.fallas): son solo del local, no se mandan a la web (stock web = stock − fallas).
 // body.solo_productos = ["500123", …]: empuja solo esos productos (y sus kits), aunque la conexión tenga el empuje apagado.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 const SB_URL = Deno.env.get("SUPABASE_URL")!, ANON = Deno.env.get("SUPABASE_ANON_KEY")!, SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, CRON_KEY = Deno.env.get("CRON_KEY") || "";
@@ -58,7 +59,7 @@ Deno.serve(async (req) => {
     if (!variantes.length) { resumen.push({ conexion: cx.id, actualizadas: 0, errores: 0 }); continue; }
 
     const { data: items } = await admin.from("canal_items").select("id,variante_id,producto_ext,variante_ext,stock,talle_canal,color_canal").eq("conexion_id", cx.id).in("variante_id", variantes);
-    const { data: stocks } = await admin.from("v_variantes").select("id,producto_id,producto_tipo,stock").in("id", variantes);
+    const { data: stocks } = await admin.from("v_variantes").select("id,producto_id,producto_tipo,stock,fallas").in("id", variantes);
     const infoVar = new Map((stocks || []).map((s: any) => [s.id, s]));
     // kits: componentes y variantes de los productos componentes (para resolver talle/color)
     const kitsIds = [...new Set((stocks || []).filter((s: any) => s.producto_tipo === "kit").map((s: any) => s.producto_id))];
@@ -68,14 +69,14 @@ Deno.serve(async (req) => {
       for (const c of cs || []) { if (!comps.has(c.producto_id)) comps.set(c.producto_id, []); comps.get(c.producto_id)!.push(c); }
       const compProds = [...new Set((cs || []).filter((c: any) => c.comp_producto_id && !c.variante_id && !c.filtro).map((c: any) => c.comp_producto_id))];
       if (compProds.length) {
-        const { data: cv } = await admin.from("v_variantes").select("id,producto_id,talle_nombre,color_nombre,stock,activa").in("producto_id", compProds).eq("activa", true);
+        const { data: cv } = await admin.from("v_variantes").select("id,producto_id,talle_nombre,color_nombre,stock,fallas,activa").in("producto_id", compProds).eq("activa", true);
         for (const v of cv || []) { if (!varsDe.has(v.producto_id)) varsDe.set(v.producto_id, []); varsDe.get(v.producto_id)!.push(v); }
       }
     }
     // stock que corresponde a un ítem del canal
     const stockPara = (d: any): number => {
       const v = infoVar.get(d.variante_id); if (!v) return 0;
-      if (v.producto_tipo !== "kit") return Math.max(0, Math.floor(+v.stock || 0));
+      if (v.producto_tipo !== "kit") return Math.max(0, Math.floor((+v.stock || 0) - (+v.fallas || 0)));   // las prendas con falla son solo del local
       const talle = n((d.talle_canal || "").split("/")[0]), color = n(d.color_canal);
       let minimo = Infinity;
       for (const c of comps.get(v.producto_id) || []) {
@@ -86,7 +87,7 @@ Deno.serve(async (req) => {
           const exacta = cands.find((x: any) => n(x.talle_nombre) === talle && n(x.color_nombre) === color)
             || cands.find((x: any) => n(x.talle_nombre) === talle && !x.color_nombre)
             || (!talle ? cands.find((x: any) => n(x.color_nombre) === color && !x.talle_nombre) : null);
-          disp = exacta ? +exacta.stock || 0 : 0;
+          disp = exacta ? Math.max(0, (+exacta.stock || 0) - (+exacta.fallas || 0)) : 0;
         }
         minimo = Math.min(minimo, Math.floor(disp / (+c.cantidad || 1)));
       }

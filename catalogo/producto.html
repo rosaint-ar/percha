@@ -16,6 +16,9 @@
   .volver{font:600 14px var(--f-ui);text-decoration:none;color:var(--suave)}
   .campo input[readonly]{background:var(--blanco);color:var(--suave)}
   @media (max-width:900px){.dos{grid-template-columns:1fr}}
+  .aviso-chequear{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:#eef4ff;border:1px solid #c9dbff;color:#1b4f99;border-radius:10px;padding:8px 12px;margin-bottom:12px;font-size:13px}
+  .aviso-chequear label{display:flex;gap:6px;align-items:center;font-weight:600;cursor:pointer}
+  .celda small.m-falla{color:#8a6400;font-weight:700}.celda small.m-chq{color:#1b4f99;font-weight:700}
 </style>
 </head>
 <body data-page="productos" data-etq="Catálogo" data-title="Producto">
@@ -219,7 +222,7 @@ APP.ready.then(async () => {
         const v = variantes.find(x => (x.talle || '') === t.c && (x.color || '') === c.c);
         if (!v) { h += '<td></td>'; return; }
         const s = +v.stock || 0; tot += s;
-        h += `<td><span class="celda ${s === 0 ? 'cero' : (s < 0 ? 'neg' : '')}" data-v="${v.id}" title="${esc(v.sku || '')}">${fmt.num(s)}${!v.ean ? '<small>sin código</small>' : ''}</span></td>`;
+        h += `<td><span class="celda ${s === 0 ? 'cero' : (s < 0 ? 'neg' : '')}" data-v="${v.id}" title="${esc(v.sku || '')}">${fmt.num(s)}${+v.fallas > 0 ? `<small class="m-falla">◆${fmt.num(v.fallas)} falla</small>` : ''}${v.chequear ? '<small class="m-chq">a chequear</small>' : ''}${!v.ean && !(+v.fallas > 0) && !v.chequear ? '<small>sin código</small>' : ''}</span></td>`;
       });
       h += `<td><b>${fmt.num(tot)}</b></td></tr>`;
     });
@@ -241,6 +244,11 @@ APP.ready.then(async () => {
         <div class="campo"><label>Precio propio</label><input id="v-precio" type="number" step="0.01" value="${v.precio != null && +v.precio !== +producto.precio ? v.precio : ''}" placeholder="igual al producto" ${APP.esAdmin ? '' : 'disabled'}></div>
       </div>
       <table class="lista" style="margin-bottom:12px"><tr><th>Depósito</th><th class="num">Stock</th></tr>${porDep.map(x => `<tr><td>${esc(x.d.nombre)}</td><td class="num num-f">${fmt.num(x.c)}</td></tr>`).join('')}</table>
+      ${v.chequear ? `<div class="aviso-chequear"><span>🔎 ${esc(v.chequear)}</span>${APP.esAdmin ? '<label><input type="checkbox" id="v-chequeado"> Ya está chequeado</label>' : ''}</div>` : ''}
+      <div class="fila c2">
+        <div class="campo"><label>◆ Con falla (solo local)</label><input id="v-fallas" type="number" min="0" step="1" value="${+v.fallas || 0}" ${APP.esAdmin ? '' : 'disabled'}><span class="ayuda">Cuentan en el local pero no se ofrecen en la web</span></div>
+        <div class="campo"><label>Qué falla tiene</label><input id="v-falla-nota" value="${esc(v.falla_nota || '')}" placeholder="Ej. hilo suelto en el bretel" ${APP.esAdmin ? '' : 'disabled'}></div>
+      </div>
       ${APP.rol !== 'visor' ? `<div class="fila c3">
         <div class="campo"><label>Ajustar stock</label><input id="v-cant" type="number" step="1" placeholder="+5 entra · -2 sale"></div>
         <div class="campo"><label>Depósito</label><select id="v-dep">${depositos.map(d => `<option value="${d.id}" ${d.id === depPrincipal.id ? 'selected' : ''}>${esc(d.nombre)}</option>`).join('')}</select></div>
@@ -256,6 +264,13 @@ APP.ready.then(async () => {
         const ean = $('#v-ean', m).value.trim() || null, precio = $('#v-precio', m).value === '' ? null : +$('#v-precio', m).value;
         if (ean !== (v.ean || null) || precio !== (v.precio != null && +v.precio !== +producto.precio ? +v.precio : null)) {
           const r = await sb.from('variantes').update({ ean, precio }).eq('id', v.id);
+          if (r.error) { toast(mensajeError(r.error), 'error'); g.disabled = false; return; }
+        }
+        const fallas = Math.max(0, parseInt($('#v-fallas', m).value) || 0), fallaNota = $('#v-falla-nota', m).value.trim() || null, chk = $('#v-chequeado', m);
+        if (fallas > Math.max(0, +v.stock || 0) + (+($('#v-cant', m) || {}).value || 0)) { toast('No puede haber más prendas con falla que stock', 'error'); g.disabled = false; return; }
+        if (fallas !== (+v.fallas || 0) || fallaNota !== (v.falla_nota || null) || (chk && chk.checked)) {
+          const cambios = { fallas, falla_nota: fallas ? fallaNota : null }; if (chk && chk.checked) cambios.chequear = null;
+          const r = await sb.from('variantes').update(cambios).eq('id', v.id);
           if (r.error) { toast(mensajeError(r.error), 'error'); g.disabled = false; return; }
         }
       }

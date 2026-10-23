@@ -32,7 +32,7 @@ APP.ready.then(async () => {
     if (fresco) { catalogo = guardado.vars; productos = Object.fromEntries(guardado.prods.map(x => [x.id, x])); }
     const traer = async () => {
       const [vars, prods] = await Promise.all([
-        paginar(() => sb.from('v_variantes').select('id,producto_id,producto_codigo,producto_nombre,producto_tipo,sku,ean,talle,talle_nombre,talle_orden,color,color_nombre,color_hex,precio,costo,stock,activa').eq('empresa_id', e).eq('activa', true).order('producto_nombre').order('talle_orden')),
+        paginar(() => sb.from('v_variantes').select('id,producto_id,producto_codigo,producto_nombre,producto_tipo,sku,ean,talle,talle_nombre,talle_orden,color,color_nombre,color_hex,precio,costo,stock,fallas,falla_nota,activa').eq('empresa_id', e).eq('activa', true).order('producto_nombre').order('talle_orden')),
         paginar(() => sb.from('productos').select('id,categoria_id,tipo,activo,imagen_url,es_generico,generico_filtro').eq('empresa_id', e).eq('activo', true))
       ]);
       productos = Object.fromEntries(prods.map(x => [x.id, x]));
@@ -143,7 +143,7 @@ APP.ready.then(async () => {
   function elegirProducto(pid) {
     const vars = catalogo.filter(v => v.producto_id === pid);
     if (vars.length === 1 && !vars[0].talle && !vars[0].color) { agregar(vars[0]); return; }
-    const m = modal(`<h2>${esc(vars[0].producto_nombre)}</h2><p class="sub">Elegí talle y color</p><div class="matriz-pick">${vars.sort((a, b) => (a.talle_orden ?? 999) - (b.talle_orden ?? 999) || String(a.color_nombre).localeCompare(b.color_nombre)).map(v => `<button data-v="${v.id}" class="${+v.stock > 0 ? '' : 'sin'}">${esc([v.talle_nombre, v.color_nombre].filter(Boolean).join(' · ') || 'único')}<small>${fmt.num(v.stock)} u.</small></button>`).join('')}</div>`);
+    const m = modal(`<h2>${esc(vars[0].producto_nombre)}</h2><p class="sub">Elegí talle y color</p><div class="matriz-pick">${vars.sort((a, b) => (a.talle_orden ?? 999) - (b.talle_orden ?? 999) || String(a.color_nombre).localeCompare(b.color_nombre)).map(v => `<button data-v="${v.id}" class="${+v.stock > 0 ? '' : 'sin'}">${esc([v.talle_nombre, v.color_nombre].filter(Boolean).join(' · ') || 'único')}<small>${fmt.num(v.stock)} u.${+v.fallas > 0 ? ' · ◆' + fmt.num(v.fallas) + ' con falla' : ''}</small></button>`).join('')}</div>`);
     $$('[data-v]', m).forEach(b => b.onclick = () => { agregar(catalogo.find(v => v.id === b.dataset.v)); m.cerrar(); });
   }
   const q = $('#q'); let tq;
@@ -219,13 +219,14 @@ APP.ready.then(async () => {
     const c = calcular(), cont = $('#lineas');
     if (!c.lineas.length) cont.innerHTML = '<div class="vacio-ticket">Escaneá o buscá una prenda para empezar.</div>';
     else cont.innerHTML = c.lineas.map((l, i) => `<div class="linea">
-      <div><div class="n">${esc(l.variante.producto_nombre)}${l.devuelta ? ' <span class="chip error">devuelve</span>' : ''}</div><div class="v">${esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || l.variante.sku || '')} · ${fmt.pesos(l.precioLista)}${l.descPct ? ' −' + l.descPct + '%' : ''}</div>${l.promo ? `<div class="promo">★ ${esc(l.promo.nombre)} · −${fmt.pesos(l.descPromo)}/u</div>` : ''}</div>
+      <div><div class="n">${esc(l.variante.producto_nombre)}${l.devuelta ? ' <span class="chip error">devuelve</span>' : ''}</div><div class="v">${esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || l.variante.sku || '')} · ${fmt.pesos(l.precioLista)}${l.descPct ? ' −' + l.descPct + '%' : ''}</div>${l.promo ? `<div class="promo">★ ${esc(l.promo.nombre)} · −${fmt.pesos(l.descPromo)}/u</div>` : ''}${+l.variante.fallas > 0 && !l.devuelta ? `<button class="falla ${l.falla ? 'on' : ''}" data-falla="${i}" title="${esc(l.variante.falla_nota || '')}">${l.falla ? '◆ Es la que tiene falla' : '◆ Hay ' + fmt.num(l.variante.fallas) + ' con falla · ¿es esta?'}</button>` : ''}</div>
       <div class="t">${fmt.pesos(l.total)}</div>
       <div class="ctrl"><button data-i="${i}" data-d="-1">−</button><input data-i="${i}" data-q value="${l.cantidad}"><button data-i="${i}" data-d="1">+</button><span class="desc">desc % <input data-i="${i}" data-desc type="number" min="0" max="100" value="${l.descPct || 0}"></span><button class="quitar" data-i="${i}" data-x title="Quitar">×</button></div></div>`).join('');
     $$('[data-d]', cont).forEach(b => b.onclick = () => { const l = carrito.lineas[+b.dataset.i]; l.cantidad += +b.dataset.d * (l.devuelta ? -1 : 1); if ((l.devuelta ? -l.cantidad : l.cantidad) <= 0) carrito.lineas.splice(+b.dataset.i, 1); pintar(); });
     $$('[data-q]', cont).forEach(i => i.onchange = () => { const n = parseInt(i.value) || 0; const l = carrito.lineas[+i.dataset.i]; if (n === 0) carrito.lineas.splice(+i.dataset.i, 1); else l.cantidad = l.devuelta ? -Math.abs(n) : Math.abs(n); pintar(); });
     $$('[data-desc]', cont).forEach(i => i.onchange = () => { if (!APP.esAdmin && +i.value > 0) { toast('Los descuentos los habilita administración', 'error'); i.value = 0; return; } carrito.lineas[+i.dataset.i].descPct = Math.min(100, Math.max(0, +i.value || 0)); pintar(); });
     $$('[data-x]', cont).forEach(b => b.onclick = () => { carrito.lineas.splice(+b.dataset.i, 1); pintar(); });
+    $$('[data-falla]', cont).forEach(b => b.onclick = ev => { ev.stopPropagation(); const l = carrito.lineas[+b.dataset.falla]; l.falla = !l.falla; pintar(); });
     $('#listas').innerHTML = listas.map(l => `<button class="${l.id === carrito.lista ? 'on' : ''}" data-l="${l.id}" title="${l.porcentaje}% del precio de lista">${esc(l.nombre)}</button>`).join('');
     $$('#listas button').forEach(b => b.onclick = () => { carrito.lista = b.dataset.l; pintar(); });
     $('#totales').innerHTML = `<div><span>Subtotal</span><span class="mono">${fmt.pesos(c.subtotal)}</span></div>${c.descuento ? `<div><span>Descuento ${carrito.descPct}%</span><span class="mono">−${fmt.pesos(c.descuento)}</span></div>` : ''}<div class="gran"><span>Total</span><span>${fmt.pesos(c.total)}</span></div>`;
@@ -310,7 +311,7 @@ APP.ready.then(async () => {
         caja_id: caja.id, turno_id: turno.id, cliente_id: cliente, vendedora_id: carrito.vendedora, lista_id: carrito.lista,
         descuento_pct: carrito.descPct || 0, descuento: t.descuento, recargo: t.recargo, nota: $('#nota').value.trim() || null,
         venta_origen_id: carrito.cambio ? carrito.cambio.id : null, origen: ($('#sel-origen') || {}).value || 'local',
-        lineas: t.lineas.map(l => ({ variante_id: l.variante.id, producto_id: l.variante.producto_id, descripcion: l.variante.producto_nombre, talle: l.variante.talle_nombre, color: l.variante.color_nombre, cantidad: l.cantidad, precio_lista: l.precioLista, precio_unit: l.precioFinal, descuento_pct: l.descPct || 0, promocion_id: l.promo ? l.promo.id : null, promocion_nombre: l.promo ? l.promo.nombre : null, total: l.total, costo_unit: +l.variante.costo || 0, componentes: l.componentes && l.componentes.length ? l.componentes : null })),
+        lineas: t.lineas.map(l => ({ variante_id: l.variante.id, producto_id: l.variante.producto_id, descripcion: l.variante.producto_nombre, talle: l.variante.talle_nombre, color: l.variante.color_nombre, cantidad: l.cantidad, precio_lista: l.precioLista, precio_unit: l.precioFinal, descuento_pct: l.descPct || 0, promocion_id: l.promo ? l.promo.id : null, promocion_nombre: l.promo ? l.promo.nombre : null, total: l.total, costo_unit: +l.variante.costo || 0, componentes: l.componentes && l.componentes.length ? l.componentes : null, falla: !!l.falla })),
         pagos: pagosFinal.filter(p => p.monto !== 0).map(p => ({ forma_pago_id: p.forma_pago_id || null, credito_id: p.credito_id || null, monto: p.monto, cuotas: p.cuotas || 1, recargo_pct: p.recargo_pct || 0 })),
         creditos_a_emitir
       };
@@ -366,7 +367,7 @@ APP.ready.then(async () => {
   // ================= Ticket =================
   function mostrarTicket(p, res, extra) {
     const emp = APP.empresa, num = res.numero ? '#' + String(res.numero).padStart(6, '0') : 'pendiente';
-    const lineas = p.lineas.map(l => `<tr><td>${l.cantidad}× ${esc(l.descripcion)}<br><small>${esc([l.talle, l.color].filter(Boolean).join(' · '))}${l.promocion_nombre ? ' · ' + esc(l.promocion_nombre) : ''}</small></td><td class="r">${fmt.pesos(l.total)}</td></tr>`).join('');
+    const lineas = p.lineas.map(l => `<tr><td>${l.cantidad}× ${esc(l.descripcion)}${l.falla ? ' ◆' : ''}<br><small>${esc([l.talle, l.color].filter(Boolean).join(' · '))}${l.promocion_nombre ? ' · ' + esc(l.promocion_nombre) : ''}</small></td><td class="r">${fmt.pesos(l.total)}</td></tr>`).join('');
     const pagos = extra.pagos.map(pg => `<tr><td>${esc(pg.nombre)}${pg.cuotas > 1 ? ' (' + pg.cuotas + ' cuotas)' : ''}</td><td class="r">${fmt.pesos(pg.monto)}</td></tr>`).join('');
     const html = `<h2 class="c">${esc(emp.nombre)}</h2><div class="c">${esc([emp.domicilio, emp.localidad].filter(Boolean).join(' · '))}<br>${esc(emp.telefono || '')}</div><hr>
       <div>Ticket ${num} · ${new Date().toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}</div>
