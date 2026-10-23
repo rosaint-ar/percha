@@ -125,8 +125,11 @@ Deno.serve(async (req) => {
       const subtotal = r2(prendas + envio);
       const total = r2(subtotal - descuento);
       const ajuste = r2((+o.total || total) - total);   // redondeos del canal (normalmente 0)
+      // el descuento del canal (p.ej. 20% por transferencia) se guarda como porcentaje sobre las prendas, con su motivo en la nota
+      const descPct = prendas > 0 && descuento > 0 ? Math.round(10000 * descuento / prendas) / 100 : 0;
+      const motivoDesc = descuento > 0 ? ` · descuento ${descPct}%${/transfer/i.test(o.gateway_name || o.gateway || "") ? " por transferencia" : ""}` : "";
       const payload = { empresa_id: e, offline_id: crypto.randomUUID(), tipo: "venta", estado: "completada", caja_id: null, turno_id: null, cliente_id: null, vendedora_id: null, lista_id: listaBase,
-        descuento_pct: 0, descuento, recargo: ajuste, nota: `Tienda Nube #${o.number}` + (o.note ? " · " + o.note : ""), origen: "tiendanube", referencia: String(o.number ?? o.id),
+        descuento_pct: descPct, descuento, recargo: ajuste, nota: `Tienda Nube #${o.number}${motivoDesc}` + (o.note ? " · " + o.note : ""), origen: "tiendanube", referencia: String(o.number ?? o.id),
         lineas, pagos: [{ forma_pago_id: await formaPara(o.gateway_name || o.gateway), credito_id: null, monto: r2(total + ajuste), cuotas: +o.payment_details?.installments || 1, recargo_pct: 0, referencia: o.gateway_name || null }], creditos_a_emitir: [] };
       // clienta
       if (o.customer?.email || o.customer?.name) {
