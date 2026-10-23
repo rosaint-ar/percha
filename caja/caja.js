@@ -147,6 +147,45 @@ APP.ready.then(async () => {
     $$('[data-v]', m).forEach(b => b.onclick = () => { agregar(catalogo.find(v => v.id === b.dataset.v)); m.cerrar(); });
     buscadorPick(m);
   }
+  // Cambiar una prenda ya cargada: otro talle/color del mismo producto, u otra prenda. Mantiene cantidad y descuento.
+  function cambiarLinea(i) {
+    const l = carrito.lineas[i]; if (!l || l.devuelta) return;
+    const matriz = (vars, actual) => `<div class="matriz-pick">${vars.slice().sort((a, b) => (a.talle_orden ?? 999) - (b.talle_orden ?? 999) || String(a.color_nombre || '').localeCompare(b.color_nombre || '')).map(v => `<button data-v="${v.id}" class="${+v.stock > 0 ? '' : 'sin'}${v.id === actual ? ' actual' : ''}">${esc([v.talle_nombre, v.color_nombre].filter(Boolean).join(' · ') || 'único')}<small>${v.id === actual ? 'la cargada' : fmt.num(v.stock) + ' u.'}${+v.fallas > 0 ? ' · ◆' + fmt.num(v.fallas) : ''}</small></button>`).join('')}</div>`;
+    const m = modal('<div id="cl"></div>');
+    const reemplazar = v => {
+      if (!v) return;
+      if (v.id !== l.variante.id) {
+        const otra = carrito.lineas.find(x => x !== l && x.variante.id === v.id && !x.devuelta);
+        if (otra) { otra.cantidad += l.cantidad; carrito.lineas.splice(carrito.lineas.indexOf(l), 1); }
+        else { l.variante = v; l.falla = false; delete l.componentes; delete l.componentes_ok; }
+        recientes(v); toast('Cambiado por ' + [v.producto_nombre, v.talle_nombre, v.color_nombre].filter(Boolean).join(' · '));
+      }
+      m.cerrar(); pintar();
+    };
+    const verProducto = pid => {
+      const vars = catalogo.filter(v => v.producto_id === pid);
+      if (vars.length === 1 && pid !== l.variante.producto_id) { reemplazar(vars[0]); return; }
+      $('#cl', m).innerHTML = `<h2>${esc(vars[0].producto_nombre)}</h2><p class="sub">${pid === l.variante.producto_id ? 'Tocá el talle o color correcto. Se mantiene la cantidad (' + fmt.num(l.cantidad) + ').' : 'Elegí talle y color'}</p>${matriz(vars, l.variante.id)}
+        <div class="pie" style="justify-content:space-between"><button class="btn" data-otro>🔎 Es otra prenda</button><button class="btn" data-cerrar>Dejar como está</button></div>`;
+      $$('[data-v]', m).forEach(b => b.onclick = () => reemplazar(catalogo.find(v => v.id === b.dataset.v)));
+      $('[data-otro]', m).onclick = buscarOtro; $('[data-cerrar]', m).onclick = () => m.cerrar();
+      buscadorPick(m);
+    };
+    const buscarOtro = () => {
+      $('#cl', m).innerHTML = `<h2>¿Qué prenda era?</h2><p class="sub">Se cambia "${esc(l.variante.producto_nombre)}" por la que elijas, con la misma cantidad.</p>
+        <input class="pick-busca" id="cl-q" placeholder="Escribí el nombre o el código (ej. fru cel)" autocomplete="off"><div id="cl-res" class="cl-res"></div>
+        <div class="pie"><button class="btn" data-volver>Volver</button></div>`;
+      const q = $('#cl-q', m), res = $('#cl-res', m);
+      q.oninput = () => { const r = buscar(q.value);
+        if (r.exacta) { res.innerHTML = ''; reemplazar(r.exacta[0]); return; }
+        const stk = vars => vars.reduce((t, v) => t + Math.max(+v.stock || 0, 0), 0); res.innerHTML = (r.productos || []).slice().sort((x, y) => stk(y[1]) - stk(x[1])).slice(0, 14).map(([pid, vars]) => `<button data-pid="${pid}"><span>${esc(vars[0].producto_nombre)}</span><small>${fmt.num(vars.reduce((s, v) => s + Math.max(+v.stock || 0, 0), 0))} u.</small></button>`).join('') || (q.value.trim() ? '<div class="vacio">Nada con ese nombre.</div>' : '');
+        $$('[data-pid]', res).forEach(b => b.onclick = () => verProducto(b.dataset.pid)); };
+      q.onkeydown = ev => { if (ev.key === 'Enter') { const b = $('[data-pid]', res); if (b) b.click(); } };
+      $('[data-volver]', m).onclick = () => verProducto(l.variante.producto_id);
+      setTimeout(() => q.focus(), 30);
+    };
+    verProducto(l.variante.producto_id);
+  }
   // Buscador de la ventana "talle y color": se escribe directo (sin tocar nada) y filtra; Enter elige si queda una sola
   function buscadorPick(m) {
     const grilla = $('.matriz-pick', m); if (!grilla) return;
@@ -268,13 +307,14 @@ APP.ready.then(async () => {
     const c = calcular(), cont = $('#lineas');
     if (!c.lineas.length) cont.innerHTML = '<div class="vacio-ticket">Escaneá o buscá una prenda para empezar.</div>';
     else cont.innerHTML = c.lineas.map((l, i) => `<div class="linea">
-      <div><div class="n">${esc(l.variante.producto_nombre)}${l.devuelta ? ' <span class="chip error">devuelve</span>' : ''}</div><div class="v">${esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || l.variante.sku || '')} · ${fmt.pesos(l.precioLista)}${l.descPct ? ' −' + l.descPct + '%' : ''}</div>${l.promo ? `<div class="promo">★ ${esc(l.promo.nombre)} · −${fmt.pesos(l.descPromo)}/u</div>` : ''}${+l.variante.fallas > 0 && !l.devuelta ? `<button class="falla ${l.falla ? 'on' : ''}" data-falla="${i}" title="${esc(l.variante.falla_nota || '')}">${l.falla ? '◆ Es la que tiene falla' : '◆ Hay ' + fmt.num(l.variante.fallas) + ' con falla · ¿es esta?'}</button>` : ''}</div>
+      <div><div class="n">${l.devuelta ? esc(l.variante.producto_nombre) : `<span class="cambiable" data-cambiar="${i}" title="Tocá para cambiar el talle, el color o la prenda">${esc(l.variante.producto_nombre)} <span class="lapiz">✎</span></span>`}${l.devuelta ? ' <span class="chip error">devuelve</span>' : ''}</div><div class="v">${l.devuelta ? esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || l.variante.sku || '') : `<span class="cambiable" data-cambiar="${i}">${esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || 'único')}</span>`} · ${fmt.pesos(l.precioLista)}${l.descPct ? ' −' + l.descPct + '%' : ''}</div>${l.promo ? `<div class="promo">★ ${esc(l.promo.nombre)} · −${fmt.pesos(l.descPromo)}/u</div>` : ''}${+l.variante.fallas > 0 && !l.devuelta ? `<button class="falla ${l.falla ? 'on' : ''}" data-falla="${i}" title="${esc(l.variante.falla_nota || '')}">${l.falla ? '◆ Es la que tiene falla' : '◆ Hay ' + fmt.num(l.variante.fallas) + ' con falla · ¿es esta?'}</button>` : ''}</div>
       <div class="t">${fmt.pesos(l.total)}</div>
       <div class="ctrl"><button data-i="${i}" data-d="-1">−</button><input data-i="${i}" data-q value="${l.cantidad}"><button data-i="${i}" data-d="1">+</button><span class="desc">desc % <input data-i="${i}" data-desc type="number" min="0" max="100" value="${l.descPct || 0}"></span><button class="quitar" data-i="${i}" data-x title="Quitar">×</button></div></div>`).join('');
     $$('[data-d]', cont).forEach(b => b.onclick = () => { const l = carrito.lineas[+b.dataset.i]; l.cantidad += +b.dataset.d * (l.devuelta ? -1 : 1); if ((l.devuelta ? -l.cantidad : l.cantidad) <= 0) carrito.lineas.splice(+b.dataset.i, 1); pintar(); });
     $$('[data-q]', cont).forEach(i => i.onchange = () => { const n = parseInt(i.value) || 0; const l = carrito.lineas[+i.dataset.i]; if (n === 0) carrito.lineas.splice(+i.dataset.i, 1); else l.cantidad = l.devuelta ? -Math.abs(n) : Math.abs(n); pintar(); });
     $$('[data-desc]', cont).forEach(i => i.onchange = () => { if (!APP.esAdmin && +i.value > 0) { toast('Los descuentos los habilita administración', 'error'); i.value = 0; return; } carrito.lineas[+i.dataset.i].descPct = Math.min(100, Math.max(0, +i.value || 0)); pintar(); });
     $$('[data-x]', cont).forEach(b => b.onclick = () => { carrito.lineas.splice(+b.dataset.i, 1); pintar(); });
+    $$('[data-cambiar]', cont).forEach(el => el.onclick = ev => { ev.stopPropagation(); cambiarLinea(+el.dataset.cambiar); });
     $$('[data-falla]', cont).forEach(b => b.onclick = ev => { ev.stopPropagation(); const l = carrito.lineas[+b.dataset.falla]; l.falla = !l.falla; pintar(); });
     $('#listas').innerHTML = listas.map(l => `<button class="${l.id === carrito.lista ? 'on' : ''}" data-l="${l.id}" title="${l.porcentaje}% del precio de lista">${esc(l.nombre)}</button>`).join('');
     $$('#listas button').forEach(b => b.onclick = () => { carrito.lista = b.dataset.l; pintar(); });

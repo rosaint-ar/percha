@@ -247,7 +247,7 @@ APP.ready.then(async () => {
     const { data } = await sb.from('v_stock_revisar').select('*').eq('empresa_id', e).is('resuelto', null).order('creado', { ascending: false });
     const tb = $('#tb-revisar tbody'); const ds = data || [];
     tb.innerHTML = ds.map(r => `<tr><td>${fmt.fechaHora(r.creado)}</td><td><b>${esc(r.producto_nombre)}</b><br><small>${esc([r.talle_nombre, r.color_nombre].filter(Boolean).join(' · '))}</small></td><td>${r.motivo === 'falla' ? '◆ ' : '⚠ '}${esc(r.detalle || '')}</td><td class="num num-f">${fmt.num(r.stock)}${+r.fallas ? ' <small>(◆' + fmt.num(r.fallas) + ')</small>' : ''}</td><td><button class="btn chico primario" data-corr="${r.id}">Corregir</button></td></tr>`).join('') || '<tr><td colspan="5" class="vacio">No hay nada para revisar. 👌</td></tr>';
-    $('[data-corr]', tb).forEach(b => b.onclick = () => corregirRevisar(ds.find(x => String(x.id) === b.dataset.corr)));
+    $$('[data-corr]', tb).forEach(b => b.onclick = () => corregirRevisar(ds.find(x => String(x.id) === b.dataset.corr)));
     contarRevisar();
   }
   function corregirRevisar(r) {
