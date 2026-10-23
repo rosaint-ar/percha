@@ -62,8 +62,8 @@ APP.ready.then(async () => {
     const v0 = vars[0], st = sumaStock(vars), foto = (C.productos[pid] || {}).imagen_url, unico = vars.length === 1 && !v0.talle && !v0.color, gen = (C.productos[pid] || {}).es_generico;
     const visibles = (coinciden || []).filter(v => $('#chk-sinstock').checked || +v.stock > 0);
     const chips = visibles.length && visibles.length < vars.length ? `<div class="vchips">${visibles.slice(0, 6).map(v => `<button data-v="${v.id}">${esc([v.talle_nombre, v.color_nombre].filter(Boolean).join(' · '))}<small>${fmt.num(v.stock)}</small></button>`).join('')}</div>` : '';
-    return `<div class="tile-p${conFoto ? '' : ' compacta'}" data-pid="${pid}">${!conFoto ? '' : foto ? `<div class="foto"><img src="${esc(foto)}" loading="lazy" alt=""></div>` : `<div class="foto sinfoto">${esc(APP.iniciales(v0.producto_nombre.replace(/[«»]/g, '')))}</div>`}<span class="st ${st > 0 ? '' : 'cero'}">${gen ? '∞' : fmt.num(st)}</span>
-      <div class="txt"><div class="nom">${esc(v0.producto_nombre)}</div><div class="cod">${esc(v0.producto_codigo)}${unico ? '' : ' · ' + vars.length + ' var.'}${gen ? ' · al cobrar se elige el modelo' : ''}</div><div class="pre">${fmt.pesos(C.precioLista(v0))}</div></div>${chips}</div>`;
+    return `<div class="tile-p${conFoto ? (foto ? ' con-foto' : '') : ' compacta'}" data-pid="${pid}">${!conFoto ? '' : foto ? `<div class="foto"><img src="${esc(foto)}" loading="lazy" alt=""></div>` : `<div class="foto sinfoto">${esc(APP.iniciales(v0.producto_nombre.replace(/[«»]/g, '')))}</div>`}<span class="st ${st > 0 ? '' : 'cero'}">${gen ? '∞' : fmt.num(st)}</span>
+      <div class="txt"><div class="nom">${esc(v0.producto_nombre)}</div><div class="cod">${esc(v0.producto_codigo)}${unico ? '' : ' · ' + vars.length + ' var.'}${gen ? ' · se elige al cobrar' : ''}</div><div class="pie-tile"><div class="pre">${fmt.pesos(C.precioLista(v0))}</div><span class="mas-tile" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></span></div></div>${chips}</div>`;
   }
   function activarTiles(cont, alElegir) {
     $$('.tile-p', cont).forEach(t => t.onclick = ev => { const b = ev.target.closest('[data-v]'); if (b) { alElegir(C.catalogo.find(v => v.id === b.dataset.v)); return; } alElegir(null, t.dataset.pid); });
@@ -206,5 +206,12 @@ APP.ready.then(async () => {
 
   // ================= Más opciones (clienta, nota, descuento, canal) =================
   $('#btn-mas').onclick = () => { const m = $('#mas'); m.classList.toggle('ver'); $('#btn-mas').classList.toggle('on', m.classList.contains('ver')); if (m.classList.contains('ver')) $('#sel-cliente').focus(); };
+  // la grilla se pinta apenas está el catálogo (caja.js y pos.js arrancan en paralelo; a veces el aviso de "cargado" llega antes que la grilla)
+  let intentosGrilla = 0;
+  const esperarCatalogo = setInterval(() => {
+    intentosGrilla++;
+    if (C.catalogo.length && !$('#grilla .tile-p') && !$('#grilla .vacio')) C.alCargar();
+    if ($('#grilla .tile-p') || intentosGrilla > 75) clearInterval(esperarCatalogo);
+  }, 400);
   if (C.catalogo.length) C.alCargar();
 });
