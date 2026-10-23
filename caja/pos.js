@@ -87,7 +87,7 @@ APP.ready.then(async () => {
   // Enter con una sola coincidencia exacta de talle/color la agrega directo (antes de que caja.js abra el selector)
   $('#q').addEventListener('keydown', ev => {
     if (ev.key !== 'Enter') return;
-    const q = $('#q').value.trim(); if (!q || /^\d{8,}$/.test(q)) return;
+    const q = $('#q').value.trim(); if (!q || /^\d{8,}$/.test(q) || /^\d{4}$/.test(q)) return;
     const res = buscarModelos(q, (pid, vars) => conStock(pid, vars));
     if (res.length === 1 && res[0].coinciden.length === 1) { ev.preventDefault(); ev.stopImmediatePropagation(); C.agregar(res[0].coinciden[0]); $('#q').value = ''; pintarGrilla(); }
   }, true);

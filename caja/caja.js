@@ -186,6 +186,49 @@ APP.ready.then(async () => {
     };
     verProducto(l.variante.producto_id);
   }
+  // ================= Modo reservado (Emi) =================
+  // Se entra y se sale escribiendo la clave en el buscador + Enter. La clave la valida el servidor y queda solo en memoria.
+  let reservado = null, vendedoraAntes = null;
+  async function alternarReservado(pin) {
+    if (reservado) { if (pin === reservado) salirReservado(); return; }
+    let ok = false; try { const r = await sb.rpc('reservado_entrar', { e, p_pin: pin }); ok = r.data === true; if (r.error && /intentos/i.test(r.error.message)) toast(r.error.message, 'error'); } catch (_) {}
+    if (!ok) return;   // clave mala: no se dice nada
+    reservado = pin; document.body.classList.add('reservado');
+    const emi = vendedoras.find(v => /^emi/i.test(v.nombre || '')); vendedoraAntes = carrito.vendedora;
+    if (emi) { carrito.vendedora = emi.user_id; const sv = $('#sel-vendedora'); if (sv) sv.value = emi.user_id; }
+    document.body.insertAdjacentHTML('beforeend', '<div id="barra-reservado"><span>🔒 Modo reservado</span><button type="button" id="btn-reservadas">Ventas reservadas</button><small>Para salir: la clave + Enter en el buscador</small></div>');
+    $('#btn-reservadas').onclick = verReservadas;
+    pintar(); $('#q').focus();
+  }
+  function salirReservado() {
+    reservado = null; document.body.classList.remove('reservado');
+    const b = $('#barra-reservado'); if (b) b.remove();
+    document.querySelectorAll('.modal-reservadas').forEach(m => m.remove());
+    if (vendedoraAntes) { carrito.vendedora = vendedoraAntes; const sv = $('#sel-vendedora'); if (sv) sv.value = vendedoraAntes; }
+    pintar(); $('#q').focus();
+  }
+  async function verReservadas() {
+    if (!reservado) return;
+    const hoy = new Date(), d = n => { const x = new Date(hoy); x.setDate(x.getDate() - n); return x.toISOString().slice(0, 10); };
+    const m = modal(`<h2>🔒 Ventas reservadas</h2><div class="filtros-res"><input type="date" id="rv-desde" value="${d(30)}"><span>a</span><input type="date" id="rv-hasta" value="${d(0)}"><b id="rv-total"></b></div><div id="rv-lista" class="rv-lista">Cargando…</div><div class="pie"><button class="btn" data-cerrar>Cerrar</button></div>`);
+    m.classList.add('modal-reservadas');
+    $('[data-cerrar]', m).onclick = () => m.cerrar();
+    const cargarRes = async () => {
+      const { data, error } = await sb.rpc('reservadas_listar', { e, p_pin: reservado, p_desde: $('#rv-desde', m).value, p_hasta: $('#rv-hasta', m).value });
+      if (error) { $('#rv-lista', m).textContent = mensajeError(error); return; }
+      const vs = data || [], ok = vs.filter(v => v.estado !== 'anulada');
+      $('#rv-total', m).textContent = ok.length + ' ventas · ' + fmt.pesos(ok.reduce((s, v) => s + +v.total, 0));
+      $('#rv-lista', m).innerHTML = vs.map(v => `<details class="rv-venta ${v.estado === 'anulada' ? 'anulada' : ''}"><summary><span class="mono">${esc(v.numero)}</span><span>${fmt.fechaHora(v.fecha)}</span><span>${esc(v.cliente || '—')}</span><b class="mono">${fmt.pesos(v.total)}</b>${v.estado === 'anulada' ? '<span class="chip error">anulada</span>' : ''}</summary>
+        <div class="rv-det">${(v.lineas || []).map(l => `<div>${l.n}× ${esc(l.d)} <small>${esc([l.t, l.c].filter(Boolean).join(' · '))}${l.falla ? ' ◆' : ''}</small><span class="mono">${fmt.pesos(l.total)}</span></div>`).join('')}
+        <div class="rv-pagos">${(v.pagos || []).map(p => esc(p.forma || 'Pago') + ' ' + fmt.pesos(p.monto)).join(' · ')}${v.vendedora ? ' · atendió ' + esc(v.vendedora) : ''}${v.nota ? ' · ' + esc(v.nota) : ''}${v.anulada_motivo ? ' · anulada: ' + esc(v.anulada_motivo) : ''}</div>
+        ${v.estado !== 'anulada' ? `<button class="btn chico peligro" data-anular="${v.id}">Anular (vuelve el stock)</button>` : ''}</div></details>`).join('') || '<p class="sub">No hay ventas reservadas en esas fechas.</p>';
+      $$('[data-anular]', m).forEach(b => b.onclick = async () => {
+        if (!await confirmar('Se anula la venta y vuelve el stock. ¿Seguimos?', 'Anular')) return;
+        const { error: er } = await sb.rpc('reservada_anular', { e, p_pin: reservado, p_venta: b.dataset.anular, p_motivo: 'Anulada desde el modo reservado' });
+        if (er) { toast(mensajeError(er), 'error'); return; } toast('Venta anulada, stock devuelto'); cargarBase(); cargarRes(); });
+    };
+    $('#rv-desde', m).onchange = cargarRes; $('#rv-hasta', m).onchange = cargarRes; cargarRes();
+  }
   // Buscador de la ventana "talle y color": se escribe directo (sin tocar nada) y filtra; Enter elige si queda una sola
   function buscadorPick(m) {
     const grilla = $('.matriz-pick', m); if (!grilla) return;
@@ -237,6 +280,7 @@ APP.ready.then(async () => {
   const q = $('#q'); let tq;
   q.addEventListener('input', () => { clearTimeout(tq); tq = setTimeout(() => { const r = buscar(q.value); if (r.exacta && q.value.trim().length >= 8) { agregar(r.exacta[0]); q.value = ''; pintarResultados(null); } else pintarResultados(r); }, 120); });
   q.addEventListener('keydown', ev => {
+    if (ev.key === 'Enter' && /^\d{4}$/.test(q.value.trim()) && !buscar(q.value).exacta) { ev.preventDefault(); const pin = q.value.trim(); q.value = ''; pintarResultados(null); alternarReservado(pin); return; }
     if (ev.key === 'Enter') { ev.preventDefault(); const r = buscar(q.value); if (r.exacta) { agregar(r.exacta[0]); q.value = ''; pintarResultados(null); } else if (r.productos && r.productos.length) { elegirProducto(r.productos[0][0]); q.value = ''; pintarResultados(null); } }
     if (ev.key === 'Escape') { q.value = ''; pintarResultados(null); }
   });
@@ -356,7 +400,7 @@ APP.ready.then(async () => {
   function listaDeForma(f) { return f && f.lista_id ? listas.find(l => l.id === f.lista_id) : null; }
   async function cobrar(modoSena) {
     const c = calcular(); if (!c.lineas.length) return;
-    if (!turno) { toast('Primero abrí la caja', 'error'); abrirTurno(); return; }
+    if (!turno && !reservado) { toast('Primero abrí la caja', 'error'); abrirTurno(); return; }
     if (!(await revisarStock())) return;
     const pagos = []; let creditoUsado = null;
     const total = () => { const cc = calcular(); const recargo = pagos.reduce((s, p) => s + r2(p.monto * (p.recargo_pct || 0) / 100), 0); return { ...cc, recargo: r2(recargo), aPagar: r2(cc.total + recargo) }; };
@@ -423,7 +467,7 @@ APP.ready.then(async () => {
       const cliente = await resolverCliente();
       const payload = {
         empresa_id: e, offline_id: crypto.randomUUID(), tipo: carrito.cambio ? 'cambio' : 'venta', estado: modoSena ? 'senada' : 'completada',
-        caja_id: caja.id, turno_id: turno.id, cliente_id: cliente, vendedora_id: carrito.vendedora, lista_id: carrito.lista,
+        caja_id: reservado ? null : caja.id, turno_id: reservado ? null : turno.id, reservada: !!reservado, pin: reservado || undefined, cliente_id: cliente, vendedora_id: carrito.vendedora, lista_id: carrito.lista,
         descuento_pct: carrito.descPct || 0, descuento: t.descuento, recargo: t.recargo, nota: $('#nota').value.trim() || null,
         venta_origen_id: carrito.cambio ? carrito.cambio.id : null, origen: ($('#sel-origen') || {}).value || 'local',
         lineas: t.lineas.map(l => ({ variante_id: l.variante.id, producto_id: l.variante.producto_id, descripcion: l.variante.producto_nombre, talle: l.variante.talle_nombre, color: l.variante.color_nombre, cantidad: l.cantidad, precio_lista: l.precioLista, precio_unit: l.precioFinal, descuento_pct: l.descPct || 0, promocion_id: l.promo ? l.promo.id : null, promocion_nombre: l.promo ? l.promo.nombre : null, total: l.total, costo_unit: +l.variante.costo || 0, componentes: l.componentes && l.componentes.length ? l.componentes : null, falla: !!l.falla })),
@@ -459,6 +503,7 @@ APP.ready.then(async () => {
       if (error) { if (/fetch|network/i.test(error.message)) throw error; toast(mensajeError(error), 'error'); throw error; }
       return data;
     } catch (err) {
+      if (/fetch|network/i.test(err.message || '') && payload.reservada) { toast('Sin internet: la venta reservada no se guardó. Probá de nuevo.', 'error'); throw err; }
       if (/fetch|network/i.test(err.message || '')) {
         const cola = colaPendiente(); cola.push(payload); localStorage.setItem(LS('cola_ventas'), JSON.stringify(cola));
         toast('Sin internet: la venta quedó guardada y se sube sola', 'error'); pintarEstado();
@@ -482,7 +527,7 @@ APP.ready.then(async () => {
 
   // ================= Ticket =================
   function mostrarTicket(p, res, extra) {
-    const emp = APP.empresa, num = res.numero ? '#' + String(res.numero).padStart(6, '0') : 'pendiente';
+    const emp = APP.empresa, num = res.numero_mostrar ? res.numero_mostrar : res.numero ? '#' + String(res.numero).padStart(6, '0') : 'pendiente';
     const lineas = p.lineas.map(l => `<tr><td>${l.cantidad}× ${esc(l.descripcion)}${l.falla ? ' ◆' : ''}<br><small>${esc([l.talle, l.color].filter(Boolean).join(' · '))}${l.promocion_nombre ? ' · ' + esc(l.promocion_nombre) : ''}</small></td><td class="r">${fmt.pesos(l.total)}</td></tr>`).join('');
     const pagos = extra.pagos.map(pg => `<tr><td>${esc(pg.nombre)}${pg.cuotas > 1 ? ' (' + pg.cuotas + ' cuotas)' : ''}</td><td class="r">${fmt.pesos(pg.monto)}</td></tr>`).join('');
     const html = `<h2 class="c">${esc(emp.nombre)}</h2><div class="c">${esc([emp.domicilio, emp.localidad].filter(Boolean).join(' · '))}<br>${esc(emp.telefono || '')}</div><hr>

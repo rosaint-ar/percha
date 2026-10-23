@@ -156,6 +156,23 @@
   .tile-p.compacta .pre{font-size:14px;padding-top:6px}
   .tile-p.compacta .st{top:9px;right:9px;background:var(--relleno);box-shadow:none}
   .btn-mas{width:100%;margin-top:8px;justify-content:center;gap:8px}.btn-mas small{color:var(--tinta-3);font-weight:500}.btn-mas.on{background:var(--lila);color:var(--acento)}
+  /* ===== Modo reservado: tema oscuro ===== */
+  body.reservado{--lienzo:#121016;--lienzo-2:#17141c;--tinta:#ECE8F2;--tinta-2:#CFC8D9;--tinta-3:#9C95A8;--tinta-4:#6F6979;--superficie:rgba(30,27,36,.92);--superficie-2:#221e29;--superficie-borde:rgba(255,255,255,.06);--linea:rgba(255,255,255,.11);--linea-suave:rgba(255,255,255,.06);--relleno:rgba(255,255,255,.06);--relleno-2:rgba(255,255,255,.1);--acento:#C3A6EC;--acento-rgb:195,166,236;--lila:rgba(195,166,236,.16);--ok:#6FD39B;--error:#F08A91;background:#121016!important;color:var(--tinta)}
+  body.reservado main,body.reservado .pos,body.reservado .ticket,body.reservado .catalogo{background:transparent;color:var(--tinta)}
+  body.reservado .modal{background:rgba(30,27,36,.98);color:var(--tinta);border-color:rgba(255,255,255,.08)}
+  body.reservado input,body.reservado select,body.reservado textarea,body.reservado .linea .ctrl button,body.reservado .linea .ctrl input{background:#1b1820!important;color:var(--tinta)!important;border-color:var(--linea)!important}
+  body.reservado .btn:not(.primario):not(.peligro){background:#2a2531;color:var(--tinta);border-color:var(--linea)}
+  body.reservado .tile-p,body.reservado .matriz-pick button,body.reservado .familias button:not(.on),body.reservado .cl-res button{background:#221e29;color:var(--tinta);border-color:var(--linea)}
+  body.reservado .listas button{background:transparent;color:var(--tinta-2)}body.reservado .listas button.on{background:#2f2938;color:var(--tinta)}body.reservado .listas{background:rgba(255,255,255,.05)}
+  #barra-reservado{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:50;display:flex;align-items:center;gap:12px;background:#000;color:#ECE8F2;border:1px solid rgba(195,166,236,.45);border-radius:999px;padding:8px 10px 8px 16px;box-shadow:0 10px 30px rgba(0,0,0,.5);font:600 13px var(--f-ui)}
+  #barra-reservado button{background:#C3A6EC;color:#1b1424;border:0;border-radius:999px;padding:7px 14px;font:700 12.5px var(--f-ui);cursor:pointer}
+  #barra-reservado small{color:#9C95A8;font-weight:500}
+  .filtros-res{display:flex;gap:8px;align-items:center;margin:10px 0}.filtros-res b{margin-left:auto;font-family:var(--f-mono)}
+  .rv-lista{display:grid;gap:6px;max-height:60vh;overflow:auto}
+  .rv-venta{border:1px solid var(--linea);border-radius:10px;padding:8px 12px}.rv-venta.anulada{opacity:.55}
+  .rv-venta summary{display:flex;gap:12px;align-items:center;cursor:pointer;font-size:13.5px}.rv-venta summary b{margin-left:auto}
+  .rv-det{padding:8px 0 4px;display:grid;gap:4px;font-size:13px}.rv-det>div{display:flex;gap:8px}.rv-det>div .mono{margin-left:auto}
+  .rv-pagos{color:var(--tinta-3);font-size:12.5px;margin:4px 0}
 </style>
 </head>
 <body data-page="pos" data-title="Punto de venta">
