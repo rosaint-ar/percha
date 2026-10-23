@@ -89,6 +89,9 @@ APP.ready.then(async () => {
   observador.observe($('#lineas'), { childList: true });
 
   // ================= "¿Qué modelos se lleva?" (genéricos) =================
+  const filtroGenerico = gen => { const cat = gen.categoria_id, primera = (((porProducto.get(gen.id) || [{}])[0].producto_nombre || '').split(' ')[0] || '').toUpperCase();
+    const porPrefijo = primera && [...porProducto.entries()].some(([p2, vars]) => p2 !== gen.id && (C.productos[p2] || {}).categoria_id === cat && !(C.productos[p2] || {}).es_generico && vars[0].producto_nombre.toUpperCase().startsWith(primera + ' '));
+    return (p2, vars) => !(C.productos[p2] || {}).es_generico && (C.productos[p2] || {}).tipo !== 'kit' && (C.productos[p2] || {}).categoria_id === cat && (!porPrefijo || vars[0].producto_nombre.toUpperCase().startsWith(primera + ' ')); };
   // El genérico (BOMBIS «VARIAS») se vende rápido. Antes de cobrar, se pide definir cada unidad buscando el modelo real.
   function definirModelos() {
     return new Promise(res => {
@@ -107,7 +110,7 @@ APP.ready.then(async () => {
       const pintarPend = () => { $('#df-n', m).textContent = pendientes(); $('#df-elegidos', m).innerHTML = elegidos.map(v => `<span>${esc(v.producto_nombre)} ${esc([v.talle_nombre, v.color_nombre].filter(Boolean).join(' '))}</span>`).join(''); };
       const pintarLista = () => {
         const q = $('#df-q', m).value.trim(), sin = $('#df-sinstock', m).checked;
-        const lista = buscarModelos(q, (pid, vars) => !(C.productos[pid] || {}).es_generico && (C.productos[pid] || {}).tipo !== 'kit' && (q || (C.productos[pid] || {}).categoria_id === catId) && (sin || sumaStock(vars) > 0));
+        const fg = filtroGenerico(Object.assign({ id: l0.variante.producto_id }, gen)); const lista = buscarModelos(q, (pid, vars) => (q ? !(C.productos[pid] || {}).es_generico && (C.productos[pid] || {}).tipo !== 'kit' : fg(pid, vars)) && (sin || sumaStock(vars) > 0));
         if (!q) lista.sort((a, b) => sumaStock(b.vars) - sumaStock(a.vars) || a.vars[0].producto_nombre.localeCompare(b.vars[0].producto_nombre));
         $('#df-grilla', m).innerHTML = lista.slice(0, 120).map(x => tile(x.pid, x.vars, x.coinciden)).join('') || '<div class="vacio" style="grid-column:1/-1">Nada con ese nombre. Probá con menos letras o marcá "sin stock".</div>';
         activarTiles($('#df-grilla', m), (v, pid) => {
@@ -135,9 +138,57 @@ APP.ready.then(async () => {
       pintarPend(); pintarLista(); $('#df-q', m).focus();
     });
   }
-  // cobrar y seña pasan primero por la definición de genéricos
-  $('#btn-cobrar').onclick = async () => { if (!C.carrito.lineas.length) return; if (await definirModelos()) C.cobrar(false); };
-  $('#btn-sena').onclick = async () => { if (!C.carrito.lineas.length) return; if (await definirModelos()) C.cobrar(true); };
+  // ================= "¿Qué lleva el pack?" (kits por producto) =================
+  // Un [PACK x3] LESS «ALDI» lleva 3 LESS «ALDI» del color que elija la clienta: se eligen acá y van en la línea (componentes).
+  let componentesKit = {};   // producto_id del kit → [{comp_producto_id, cantidad, comp_generico, variante_id}]
+  async function cargarComponentes() { const { data } = await sb.from('v_componentes').select('producto_id,comp_producto_id,cantidad,comp_generico,variante_id').eq('empresa_id', e); componentesKit = {}; (data || []).forEach(c => { (componentesKit[c.producto_id] = componentesKit[c.producto_id] || []).push(c); }); }
+  cargarComponentes();
+  function definirKits() {
+    return new Promise(res => {
+      const pendientes = () => C.carrito.lineas.filter(l => !l.devuelta && l.cantidad > 0 && (C.productos[l.variante.producto_id] || {}).tipo === 'kit' && !l.componentes_ok && (componentesKit[l.variante.producto_id] || []).some(c => !c.variante_id));
+      const siguiente = () => {
+        const l = pendientes()[0]; if (!l) { res(true); return; }
+        // ranuras: por cada kit × cada componente "por producto" × su cantidad
+        const ranuras = []; (componentesKit[l.variante.producto_id] || []).filter(c => !c.variante_id).forEach(c => { for (let i = 0; i < l.cantidad * c.cantidad; i++) ranuras.push(c.comp_producto_id); });
+        l.componentes = l.componentes || []; const elegidos = [];
+        const nombreDe = pid => (porProducto.get(pid) || [{}])[0].producto_nombre || '';
+        const m = modal(`<h2>¿Qué lleva ${esc(l.variante.producto_nombre)}?</h2><p class="sub">Tocá cada prenda que va adentro (${ranuras.length} en total). Si no sabés, dejalo sin definir y se acomoda en el Conteo.</p>
+          <div class="pend"><b id="dk-n"></b><span class="sub" id="dk-que"></span><div class="elegidos" id="dk-elegidos"></div></div>
+          <div class="buscador" style="min-width:0;width:100%"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="dk-q" placeholder="Color, talle…" autocomplete="off"><label class="filtro-stock"><input type="checkbox" id="dk-sinstock"> sin stock</label></div>
+          <div class="grilla" id="dk-grilla"></div>
+          <div class="pie"><button class="btn" data-dejar>Dejar sin definir</button><button class="btn primario" data-ok style="padding:12px 22px;font-size:15px">Seguir</button></div>`, { fijo: true });
+        m.querySelector('.modal').classList.add('definir');
+        const actual = () => ranuras[elegidos.length];
+        const pintar = () => { $('#dk-n', m).textContent = ranuras.length - elegidos.length; $('#dk-que', m).textContent = actual() ? 'por definir · ahora: ' + nombreDe(actual()) : 'listo'; $('#dk-elegidos', m).innerHTML = elegidos.map(v => `<span>${esc(v.producto_nombre)} ${esc([v.talle_nombre, v.color_nombre].filter(Boolean).join(' '))}</span>`).join(''); };
+        const pintarLista = () => {
+          const pid = actual(); if (!pid) { $('#dk-grilla', m).innerHTML = ''; return; }
+          const gen = (C.productos[pid] || {}).es_generico, catId = (C.productos[pid] || {}).categoria_id, q = $('#dk-q', m).value.trim(), sin = $('#dk-sinstock', m).checked;
+          // genérico (BOMBIS VARIAS): cualquier prenda de su familia; producto concreto: sus variantes
+          const fg = gen ? filtroGenerico(Object.assign({ id: pid }, C.productos[pid])) : null; const lista = buscarModelos(q, (p2, vars) => (gen ? fg(p2, vars) : p2 === pid) && (sin || sumaStock(vars) > 0 || p2 === pid));
+          $('#dk-grilla', m).innerHTML = lista.slice(0, 120).map(x => tile(x.pid, x.vars, x.coinciden)).join('') || '<div class="vacio" style="grid-column:1/-1">Nada con ese nombre.</div>';
+          activarTiles($('#dk-grilla', m), (v, p2) => {
+            if (v) { elegir(v); return; }
+            const vars = porProducto.get(p2); if (vars.length === 1) { elegir(vars[0]); return; }
+            const m2 = modal(`<h2>${esc(vars[0].producto_nombre)}</h2><p class="sub">¿Qué talle y color?</p><div class="matriz-pick">${vars.slice().sort((a, b) => (a.talle_orden ?? 999) - (b.talle_orden ?? 999) || String(a.color_nombre || '').localeCompare(b.color_nombre || '')).map(v2 => `<button data-v="${v2.id}" class="${+v2.stock > 0 ? '' : 'sin'}">${esc([v2.talle_nombre, v2.color_nombre].filter(Boolean).join(' · ') || 'único')}<small>${fmt.num(v2.stock)} u.</small></button>`).join('')}</div>`);
+            $$('[data-v]', m2).forEach(b => b.onclick = () => { m2.cerrar(); elegir(C.catalogo.find(v2 => v2.id === b.dataset.v)); });
+          });
+        };
+        const elegir = v => {
+          elegidos.push(v); const ya = l.componentes.find(c => c.variante_id === v.id); if (ya) ya.cantidad += 1; else l.componentes.push({ variante_id: v.id, cantidad: 1 });
+          $('#dk-q', m).value = ''; pintar(); pintarLista(); $('#dk-q', m).focus();
+          if (!actual()) { l.componentes_ok = true; m.cerrar(); siguiente(); }
+        };
+        $('#dk-q', m).addEventListener('input', pintarLista); $('#dk-sinstock', m).onchange = pintarLista;
+        $('[data-dejar]', m).onclick = () => { l.componentes_ok = true; m.cerrar(); siguiente(); };
+        $('[data-ok]', m).onclick = () => { l.componentes_ok = true; m.cerrar(); siguiente(); };
+        pintar(); pintarLista(); $('#dk-q', m).focus();
+      };
+      siguiente();
+    });
+  }
+  // cobrar y seña pasan primero por la definición de genéricos y de kits
+  $('#btn-cobrar').onclick = async () => { if (!C.carrito.lineas.length) return; if (await definirModelos() && await definirKits()) C.cobrar(false); };
+  $('#btn-sena').onclick = async () => { if (!C.carrito.lineas.length) return; if (await definirModelos() && await definirKits()) C.cobrar(true); };
 
   // ================= Teclado numérico =================
   let buffer = '', seleccionada = null;

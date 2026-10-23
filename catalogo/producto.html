@@ -288,14 +288,12 @@ APP.ready.then(async () => {
   // ---------- kit: componentes ----------
   let catalogoKit = null;
   async function pintarKit() {
-    const { data: comps } = await sb.from('producto_componentes').select('id,cantidad,variante_id').eq('producto_id', id);
-    const ids = (comps || []).map(c => c.variante_id);
-    const { data: vs } = ids.length ? await sb.from('v_variantes').select('*').in('id', ids) : { data: [] };
-    const vm = Object.fromEntries((vs || []).map(v => [v.id, v]));
+    // un componente es una variante exacta o "cualquier talle/color" de un producto (lo elige la vendedora al cobrar)
+    const { data: comps } = await sb.from('v_componentes').select('*').eq('producto_id', id);
     const tb = $('#tb-kit'); tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());
     let costo = 0, disponible = null;
-    (comps || []).forEach(c => { const v = vm[c.variante_id] || {}; costo += (+v.costo || 0) * c.cantidad; const d = Math.floor((+v.stock || 0) / c.cantidad); disponible = disponible == null ? d : Math.min(disponible, d);
-      tb.insertAdjacentHTML('beforeend', `<tr><td>${esc(v.producto_nombre || '')}</td><td>${esc([v.talle_nombre, v.color_nombre].filter(Boolean).join(' · ') || 'único')}</td><td class="num"><input type="number" min="1" value="${c.cantidad}" data-c="${c.id}" style="width:64px;text-align:right;font-family:var(--f-mono);border:1px solid var(--linea);border-radius:7px;padding:4px 6px" ${APP.esAdmin ? '' : 'disabled'}></td><td class="num ${+v.stock > 0 ? 'num-f' : ''}">${fmt.num(v.stock)}</td><td class="num">${fmt.pesos((+v.costo || 0) * c.cantidad)}</td><td>${APP.esAdmin ? `<button class="btn chico peligro" data-x="${c.id}">×</button>` : ''}</td></tr>`); });
+    (comps || []).forEach(c => { costo += (+c.costo || 0) * c.cantidad; const d = Math.floor((+c.stock || 0) / c.cantidad); disponible = disponible == null ? d : Math.min(disponible, d);
+      tb.insertAdjacentHTML('beforeend', `<tr><td>${esc(c.comp_nombre || '')}</td><td>${c.variante_id ? esc([c.talle_nombre, c.color_nombre].filter(Boolean).join(' · ') || 'único') : '<span class="chip">cualquier talle · color</span>'}</td><td class="num"><input type="number" min="1" value="${c.cantidad}" data-c="${c.id}" style="width:64px;text-align:right;font-family:var(--f-mono);border:1px solid var(--linea);border-radius:7px;padding:4px 6px" ${APP.esAdmin ? '' : 'disabled'}></td><td class="num ${+c.stock > 0 ? 'num-f' : ''}">${fmt.num(c.stock)}</td><td class="num">${fmt.pesos((+c.costo || 0) * c.cantidad)}</td><td>${APP.esAdmin ? `<button class="btn chico peligro" data-x="${c.id}">×</button>` : ''}</td></tr>`); });
     if (!(comps || []).length) tb.insertAdjacentHTML('beforeend', '<tr><td colspan="6" class="vacio">Todavía no tiene componentes. Buscá arriba la primera prenda.</td></tr>');
     $('#kit-resumen').innerHTML = (comps || []).length ? `Se pueden armar <b>${fmt.num(disponible || 0)}</b> kits con el stock actual · costo del kit <b>${fmt.pesos(costo)}</b> · precio ${fmt.pesos(producto.precio)} → margen <b>${producto.precio ? fmt.pct(100 * (producto.precio - costo) / producto.precio) : '—'}</b>` : '';
     $('#stock-total').value = fmt.num(disponible || 0);
@@ -308,8 +306,11 @@ APP.ready.then(async () => {
     if (!catalogoKit) { let d = 0, todo = []; while (true) { const { data } = await sb.from('v_variantes').select('id,producto_id,producto_nombre,producto_codigo,producto_tipo,talle_nombre,color_nombre,stock,costo').eq('empresa_id', e).eq('activa', true).neq('producto_tipo', 'kit').order('producto_nombre').range(d, d + 999); todo = todo.concat(data || []); if (!data || data.length < 1000) break; d += 1000; } catalogoKit = todo; }
     const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); const pal = norm(t).split(/\s+/);
     const res = catalogoKit.filter(v => v.producto_id !== id && pal.every(w => norm(`${v.producto_nombre} ${v.producto_codigo} ${v.talle_nombre} ${v.color_nombre}`).includes(w))).slice(0, 25);
-    ksug.innerHTML = res.map(v => `<div data-v="${v.id}" style="padding:8px 12px;cursor:pointer;font-size:13px">${esc(v.producto_nombre)} · ${esc([v.talle_nombre, v.color_nombre].filter(Boolean).join(' · ') || 'único')} <small style="font-family:var(--f-mono);color:var(--tinta-3)">stock ${fmt.num(v.stock)}</small></div>`).join('') || '<div class="vacio">Nada</div>'; ksug.style.display = 'block';
+    // primero el producto entero ("cualquier talle/color": lo elige la vendedora al cobrar), después sus variantes exactas
+    const prods = []; res.forEach(v => { if (!prods.some(p => p.id === v.producto_id)) prods.push({ id: v.producto_id, nombre: v.producto_nombre }); });
+    ksug.innerHTML = prods.slice(0, 6).map(p => `<div data-p="${p.id}" style="padding:8px 12px;cursor:pointer;font-size:13px;background:var(--lila-suave)"><b>${esc(p.nombre)}</b> <span class="chip">cualquier talle · color</span></div>`).join('') + res.map(v => `<div data-v="${v.id}" style="padding:8px 12px;cursor:pointer;font-size:13px">${esc(v.producto_nombre)} · ${esc([v.talle_nombre, v.color_nombre].filter(Boolean).join(' · ') || 'único')} <small style="font-family:var(--f-mono);color:var(--tinta-3)">stock ${fmt.num(v.stock)}</small></div>`).join('') || '<div class="vacio">Nada</div>'; ksug.style.display = 'block';
     $$('[data-v]', ksug).forEach(d => d.onclick = async () => { const r = await sb.from('producto_componentes').insert(APP.conEmpresa({ producto_id: id, variante_id: d.dataset.v, cantidad: 1 })); if (r.error) toast(mensajeError(r.error), 'error'); ksug.style.display = 'none'; kq.value = ''; pintarKit(); });
+    $$('[data-p]', ksug).forEach(d => d.onclick = async () => { const r = await sb.from('producto_componentes').insert(APP.conEmpresa({ producto_id: id, componente_producto_id: d.dataset.p, cantidad: 1 })); if (r.error) toast(mensajeError(r.error), 'error'); ksug.style.display = 'none'; kq.value = ''; pintarKit(); });
   });
   document.addEventListener('click', ev => { if (!ev.target.closest('#kit-q') && !ev.target.closest('#kit-sug')) ksug.style.display = 'none'; });
 
