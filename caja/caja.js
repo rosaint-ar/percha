@@ -145,6 +145,55 @@ APP.ready.then(async () => {
     if (vars.length === 1 && !vars[0].talle && !vars[0].color) { agregar(vars[0]); return; }
     const m = modal(`<h2>${esc(vars[0].producto_nombre)}</h2><p class="sub">Elegí talle y color</p><div class="matriz-pick">${vars.sort((a, b) => (a.talle_orden ?? 999) - (b.talle_orden ?? 999) || String(a.color_nombre).localeCompare(b.color_nombre)).map(v => `<button data-v="${v.id}" class="${+v.stock > 0 ? '' : 'sin'}">${esc([v.talle_nombre, v.color_nombre].filter(Boolean).join(' · ') || 'único')}<small>${fmt.num(v.stock)} u.${+v.fallas > 0 ? ' · ◆' + fmt.num(v.fallas) + ' con falla' : ''}</small></button>`).join('')}</div>`);
     $$('[data-v]', m).forEach(b => b.onclick = () => { agregar(catalogo.find(v => v.id === b.dataset.v)); m.cerrar(); });
+    buscadorPick(m);
+  }
+  // Buscador de la ventana "talle y color": se escribe directo (sin tocar nada) y filtra; Enter elige si queda una sola
+  function buscadorPick(m) {
+    const grilla = $('.matriz-pick', m); if (!grilla) return;
+    const botones = $$('button[data-v]', grilla); if (botones.length < 7) return;
+    grilla.insertAdjacentHTML('beforebegin', '<input class="pick-busca" placeholder="Escribí el talle o el color (ej. 100, negro, 90 bla)" autocomplete="off">');
+    const inp = $('.pick-busca', m), nrm = s => String(s || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+    const textos = botones.map(b => nrm(b.firstChild ? b.firstChild.textContent : b.textContent).split(/[\s·/]+/).filter(Boolean));
+    const filtrar = () => { const qs = nrm(inp.value).split(/\s+/).filter(Boolean);
+      botones.forEach((b, i) => { b.style.display = qs.every(x => textos[i].some(t => t.startsWith(x))) ? '' : 'none'; }); };
+    inp.addEventListener('input', filtrar);
+    inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); const vis = botones.filter(b => b.style.display !== 'none'); const conStock = vis.filter(b => !b.classList.contains('sin')); const uno = vis.length === 1 ? vis[0] : (conStock.length === 1 ? conStock[0] : null); if (uno) uno.click(); } });
+    setTimeout(() => inp.focus(), 30);
+  }
+  // Antes de cobrar: avisa si se vende algo que el sistema dice que no hay, o si solo quedan las que tienen falla.
+  // Se puede seguir igual: la venta se hace y queda un aviso en "Stock a revisar".
+  function revisarStock() {
+    return new Promise(resolve => {
+      const problemas = () => {
+        const g = new Map();
+        carrito.lineas.forEach(l => { const v = l.variante; if (!v || l.devuelta || v.producto_tipo === 'kit' || (productos[v.producto_id] || {}).es_generico || /-SD$/.test(v.sku || '')) return;
+          const x = g.get(v.id) || { v, normal: 0, falla: 0, lineas: [] }; if (l.falla) x.falla += l.cantidad; else x.normal += l.cantidad; x.lineas.push(l); g.set(v.id, x); });
+        const out = [];
+        g.forEach(x => { const st = Math.max(+x.v.stock || 0, 0), f = Math.min(+x.v.fallas || 0, st), buenas = st - f;
+          if (f > 0 && x.normal > buenas && x.falla < f) out.push({ tipo: 'falla', x, cuantas: Math.min(x.normal - buenas, f - x.falla), st, f, buenas });
+          else if (x.normal + x.falla > st) out.push({ tipo: 'sin', x, st, n: x.normal + x.falla }); });
+        return out;
+      };
+      const nombre = v => esc([v.producto_nombre, v.talle_nombre, v.color_nombre].filter(Boolean).join(' · '));
+      let ps = problemas(); if (!ps.length) { carrito.avisos = 0; resolve(true); return; }
+      const m = modal('<div id="rs"></div>', { fijo: true });
+      const pintarRs = () => {
+        ps = problemas(); if (!ps.length) { m.cerrar(); carrito.avisos = 0; pintar(); resolve(true); return; }
+        $('#rs', m).innerHTML = `<h2>⚠ Revisá antes de cobrar</h2><div class="rs-lista">${ps.map((p, i) => p.tipo === 'falla'
+          ? `<div class="rs-item falla"><div><b>${nombre(p.x.v)}</b><span>${p.buenas ? `Hay ${p.buenas} sin falla y estás vendiendo ${p.x.normal}.` : 'La que queda tiene falla.'} ¿Es la de la falla?</span></div><button class="btn primario" data-es-falla="${i}">◆ Sí, es la de la falla</button></div>`
+          : `<div class="rs-item sin"><div><b>${nombre(p.x.v)}</b><span>${p.st ? `El sistema dice que hay ${p.st} y estás vendiendo ${p.n}.` : 'El sistema dice que no hay.'}</span></div></div>`).join('')}</div>
+          <p class="rs-nota">Si seguís, la venta se hace igual y queda un aviso en <b>Ventas → Stock a revisar</b> para corregir el stock.</p>
+          <div class="pie"><button class="btn" data-volver>Volver al ticket</button><button class="btn peligro" data-seguir>Vender igual</button></div>`;
+        $$('[data-es-falla]', m).forEach(b => b.onclick = () => { const p = ps[+b.dataset.esFalla]; let resta = p.cuantas;
+          p.x.lineas.filter(l => !l.falla).forEach(l => { if (resta <= 0) return;
+            if (l.cantidad <= resta) { l.falla = true; resta -= l.cantidad; }
+            else { l.cantidad -= resta; carrito.lineas.splice(carrito.lineas.indexOf(l) + 1, 0, Object.assign({}, l, { cantidad: resta, falla: true })); resta = 0; } });
+          pintar(); pintarRs(); });
+        $('[data-volver]', m).onclick = () => { m.cerrar(); resolve(false); };
+        $('[data-seguir]', m).onclick = () => { m.cerrar(); carrito.avisos = ps.length; resolve(true); };
+      };
+      pintarRs();
+    });
   }
   const q = $('#q'); let tq;
   q.addEventListener('input', () => { clearTimeout(tq); tq = setTimeout(() => { const r = buscar(q.value); if (r.exacta && q.value.trim().length >= 8) { agregar(r.exacta[0]); q.value = ''; pintarResultados(null); } else pintarResultados(r); }, 120); });
@@ -243,6 +292,7 @@ APP.ready.then(async () => {
   async function cobrar(modoSena) {
     const c = calcular(); if (!c.lineas.length) return;
     if (!turno) { toast('Primero abrí la caja', 'error'); abrirTurno(); return; }
+    if (!(await revisarStock())) return;
     const pagos = []; let creditoUsado = null;
     const total = () => { const cc = calcular(); const recargo = pagos.reduce((s, p) => s + r2(p.monto * (p.recargo_pct || 0) / 100), 0); return { ...cc, recargo: r2(recargo), aPagar: r2(cc.total + recargo) }; };
     const m = modal(`<h2>${modoSena ? 'Dejar seña' : (c.total < 0 ? 'Devolver dinero' : 'Cobrar')} <span class="mono" id="cb-total" style="float:right"></span></h2>
@@ -318,6 +368,7 @@ APP.ready.then(async () => {
       m.cerrar();
       const res = await enviarVenta(payload);
       mostrarTicket(payload, res, { vuelto: vuelto > 0 ? vuelto : 0, pagos: pagosFinal, total: t });
+      if (carrito.avisos) { toast('Venta hecha. Quedó un aviso para corregir el stock en Ventas → Stock a revisar', 'error'); carrito.avisos = 0; setTimeout(pintarAvisosStock, 1500); }
       carrito.lineas = []; carrito.cambio = null; carrito.descPct = 0; $('#desc-general').value = 0; $('#nota').value = ''; $('#sel-cliente').value = ''; if ($('#sel-origen')) $('#sel-origen').value = 'local';
       carrito.lista = (listas.find(x => x.predeterminada) || listas[0] || {}).id;   // la próxima venta arranca con la lista base
       // el stock del catálogo en memoria
@@ -423,8 +474,16 @@ APP.ready.then(async () => {
   // ================= Arranque =================
   // lo que el POS (pos.js) necesita de la caja: catálogo en memoria, carrito y acciones
   APP.caja = { get catalogo() { return catalogo; }, get productos() { return productos; }, get carrito() { return carrito; }, get turno() { return turno; }, get listas() { return listas; },
-    agregar, elegirProducto, pintar, precioLista, cobrar, calcular: () => calcular(), buscar, abrirTurno, cerrarTurno, movimientoCaja, pintarEstado, colaPendiente, sincronizar };
-  await cargarBase(); await cargarTurno(); pintar(); pintarRecientes(); sincronizar();
+    agregar, elegirProducto, pintar, precioLista, cobrar, calcular: () => calcular(), buscar, abrirTurno, cerrarTurno, movimientoCaja, pintarEstado, colaPendiente, sincronizar, buscadorPick, pintarAvisosStock, revisarStock };
+  // Recordatorio: prendas vendidas sin stock en el sistema (o sin marcar la falla) que hay que corregir
+  async function pintarAvisosStock() {
+    const { count } = await sb.from('stock_revisar').select('id', { count: 'exact', head: true }).eq('empresa_id', e).is('resuelto', null);
+    let b = document.getElementById('aviso-stock');
+    if (!count) { if (b) b.remove(); return; }
+    if (!b) { const sub = document.getElementById('ticket-sub'); if (!sub) return; sub.insertAdjacentHTML('afterend', '<a id="aviso-stock" class="aviso-stock" href="ventas.html#revisar"></a>'); b = document.getElementById('aviso-stock'); }
+    b.textContent = '⚠ ' + count + ' para corregir stock'; b.title = 'Prendas vendidas sin stock en el sistema. Tocá para revisarlas.';
+  }
+  await cargarBase(); await cargarTurno(); pintar(); pintarRecientes(); sincronizar(); pintarAvisosStock();
   if (APP.caja.alCargar) APP.caja.alCargar();
   const params = new URLSearchParams(location.search); if (params.get('cambio')) { $('#btn-cambio').click(); }
 });

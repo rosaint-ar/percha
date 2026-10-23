@@ -130,7 +130,7 @@ APP.ready.then(async () => {
           const vars = porProducto.get(pid);
           if (vars.length === 1 && !vars[0].talle && !vars[0].color) { asignar(vars[0]); return; }
           const m2 = modal(`<h2>${esc(vars[0].producto_nombre)}</h2><p class="sub">¿Qué talle y color?</p><div class="matriz-pick">${vars.slice().sort((a, b) => (a.talle_orden ?? 999) - (b.talle_orden ?? 999) || String(a.color_nombre || '').localeCompare(b.color_nombre || '')).map(v => `<button data-v="${v.id}" class="${+v.stock > 0 ? '' : 'sin'}">${esc([v.talle_nombre, v.color_nombre].filter(Boolean).join(' · ') || 'único')}<small>${fmt.num(v.stock)} u.</small></button>`).join('')}</div>`);
-          $$('[data-v]', m2).forEach(b => b.onclick = () => { m2.cerrar(); asignar(C.catalogo.find(v => v.id === b.dataset.v)); });
+          $$('[data-v]', m2).forEach(b => b.onclick = () => { m2.cerrar(); asignar(C.catalogo.find(v => v.id === b.dataset.v)); }); C.buscadorPick(m2);
         });
       };
       // una unidad del genérico pasa a ser el modelo real (a su precio)
@@ -182,7 +182,7 @@ APP.ready.then(async () => {
             if (v) { elegir(v); return; }
             const vars = porProducto.get(p2); if (vars.length === 1) { elegir(vars[0]); return; }
             const m2 = modal(`<h2>${esc(vars[0].producto_nombre)}</h2><p class="sub">¿Qué talle y color?</p><div class="matriz-pick">${vars.slice().sort((a, b) => (a.talle_orden ?? 999) - (b.talle_orden ?? 999) || String(a.color_nombre || '').localeCompare(b.color_nombre || '')).map(v2 => `<button data-v="${v2.id}" class="${+v2.stock > 0 ? '' : 'sin'}">${esc([v2.talle_nombre, v2.color_nombre].filter(Boolean).join(' · ') || 'único')}<small>${fmt.num(v2.stock)} u.</small></button>`).join('')}</div>`);
-            $$('[data-v]', m2).forEach(b => b.onclick = () => { m2.cerrar(); elegir(C.catalogo.find(v2 => v2.id === b.dataset.v)); });
+            $$('[data-v]', m2).forEach(b => b.onclick = () => { m2.cerrar(); elegir(C.catalogo.find(v2 => v2.id === b.dataset.v)); }); C.buscadorPick(m2);
           });
         };
         const elegir = v => {
