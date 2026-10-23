@@ -89,7 +89,33 @@ Deno.serve(async (req) => {
         let costo = 0, producto_id: string | null = null;
         if (it?.variante_id) { const { data: v } = await admin.from("v_variantes").select("costo,producto_id").eq("id", it.variante_id).single(); costo = +v?.costo || 0; producto_id = v?.producto_id || null; }
         else problemas.push(`${pr.name} (${pr.sku || "sin sku"}) no está cruzado: no descontó stock`);
-        lineas.push({ variante_id: it?.variante_id || null, producto_id, descripcion: pr.name, talle: pr.variant_values?.[0] || null, color: pr.variant_values?.[1] || null, cantidad: cant, precio_lista: precio, precio_unit: precio, descuento_pct: 0, total: r2(precio * cant), costo_unit: costo });
+        const linea: any = { variante_id: it?.variante_id || null, producto_id, descripcion: pr.name, talle: pr.variant_values?.[0] || null, color: pr.variant_values?.[1] || null, cantidad: cant, precio_lista: precio, precio_unit: precio, descuento_pct: 0, total: r2(precio * cant), costo_unit: costo };
+        // kit (box/pack): los componentes "por producto" se resuelven con el talle/color que eligió la clienta en el canal;
+        // los que no se pueden resolver van a la variante "sin definir" (el Conteo los acomoda después)
+        if (producto_id) {
+          const { data: prod } = await admin.from("productos").select("tipo").eq("id", producto_id).single();
+          if (prod?.tipo === "kit") {
+            const { data: comps } = await admin.from("v_componentes").select("variante_id,comp_producto_id,filtro,cantidad").eq("producto_id", producto_id);
+            const vals: string[] = (pr.variant_values || []).map((x: any) => String(x).trim().toLowerCase());
+            const componentes: any[] = [];
+            for (const c of comps || []) {
+              let vid: string | null = c.variante_id;
+              if (!vid && c.comp_producto_id && !c.filtro) {
+                const { data: cand } = await admin.from("v_variantes").select("id,talle_nombre,color_nombre").eq("producto_id", c.comp_producto_id).eq("activa", true);
+                const n = (s: any) => String(s || "").trim().toLowerCase();
+                const exacta = (cand || []).find((v: any) => vals.includes(n(v.talle_nombre)) && vals.includes(n(v.color_nombre)))
+                  || (cand || []).find((v: any) => v.talle_nombre && vals.includes(n(v.talle_nombre)) && !v.color_nombre)
+                  || ((cand || []).filter((v: any) => v.talle_nombre && vals.includes(n(v.talle_nombre))).length === 1 ? (cand || []).find((v: any) => v.talle_nombre && vals.includes(n(v.talle_nombre))) : null);
+                vid = exacta?.id || null;
+                if (!vid) { const { data: ind } = await admin.rpc("variante_indefinida", { p_producto: c.comp_producto_id }); vid = ind || null; }
+              }
+              if (!vid && c.filtro?.defecto_producto_id) { const { data: ind } = await admin.rpc("variante_indefinida", { p_producto: c.filtro.defecto_producto_id }); vid = ind || null; }
+              if (vid) componentes.push({ variante_id: vid, cantidad: r2(cant * (+c.cantidad || 1)) });
+            }
+            if (componentes.length) linea.componentes = componentes;
+          }
+        }
+        lineas.push(linea);
       }
       // el envío que pagó la clienta = total − (subtotal − descuento); la API de pedidos no lo trae como campo aparte
       const descuento = r2(+o.discount || 0);
