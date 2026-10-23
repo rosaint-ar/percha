@@ -56,9 +56,26 @@
     </div>
   </div>
 
+  <div class="card" id="card-generico" style="margin-top:14px;display:none">
+    <div class="card-cab"><div><h2>Qué incluye este genérico</h2><p class="sub">Se vende rápido como «varias» y al cobrar el POS pregunta el modelo. Acá se define entre qué prendas elegir.</p></div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+      <div class="campo" style="margin:0;min-width:150px"><label>Familia</label><select id="gf-cat"><option value="">Todas</option></select></div>
+      <div class="campo" style="margin:0;min-width:150px"><label>Que contenga (coma)</label><input id="gf-inc" placeholder="MEDIAS"></div>
+      <div class="campo" style="margin:0;min-width:170px"><label>Que NO contenga (coma)</label><input id="gf-exc" placeholder="PACK, RED"></div>
+      <button class="btn primario" id="gf-guardar" type="button">Guardar filtro</button><span class="sub" id="gf-cuenta"></span>
+    </div>
+  </div>
   <div class="card" id="card-kit" style="margin-top:14px;display:none">
     <div class="card-cab"><div><h2>Qué lleva este kit</h2><p class="sub">No tiene stock propio: se puede vender mientras haya de cada componente, y al venderlo se descuentan todos.</p></div></div>
     <div class="agregar" style="position:relative;margin-bottom:10px"><div class="buscador" style="min-width:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="kit-q" placeholder="Buscar prenda, talle o color para agregar…" autocomplete="off"></div><div id="kit-sug" class="sugerencias" style="display:none;position:absolute;z-index:5;background:var(--superficie-2);border:1px solid var(--linea);border-radius:var(--radio-chico);box-shadow:var(--sombra-flotante);max-height:260px;overflow:auto;width:min(520px,90vw)"></div></div>
+    <div id="kit-filtro" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin:0 0 12px;padding:10px 12px;background:var(--lila-suave);border-radius:10px">
+      <div class="campo" style="margin:0;min-width:150px"><label>O por filtro · familia</label><select id="kf-cat"><option value="">Todas</option></select></div>
+      <div class="campo" style="margin:0;min-width:150px"><label>Que contenga (coma)</label><input id="kf-inc" placeholder="MEDIAS"></div>
+      <div class="campo" style="margin:0;min-width:170px"><label>Que NO contenga (coma)</label><input id="kf-exc" placeholder="RED, CON LIGA"></div>
+      <div class="campo" style="margin:0;width:80px"><label>Cantidad</label><input id="kf-cant" type="number" min="1" value="1"></div>
+      <div class="campo" style="margin:0;min-width:170px"><label>Descontar de (si nadie elige)</label><select id="kf-def"><option value="">—</option></select></div>
+      <button class="btn primario" id="kf-agregar" type="button">Agregar filtro</button><span class="sub" id="kf-cuenta"></span>
+    </div>
     <table class="lista" id="tb-kit"><tr><th>Componente</th><th>Talle · color</th><th class="num">Cantidad</th><th class="num">Stock</th><th class="num">Costo</th><th></th></tr></table>
     <p class="sub" id="kit-resumen" style="margin-top:10px"></p>
   </div>
@@ -116,6 +133,7 @@ APP.ready.then(async () => {
     $('#stock-total').value = fmt.num(variantes.reduce((s, x) => s + (+x.stock || 0), 0));
     $('#ayuda-ean').textContent = producto.tiene_variantes ? 'Con variantes, el código de barras va en cada talle y color.' : '';
     pintarPrecios(); pintarAcciones();
+    pintarGenerico();
     if (producto.tipo === 'kit') { $('#card-matriz').style.display = 'none'; $('#card-kit').style.display = ''; await pintarKit(); }
     else { $('#card-matriz').style.display = ''; $('#card-kit').style.display = 'none'; pintarMatriz(); }
     pintarMovimientos(mv.data || []);
@@ -293,7 +311,7 @@ APP.ready.then(async () => {
     const tb = $('#tb-kit'); tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());
     let costo = 0, disponible = null;
     (comps || []).forEach(c => { costo += (+c.costo || 0) * c.cantidad; const d = Math.floor((+c.stock || 0) / c.cantidad); disponible = disponible == null ? d : Math.min(disponible, d);
-      tb.insertAdjacentHTML('beforeend', `<tr><td>${esc(c.comp_nombre || '')}</td><td>${c.variante_id ? esc([c.talle_nombre, c.color_nombre].filter(Boolean).join(' · ') || 'único') : '<span class="chip">cualquier talle · color</span>'}</td><td class="num"><input type="number" min="1" value="${c.cantidad}" data-c="${c.id}" style="width:64px;text-align:right;font-family:var(--f-mono);border:1px solid var(--linea);border-radius:7px;padding:4px 6px" ${APP.esAdmin ? '' : 'disabled'}></td><td class="num ${+c.stock > 0 ? 'num-f' : ''}">${fmt.num(c.stock)}</td><td class="num">${fmt.pesos((+c.costo || 0) * c.cantidad)}</td><td>${APP.esAdmin ? `<button class="btn chico peligro" data-x="${c.id}">×</button>` : ''}</td></tr>`); });
+      tb.insertAdjacentHTML('beforeend', `<tr><td>${esc(c.comp_nombre || '')}${c.filtro ? ` <small style="color:var(--tinta-3)">(${fmt.num(c.productos_filtro || 0)} productos)</small>` : ''}</td><td>${c.variante_id ? esc([c.talle_nombre, c.color_nombre].filter(Boolean).join(' · ') || 'único') : c.filtro ? '<span class="chip aviso">por filtro</span>' : '<span class="chip">cualquier talle · color</span>'}</td><td class="num"><input type="number" min="1" value="${c.cantidad}" data-c="${c.id}" style="width:64px;text-align:right;font-family:var(--f-mono);border:1px solid var(--linea);border-radius:7px;padding:4px 6px" ${APP.esAdmin ? '' : 'disabled'}></td><td class="num ${+c.stock > 0 ? 'num-f' : ''}">${fmt.num(c.stock)}</td><td class="num">${fmt.pesos((+c.costo || 0) * c.cantidad)}</td><td>${APP.esAdmin ? `<button class="btn chico peligro" data-x="${c.id}">×</button>` : ''}</td></tr>`); });
     if (!(comps || []).length) tb.insertAdjacentHTML('beforeend', '<tr><td colspan="6" class="vacio">Todavía no tiene componentes. Buscá arriba la primera prenda.</td></tr>');
     $('#kit-resumen').innerHTML = (comps || []).length ? `Se pueden armar <b>${fmt.num(disponible || 0)}</b> kits con el stock actual · costo del kit <b>${fmt.pesos(costo)}</b> · precio ${fmt.pesos(producto.precio)} → margen <b>${producto.precio ? fmt.pct(100 * (producto.precio - costo) / producto.precio) : '—'}</b>` : '';
     $('#stock-total').value = fmt.num(disponible || 0);
@@ -313,6 +331,35 @@ APP.ready.then(async () => {
     $$('[data-p]', ksug).forEach(d => d.onclick = async () => { const r = await sb.from('producto_componentes').insert(APP.conEmpresa({ producto_id: id, componente_producto_id: d.dataset.p, cantidad: 1 })); if (r.error) toast(mensajeError(r.error), 'error'); ksug.style.display = 'none'; kq.value = ''; pintarKit(); });
   });
   document.addEventListener('click', ev => { if (!ev.target.closest('#kit-q') && !ev.target.closest('#kit-sug')) ksug.style.display = 'none'; });
+
+  // ---------- filtros (kit y genérico) ----------
+  const partir = s => s.split(',').map(x => x.trim()).filter(Boolean);
+  async function llenarFiltros() {
+    const cats = $$('select[name=categoria_id] option').map(o => `<option value="${o.value}">${esc(o.textContent)}</option>`).join('');
+    $('#kf-cat').innerHTML = '<option value="">Todas</option>' + cats; $('#gf-cat').innerHTML = '<option value="">Todas</option>' + cats;
+    const { data: gens } = await sb.from('productos').select('id,nombre').eq('empresa_id', e).eq('es_generico', true).order('nombre');
+    $('#kf-def').innerHTML = '<option value="">—</option>' + (gens || []).map(g => `<option value="${g.id}">${esc(g.nombre)}</option>`).join('');
+  }
+  const filtroKit = () => ({ categoria_id: $('#kf-cat').value || null, incluye: partir($('#kf-inc').value), excluye: partir($('#kf-exc').value), defecto_producto_id: $('#kf-def').value || null });
+  const filtroGen = () => ({ categoria_id: $('#gf-cat').value || null, incluye: partir($('#gf-inc').value), excluye: partir($('#gf-exc').value) });
+  let tc; const contar = async (f, destino) => { clearTimeout(tc); tc = setTimeout(async () => { const { data } = await sb.rpc('filtro_cuenta', { e, f }); $(destino).textContent = `${fmt.num(data || 0)} productos coinciden`; }, 300); };
+  ['#kf-cat', '#kf-inc', '#kf-exc'].forEach(s => $(s).addEventListener('input', () => contar(filtroKit(), '#kf-cuenta')));
+  ['#gf-cat', '#gf-inc', '#gf-exc'].forEach(s => $(s).addEventListener('input', () => contar(filtroGen(), '#gf-cuenta')));
+  $('#kf-agregar').onclick = async () => {
+    const f = filtroKit(); if (!f.categoria_id && !f.incluye.length) { toast('Elegí una familia o escribí qué tiene que contener', 'error'); return; }
+    const r = await sb.from('producto_componentes').insert(APP.conEmpresa({ producto_id: id, filtro: f, cantidad: Math.max(1, +$('#kf-cant').value || 1) }));
+    if (r.error) { toast(mensajeError(r.error), 'error'); return; } toast('Filtro agregado'); pintarKit();
+  };
+  function pintarGenerico() {
+    const es = form.es_generico.value === 'true'; $('#card-generico').style.display = es ? '' : 'none'; if (!es) return;
+    const f = (producto && producto.generico_filtro) || {}; $('#gf-cat').value = f.categoria_id || (producto && producto.categoria_id) || ''; $('#gf-inc').value = (f.incluye || []).join(', '); $('#gf-exc').value = (f.excluye || []).join(', ');
+    contar(filtroGen(), '#gf-cuenta');
+  }
+  form.es_generico.addEventListener('change', pintarGenerico);
+  $('#gf-guardar').onclick = async () => { if (!id) { toast('Guardá el producto primero', 'error'); return; } const r = await sb.from('productos').update({ generico_filtro: filtroGen() }).eq('id', id); toast(r.error ? mensajeError(r.error) : 'Filtro del genérico guardado', r.error ? 'error' : ''); };
+  // kit nuevo: se avisa que primero hay que guardar
+  form.tipo.addEventListener('change', () => { if (form.tipo.value === 'kit' && !id) { $('#card-kit').style.display = ''; $('#card-matriz').style.display = 'none'; $('#tb-kit').querySelectorAll('tr').forEach((x, i) => i && x.remove()); $('#tb-kit').insertAdjacentHTML('beforeend', '<tr><td colspan="6" class="vacio">Guardá el producto (arriba) y acá cargás lo que lleva: prendas exactas, "cualquier talle · color" o un filtro.</td></tr>'); } });
+  llenarFiltros();
 
   function pintarMovimientos(movs) {
     const tb = $('#tb-mov'); tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());

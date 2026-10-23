@@ -53,27 +53,30 @@ APP.ready.then(async () => {
     const total = Object.values(cuenta).reduce((s, n) => s + n, 0);
     const items = [{ id: 'todo', nombre: 'Todo', n: total }, ...(recientes.length ? [{ id: 'recientes', nombre: 'Recientes', n: recientes.length }] : []), ...categorias.filter(c => cuenta[c.id]).map(c => ({ id: c.id, nombre: c.nombre, n: cuenta[c.id] }))];
     $('#familias').innerHTML = items.map(c => `<button class="${c.id === familia ? 'on' : ''}" data-f="${c.id}">${esc(c.nombre)}<b>${fmt.num(c.n)}</b></button>`).join('');
-    $$('#familias button').forEach(b => b.onclick = () => { familia = b.dataset.f; $('#q').value = ''; pintarFamilias(); pintarGrilla(); });
+    $$('#familias button').forEach(b => b.onclick = () => { familia = b.dataset.f; grillaMax = 60; $('#q').value = ''; pintarFamilias(); pintarGrilla(); });
   }
   function tile(pid, vars, coinciden) {
     const v0 = vars[0], st = sumaStock(vars), foto = (C.productos[pid] || {}).imagen_url, unico = vars.length === 1 && !v0.talle && !v0.color, gen = (C.productos[pid] || {}).es_generico;
     const visibles = (coinciden || []).filter(v => $('#chk-sinstock').checked || +v.stock > 0);
     const chips = visibles.length && visibles.length < vars.length ? `<div class="vchips">${visibles.slice(0, 6).map(v => `<button data-v="${v.id}">${esc([v.talle_nombre, v.color_nombre].filter(Boolean).join(' · '))}<small>${fmt.num(v.stock)}</small></button>`).join('')}</div>` : '';
-    return `<div class="tile-p" data-pid="${pid}">${foto ? `<div class="foto" style="background-image:url('${esc(foto)}')"></div>` : `<div class="foto sinfoto">${esc(APP.iniciales(v0.producto_nombre.replace(/[«»]/g, '')))}</div>`}<span class="st ${st > 0 ? '' : 'cero'}">${gen ? '∞' : fmt.num(st)}</span>
+    return `<div class="tile-p" data-pid="${pid}">${foto ? `<div class="foto"><img src="${esc(foto)}" loading="lazy" alt=""></div>` : `<div class="foto sinfoto">${esc(APP.iniciales(v0.producto_nombre.replace(/[«»]/g, '')))}</div>`}<span class="st ${st > 0 ? '' : 'cero'}">${gen ? '∞' : fmt.num(st)}</span>
       <div class="txt"><div class="nom">${esc(v0.producto_nombre)}</div><div class="cod">${esc(v0.producto_codigo)}${unico ? '' : ' · ' + vars.length + ' var.'}${gen ? ' · al cobrar se elige el modelo' : ''}</div><div class="pre">${fmt.pesos(C.precioLista(v0))}</div></div>${chips}</div>`;
   }
   function activarTiles(cont, alElegir) {
     $$('.tile-p', cont).forEach(t => t.onclick = ev => { const b = ev.target.closest('[data-v]'); if (b) { alElegir(C.catalogo.find(v => v.id === b.dataset.v)); return; } alElegir(null, t.dataset.pid); });
   }
+  let grillaMax = 60;
   function pintarGrilla() {
     const q = $('#q').value.trim();
     const recientes = JSON.parse(localStorage.getItem(`percha_recientes_${e}`) || '[]');
     let lista = buscarModelos(q, (pid, vars) => conStock(pid, vars) && (q || familia === 'todo' || familia === 'recientes' || (C.productos[pid] || {}).categoria_id === familia));
     if (!q && familia === 'recientes') lista = recientes.map(pid => lista.find(x => x.pid === pid)).filter(Boolean);
     else if (!q) lista.sort((a, b) => a.vars[0].producto_nombre.localeCompare(b.vars[0].producto_nombre));
-    const max = 240;
+    // se dibujan de a 60 para que la pantalla arranque al instante; "Ver más" trae el resto
+    const max = q ? 120 : grillaMax;
     $('#grilla').innerHTML = lista.slice(0, max).map(x => tile(x.pid, x.vars, x.coinciden)).join('') || '<div class="vacio">Nada con ese nombre.</div>';
-    if (lista.length > max) $('#grilla').insertAdjacentHTML('beforeend', `<div class="vacio">Hay ${fmt.num(lista.length - max)} más: afiná la búsqueda.</div>`);
+    if (lista.length > max) $('#grilla').insertAdjacentHTML('beforeend', `<div class="vacio"><button class="btn" id="btn-grilla-mas">Ver ${fmt.num(Math.min(120, lista.length - max))} más</button></div>`);
+    const bm = $('#btn-grilla-mas'); if (bm) bm.onclick = () => { grillaMax += 120; pintarGrilla(); };
     activarTiles($('#grilla'), (v, pid) => { if (v) C.agregar(v); else C.elegirProducto(pid); $('#q').value = ''; setTimeout(pintarGrilla, 50); });
   }
   let tq; $('#q').addEventListener('input', () => { clearTimeout(tq); tq = setTimeout(pintarGrilla, 150); });
@@ -89,7 +92,13 @@ APP.ready.then(async () => {
   observador.observe($('#lineas'), { childList: true });
 
   // ================= "¿Qué modelos se lleva?" (genéricos) =================
-  const filtroGenerico = gen => { const cat = gen.categoria_id, primera = (((porProducto.get(gen.id) || [{}])[0].producto_nombre || '').split(' ')[0] || '').toUpperCase();
+  // multiplicador: ×2, ×3, ×5 aplican al próximo toque y vuelven a ×1
+  const multDe = m => +(((m.querySelector('[data-mult] .on') || {}).dataset || {}).m) || 1;
+  const ponerMult = (m, n) => $$('[data-mult] button', m).forEach(b => b.classList.toggle('on', +b.dataset.m === n));
+  const activarMult = m => $$('[data-mult] button', m).forEach(b => b.onclick = () => ponerMult(m, +b.dataset.m));
+  const cumpleFiltro = (f, nombre) => { const n = (nombre || '').toUpperCase(); return (f.incluye || []).every(w => !w.trim() || n.includes(w.trim().toUpperCase())) && !(f.excluye || []).some(w => w.trim() && n.includes(w.trim().toUpperCase())); };
+  const filtroDe = f => (p2, vars) => !(C.productos[p2] || {}).es_generico && (C.productos[p2] || {}).tipo !== 'kit' && (!f.categoria_id || (C.productos[p2] || {}).categoria_id === f.categoria_id) && cumpleFiltro(f, vars[0].producto_nombre);
+  const filtroGenerico = gen => { if (gen.generico_filtro) return filtroDe(gen.generico_filtro); const cat = gen.categoria_id, primera = (((porProducto.get(gen.id) || [{}])[0].producto_nombre || '').split(' ')[0] || '').toUpperCase();
     const porPrefijo = primera && [...porProducto.entries()].some(([p2, vars]) => p2 !== gen.id && (C.productos[p2] || {}).categoria_id === cat && !(C.productos[p2] || {}).es_generico && vars[0].producto_nombre.toUpperCase().startsWith(primera + ' '));
     return (p2, vars) => !(C.productos[p2] || {}).es_generico && (C.productos[p2] || {}).tipo !== 'kit' && (C.productos[p2] || {}).categoria_id === cat && (!porPrefijo || vars[0].producto_nombre.toUpperCase().startsWith(primera + ' ')); };
   // El genérico (BOMBIS «VARIAS») se vende rápido. Antes de cobrar, se pide definir cada unidad buscando el modelo real.
@@ -101,7 +110,7 @@ APP.ready.then(async () => {
       const nombreGen = l0.variante.producto_nombre;
       const elegidos = [];
       const m = modal(`<h2>¿Qué modelos se lleva?</h2><p class="sub">Buscá cada uno (ej. <b>fru cel</b> = Fru Fru celeste) y tocalo. Si no sabés cuál es, dejalo como ${esc(nombreGen)}.</p>
-        <div class="pend"><b id="df-n"></b><span class="sub">por definir</span><div class="elegidos" id="df-elegidos"></div></div>
+        <div class="pend"><b id="df-n"></b><span class="sub">por definir</span><span class="mult" data-mult><button class="on" data-m="1">×1</button><button data-m="2">×2</button><button data-m="3">×3</button><button data-m="5">×5</button></span><div class="elegidos" id="df-elegidos"></div></div>
         <div class="buscador" style="min-width:0;width:100%"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="df-q" placeholder="Modelo, color, talle…" autocomplete="off"><label class="filtro-stock"><input type="checkbox" id="df-sinstock"> sin stock</label></div>
         <div class="grilla" id="df-grilla"></div>
         <div class="pie"><div style="display:flex;gap:8px"><button class="btn" data-mas>+ Una más</button><button class="btn" data-dejar>Dejar como ${esc(nombreGen)}</button></div><button class="btn primario" data-ok style="padding:12px 22px;font-size:15px">Seguir al cobro</button></div>`, { fijo: true });
@@ -126,9 +135,8 @@ APP.ready.then(async () => {
       };
       // una unidad del genérico pasa a ser el modelo real (a su precio)
       const asignar = v => {
-        const g = genericas()[0]; if (!g) return;
-        g.cantidad -= 1; if (g.cantidad <= 0) C.carrito.lineas.splice(C.carrito.lineas.indexOf(g), 1);
-        C.agregar(v, 1); elegidos.push(v); $('#df-q', m).value = ''; pintarPend(); pintarLista(); $('#df-q', m).focus();
+        const n = Math.min(multDe(m), pendientes()); for (let i = 0; i < n; i++) { const g = genericas()[0]; if (!g) break; g.cantidad -= 1; if (g.cantidad <= 0) C.carrito.lineas.splice(C.carrito.lineas.indexOf(g), 1); elegidos.push(v); }
+        C.agregar(v, n); ponerMult(m, 1); $('#df-q', m).value = ''; pintarPend(); pintarLista(); $('#df-q', m).focus();
         if (!pendientes()) { m.cerrar(); res(true); }
       };
       $('#df-q', m).addEventListener('input', () => pintarLista());
@@ -138,13 +146,13 @@ APP.ready.then(async () => {
       $('[data-dejar]', m).onclick = () => { m.cerrar(); res(true); };
       $('[data-ok]', m).onclick = () => { m.cerrar(); res(true); };
       m.addEventListener('click', ev => { if (ev.target === m) { /* fijo: no se cierra tocando afuera */ } });
-      pintarPend(); pintarLista(); $('#df-q', m).focus();
+      activarMult(m); pintarPend(); pintarLista(); $('#df-q', m).focus();
     });
   }
   // ================= "¿Qué lleva el pack?" (kits por producto) =================
   // Un [PACK x3] LESS «ALDI» lleva 3 LESS «ALDI» del color que elija la clienta: se eligen acá y van en la línea (componentes).
   let componentesKit = {};   // producto_id del kit → [{comp_producto_id, cantidad, comp_generico, variante_id}]
-  async function cargarComponentes() { const { data } = await sb.from('v_componentes').select('producto_id,comp_producto_id,cantidad,comp_generico,variante_id').eq('empresa_id', e); componentesKit = {}; (data || []).forEach(c => { (componentesKit[c.producto_id] = componentesKit[c.producto_id] || []).push(c); }); }
+  async function cargarComponentes() { const { data } = await sb.from('v_componentes').select('producto_id,comp_producto_id,cantidad,comp_generico,variante_id,filtro').eq('empresa_id', e); componentesKit = {}; (data || []).forEach(c => { (componentesKit[c.producto_id] = componentesKit[c.producto_id] || []).push(c); }); }
   cargarComponentes();
   function definirKits() {
     return new Promise(res => {
@@ -152,11 +160,11 @@ APP.ready.then(async () => {
       const siguiente = () => {
         const l = pendientes()[0]; if (!l) { res(true); return; }
         // ranuras: por cada kit × cada componente "por producto" × su cantidad
-        const ranuras = []; (componentesKit[l.variante.producto_id] || []).filter(c => !c.variante_id).forEach(c => { for (let i = 0; i < l.cantidad * c.cantidad; i++) ranuras.push(c.comp_producto_id); });
+        const ranuras = []; (componentesKit[l.variante.producto_id] || []).filter(c => !c.variante_id).forEach(c => { for (let i = 0; i < l.cantidad * c.cantidad; i++) ranuras.push(c.filtro ? { filtro: c.filtro } : { pid: c.comp_producto_id }); });
         l.componentes = l.componentes || []; const elegidos = [];
-        const nombreDe = pid => (porProducto.get(pid) || [{}])[0].producto_nombre || '';
+        const nombreDe = r => r.pid ? ((porProducto.get(r.pid) || [{}])[0].producto_nombre || '') : ((r.filtro.incluye || []).join(' ') || 'prenda del filtro');
         const m = modal(`<h2>¿Qué lleva ${esc(l.variante.producto_nombre)}?</h2><p class="sub">Tocá cada prenda que va adentro (${ranuras.length} en total). Si no sabés, dejalo sin definir y se acomoda en el Conteo.</p>
-          <div class="pend"><b id="dk-n"></b><span class="sub" id="dk-que"></span><div class="elegidos" id="dk-elegidos"></div></div>
+          <div class="pend"><b id="dk-n"></b><span class="sub" id="dk-que"></span><span class="mult" data-mult><button class="on" data-m="1">×1</button><button data-m="2">×2</button><button data-m="3">×3</button><button data-m="5">×5</button></span><div class="elegidos" id="dk-elegidos"></div></div>
           <div class="buscador" style="min-width:0;width:100%"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="dk-q" placeholder="Color, talle…" autocomplete="off"><label class="filtro-stock"><input type="checkbox" id="dk-sinstock"> sin stock</label></div>
           <div class="grilla" id="dk-grilla"></div>
           <div class="pie"><button class="btn" data-dejar>Dejar sin definir</button><button class="btn primario" data-ok style="padding:12px 22px;font-size:15px">Seguir</button></div>`, { fijo: true });
@@ -164,10 +172,11 @@ APP.ready.then(async () => {
         const actual = () => ranuras[elegidos.length];
         const pintar = () => { $('#dk-n', m).textContent = ranuras.length - elegidos.length; $('#dk-que', m).textContent = actual() ? 'por definir · ahora: ' + nombreDe(actual()) : 'listo'; $('#dk-elegidos', m).innerHTML = elegidos.map(v => `<span>${esc(v.producto_nombre)} ${esc([v.talle_nombre, v.color_nombre].filter(Boolean).join(' '))}</span>`).join(''); };
         const pintarLista = () => {
-          const pid = actual(); if (!pid) { $('#dk-grilla', m).innerHTML = ''; return; }
-          const gen = (C.productos[pid] || {}).es_generico, catId = (C.productos[pid] || {}).categoria_id, q = $('#dk-q', m).value.trim(), sin = $('#dk-sinstock', m).checked;
-          // genérico (BOMBIS VARIAS): cualquier prenda de su familia; producto concreto: sus variantes
-          const fg = gen ? filtroGenerico(Object.assign({ id: pid }, C.productos[pid])) : null; const lista = buscarModelos(q, (p2, vars) => (gen ? fg(p2, vars) : p2 === pid) && (sin || sumaStock(vars) > 0 || p2 === pid));
+          const r = actual(); if (!r) { $('#dk-grilla', m).innerHTML = ''; return; }
+          const pid = r.pid, gen = pid && (C.productos[pid] || {}).es_generico, q = $('#dk-q', m).value.trim(), sin = $('#dk-sinstock', m).checked;
+          // filtro: lo que cumple el filtro; genérico (BOMBIS VARIAS): su filtro o su familia; producto concreto: sus variantes
+          const fg = r.filtro ? filtroDe(r.filtro) : gen ? filtroGenerico(Object.assign({ id: pid }, C.productos[pid])) : null;
+          const lista = buscarModelos(q, (p2, vars) => (fg ? fg(p2, vars) : p2 === pid) && (sin || sumaStock(vars) > 0 || p2 === pid));
           $('#dk-grilla', m).innerHTML = lista.slice(0, 120).map(x => tile(x.pid, x.vars, x.coinciden)).join('') || '<div class="vacio" style="grid-column:1/-1">Nada con ese nombre.</div>';
           activarTiles($('#dk-grilla', m), (v, p2) => {
             if (v) { elegir(v); return; }
@@ -177,14 +186,14 @@ APP.ready.then(async () => {
           });
         };
         const elegir = v => {
-          elegidos.push(v); const ya = l.componentes.find(c => c.variante_id === v.id); if (ya) ya.cantidad += 1; else l.componentes.push({ variante_id: v.id, cantidad: 1 });
+          const n = Math.min(multDe(m), ranuras.length - elegidos.length); for (let i = 0; i < n; i++) elegidos.push(v); const ya = l.componentes.find(c => c.variante_id === v.id); if (ya) ya.cantidad += n; else l.componentes.push({ variante_id: v.id, cantidad: n }); ponerMult(m, 1);
           $('#dk-q', m).value = ''; pintar(); pintarLista(); $('#dk-q', m).focus();
           if (!actual()) { l.componentes_ok = true; m.cerrar(); siguiente(); }
         };
         $('#dk-q', m).addEventListener('input', pintarLista); $('#dk-sinstock', m).onchange = pintarLista;
         $('[data-dejar]', m).onclick = () => { l.componentes_ok = true; m.cerrar(); siguiente(); };
         $('[data-ok]', m).onclick = () => { l.componentes_ok = true; m.cerrar(); siguiente(); };
-        pintar(); pintarLista(); $('#dk-q', m).focus();
+        activarMult(m); pintar(); pintarLista(); $('#dk-q', m).focus();
       };
       siguiente();
     });

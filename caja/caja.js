@@ -26,18 +26,26 @@ APP.ready.then(async () => {
     ]);
     listas = l.data || []; formas = f.data || []; promos = p.data || []; vendedoras = v.data || []; caja = (c.data || [])[0]; clientes = cl.data || [];
     carrito.lista = carrito.lista || (listas.find(x => x.predeterminada) || listas[0] || {}).id;
-    try {
+    // arranque rápido: si hay catálogo guardado de hace menos de 12 h, se usa ya y se refresca en segundo plano
+    const guardado = JSON.parse(localStorage.getItem(LS('catalogo')) || 'null');
+    const fresco = guardado && Date.now() - guardado.t < 12 * 3600 * 1000;
+    if (fresco) { catalogo = guardado.vars; productos = Object.fromEntries(guardado.prods.map(x => [x.id, x])); }
+    const traer = async () => {
       const [vars, prods] = await Promise.all([
         paginar(() => sb.from('v_variantes').select('id,producto_id,producto_codigo,producto_nombre,producto_tipo,sku,ean,talle,talle_nombre,talle_orden,color,color_nombre,color_hex,precio,costo,stock,activa').eq('empresa_id', e).eq('activa', true).order('producto_nombre').order('talle_orden')),
-        paginar(() => sb.from('productos').select('id,categoria_id,tipo,activo,imagen_url,es_generico').eq('empresa_id', e).eq('activo', true))
+        paginar(() => sb.from('productos').select('id,categoria_id,tipo,activo,imagen_url,es_generico,generico_filtro').eq('empresa_id', e).eq('activo', true))
       ]);
       productos = Object.fromEntries(prods.map(x => [x.id, x]));
       catalogo = vars.filter(x => productos[x.id === undefined ? '' : x.producto_id]);
       localStorage.setItem(LS('catalogo'), JSON.stringify({ t: Date.now(), vars: catalogo, prods }));
-    } catch (err) {
-      const cache = JSON.parse(localStorage.getItem(LS('catalogo')) || 'null');
-      if (cache) { catalogo = cache.vars; productos = Object.fromEntries(cache.prods.map(x => [x.id, x])); toast('Sin conexión: catálogo guardado del ' + fmt.fechaHora(cache.t), 'error'); }
-      else { toast('No se pudo cargar el catálogo', 'error'); }
+    };
+    if (fresco) { traer().then(() => { pintar(); if (APP.caja.alCargar) APP.caja.alCargar(); }).catch(() => {}); }
+    else {
+      try { await traer(); }
+      catch (err) {
+        if (guardado) { catalogo = guardado.vars; productos = Object.fromEntries(guardado.prods.map(x => [x.id, x])); toast('Sin conexión: catálogo guardado del ' + fmt.fechaHora(guardado.t), 'error'); }
+        else { toast('No se pudo cargar el catálogo', 'error'); }
+      }
     }
     const selV = $('#sel-vendedora'); selV.innerHTML = vendedoras.map(x => `<option value="${x.user_id}" ${x.user_id === APP.user.id ? 'selected' : ''}>${esc(x.nombre)}</option>`).join('');
     $('#dl-clientes').innerHTML = clientes.map(x => `<option value="${esc(x.nombre)}">${esc(x.telefono || '')}</option>`).join('');
