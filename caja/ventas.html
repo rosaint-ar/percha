@@ -42,6 +42,7 @@
   <div class="pestanas"><button class="on" data-t="ventas">Ventas</button><button data-t="senas">Señas pendientes</button><button data-t="cierres">Cierres de caja</button><button data-t="creditos">Créditos y gift cards</button></div>
   <section id="t-ventas">
     <div class="filtros"><input type="date" id="f-desde"><span class="sub">a</span><input type="date" id="f-hasta"><select id="f-estado"><option value="">Todas</option><option value="completada">Completadas</option><option value="senada">Señadas</option><option value="anulada">Anuladas</option></select><select id="f-origen"><option value="">Local y online</option><option value="local">Solo local</option><option value="online">Solo online (Tienda Nube, WhatsApp…)</option><option value="tiendanube">Tienda Nube</option><option value="whatsapp">WhatsApp</option><option value="factusol">FactuSOL</option></select><span class="sub" id="resumen" style="margin-left:auto"></span></div>
+    <div class="sub" id="fs-estado" style="display:none;margin:-6px 0 12px;align-items:center;gap:10px"></div>
     <section class="tiles" id="tiles"></section>
     <div class="card" style="padding:0"><table class="lista" id="tb"><thead><tr><th>Ticket</th><th>Fecha</th><th>Canal</th><th>Clienta</th><th>Atendió</th><th>Pago</th><th class="num">Total</th><th>Estado</th><th></th></tr></thead><tbody></tbody></table></div>
   </section>
@@ -226,6 +227,17 @@ APP.ready.then(async () => {
     const tb = $('#tb-creditos tbody'); tb.innerHTML = (data || []).map(c => `<tr><td class="mono">${esc(c.codigo)}</td><td>${c.tipo === 'gift_card' ? 'Gift card' : 'Nota de crédito'}</td><td>${esc(c.clientes ? c.clientes.nombre : '—')}</td><td>${fmt.fecha(c.creado)}</td><td class="num">${fmt.pesos(c.monto)}</td><td class="num num-f">${fmt.pesos(c.saldo)}</td><td><span class="chip ${c.estado === 'vigente' ? 'ok' : 'gris'}">${c.estado}</span></td></tr>`).join('') || '<tr><td colspan="7" class="vacio">No hay créditos emitidos.</td></tr>';
   }
   ['#f-desde', '#f-hasta', '#f-estado', '#f-origen'].forEach(s => $(s).addEventListener('change', cargar));
+  // FactuSOL: mientras el local siga cargando ahí, el script "Sincronizar FactuSOL" (PC de Diego) trae los remitos y acá se ve hasta dónde llegó
+  async function estadoFactusol() {
+    if (!APP.esAdmin) return;
+    const { data: s } = await sb.rpc('factusol_estado'); if (!s || !s.ultima_sync) return;
+    const el = $('#fs-estado'); el.style.display = 'flex';
+    el.innerHTML = `<span>FactuSOL: datos al <b>${fmt.fechaHora(s.archivo_modificado)}</b> · último remito ${s.ultimo_codigo} · leído ${fmt.fechaHora(s.ultima_sync)}${+s.pendientes ? ` · <b style="color:var(--aviso)">${s.pendientes} sin traer</b>` : ''}${+s.con_problema ? ` · ${s.con_problema} con algo para revisar` : ''}</span>
+      ${+s.pendientes ? '<button class="btn chico" id="fs-traer">Traer a Percha</button>' : ''}<span style="color:var(--tinta-3)">Para leer lo nuevo de FactuSOL: "Sincronizar FactuSOL" en la PC de Diego.</span>`;
+    const b = $('#fs-traer'); if (b) b.onclick = async () => { b.disabled = true; const { data, error } = await sb.rpc('factusol_importar_ventas'); if (error) { toast(mensajeError(error), 'error'); b.disabled = false; return; }
+      toast(`${(data.importados || []).length} tickets traídos de FactuSOL`); estadoFactusol(); cargar(); };
+  }
+  estadoFactusol();
   await cargar();
 });
 </script>
