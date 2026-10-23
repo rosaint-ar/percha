@@ -256,6 +256,31 @@ APP.ready.then(async () => {
     const ya = carrito.lineas.find(l => l.variante.id === v.id && !l.devuelta);
     if (ya) ya.cantidad += cantidad; else carrito.lineas.push({ variante: v, cantidad, descPct: 0 });
     recientes(v); pintar(); $('#q').focus();
+    avisoAlAgregar(v, cantidad);
+  }
+  // Para el ticket: ¿esta línea vende más de lo que el sistema dice que hay?
+  const controlaStock = v => v && v.producto_tipo !== 'kit' && !(productos[v.producto_id] || {}).es_generico && !/-SD$/.test(v.sku || '');
+  const llevando = v => carrito.lineas.filter(l => l.variante.id === v.id && !l.devuelta).reduce((t, l) => t + l.cantidad, 0);
+  // Primer aviso, apenas se agrega (el segundo es al cobrar): no hay stock, o solo quedan las que tienen falla
+  function avisoAlAgregar(v, cantidad) {
+    if (!controlaStock(v)) return;
+    const st = Math.max(+v.stock || 0, 0), f = Math.min(+v.fallas || 0, st), lleva = llevando(v);
+    const conFalla = carrito.lineas.filter(l => l.variante.id === v.id && !l.devuelta && l.falla).reduce((t, l) => t + l.cantidad, 0);
+    const soloFalla = f > 0 && lleva - conFalla > st - f && conFalla < f && lleva <= st;
+    if (lleva <= st && !soloFalla) return;
+    const nom = esc([v.producto_nombre, v.talle_nombre, v.color_nombre].filter(Boolean).join(' · '));
+    const m = modal(soloFalla
+      ? `<h2>◆ La que queda tiene falla</h2><p><b>${nom}</b></p><p class="sub">${st - f > 0 ? 'Hay ' + (st - f) + ' sin falla y ' + f + ' con falla.' : 'La única que hay en el sistema tiene falla.'} ¿Es la de la falla?</p>
+         <div class="pie" style="justify-content:space-between"><button class="btn" data-sacar>Sacarla del ticket</button><div style="display:flex;gap:6px"><button class="btn" data-dejar>No, es otra</button><button class="btn primario" data-falla-si>◆ Sí, es la de la falla</button></div></div>`
+      : `<h2>⚠ No hay stock en el sistema</h2><p><b>${nom}</b></p><p class="sub">${st ? 'El sistema dice que hay ' + st + ' y estás llevando ' + lleva + '.' : 'El sistema dice que no hay ninguna.'} Si la tenés en la mano, dejala: queda un aviso para corregir el stock.</p>
+         <div class="pie" style="justify-content:space-between"><button class="btn" data-sacar>Sacarla del ticket</button><button class="btn primario" data-dejar>Sí, dejarla</button></div>`, { fijo: true });
+    const linea = () => carrito.lineas.find(l => l.variante.id === v.id && !l.devuelta && !l.falla) || carrito.lineas.find(l => l.variante.id === v.id && !l.devuelta);
+    $('[data-sacar]', m).onclick = () => { const l = linea(); if (l) { l.cantidad -= cantidad; if (l.cantidad <= 0) carrito.lineas.splice(carrito.lineas.indexOf(l), 1); } m.cerrar(); pintar(); };
+    $('[data-dejar]', m).onclick = () => { m.cerrar(); $('#q').focus(); };
+    const fs1 = $('[data-falla-si]', m); if (fs1) fs1.onclick = () => { const l = linea();
+      if (l && !l.falla) { const n = Math.min(cantidad, f - conFalla); if (l.cantidad <= n) l.falla = true; else { l.cantidad -= n; carrito.lineas.splice(carrito.lineas.indexOf(l) + 1, 0, Object.assign({}, l, { cantidad: n, falla: true })); } }
+      m.cerrar(); pintar(); };
+    setTimeout(() => (fs1 || $('[data-dejar]', m)).focus(), 30);
   }
   function recientes(v) {
     const lista = JSON.parse(localStorage.getItem(LS('recientes')) || '[]').filter(x => x !== v.producto_id); lista.unshift(v.producto_id);
@@ -307,7 +332,7 @@ APP.ready.then(async () => {
     const c = calcular(), cont = $('#lineas');
     if (!c.lineas.length) cont.innerHTML = '<div class="vacio-ticket">Escaneá o buscá una prenda para empezar.</div>';
     else cont.innerHTML = c.lineas.map((l, i) => `<div class="linea">
-      <div><div class="n">${l.devuelta ? esc(l.variante.producto_nombre) : `<span class="cambiable" data-cambiar="${i}" title="Tocá para cambiar el talle, el color o la prenda">${esc(l.variante.producto_nombre)} <span class="lapiz">✎</span></span>`}${l.devuelta ? ' <span class="chip error">devuelve</span>' : ''}</div><div class="v">${l.devuelta ? esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || l.variante.sku || '') : `<span class="cambiable" data-cambiar="${i}">${esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || 'único')}</span>`} · ${fmt.pesos(l.precioLista)}${l.descPct ? ' −' + l.descPct + '%' : ''}</div>${l.promo ? `<div class="promo">★ ${esc(l.promo.nombre)} · −${fmt.pesos(l.descPromo)}/u</div>` : ''}${+l.variante.fallas > 0 && !l.devuelta ? `<button class="falla ${l.falla ? 'on' : ''}" data-falla="${i}" title="${esc(l.variante.falla_nota || '')}">${l.falla ? '◆ Es la que tiene falla' : '◆ Hay ' + fmt.num(l.variante.fallas) + ' con falla · ¿es esta?'}</button>` : ''}</div>
+      <div><div class="n">${l.devuelta ? esc(l.variante.producto_nombre) : `<span class="cambiable" data-cambiar="${i}" title="Tocá para cambiar el talle, el color o la prenda">${esc(l.variante.producto_nombre)} <span class="lapiz">✎</span></span>`}${l.devuelta ? ' <span class="chip error">devuelve</span>' : ''}</div><div class="v">${l.devuelta ? esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || l.variante.sku || '') : `<span class="cambiable" data-cambiar="${i}">${esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || 'único')}</span>`} · ${fmt.pesos(l.precioLista)}${l.descPct ? ' −' + l.descPct + '%' : ''}${!l.devuelta && controlaStock(l.variante) && llevando(l.variante) > Math.max(+l.variante.stock || 0, 0) ? '<span class="sinstock-chip" title="El sistema dice que no hay suficiente">⚠ sin stock</span>' : ''}</div>${l.promo ? `<div class="promo">★ ${esc(l.promo.nombre)} · −${fmt.pesos(l.descPromo)}/u</div>` : ''}${+l.variante.fallas > 0 && !l.devuelta ? `<button class="falla ${l.falla ? 'on' : ''}" data-falla="${i}" title="${esc(l.variante.falla_nota || '')}">${l.falla ? '◆ Es la que tiene falla' : '◆ Hay ' + fmt.num(l.variante.fallas) + ' con falla · ¿es esta?'}</button>` : ''}</div>
       <div class="t">${fmt.pesos(l.total)}</div>
       <div class="ctrl"><button data-i="${i}" data-d="-1">−</button><input data-i="${i}" data-q value="${l.cantidad}"><button data-i="${i}" data-d="1">+</button><span class="desc">desc % <input data-i="${i}" data-desc type="number" min="0" max="100" value="${l.descPct || 0}"></span><button class="quitar" data-i="${i}" data-x title="Quitar">×</button></div></div>`).join('');
     $$('[data-d]', cont).forEach(b => b.onclick = () => { const l = carrito.lineas[+b.dataset.i]; l.cantidad += +b.dataset.d * (l.devuelta ? -1 : 1); if ((l.devuelta ? -l.cantidad : l.cantidad) <= 0) carrito.lineas.splice(+b.dataset.i, 1); pintar(); });
