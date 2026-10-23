@@ -35,9 +35,11 @@ APP.ready.then(async () => {
   }
 
   // ================= Familias y grilla =================
-  let categorias = [], familia = 'todo', porProducto = new Map();
+  let categorias = [], familia = 'top', porProducto = new Map(), masVendidos = [];
   const { data: cats } = await sb.from('categorias').select('id,nombre,orden').eq('empresa_id', e).eq('activa', true).order('orden').order('nombre');
   categorias = cats || [];
+  // "Más vendidos" (últimos 90 días) es la vista de arranque: lo que más sale, a mano
+  sb.rpc('pos_mas_vendidos', { p_empresa: e, p_dias: 90 }).then(({ data }) => { masVendidos = (data || []).map(x => x.producto_id); if (typeof pintarFamilias === 'function' && porProducto.size) { pintarFamilias(); pintarGrilla(); } });
   const LS_SINSTOCK = `percha_pos_sinstock_${e}`;
   $('#chk-sinstock').checked = localStorage.getItem(LS_SINSTOCK) === '1';
   $('#chk-sinstock').onchange = ev => { localStorage.setItem(LS_SINSTOCK, ev.target.checked ? '1' : '0'); pintarFamilias(); pintarGrilla(); };
@@ -51,15 +53,16 @@ APP.ready.then(async () => {
     const cuenta = {}; porProducto.forEach((vars, pid) => { if (!conStock(pid, vars)) return; const c = (C.productos[pid] || {}).categoria_id || 'sin'; cuenta[c] = (cuenta[c] || 0) + 1; });
     const recientes = JSON.parse(localStorage.getItem(`percha_recientes_${e}`) || '[]');
     const total = Object.values(cuenta).reduce((s, n) => s + n, 0);
-    const items = [{ id: 'todo', nombre: 'Todo', n: total }, ...(recientes.length ? [{ id: 'recientes', nombre: 'Recientes', n: recientes.length }] : []), ...categorias.filter(c => cuenta[c.id]).map(c => ({ id: c.id, nombre: c.nombre, n: cuenta[c.id] }))];
+    const top = masVendidos.filter(pid => porProducto.has(pid) && conStock(pid, porProducto.get(pid))).length;
+    const items = [{ id: 'top', nombre: '★ Más vendidos', n: Math.min(top, 48) }, ...(recientes.length ? [{ id: 'recientes', nombre: 'Recientes', n: recientes.length }] : []), ...categorias.filter(c => cuenta[c.id]).map(c => ({ id: c.id, nombre: c.nombre, n: cuenta[c.id] }))];
     $('#familias').innerHTML = items.map(c => `<button class="${c.id === familia ? 'on' : ''}" data-f="${c.id}">${esc(c.nombre)}<b>${fmt.num(c.n)}</b></button>`).join('');
     $$('#familias button').forEach(b => b.onclick = () => { familia = b.dataset.f; grillaMax = 60; $('#q').value = ''; pintarFamilias(); pintarGrilla(); });
   }
-  function tile(pid, vars, coinciden) {
+  function tile(pid, vars, coinciden, conFoto = true) {
     const v0 = vars[0], st = sumaStock(vars), foto = (C.productos[pid] || {}).imagen_url, unico = vars.length === 1 && !v0.talle && !v0.color, gen = (C.productos[pid] || {}).es_generico;
     const visibles = (coinciden || []).filter(v => $('#chk-sinstock').checked || +v.stock > 0);
     const chips = visibles.length && visibles.length < vars.length ? `<div class="vchips">${visibles.slice(0, 6).map(v => `<button data-v="${v.id}">${esc([v.talle_nombre, v.color_nombre].filter(Boolean).join(' · '))}<small>${fmt.num(v.stock)}</small></button>`).join('')}</div>` : '';
-    return `<div class="tile-p" data-pid="${pid}">${foto ? `<div class="foto"><img src="${esc(foto)}" loading="lazy" alt=""></div>` : `<div class="foto sinfoto">${esc(APP.iniciales(v0.producto_nombre.replace(/[«»]/g, '')))}</div>`}<span class="st ${st > 0 ? '' : 'cero'}">${gen ? '∞' : fmt.num(st)}</span>
+    return `<div class="tile-p${conFoto ? '' : ' compacta'}" data-pid="${pid}">${!conFoto ? '' : foto ? `<div class="foto"><img src="${esc(foto)}" loading="lazy" alt=""></div>` : `<div class="foto sinfoto">${esc(APP.iniciales(v0.producto_nombre.replace(/[«»]/g, '')))}</div>`}<span class="st ${st > 0 ? '' : 'cero'}">${gen ? '∞' : fmt.num(st)}</span>
       <div class="txt"><div class="nom">${esc(v0.producto_nombre)}</div><div class="cod">${esc(v0.producto_codigo)}${unico ? '' : ' · ' + vars.length + ' var.'}${gen ? ' · al cobrar se elige el modelo' : ''}</div><div class="pre">${fmt.pesos(C.precioLista(v0))}</div></div>${chips}</div>`;
   }
   function activarTiles(cont, alElegir) {
@@ -69,12 +72,13 @@ APP.ready.then(async () => {
   function pintarGrilla() {
     const q = $('#q').value.trim();
     const recientes = JSON.parse(localStorage.getItem(`percha_recientes_${e}`) || '[]');
-    let lista = buscarModelos(q, (pid, vars) => conStock(pid, vars) && (q || familia === 'todo' || familia === 'recientes' || (C.productos[pid] || {}).categoria_id === familia));
+    let lista = buscarModelos(q, (pid, vars) => conStock(pid, vars) && (q || familia === 'top' || familia === 'recientes' || (C.productos[pid] || {}).categoria_id === familia));
     if (!q && familia === 'recientes') lista = recientes.map(pid => lista.find(x => x.pid === pid)).filter(Boolean);
+    else if (!q && familia === 'top' && masVendidos.length) lista = masVendidos.map(pid => lista.find(x => x.pid === pid)).filter(Boolean).slice(0, 48);
     else if (!q) lista.sort((a, b) => a.vars[0].producto_nombre.localeCompare(b.vars[0].producto_nombre));
     // se dibujan de a 60 para que la pantalla arranque al instante; "Ver más" trae el resto
     const max = q ? 120 : grillaMax;
-    $('#grilla').innerHTML = lista.slice(0, max).map(x => tile(x.pid, x.vars, x.coinciden)).join('') || '<div class="vacio">Nada con ese nombre.</div>';
+    $('#grilla').classList.toggle('con-fotos', !!q); $('#grilla').innerHTML = lista.slice(0, max).map(x => tile(x.pid, x.vars, x.coinciden, !!q)).join('') || '<div class="vacio">Nada con ese nombre.</div>';
     if (lista.length > max) $('#grilla').insertAdjacentHTML('beforeend', `<div class="vacio"><button class="btn" id="btn-grilla-mas">Ver ${fmt.num(Math.min(120, lista.length - max))} más</button></div>`);
     const bm = $('#btn-grilla-mas'); if (bm) bm.onclick = () => { grillaMax += 120; pintarGrilla(); };
     activarTiles($('#grilla'), (v, pid) => { if (v) C.agregar(v); else C.elegirProducto(pid); $('#q').value = ''; setTimeout(pintarGrilla, 50); });
@@ -88,8 +92,6 @@ APP.ready.then(async () => {
     if (res.length === 1 && res[0].coinciden.length === 1) { ev.preventDefault(); ev.stopImmediatePropagation(); C.agregar(res[0].coinciden[0]); $('#q').value = ''; pintarGrilla(); }
   }, true);
   C.alCargar = () => { agrupar(); pintarFamilias(); pintarGrilla(); };
-  const observador = new MutationObserver(() => { marcarSeleccion(); });
-  observador.observe($('#lineas'), { childList: true });
 
   // ================= "¿Qué modelos se lleva?" (genéricos) =================
   // multiplicador: ×2, ×3, ×5 aplican al próximo toque y vuelven a ×1
@@ -202,35 +204,7 @@ APP.ready.then(async () => {
   $('#btn-cobrar').onclick = async () => { if (!C.carrito.lineas.length) return; if (await definirModelos() && await definirKits()) C.cobrar(false); };
   $('#btn-sena').onclick = async () => { if (!C.carrito.lineas.length) return; if (await definirModelos() && await definirKits()) C.cobrar(true); };
 
-  // ================= Teclado numérico =================
-  let buffer = '', seleccionada = null;
-  const pintarBuffer = () => { $('#tk-buffer').textContent = buffer ? '× ' + buffer : ''; $('#tk-ayuda').textContent = seleccionada != null ? 'Cantidad para la prenda marcada' : 'Cantidad para lo próximo que agregues'; };
-  C.tomarCantidad = () => { const n = parseInt(buffer) || 0; buffer = ''; pintarBuffer(); return n > 0 ? n : 1; };
-  $$('#teclado button').forEach(b => b.onclick = () => {
-    const k = b.dataset.k;
-    if (/^\d$/.test(k)) { if (buffer.length < 3) buffer += k; }
-    else if (k === 'borrar') buffer = buffer.slice(0, -1);
-    else if (k === 'limpiar') { buffer = ''; seleccionada = null; marcarSeleccion(); }
-    else if (k === 'mas') $('#mas').classList.toggle('ver');
-    else if (k === 'aplicar') {
-      const n = parseInt(buffer) || 0;
-      if (seleccionada != null && C.carrito.lineas[seleccionada]) { const l = C.carrito.lineas[seleccionada]; if (n === 0) C.carrito.lineas.splice(seleccionada, 1); else l.cantidad = l.devuelta ? -n : n; buffer = ''; seleccionada = null; C.pintar(); }
-      else if (!n) toast('Primero escribí la cantidad');
-      else toast(`Se agregará × ${n} a lo próximo que toques`);
-    }
-    pintarBuffer(); $('#q').focus();
-  });
-  $('#lineas').addEventListener('click', ev => {
-    if (ev.target.closest('button,input')) return;
-    const li = ev.target.closest('.linea'); if (!li) return;
-    const i = $$('.linea', $('#lineas')).indexOf(li);
-    seleccionada = seleccionada === i ? null : i; marcarSeleccion(); pintarBuffer();
-  });
-  function marcarSeleccion() { $$('.linea', $('#lineas')).forEach((li, i) => li.classList.toggle('sel', i === seleccionada)); if (seleccionada != null && !C.carrito.lineas[seleccionada]) { seleccionada = null; pintarBuffer(); } }
-  document.addEventListener('keydown', ev => {
-    if (ev.target.closest('input,select,textarea,.modal')) return;
-    if (/^\d$/.test(ev.key)) { if (buffer.length < 3) buffer += ev.key; pintarBuffer(); }
-    if (ev.key === 'Backspace') { buffer = buffer.slice(0, -1); pintarBuffer(); }
-  });
+  // ================= Más opciones (clienta, nota, descuento, canal) =================
+  $('#btn-mas').onclick = () => { const m = $('#mas'); m.classList.toggle('ver'); $('#btn-mas').classList.toggle('on', m.classList.contains('ver')); if (m.classList.contains('ver')) $('#sel-cliente').focus(); };
   if (C.catalogo.length) C.alCargar();
 });
