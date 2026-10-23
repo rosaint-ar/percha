@@ -110,7 +110,10 @@ APP.ready.then(async () => {
       const pintarPend = () => { $('#df-n', m).textContent = pendientes(); $('#df-elegidos', m).innerHTML = elegidos.map(v => `<span>${esc(v.producto_nombre)} ${esc([v.talle_nombre, v.color_nombre].filter(Boolean).join(' '))}</span>`).join(''); };
       const pintarLista = () => {
         const q = $('#df-q', m).value.trim(), sin = $('#df-sinstock', m).checked;
-        const fg = filtroGenerico(Object.assign({ id: l0.variante.producto_id }, gen)); const lista = buscarModelos(q, (pid, vars) => (q ? !(C.productos[pid] || {}).es_generico && (C.productos[pid] || {}).tipo !== 'kit' : fg(pid, vars)) && (sin || sumaStock(vars) > 0));
+        const fg = filtroGenerico(Object.assign({ id: l0.variante.producto_id }, gen));
+        // se busca dentro de la familia; solo si ahí no hay nada, en todo el catálogo
+        let lista = buscarModelos(q, (pid, vars) => fg(pid, vars) && (sin || sumaStock(vars) > 0));
+        if (q && !lista.length) lista = buscarModelos(q, (pid, vars) => !(C.productos[pid] || {}).es_generico && (C.productos[pid] || {}).tipo !== 'kit' && (sin || sumaStock(vars) > 0));
         if (!q) lista.sort((a, b) => sumaStock(b.vars) - sumaStock(a.vars) || a.vars[0].producto_nombre.localeCompare(b.vars[0].producto_nombre));
         $('#df-grilla', m).innerHTML = lista.slice(0, 120).map(x => tile(x.pid, x.vars, x.coinciden)).join('') || '<div class="vacio" style="grid-column:1/-1">Nada con ese nombre. Probá con menos letras o marcá "sin stock".</div>';
         activarTiles($('#df-grilla', m), (v, pid) => {
