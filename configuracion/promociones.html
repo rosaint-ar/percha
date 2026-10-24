@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Promociones · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610241735">
+<link rel="stylesheet" href="../shell/shell.css?v=202610241809">
 <style>
   .pestanas{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
   .pestanas a{font:600 13px var(--f-ui);color:var(--tinta);text-decoration:none;padding:8px 14px;border:1px solid var(--linea);background:var(--superficie-2);border-radius:10px}
@@ -15,7 +15,9 @@
   .chip-sel{border:1px solid var(--linea);background:var(--superficie-2);border-radius:999px;padding:7px 13px;font:600 12.5px var(--f-ui);cursor:pointer;color:var(--tinta-2)}
   .chip-sel.chico{padding:5px 11px;font-size:12px}
   .chip-sel.on{background:var(--acento);border-color:var(--acento);color:#fff}
-  .escalones{display:grid;gap:6px}
+  .escalones{display:grid;gap:8px}
+  .esc-bloque{border:1px solid var(--linea-suave);border-radius:12px;padding:8px 10px;display:grid;gap:6px}
+  .esc-canales{display:flex;flex-wrap:wrap;gap:5px;align-items:center;font-size:12px;color:var(--tinta-3)}
   .esc-fila{display:flex;align-items:center;gap:8px;font:500 13.5px var(--f-ui);flex-wrap:wrap}
   .esc-fila input{width:74px;height:38px;border:1px solid var(--linea);border-radius:10px;text-align:center;font:700 15px var(--f-mono);background:var(--superficie-2)}
 </style>
@@ -27,36 +29,38 @@
     <table class="lista" id="tb"><tr><th>Nombre</th><th>Regla</th><th>Alcance</th><th>Dónde</th><th>Vigencia</th><th>Activa</th><th></th></tr></table></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610241735"></script>
-<script src="../shell/shell.js?v=202610241735"></script>
+<script src="../shared/supabase.js?v=202610241809"></script>
+<script src="../shared/canales.js?v=202610241809"></script>
+<script src="../shell/shell.js?v=202610241809"></script>
 <script>
 APP.ready.then(async () => {
   const { esc, $, $$, toast, modal, confirmar, mensajeError, fmt } = APP, e = APP.empresa.id;
   if (!APP.esAdmin) { document.querySelector('main').innerHTML = '<div class="card"><p>Esta sección es solo para administración.</p></div>'; return; }
   const [{ data: cats }, { data: prods }, { data: listas }] = await Promise.all([sb.from('categorias').select('id,nombre').eq('empresa_id', e).eq('activa', true).order('orden'), sb.from('productos').select('id,nombre,codigo').eq('empresa_id', e).eq('activo', true).order('nombre'), sb.from('listas_precios').select('id,nombre').eq('empresa_id', e).eq('activa', true).order('orden')]);
   const nice = s => s.charAt(0) + s.slice(1).toLowerCase();
-  const CANAL = { local: 'Solo en el local', online: 'Solo en la tienda online', ambos: 'Local y tienda online' };
+  const canales = await CANALES.cargar(e);
+  const dondeTxt = cs => !cs || !cs.length || cs.length >= canales.length ? 'Todos los canales' : cs.map(k => CANALES.nombre(canales, k)).join(' · ');
   const DIAS = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá', 'Do'];
   const escalonesDe = p => (p.escalones && p.escalones.length ? p.escalones : [{ n: p.n, valor: p.valor }]).slice().sort((a, b) => a.n - b.n);
-  const regla = p => ({ porcentaje: `${p.valor}% de descuento`, monto: `${fmt.pesos(p.valor)} menos por unidad`, nxm: `Lleva ${p.n}, paga ${p.m}`, cantidad: escalonesDe(p).map(x => `${fmt.dec(x.valor)}% llevando ${x.n}+`).join(' · ') })[p.tipo];
+  const regla = p => ({ porcentaje: `${p.valor}% de descuento`, monto: `${fmt.pesos(p.valor)} menos por unidad`, nxm: `Lleva ${p.n}, paga ${p.m}`, cantidad: escalonesDe(p).map(x => `${fmt.dec(x.valor)}% llevando ${x.n}+${x.canales && x.canales.length ? ' (' + dondeTxt(x.canales) + ')' : ''}`).join(' · ') })[p.tipo];
   const alcance = p => p.alcance === 'todo' ? 'Todas las prendas' : p.alcance === 'familias' ? (p.familia_ids || []).map(id => nice((cats.find(c => c.id === id) || {}).nombre || '')).filter(Boolean).join(', ') : `${(p.producto_ids || []).length} productos`;
   async function cargar() {
     const { data } = await sb.from('promociones').select('*').eq('empresa_id', e).order('creada', { ascending: false });
     const tb = $('#tb'); tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());
-    (data || []).forEach(p => tb.insertAdjacentHTML('beforeend', `<tr><td><b>${esc(p.nombre)}</b></td><td>${regla(p)}</td><td>${esc(alcance(p))}</td><td><span class="chip ${p.canal === 'local' ? '' : p.canal === 'online' ? 'aviso' : 'ok'}">${{ local: 'Local', online: 'Tienda', ambos: 'Local y tienda' }[p.canal || 'ambos']}</span>${p.listas && p.listas.length ? `<br><small>${esc(p.listas.map(id => (listas.find(l => l.id === id) || {}).nombre).filter(Boolean).join(', '))}</small>` : ''}</td><td><small>${p.desde ? fmt.fecha(p.desde) : 'siempre'}${p.hasta ? ' → ' + fmt.fecha(p.hasta) : ''} · ${(p.dias_semana || []).length === 7 ? 'todos los días' : (p.dias_semana || []).map(d => DIAS[d - 1]).join(' ')}</small></td><td>${p.activa ? '<span class="chip ok">activa</span>' : '<span class="chip gris">pausada</span>'}</td><td><button class="btn chico" data-e="${p.id}">Editar</button> <button class="btn chico" data-p="${p.id}">${p.activa ? 'Pausar' : 'Activar'}</button></td></tr>`));
+    (data || []).forEach(p => tb.insertAdjacentHTML('beforeend', `<tr><td><b>${esc(p.nombre)}</b></td><td>${regla(p)}</td><td>${esc(alcance(p))}</td><td><span class="chip ${p.canales && p.canales.length ? '' : 'ok'}">${esc(dondeTxt(p.canales))}</span>${p.listas && p.listas.length ? `<br><small>${esc(p.listas.map(id => (listas.find(l => l.id === id) || {}).nombre).filter(Boolean).join(', '))}</small>` : ''}</td><td><small>${p.desde ? fmt.fecha(p.desde) : 'siempre'}${p.hasta ? ' → ' + fmt.fecha(p.hasta) : ''} · ${(p.dias_semana || []).length === 7 ? 'todos los días' : (p.dias_semana || []).map(d => DIAS[d - 1]).join(' ')}</small></td><td>${p.activa ? '<span class="chip ok">activa</span>' : '<span class="chip gris">pausada</span>'}</td><td><button class="btn chico" data-e="${p.id}">Editar</button> <button class="btn chico" data-p="${p.id}">${p.activa ? 'Pausar' : 'Activar'}</button></td></tr>`));
     if (!(data || []).length) tb.insertAdjacentHTML('beforeend', '<tr><td colspan="7" class="vacio">Sin promociones. Creá la primera: por ejemplo "3 bombachas, paga 2".</td></tr>');
     $$('[data-e]', tb).forEach(b => b.onclick = () => editar(data.find(p => p.id === b.dataset.e)));
     $$('[data-p]', tb).forEach(b => b.onclick = async () => { const p = data.find(x => x.id === b.dataset.p); await sb.from('promociones').update({ activa: !p.activa }).eq('id', p.id); cargar(); });
   }
   function editar(p) {
-    p = JSON.parse(JSON.stringify(p || { nombre: '', tipo: 'cantidad', escalones: [{ n: 3, valor: 10 }], valor: 0, n: 3, m: 2, alcance: 'todo', familia_ids: [], producto_ids: [], dias_semana: [1, 2, 3, 4, 5, 6, 7], activa: true, canal: 'ambos', listas: null }));
+    p = JSON.parse(JSON.stringify(p || { nombre: '', tipo: 'cantidad', escalones: [{ n: 3, valor: 10 }], valor: 0, n: 3, m: 2, alcance: 'todo', familia_ids: [], producto_ids: [], dias_semana: [1, 2, 3, 4, 5, 6, 7], activa: true, canales: null, listas: null }));
     if (p.tipo === 'cantidad') p.escalones = escalonesDe(p);
     const TIPOS = [['cantidad', 'Llevando N o más, % off'], ['nxm', 'Lleva N, paga M'], ['porcentaje', '% de descuento'], ['monto', '$ menos por prenda']];
     const m = modal('<div id="pe"></div>'); $('.modal', m).style.maxWidth = '640px';
     const leer = () => {
       p.nombre = $('#p-nombre', m).value; p.desde = $('#p-desde', m).value || null; p.hasta = $('#p-hasta', m).value || null;
       p.dias_semana = $$('.dias input:checked', m).map(i => +i.value);
-      if (p.tipo === 'cantidad') p.escalones = $$('.esc-fila', m).map(f => ({ n: +$('[data-k="n"]', f).value || 0, valor: +String($('[data-k="valor"]', f).value).replace(',', '.') || 0 }));
+      if (p.tipo === 'cantidad') p.escalones = $$('.esc-fila', m).map((f, i) => ({ n: +$('[data-k="n"]', f).value || 0, valor: +String($('[data-k="valor"]', f).value).replace(',', '.') || 0, canales: (p.escalones[i] || {}).canales || null }));
       else if (p.tipo === 'nxm') { p.n = +$('#p-n', m).value || 0; p.m = +$('#p-m', m).value || 0; }
       else p.valor = +String($('#p-valor', m).value).replace(',', '.') || 0;
       if (p.alcance === 'productos') p.producto_ids = [...$('#p-prod', m).selectedOptions].map(o => o.value);
@@ -65,15 +69,16 @@ APP.ready.then(async () => {
       $('#pe', m).innerHTML = `<h2>${p.id ? 'Editar' : 'Nueva'} promoción</h2>
         <div class="campo" style="margin-top:12px"><label>Nombre (sale en el ticket)</label><input id="p-nombre" value="${esc(p.nombre)}" placeholder="Ej. Armá tu pack de bombachas"></div>
         <div class="campo"><label>Cómo funciona</label><div class="chips-sel">${TIPOS.map(([k, t]) => `<button type="button" class="chip-sel${p.tipo === k ? ' on' : ''}" data-tipo="${k}">${t}</button>`).join('')}</div></div>
-        <div class="campo">${p.tipo === 'cantidad' ? `<label>Escalones</label><div class="escalones">${p.escalones.map((x, i) => `<div class="esc-fila">Llevando <input data-k="n" type="number" min="2" value="${x.n}"> o más → <input data-k="valor" inputmode="decimal" value="${x.valor}"> % off${p.escalones.length > 1 ? `<button type="button" class="btn-eliminar" data-quitar="${i}" title="Quitar">✕</button>` : ''}</div>`).join('')}</div>
-            <button type="button" class="btn chico" id="p-mas-esc" style="margin-top:6px">+ Agregar escalón</button><span class="ayuda">Se aplica el escalón más alto que se alcance: llevando 7, vale el de 6.</span>`
+        <div class="campo">${p.tipo === 'cantidad' ? `<label>Escalones</label><div class="escalones">${p.escalones.map((x, i) => `<div class="esc-bloque"><div class="esc-fila">Llevando <input data-k="n" type="number" min="2" value="${x.n}"> o más → <input data-k="valor" inputmode="decimal" value="${x.valor}"> % off${p.escalones.length > 1 ? `<button type="button" class="btn-eliminar" data-quitar="${i}" title="Quitar">✕</button>` : ''}</div>
+              <div class="esc-canales"><span>Vale en:</span><button type="button" class="chip-sel chico${!x.canales || !x.canales.length ? ' on' : ''}" data-esc-canal="${i}:">Como la promo</button>${canales.filter(c => !p.canales || !p.canales.length || p.canales.includes(c.k)).map(c => `<button type="button" class="chip-sel chico${x.canales && x.canales.includes(c.k) ? ' on' : ''}" data-esc-canal="${i}:${c.k}">${esc(c.n)}</button>`).join('')}</div></div>`).join('')}</div>
+            <button type="button" class="btn chico" id="p-mas-esc" style="margin-top:6px">+ Agregar escalón</button><span class="ayuda">Se aplica el escalón más alto que se alcance en ese canal: llevando 7, vale el de 6. Un escalón puede valer solo en algunos canales (por ejemplo, el de 6 solo en la tienda).</span>`
           : p.tipo === 'nxm' ? `<label>Lleva / paga</label><div class="esc-fila">Lleva <input id="p-n" type="number" min="2" value="${p.n || 3}">, paga <input id="p-m" type="number" min="1" value="${p.m || 2}"></div><span class="ayuda">Las más baratas salen gratis.</span>`
           : `<label>${p.tipo === 'monto' ? 'Pesos menos por prenda' : 'Porcentaje de descuento'}</label><div class="esc-fila"><input id="p-valor" inputmode="decimal" value="${p.valor || ''}" style="width:110px"> ${p.tipo === 'monto' ? '$' : '% off'}</div>`}</div>
         <div class="campo"><label>A qué prendas</label><div class="chips-sel">${[['todo', 'Todas'], ['familias', 'Algunas familias'], ['productos', 'Algunos productos']].map(([k, t]) => `<button type="button" class="chip-sel${p.alcance === k ? ' on' : ''}" data-alc="${k}">${t}</button>`).join('')}</div>
           ${p.alcance === 'familias' ? `<div class="chips-sel" style="margin-top:8px">${cats.map(c => `<button type="button" class="chip-sel chico${(p.familia_ids || []).includes(c.id) ? ' on' : ''}" data-fam="${c.id}">${esc(nice(c.nombre))}</button>`).join('')}</div>`
           : p.alcance === 'productos' ? `<select id="p-prod" multiple size="7" style="margin-top:8px;width:100%">${prods.map(x => `<option value="${x.id}" ${(p.producto_ids || []).includes(x.id) ? 'selected' : ''}>${esc(x.nombre)} · ${esc(x.codigo)}</option>`).join('')}</select><span class="ayuda">Con Ctrl (o ⌘) elegís varios.</span>` : ''}</div>
-        <div class="campo"><label>Dónde vale</label><div class="chips-sel">${Object.entries(CANAL).map(([k, t]) => `<button type="button" class="chip-sel${(p.canal || 'ambos') === k ? ' on' : ''}" data-canal="${k}">${t}</button>`).join('')}</div>
-          <span class="ayuda">${p.canal === 'local' ? 'Solo en la caja del local (y ventas por WhatsApp).' : 'En la caja se aplica a las ventas marcadas como online. En la web de Tienda Nube, por ahora, cargala también allá: Percha todavía no la publica.'}</span></div>
+        <div class="campo"><label>Dónde vale</label><div class="chips-sel"><button type="button" class="chip-sel${!p.canales || !p.canales.length ? ' on' : ''}" data-canal="">Todos los canales</button>${canales.map(c => `<button type="button" class="chip-sel${p.canales && p.canales.includes(c.k) ? ' on' : ''}" data-canal="${c.k}">${esc(c.n)}</button>`).join('')}</div>
+          <span class="ayuda">En la caja se aplica según el canal de la venta.${canales.some(c => !['local', 'whatsapp'].includes(c.k)) ? ' En la web de cada tienda online, por ahora, la promo hay que cargarla también allá: Percha todavía no la publica.' : ''}</span></div>
         <div class="campo"><label>Listas de precios</label><div class="chips-sel"><button type="button" class="chip-sel chico${!p.listas || !p.listas.length ? ' on' : ''}" data-lista="todas">Todas</button>${listas.map(l => `<button type="button" class="chip-sel chico${p.listas && p.listas.includes(l.id) ? ' on' : ''}" data-lista="${l.id}">${esc(l.nombre)}</button>`).join('')}</div></div>
         <div class="fila c2"><div class="campo"><label>Desde</label><input id="p-desde" type="date" value="${p.desde || ''}"></div><div class="campo"><label>Hasta</label><input id="p-hasta" type="date" value="${p.hasta || ''}"></div></div>
         <div class="campo"><label>Días</label><div class="dias">${DIAS.map((d, i) => `<label><input type="checkbox" value="${i + 1}" ${(p.dias_semana || []).includes(i + 1) ? 'checked' : ''}><span>${d}</span></label>`).join('')}</div></div>
@@ -81,7 +86,9 @@ APP.ready.then(async () => {
       $$('[data-tipo]', m).forEach(b => b.onclick = () => { leer(); p.tipo = b.dataset.tipo; if (p.tipo === 'cantidad' && !(p.escalones || []).length) p.escalones = [{ n: 3, valor: 10 }]; pintar(); });
       $$('[data-alc]', m).forEach(b => b.onclick = () => { leer(); p.alcance = b.dataset.alc; pintar(); });
       $$('[data-fam]', m).forEach(b => b.onclick = () => { leer(); const s = new Set(p.familia_ids || []); s.has(b.dataset.fam) ? s.delete(b.dataset.fam) : s.add(b.dataset.fam); p.familia_ids = [...s]; pintar(); });
-      $$('[data-canal]', m).forEach(b => b.onclick = () => { leer(); p.canal = b.dataset.canal; pintar(); });
+      $$('[data-canal]', m).forEach(b => b.onclick = () => { leer(); const k = b.dataset.canal; if (!k) p.canales = null; else { const s = new Set(p.canales || []); s.has(k) ? s.delete(k) : s.add(k); p.canales = s.size && s.size < canales.length ? [...s] : null; }
+        (p.escalones || []).forEach(x => { if (x.canales && p.canales) { x.canales = x.canales.filter(c => p.canales.includes(c)); if (!x.canales.length) x.canales = null; } }); pintar(); });
+      $$('[data-esc-canal]', m).forEach(b => b.onclick = () => { leer(); const [i, k] = b.dataset.escCanal.split(':'), x = p.escalones[+i]; if (!k) x.canales = null; else { const s = new Set(x.canales || []); s.has(k) ? s.delete(k) : s.add(k); x.canales = s.size ? [...s] : null; } pintar(); });
       $$('[data-lista]', m).forEach(b => b.onclick = () => { leer(); if (b.dataset.lista === 'todas') p.listas = null; else { const s = new Set(p.listas || []); s.has(b.dataset.lista) ? s.delete(b.dataset.lista) : s.add(b.dataset.lista); p.listas = s.size && s.size < listas.length ? [...s] : null; } pintar(); });
       const mas = $('#p-mas-esc', m); if (mas) mas.onclick = () => { leer(); const ult = p.escalones[p.escalones.length - 1] || { n: 2, valor: 5 }; p.escalones.push({ n: ult.n * 2, valor: Math.min(100, ult.valor + 5) }); pintar(); const ins = $$('.esc-fila [data-k="valor"]', m); ins[ins.length - 1].focus(); };
       $$('[data-quitar]', m).forEach(b => b.onclick = () => { leer(); p.escalones.splice(+b.dataset.quitar, 1); pintar(); });
@@ -94,15 +101,15 @@ APP.ready.then(async () => {
       if (!p.nombre.trim()) { toast('Ponele un nombre', 'error'); return; }
       if (p.tipo === 'nxm' && !(p.n > p.m && p.m > 0)) { toast('"Lleva" tiene que ser mayor que "paga"', 'error'); return; }
       if (p.tipo === 'cantidad') {
-        const es = p.escalones.filter(x => x.n > 0 && x.valor > 0).sort((a, b) => a.n - b.n);
+        const es = p.escalones.filter(x => x.n > 0 && x.valor > 0).sort((a, b) => a.n - b.n).map(x => ({ n: x.n, valor: x.valor, canales: x.canales && x.canales.length ? x.canales : null }));
         if (!es.length) { toast('Completá al menos un escalón', 'error'); return; }
-        if (new Set(es.map(x => x.n)).size !== es.length) { toast('Hay dos escalones con la misma cantidad', 'error'); return; }
+        if (new Set(es.map(x => x.n + '|' + (x.canales || []).slice().sort().join(','))).size !== es.length) { toast('Hay dos escalones iguales (misma cantidad y mismos canales)', 'error'); return; }
         if (es.some(x => x.valor > 100)) { toast('El descuento no puede pasar el 100%', 'error'); return; }
         p.escalones = es; p.n = es[0].n; p.valor = es[0].valor;
       }
       if (p.alcance === 'familias' && !(p.familia_ids || []).length) { toast('Elegí al menos una familia', 'error'); return; }
       const d = { nombre: p.nombre.trim(), tipo: p.tipo, valor: p.valor || 0, n: p.n || 0, m: p.m || 0, escalones: p.tipo === 'cantidad' ? p.escalones : null, alcance: p.alcance,
-        familia_ids: p.alcance === 'familias' ? p.familia_ids : [], producto_ids: p.alcance === 'productos' ? p.producto_ids : [], canal: p.canal || 'ambos', listas: p.listas && p.listas.length ? p.listas : null,
+        familia_ids: p.alcance === 'familias' ? p.familia_ids : [], producto_ids: p.alcance === 'productos' ? p.producto_ids : [], canales: p.canales && p.canales.length ? p.canales : null, listas: p.listas && p.listas.length ? p.listas : null,
         desde: p.desde, hasta: p.hasta, dias_semana: p.dias_semana };
       const r = p.id ? await sb.from('promociones').update(d).eq('id', p.id) : await sb.from('promociones').insert(APP.conEmpresa(d));
       if (r.error) { toast(mensajeError(r.error), 'error'); return; } m.cerrar(); toast('Guardada'); cargar();

@@ -374,13 +374,22 @@ APP.ready.then(async () => {
   }
 
   // ---- promociones ----
+  const origenVenta = () => (document.getElementById('sel-origen') || {}).value || 'local';
+  // el selector de canal de la venta: Local, WhatsApp y cada conexión de la empresa (genérico)
+  async function armarCanales() {
+    const sel = document.getElementById('sel-origen'); if (!sel || !window.CANALES) return;
+    const lista = await CANALES.cargar(e), actual = sel.value;
+    sel.innerHTML = lista.map(x => `<option value="${x.k}">${esc(x.n)}</option>`).join('') + '<option value="online">Otra venta online</option>';
+    sel.value = lista.some(x => x.k === actual) ? actual : 'local';
+    sel.onchange = () => pintar();
+  }
+  armarCanales();
   function promoAplica(p, v) {
     const d = new Date(); const dow = ((d.getDay() + 6) % 7) + 1; const f = hoy();
     if (p.desde && f < p.desde) return false; if (p.hasta && f > p.hasta) return false;
     if (!(p.dias_semana || []).includes(dow)) return false;
-    // dónde vale: local (y WhatsApp) / tienda online / ambos; y en qué listas
-    const origen = (document.getElementById('sel-origen') || {}).value || 'local', online = ['tiendanube', 'online', 'mercadolibre'].includes(origen);
-    if (p.canal === 'local' && online) return false; if (p.canal === 'online' && !online) return false;
+    // en qué canales vale (null = todos) y en qué listas
+    if (p.canales && p.canales.length && !p.canales.includes(origenVenta())) return false;
     if (p.listas && p.listas.length && !p.listas.includes(carrito.lista)) return false;
     if (p.alcance === 'familias') return (p.familia_ids || []).includes((productos[v.producto_id] || {}).categoria_id);
     if (p.alcance === 'productos') return (p.producto_ids || []).includes(v.producto_id);
@@ -394,7 +403,7 @@ APP.ready.then(async () => {
       if (!grupo.length) return;
       const unidades = grupo.reduce((s, l) => s + l.cantidad, 0);
       // escalones: vale el más alto alcanzado (3 o más: 20% · 6 o más: 30%)
-      const esc = p.tipo === 'cantidad' ? (p.escalones && p.escalones.length ? p.escalones : [{ n: p.n, valor: p.valor }]).filter(x => unidades >= +x.n).sort((a, b) => b.n - a.n)[0] : null;
+      const esc = p.tipo === 'cantidad' ? (p.escalones && p.escalones.length ? p.escalones : [{ n: p.n, valor: p.valor }]).filter(x => unidades >= +x.n && (!x.canales || !x.canales.length || x.canales.includes(origenVenta()))).sort((a, b) => b.n - a.n)[0] : null;
       if (p.tipo === 'porcentaje' || esc) {
         const pct = esc ? +esc.valor : +p.valor;
         grupo.forEach(l => { const d = r2(l.precioUnit * pct / 100); if (d > l.descPromo) { l.descPromo = d; l.promo = esc ? Object.assign({}, p, { nombre: p.nombre + (p.escalones && p.escalones.length > 1 ? ` (${esc.n}+: ${esc.valor}%)` : '') }) : p; } });
