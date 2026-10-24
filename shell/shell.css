@@ -77,6 +77,11 @@ body.con-lateral{display:grid;grid-template-columns:var(--ancho-lateral) 1fr;min
   background:linear-gradient(180deg, rgba(238,240,244,.92), rgba(238,240,244,.6));backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
 .barra-superior .miga{font:500 12.5px var(--f-ui);color:var(--tinta-3);display:flex;gap:6px;align-items:center}
 .barra-superior .miga b{color:var(--tinta);font-weight:600}
+.pildora-pend{margin-left:auto;display:inline-flex;align-items:center;gap:5px;border:1px solid rgba(var(--acento-rgb),.28);background:var(--lila-suave);color:var(--acento);border-radius:999px;padding:5px 12px;font:600 12px var(--f-ui);cursor:pointer;animation:aparecer .25s ease-out;transition:background .12s}
+.pildora-pend:hover{background:var(--lila)}
+.pildora-pend b{font:800 12.5px var(--f-mono)}
+.pildora-pend[hidden]{display:none}
+.pildora-pend:not([hidden])+.reloj{margin-left:12px}
 .barra-superior .reloj{margin-left:auto;font:500 12px var(--f-mono);color:var(--tinta-3);letter-spacing:.02em}
 .barra-superior .menu{display:none;border:0;background:var(--superficie-2);border-radius:9px;padding:7px;cursor:pointer;box-shadow:inset 0 0 0 1px var(--linea)}
 .barra-superior .menu svg{width:18px;height:18px;display:block}

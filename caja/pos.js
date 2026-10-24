@@ -145,8 +145,9 @@ APP.ready.then(async () => {
       $('#df-q', m).addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); const q = $('#df-q', m).value.trim(); const r = buscarModelos(q, (pid, vars) => !(C.productos[pid] || {}).es_generico && ($('#df-sinstock', m).checked || sumaStock(vars) > 0)); if (r.length === 1 && r[0].coinciden.length === 1) asignar(r[0].coinciden[0]); else if (r.length === 1 && r[0].vars.length === 1) asignar(r[0].vars[0]); } });
       $('#df-sinstock', m).onchange = pintarLista;
       $('[data-mas]', m).onclick = () => { const g = genericas()[0]; if (g) g.cantidad += 1; else C.agregar(l0.variante, 1); C.pintar(); pintarPend(); };
-      $('[data-dejar]', m).onclick = () => { m.cerrar(); res(true); };
-      $('[data-ok]', m).onclick = () => { m.cerrar(); res(true); };
+      const avisarPend = () => { if (pendientes()) toast(`Quedan ${pendientes()} por definir: después las definís desde 📌 Pendientes`); };
+      $('[data-dejar]', m).onclick = () => { avisarPend(); m.cerrar(); res(true); };
+      $('[data-ok]', m).onclick = () => { avisarPend(); m.cerrar(); res(true); };
       m.addEventListener('click', ev => { if (ev.target === m) { /* fijo: no se cierra tocando afuera */ } });
       activarMult(m); pintarPend(); pintarLista(); $('#df-q', m).focus();
     });
@@ -193,7 +194,7 @@ APP.ready.then(async () => {
           if (!actual()) { l.componentes_ok = true; m.cerrar(); siguiente(); }
         };
         $('#dk-q', m).addEventListener('input', pintarLista); $('#dk-sinstock', m).onchange = pintarLista;
-        $('[data-dejar]', m).onclick = () => { l.componentes_ok = true; m.cerrar(); siguiente(); };
+        $('[data-dejar]', m).onclick = () => { l.componentes_ok = true; toast('Lo que falta queda en 📌 Pendientes para definir después'); m.cerrar(); siguiente(); };
         $('[data-ok]', m).onclick = () => { l.componentes_ok = true; m.cerrar(); siguiente(); };
         activarMult(m); pintar(); pintarLista(); $('#dk-q', m).focus();
       };

@@ -155,7 +155,7 @@
     const contenido = document.createElement('div'); contenido.className = 'contenido';
     const tituloPlano = (body.dataset.title || '').replace(/<[^>]+>/g, '');
     const barra = document.createElement('div'); barra.className = 'barra-superior';
-    barra.innerHTML = `<button class="menu" id="btn-menu" title="Menú">${I.menu}</button><div class="miga"><span>${esc(APP.empresa.nombre)}</span><span>/</span><b>${esc(tituloPlano || 'Inicio')}</b></div><div class="reloj" id="reloj"></div>`;
+    barra.innerHTML = `<button class="menu" id="btn-menu" title="Menú">${I.menu}</button><div class="miga"><span>${esc(APP.empresa.nombre)}</span><span>/</span><b>${esc(tituloPlano || 'Inicio')}</b></div><button class="pildora-pend" data-pendientes hidden title="">📌 <b></b> pendientes</button><div class="reloj" id="reloj"></div>`;
     body.insertBefore(contenido, main); contenido.appendChild(barra); contenido.appendChild(main);
     body.prepend(lateral); body.appendChild(telon); body.classList.add('con-lateral');
     $('#btn-menu').onclick = () => body.classList.toggle('lateral-abierta');
@@ -168,6 +168,15 @@
       cab.innerHTML = `<div>${body.dataset.etq ? `<p class="etq">${esc(body.dataset.etq)}</p>` : ''}<h1>${body.dataset.title}</h1>${body.dataset.subtitle ? `<p class="sub">${esc(body.dataset.subtitle)}</p>` : ''}</div><div class="acciones" id="acciones-pagina"></div>`;
       main.prepend(cab);
     }
+  }
+  // Pendientes: tareas que quedaron para después (prendas vendidas sin definir, stock para revisar). Siempre a la vista, sin molestar.
+  function iniciarPendientes() {
+    if (APP.rol === 'visor') return;
+    document.addEventListener('click', ev => { const b = ev.target.closest('[data-pendientes]'); if (b && window.PENDIENTES) PENDIENTES.abrir(); });
+    const s = document.createElement('script'); s.src = ROOT + 'shared/pendientes.js?v=' + ((document.querySelector('script[src*="shell.js"]') || {}).src || '').split('v=')[1];
+    s.onload = () => { PENDIENTES.refrescar(); setInterval(PENDIENTES.refrescar, 180000); document.addEventListener('visibilitychange', () => { if (!document.hidden) PENDIENTES.refrescar(); }); };
+    document.head.appendChild(s);
+    APP.pendientes = { refrescar: () => window.PENDIENTES && PENDIENTES.refrescar(), abrir: () => window.PENDIENTES && PENDIENTES.abrir() };
   }
   function rolNombre(r) { return { duenio: 'Dueña', admin: 'Administración', vendedora: 'Vendedora', visor: 'Solo ver' }[r] || r; }
 
@@ -189,6 +198,7 @@
     aplicarTema();
     pintarLateral();
     document.title = ((body.dataset.title || '').replace(/<[^>]+>/g, '') || 'Inicio') + ' · ' + APP.empresa.nombre + ' · ' + SISTEMA;
+    iniciarPendientes();
     return APP;
   })();
 

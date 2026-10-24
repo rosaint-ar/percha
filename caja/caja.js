@@ -378,6 +378,10 @@ APP.ready.then(async () => {
     const d = new Date(); const dow = ((d.getDay() + 6) % 7) + 1; const f = hoy();
     if (p.desde && f < p.desde) return false; if (p.hasta && f > p.hasta) return false;
     if (!(p.dias_semana || []).includes(dow)) return false;
+    // dónde vale: local (y WhatsApp) / tienda online / ambos; y en qué listas
+    const origen = (document.getElementById('sel-origen') || {}).value || 'local', online = ['tiendanube', 'online', 'mercadolibre'].includes(origen);
+    if (p.canal === 'local' && online) return false; if (p.canal === 'online' && !online) return false;
+    if (p.listas && p.listas.length && !p.listas.includes(carrito.lista)) return false;
     if (p.alcance === 'familias') return (p.familia_ids || []).includes((productos[v.producto_id] || {}).categoria_id);
     if (p.alcance === 'productos') return (p.producto_ids || []).includes(v.producto_id);
     return (productos[v.producto_id] || {}).tipo === 'prenda';
@@ -389,8 +393,11 @@ APP.ready.then(async () => {
       const grupo = lineas.filter(l => l.cantidad > 0 && promoAplica(p, l.variante));
       if (!grupo.length) return;
       const unidades = grupo.reduce((s, l) => s + l.cantidad, 0);
-      if (p.tipo === 'porcentaje' || (p.tipo === 'cantidad' && unidades >= p.n)) {
-        grupo.forEach(l => { const d = r2(l.precioUnit * (+p.valor) / 100); if (d > l.descPromo) { l.descPromo = d; l.promo = p; } });
+      // escalones: vale el más alto alcanzado (3 o más: 20% · 6 o más: 30%)
+      const esc = p.tipo === 'cantidad' ? (p.escalones && p.escalones.length ? p.escalones : [{ n: p.n, valor: p.valor }]).filter(x => unidades >= +x.n).sort((a, b) => b.n - a.n)[0] : null;
+      if (p.tipo === 'porcentaje' || esc) {
+        const pct = esc ? +esc.valor : +p.valor;
+        grupo.forEach(l => { const d = r2(l.precioUnit * pct / 100); if (d > l.descPromo) { l.descPromo = d; l.promo = esc ? Object.assign({}, p, { nombre: p.nombre + (p.escalones && p.escalones.length > 1 ? ` (${esc.n}+: ${esc.valor}%)` : '') }) : p; } });
       } else if (p.tipo === 'monto') {
         grupo.forEach(l => { const d = Math.min(l.precioUnit, +p.valor); if (d > l.descPromo) { l.descPromo = d; l.promo = p; } });
       } else if (p.tipo === 'nxm' && p.n > 0 && p.m > 0 && p.m < p.n) {
@@ -519,7 +526,7 @@ APP.ready.then(async () => {
       m.cerrar();
       const res = await enviarVenta(payload);
       mostrarTicket(payload, res, { vuelto: vuelto > 0 ? vuelto : 0, pagos: pagosFinal, total: t });
-      cargarFallas();
+      cargarFallas(); setTimeout(pintarAvisosStock, 1200);
       if (carrito.avisos) { toast('Venta hecha. Quedó un aviso para corregir el stock en Inventario', 'error'); carrito.avisos = 0; setTimeout(pintarAvisosStock, 1500); }
       carrito.lineas = []; carrito.cambio = null; carrito.descPct = 0; $('#desc-general').value = 0; $('#nota').value = ''; $('#sel-cliente').value = ''; if ($('#sel-origen')) $('#sel-origen').value = 'local';
       carrito.lista = (listas.find(x => x.predeterminada) || listas[0] || {}).id;   // la próxima venta arranca con la lista base
@@ -629,12 +636,10 @@ APP.ready.then(async () => {
   APP.caja = { get catalogo() { return catalogo; }, get productos() { return productos; }, get carrito() { return carrito; }, get turno() { return turno; }, get listas() { return listas; },
     agregar, elegirProducto, pintar, precioLista, cobrar, calcular: () => calcular(), buscar, abrirTurno, cerrarTurno, movimientoCaja, pintarEstado, colaPendiente, sincronizar, buscadorPick, pintarAvisosStock, revisarStock };
   // Recordatorio: prendas vendidas sin stock en el sistema (o sin marcar la falla) que hay que corregir
-  async function pintarAvisosStock() {
-    const { count } = await sb.from('stock_revisar').select('id', { count: 'exact', head: true }).eq('empresa_id', e).is('resuelto', null);
-    let b = document.getElementById('aviso-stock');
-    if (!count) { if (b) b.remove(); return; }
-    if (!b) { const sub = document.getElementById('ticket-sub'); if (!sub) return; sub.insertAdjacentHTML('afterend', '<a id="aviso-stock" class="aviso-stock" href="../catalogo/inventario.html#stock"></a>'); b = document.getElementById('aviso-stock'); }
-    b.textContent = '⚠ ' + count + ' para corregir stock'; b.title = 'Prendas vendidas sin stock en el sistema. Tocá para revisarlas.';
+  // Pendientes (prendas sin definir, stock para revisar): la píldora va en el ticket porque el POS no tiene barra superior
+  function pintarAvisosStock() {
+    if (!document.getElementById('aviso-stock')) { const sub = document.getElementById('ticket-sub'); if (!sub) return; sub.insertAdjacentHTML('afterend', '<button id="aviso-stock" class="pildora-pend" data-pendientes hidden>📌 <b></b> pendientes</button>'); }
+    if (APP.pendientes) APP.pendientes.refrescar();
   }
   await cargarBase(); await cargarTurno(); pintar(); pintarRecientes(); sincronizar(); pintarAvisosStock();
   if (APP.caja.alCargar) APP.caja.alCargar();
