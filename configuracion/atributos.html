@@ -23,15 +23,12 @@
 <main class="app">
   <div class="pestanas"><a href="empresa.html">Empresa</a><a class="on" href="atributos.html">Talles, colores y familias</a><a href="curvas.html">Curvas de talle</a><a href="promociones.html">Promociones</a><a href="usuarios.html">Usuarios</a></div>
   <div class="tres">
-    <div class="card"><div class="card-cab"><div><h2>Talles</h2><p class="sub">El orden es el de la matriz</p></div></div>
-      <table class="lista" id="tb-talle"><tr><th class="num">Orden</th><th>Código</th><th>Nombre</th><th></th></tr></table>
-      <div class="alta"><input id="n-talle-cod" placeholder="Código (ej. M)"><input id="n-talle-nom" placeholder="Nombre (ej. Medium)"><button class="btn" id="btn-talle">+</button></div></div>
-    <div class="card"><div class="card-cab"><div><h2>Colores y estampas</h2><p class="sub">Con un color de referencia</p></div></div>
-      <table class="lista" id="tb-color"><tr><th>Código</th><th>Nombre</th><th>Color</th><th></th></tr></table>
-      <div class="alta"><input id="n-color-cod" placeholder="Código (ej. ROS)"><input id="n-color-nom" placeholder="Nombre (ej. Rosa)"><button class="btn" id="btn-color">+</button></div></div>
-    <div class="card"><div class="card-cab"><div><h2>Familias</h2><p class="sub">Para agrupar y filtrar</p></div></div>
-      <table class="lista" id="tb-cat"><tr><th class="num">Orden</th><th>Nombre</th><th></th></tr></table>
-      <div class="alta"><input id="n-cat-nom" placeholder="Nombre de la familia"><button class="btn" id="btn-cat">+</button></div></div>
+    <div class="card"><div class="card-cab"><div><h2>Talles</h2><p class="sub">El orden es el de la matriz · se guarda solo</p></div><div class="acciones"><button class="btn" id="btn-talle">+ Talle</button></div></div>
+      <table class="lista" id="tb-talle"><tr><th class="num">Orden</th><th>Código</th><th>Nombre</th><th></th></tr></table></div>
+    <div class="card"><div class="card-cab"><div><h2>Colores y estampas</h2><p class="sub">Con un color de referencia · se guarda solo</p></div><div class="acciones"><button class="btn" id="btn-color">+ Color</button></div></div>
+      <table class="lista" id="tb-color"><tr><th>Código</th><th>Nombre</th><th>Color</th><th></th></tr></table></div>
+    <div class="card"><div class="card-cab"><div><h2>Familias</h2><p class="sub">Para agrupar y filtrar · se guarda solo</p></div><div class="acciones"><button class="btn" id="btn-cat">+ Familia</button></div></div>
+      <table class="lista" id="tb-cat"><tr><th class="num">Orden</th><th>Nombre</th><th></th></tr></table></div>
   </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
@@ -39,37 +36,40 @@
 <script src="../shell/shell.js"></script>
 <script>
 APP.ready.then(async () => {
-  const { esc, $, $$, toast, mensajeError, confirmar } = APP, e = APP.empresa.id;
+  const { esc, $, $$, toast } = APP, e = APP.empresa.id;
   if (!APP.esAdmin) { document.querySelector('main').innerHTML = '<div class="card"><p>Esta sección es solo para administración.</p></div>'; return; }
+  const borrar = '<button class="btn-eliminar" data-borrar title="Eliminar">✕</button>';
   async function cargarAtr(tipo, tb) {
-    const data = (await sb.from('atributos').select('*').eq('empresa_id', e).eq('tipo', tipo).order('orden').order('nombre')).data || [];
+    const data = (await sb.from('atributos').select('*').eq('empresa_id', e).eq('tipo', tipo).eq('activo', true).order('orden').order('nombre')).data || [];
     tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());
     data.forEach(a => tb.insertAdjacentHTML('beforeend', tipo === 'talle'
-      ? `<tr data-id="${a.id}"><td class="num"><input data-k="orden" type="number" value="${a.orden}"></td><td><input data-k="codigo" value="${esc(a.codigo)}"></td><td><input data-k="nombre" value="${esc(a.nombre)}"></td><td><button class="btn chico" data-guardar>✓</button> <button class="btn chico peligro" data-borrar title="Desactivar">×</button></td></tr>`
-      : `<tr data-id="${a.id}"><td><input data-k="codigo" value="${esc(a.codigo)}"></td><td><input data-k="nombre" value="${esc(a.nombre)}"></td><td><input data-k="hex" type="color" value="${a.hex || '#E6DEF0'}"></td><td><button class="btn chico" data-guardar>✓</button> <button class="btn chico peligro" data-borrar title="Desactivar">×</button></td></tr>`));
-    enganchar(tb, 'atributos', () => cargarAtr(tipo, tb));
+      ? `<tr data-id="${a.id}"><td class="num"><input data-k="orden" type="number" value="${a.orden}" style="width:64px"></td><td><input data-k="codigo" value="${esc(a.codigo)}"></td><td><input data-k="nombre" value="${esc(a.nombre)}"></td><td>${borrar}</td></tr>`
+      : `<tr data-id="${a.id}"><td><input data-k="codigo" value="${esc(a.codigo)}"></td><td><input data-k="nombre" value="${esc(a.nombre)}"></td><td><input data-k="hex" type="color" value="${a.hex || '#E6DEF0'}"></td><td>${borrar}</td></tr>`));
+    APP.autoguardar(tb, 'atributos');
+    $$('[data-borrar]', tb).forEach(b => b.onclick = async () => { const tr = b.closest('tr'); if (await APP.eliminar('atributos', tr.dataset.id, { nombre: $('[data-k="nombre"]', tr).value, campoActivo: 'activo' })) cargarAtr(tipo, tb); });
   }
   async function cargarCat() {
     const tb = $('#tb-cat'), data = (await sb.from('categorias').select('*').eq('empresa_id', e).eq('activa', true).order('orden').order('nombre')).data || [];
     tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());
-    data.forEach(c => tb.insertAdjacentHTML('beforeend', `<tr data-id="${c.id}"><td class="num"><input data-k="orden" type="number" value="${c.orden}"></td><td><input data-k="nombre" value="${esc(c.nombre)}"></td><td><button class="btn chico" data-guardar>✓</button> <button class="btn chico peligro" data-borrar title="Desactivar">×</button></td></tr>`));
-    enganchar(tb, 'categorias', cargarCat);
+    data.forEach(c => tb.insertAdjacentHTML('beforeend', `<tr data-id="${c.id}"><td class="num"><input data-k="orden" type="number" value="${c.orden}" style="width:64px"></td><td><input data-k="nombre" value="${esc(c.nombre)}"></td><td>${borrar}</td></tr>`));
+    APP.autoguardar(tb, 'categorias');
+    $$('[data-borrar]', tb).forEach(b => b.onclick = async () => { const tr = b.closest('tr'); if (await APP.eliminar('categorias', tr.dataset.id, { nombre: $('[data-k="nombre"]', tr).value, campoActivo: 'activa' })) cargarCat(); });
   }
-  function enganchar(tb, tabla, recargar) {
-    $$('[data-guardar]', tb).forEach(b => b.onclick = async () => {
-      const tr = b.closest('tr'), d = {}; $$('[data-k]', tr).forEach(el => d[el.dataset.k] = el.type === 'number' ? +el.value : el.value.trim());
-      const r = await sb.from(tabla).update(d).eq('id', tr.dataset.id); toast(r.error ? mensajeError(r.error) : 'Guardado', r.error ? 'error' : ''); if (!r.error) recargar();
-    });
-    $$('[data-borrar]', tb).forEach(b => b.onclick = async () => {
-      if (!await confirmar('¿Desactivar este valor? Las variantes que ya lo usan no se tocan.', 'Desactivar')) return;
-      const campo = tabla === 'categorias' ? 'activa' : 'activo';
-      const r = await sb.from(tabla).update({ [campo]: false }).eq('id', b.closest('tr').dataset.id); toast(r.error ? mensajeError(r.error) : 'Desactivado', r.error ? 'error' : ''); if (!r.error) recargar();
-    });
-  }
-  async function alta(tabla, d, recargar) { const r = await sb.from(tabla).insert(APP.conEmpresa(d)); toast(r.error ? mensajeError(r.error) : 'Agregado', r.error ? 'error' : ''); if (!r.error) recargar(); }
-  $('#btn-talle').onclick = () => { const c = $('#n-talle-cod').value.trim(), n = $('#n-talle-nom').value.trim() || c; if (!c) return; alta('atributos', { tipo: 'talle', codigo: c, nombre: n, orden: 999 }, () => { $('#n-talle-cod').value = $('#n-talle-nom').value = ''; cargarAtr('talle', $('#tb-talle')); }); };
-  $('#btn-color').onclick = () => { const c = $('#n-color-cod').value.trim(), n = $('#n-color-nom').value.trim() || c; if (!c) return; alta('atributos', { tipo: 'color', codigo: c.toUpperCase(), nombre: n, orden: 999 }, () => { $('#n-color-cod').value = $('#n-color-nom').value = ''; cargarAtr('color', $('#tb-color')); }); };
-  $('#btn-cat').onclick = () => { const n = $('#n-cat-nom').value.trim(); if (!n) return; alta('categorias', { nombre: n, orden: 999 }, () => { $('#n-cat-nom').value = ''; cargarCat(); }); };
+  $('#btn-talle').onclick = async () => {
+    const d = await APP.formulario({ titulo: 'Nuevo talle', campos: [{ k: 'codigo', label: 'Código', requerido: true, ancho: 'c2', placeholder: 'Ej. M, 95, XL/XXL' }, { k: 'nombre', label: 'Nombre', ancho: 'c2', placeholder: 'Si es igual al código, dejalo vacío' }, { k: 'orden', label: 'Orden en la matriz', tipo: 'number', valor: 999, ayuda: 'Más chico = más a la izquierda' }],
+      alGuardar: async d => { const r = await sb.from('atributos').insert(APP.conEmpresa({ tipo: 'talle', codigo: d.codigo, nombre: d.nombre || d.codigo, orden: d.orden ?? 999 })); if (r.error) throw r.error; } });
+    if (d) { toast('Talle agregado'); cargarAtr('talle', $('#tb-talle')); }
+  };
+  $('#btn-color').onclick = async () => {
+    const d = await APP.formulario({ titulo: 'Nuevo color o estampa', campos: [{ k: 'nombre', label: 'Nombre', requerido: true, ancho: 'c2', placeholder: 'Ej. Rosa viejo' }, { k: 'codigo', label: 'Código', ancho: 'c2', placeholder: 'Ej. ROV (si lo dejás vacío se arma solo)' }, { k: 'hex', label: 'Color de referencia', tipo: 'color', valor: '#E6DEF0' }],
+      alGuardar: async d => { const cod = (d.codigo || String(d.nombre).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z]/g, '').slice(0, 3)).toUpperCase(); const r = await sb.from('atributos').insert(APP.conEmpresa({ tipo: 'color', codigo: cod, nombre: d.nombre, hex: d.hex, orden: 999 })); if (r.error) throw r.error; } });
+    if (d) { toast('Color agregado'); cargarAtr('color', $('#tb-color')); }
+  };
+  $('#btn-cat').onclick = async () => {
+    const d = await APP.formulario({ titulo: 'Nueva familia', campos: [{ k: 'nombre', label: 'Nombre', requerido: true, placeholder: 'Ej. MEDIAS' }],
+      alGuardar: async d => { const r = await sb.from('categorias').insert(APP.conEmpresa({ nombre: d.nombre, orden: 999 })); if (r.error) throw r.error; } });
+    if (d) { toast('Familia agregada'); cargarCat(); }
+  };
   await Promise.all([cargarAtr('talle', $('#tb-talle')), cargarAtr('color', $('#tb-color')), cargarCat()]);
 });
 </script>

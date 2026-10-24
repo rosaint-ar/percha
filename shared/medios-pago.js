@@ -121,5 +121,15 @@
     `;
     document.head.appendChild(st);
   }
-  window.MEDIOS = { PROV, BANCO, GRUPO, ORDEN, logo, corto, botonera, grupoDe };
+  // empresas y bancos propios de la empresa (tabla medios_entidades): se suman a los conocidos
+  async function cargar(sb, e) {
+    try {
+      const { data } = await sb.from('medios_entidades').select('*').eq('empresa_id', e);
+      (data || []).forEach(x => {
+        if (x.tipo === 'banco') BANCO[x.clave] = { n: x.nombre, t: x.sigla, bg: x.color, propio: true };
+        else PROV[x.clave] = { n: x.nombre, t: x.sigla, bg: x.color, fg: '#fff', alias: (x.palabras || []).map(w => String(w).toLowerCase()).concat(String(x.nombre).toLowerCase()), propio: true };
+      });
+    } catch (_) {}
+  }
+  window.MEDIOS = { PROV, BANCO, GRUPO, ORDEN, logo, corto, botonera, grupoDe, cargar };
 })();

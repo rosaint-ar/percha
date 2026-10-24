@@ -25,7 +25,7 @@ APP.ready.then(async () => {
       sb.from('cajas').select('*').eq('empresa_id', e).eq('activa', true).order('nombre').limit(1),
       sb.from('clientes').select('id,nombre,telefono,lista_id').eq('empresa_id', e).eq('activo', true).eq('generico', false).order('nombre').limit(1000)
     ]);
-    listas = l.data || []; formas = f.data || []; sb.rpc('formas_pago_uso', { e }).then(({ data }) => { usosFormas = Object.fromEntries((data || []).map(x => [x.forma_pago_id, +x.usos])); }); promos = p.data || []; vendedoras = v.data || []; caja = (c.data || [])[0]; clientes = cl.data || [];
+    listas = l.data || []; formas = f.data || []; if (window.MEDIOS) MEDIOS.cargar(sb, e); sb.rpc('formas_pago_uso', { e }).then(({ data }) => { usosFormas = Object.fromEntries((data || []).map(x => [x.forma_pago_id, +x.usos])); }); promos = p.data || []; vendedoras = v.data || []; caja = (c.data || [])[0]; clientes = cl.data || [];
     carrito.lista = carrito.lista || (listas.find(x => x.predeterminada) || listas[0] || {}).id;
     // arranque rápido: si hay catálogo guardado de hace menos de 12 h, se usa ya y se refresca en segundo plano
     const guardado = JSON.parse(localStorage.getItem(LS('catalogo')) || 'null');

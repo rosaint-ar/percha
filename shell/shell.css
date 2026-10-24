@@ -187,3 +187,17 @@ td .cod{font:500 11px var(--f-mono);color:var(--tinta-3);letter-spacing:.02em}
   .buscador{min-width:0;width:100%}
 }
 @media print{.lateral,.barra-superior,.acciones,#toast{display:none!important}body.con-lateral{display:block}main.app{padding:0;max-width:none}.card,.tile{background:#fff;box-shadow:none;backdrop-filter:none}}
+
+/* ===== Ventana para agregar / editar y autoguardado (comunes) ===== */
+.form-modal{display:grid;grid-template-columns:1fr 1fr;gap:0 14px;margin-top:12px}
+.form-modal .campo{grid-column:1/3}.form-modal .campo.c2{grid-column:auto}
+.form-modal .pie{grid-column:1/3}
+.form-modal input,.form-modal select,.form-modal textarea{width:100%}
+.ayuda{font:500 11.5px var(--f-ui);color:var(--tinta-3)}
+tr.guardando td{opacity:.7}
+tr.guardado td{background:var(--ok-fondo);transition:background .4s}
+tr.error-guardar td{background:var(--error-fondo)}
+.estado-guardado{font:600 11.5px var(--f-ui);color:var(--tinta-3)}
+.btn-eliminar{border:0;background:transparent;color:var(--tinta-3);cursor:pointer;width:30px;height:30px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-size:16px}
+.btn-eliminar:hover{background:var(--error-fondo);color:var(--error)}
+.form-modal input[type=color]{height:40px;padding:3px;cursor:pointer;border:1px solid var(--linea);border-radius:var(--radio-mini);background:var(--superficie-2)}

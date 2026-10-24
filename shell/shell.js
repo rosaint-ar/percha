@@ -194,4 +194,81 @@
 
   APP.de = tabla => sb.from(tabla).select('*').eq('empresa_id', APP.empresa.id);
   APP.conEmpresa = obj => Object.assign({ empresa_id: APP.empresa.id }, obj);
+
+  // ================= Herramientas comunes de toda la plataforma =================
+  // 1) Ventana para agregar o editar: APP.formulario({ titulo, campos: [{ k, label, tipo: 'text'|'number'|'select'|'color'|'textarea', opciones: [[valor, texto]], valor, requerido, ayuda, placeholder, ancho: 'c2' }], boton })
+  //    Devuelve los datos (o null si se canceló). Si hay "alGuardar", se llama con los datos y si tira error la ventana sigue abierta.
+  APP.formulario = ({ titulo, sub, campos, boton, alGuardar }) => new Promise(res => {
+    const campo = c => {
+      const id = 'f-' + c.k, val = c.valor == null ? '' : c.valor, req = c.requerido ? ' required' : '';
+      let ctl;
+      if (c.tipo === 'select') ctl = `<select id="${id}"${req}>${(c.opciones || []).map(([v, t]) => `<option value="${esc(v)}" ${String(v) === String(val) ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
+      else if (c.tipo === 'textarea') ctl = `<textarea id="${id}" rows="3" placeholder="${esc(c.placeholder || '')}"${req}>${esc(val)}</textarea>`;
+      else ctl = `<input id="${id}" type="${c.tipo || 'text'}" value="${esc(val)}" placeholder="${esc(c.placeholder || '')}"${c.tipo === 'number' ? ' step="any"' : ''}${req}>`;
+      return `<div class="campo${c.ancho === 'c2' ? ' c2' : ''}"><label for="${id}">${esc(c.label)}${c.requerido ? ' *' : ''}</label>${ctl}${c.ayuda ? `<span class="ayuda">${esc(c.ayuda)}</span>` : ''}</div>`;
+    };
+    const m = modal(`<h2>${esc(titulo)}</h2>${sub ? `<p class="sub">${esc(sub)}</p>` : ''}<form class="form-modal">${campos.map(campo).join('')}<div class="pie"><button type="button" class="btn" data-no>Cancelar</button><button type="submit" class="btn primario" data-si>${esc(boton || 'Agregar')}</button></div></form>`);
+    m.classList.add('con-formulario');
+    const leer = () => { const d = {}; campos.forEach(c => { const el = $('#f-' + c.k, m); let v = el.value; if (c.tipo === 'number') v = v === '' ? null : +v; else if (typeof v === 'string') v = v.trim(); if (v === '' ) v = null; d[c.k] = v; }); return d; };
+    $('[data-no]', m).onclick = () => { m.cerrar(); res(null); };
+    $('form', m).onsubmit = async ev => {
+      ev.preventDefault();
+      const falta = campos.find(c => c.requerido && !String($('#f-' + c.k, m).value).trim()); if (falta) { toast('Completá: ' + falta.label, 'error'); $('#f-' + falta.k, m).focus(); return; }
+      const d = leer(), b = $('[data-si]', m); b.disabled = true;
+      if (alGuardar) { try { const r = await alGuardar(d); if (r === false) { b.disabled = false; return; } } catch (err) { toast(mensajeError(err), 'error'); b.disabled = false; return; } }
+      m.cerrar(); res(d);
+    };
+    setTimeout(() => { const f = $('input,select,textarea', m); if (f) f.focus(); }, 30);
+  });
+
+  // 2) Autoguardado de tablas editables: cada fila con data-id, cada campo con data-k. Guarda solo el campo que cambió.
+  //    APP.autoguardar(contenedor, tabla, { transformar(d, fila), alGuardar(fila, d) })
+  APP.autoguardar = (cont, tabla, op = {}) => {
+    const leer = el => { let v = el.type === 'checkbox' ? el.checked : el.value; if (v === 'true') v = true; else if (v === 'false') v = false; else if (el.type === 'number') v = v === '' ? null : +v; else if (typeof v === 'string') { v = v.trim(); if (v === '') v = null; } return v; };
+    const guardar = async el => {
+      const tr = el.closest('[data-id]'); if (!tr) return;
+      let d = { [el.dataset.k]: leer(el) }; if (op.transformar) d = op.transformar(d, tr) || d;
+      tr.classList.remove('guardado', 'error-guardar'); tr.classList.add('guardando');
+      const r = await sb.from(tabla).update(d).eq('id', tr.dataset.id);
+      tr.classList.remove('guardando');
+      if (r.error) { tr.classList.add('error-guardar'); toast(mensajeError(r.error), 'error'); return; }
+      tr.classList.add('guardado'); setTimeout(() => tr.classList.remove('guardado'), 1400);
+      if (op.alGuardar) op.alGuardar(tr, d);
+    };
+    const tiempos = new WeakMap();
+    cont.querySelectorAll('[data-k]').forEach(el => {
+      if (el.tagName === 'SELECT' || el.type === 'checkbox') el.addEventListener('change', () => { if (el.value !== '__nuevo__') guardar(el); });
+      else { el.addEventListener('input', () => { clearTimeout(tiempos.get(el)); tiempos.set(el, setTimeout(() => guardar(el), 700)); }); el.addEventListener('change', () => { clearTimeout(tiempos.get(el)); guardar(el); }); }
+    });
+  };
+
+  // 3) Eliminar: si el registro ya se usó (tiene ventas, stock, etc.) no se puede borrar, entonces se desactiva.
+  APP.eliminar = async (tabla, id, { nombre, campoActivo = 'activa' } = {}) => {
+    if (!await confirmar(`¿Eliminar ${nombre ? '"' + nombre + '"' : 'este registro'}? Si ya se usó, queda desactivado para no perder el historial.`, 'Eliminar')) return null;
+    const r = await sb.from(tabla).delete().eq('id', id);
+    if (!r.error) { toast('Eliminado'); return 'eliminado'; }
+    if (/foreign key|violates|referenc/i.test(r.error.message || '') || r.error.code === '23503') {
+      const r2 = await sb.from(tabla).update({ [campoActivo]: false }).eq('id', id);
+      if (r2.error) { toast(mensajeError(r2.error), 'error'); return null; }
+      toast('Ya se usó en ventas o movimientos: quedó desactivado'); return 'desactivado';
+    }
+    toast(mensajeError(r.error), 'error'); return null;
+  };
+
+  // 4) Listas desplegables con "+ Agregar…": al elegirla se abre la ventana para crear el valor nuevo y queda elegido.
+  //    APP.selectConAgregar(select, { texto: '+ Agregar empresa…', crear: async () => ({ valor, texto }) | null })
+  APP.selectConAgregar = (sel, { texto, crear }) => {
+    if (sel.querySelector('option[value="__nuevo__"]')) return;
+    sel.insertAdjacentHTML('beforeend', `<option value="__nuevo__">${esc(texto || '+ Agregar…')}</option>`);
+    let previo = sel.value; sel.addEventListener('focus', () => { previo = sel.value; });
+    sel.addEventListener('change', async () => {
+      if (sel.value !== '__nuevo__') { previo = sel.value; return; }
+      sel.value = previo;
+      const nuevo = await crear(); if (!nuevo) return;
+      const opt = document.createElement('option'); opt.value = nuevo.valor; opt.textContent = nuevo.texto;
+      sel.insertBefore(opt, sel.querySelector('option[value="__nuevo__"]')); sel.value = nuevo.valor; previo = nuevo.valor;
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  };
+
 })();

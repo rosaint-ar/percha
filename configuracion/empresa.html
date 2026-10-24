@@ -19,7 +19,7 @@
   <div class="pestanas"><a class="on" href="empresa.html">Empresa</a><a href="atributos.html">Talles, colores y familias</a><a href="curvas.html">Curvas de talle</a><a href="promociones.html">Promociones</a><a href="usuarios.html">Usuarios</a></div>
 
   <div class="card">
-    <div class="card-cab"><div><h2>Datos de la empresa</h2><p class="sub">Salen en facturas, tickets y etiquetas</p></div><div class="acciones"><button class="btn primario" id="btn-guardar">Guardar</button></div></div>
+    <div class="card-cab"><div><h2>Datos de la empresa</h2><p class="sub">Salen en facturas, tickets y etiquetas</p></div><div class="acciones"><span class="estado-guardado" id="est-empresa">Se guarda solo</span></div></div>
     <form id="form" autocomplete="off">
       <div class="fila c3">
         <div class="campo"><label>Nombre comercial</label><input name="nombre" required></div>
@@ -47,7 +47,7 @@
 
   <div class="card">
     <div class="card-cab"><div><h2>Listas de precios</h2><p class="sub">Cada lista es un porcentaje del precio de lista base. Contado al 80% significa 20% de descuento.</p></div><div class="acciones"><button class="btn" id="btn-nueva-lista">+ Lista</button></div></div>
-    <table class="lista" id="tb-listas"><tr><th>Nombre</th><th class="num">Porcentaje</th><th>Base</th><th>Activa</th><th></th></tr></table>
+    <table class="lista" id="tb-listas"><tr><th>Nombre</th><th class="num">Porcentaje</th><th>Base</th><th>Activa</th><th></th></tr></table><p class="sub" style="margin:8px 2px 0">Los cambios se guardan solos.</p>
   </div>
 
   <div class="card">
@@ -57,7 +57,7 @@
 
   <div class="card">
     <div class="card-cab"><div><h2>Depósitos</h2><p class="sub">Dónde está la mercadería</p></div><div class="acciones"><button class="btn" id="btn-nuevo-dep">+ Depósito</button></div></div>
-    <table class="lista" id="tb-dep"><tr><th>Código</th><th>Nombre</th><th>Principal</th><th>Activo</th><th></th></tr></table>
+    <table class="lista" id="tb-dep"><tr><th>Código</th><th>Nombre</th><th>Principal</th><th>Activo</th><th></th></tr></table><p class="sub" style="margin:8px 2px 0">Los cambios se guardan solos.</p>
   </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
@@ -68,63 +68,130 @@
 APP.ready.then(async () => {
   const { esc, $, $$, toast, mensajeError, fmt } = APP, e = APP.empresa.id;
   if (!APP.esAdmin) { document.querySelector('main').innerHTML = '<div class="card"><p>Esta sección es solo para administración.</p></div>'; return; }
+  const M = window.MEDIOS;
+  await M.cargar(sb, e);   // empresas y bancos propios
+
+  // ---- datos de la empresa: se guardan solos ----
   const form = $('#form');
   ['nombre', 'razon_social', 'cuit', 'condicion_iva', 'iibb', 'inicio_actividades', 'domicilio', 'localidad', 'provincia', 'codigo_postal', 'telefono', 'email', 'web'].forEach(k => form[k].value = APP.empresa[k] ?? '');
-  $('#btn-guardar').onclick = async () => {
+  let tEmp;
+  const guardarEmpresa = async () => {
     const d = {}; [...form.elements].forEach(el => { if (el.name) d[el.name] = el.value.trim() || null; });
+    if (!d.nombre) { $('#est-empresa').textContent = 'Falta el nombre comercial'; return; }
+    $('#est-empresa').textContent = 'Guardando…';
     const r = await sb.from('empresas').update(d).eq('id', e);
-    toast(r.error ? mensajeError(r.error) : 'Guardado', r.error ? 'error' : '');
+    $('#est-empresa').textContent = r.error ? 'No se pudo guardar' : 'Guardado ✓'; if (r.error) toast(mensajeError(r.error), 'error');
+    else { Object.assign(APP.empresa, d); setTimeout(() => { $('#est-empresa').textContent = 'Se guarda solo'; }, 1800); }
   };
+  form.addEventListener('input', () => { clearTimeout(tEmp); tEmp = setTimeout(guardarEmpresa, 800); });
+  form.addEventListener('change', () => { clearTimeout(tEmp); guardarEmpresa(); });
 
-  // ---- tablas editables genéricas ----
-  const TIPOS = { efectivo: 'Efectivo', transferencia: 'Transferencia', debito: 'Débito', credito: 'Crédito / cuotas', mercadopago: 'Mercado Pago', online: 'Online', otro: 'Otro' };
+  const sel = (k, opciones, valor, estilo) => `<select data-k="${k}" ${estilo ? 'style="' + estilo + '"' : ''}>${opciones.map(([v, t]) => `<option value="${esc(v)}" ${String(v) === String(valor ?? '') ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
+  const siNo = (k, v) => sel(k, [['true', 'Sí'], ['false', 'No']], String(!!v), 'min-width:70px');
+  const borrar = '<button class="btn-eliminar" data-borrar title="Eliminar">✕</button>';
+
+  // ---- empresas y bancos propios ----
+  const slug = s => String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 24);
+  async function nuevaEntidad(tipo) {
+    const d = await APP.formulario({
+      titulo: tipo === 'banco' ? 'Agregar banco' : 'Agregar empresa de pagos',
+      sub: tipo === 'banco' ? 'Por ejemplo: Banco Comafi, Banco del Sol…' : 'Por ejemplo: Clover, Prisma, Wilobank, una billetera nueva…',
+      campos: [
+        { k: 'nombre', label: 'Nombre', requerido: true },
+        { k: 'sigla', label: 'Sigla para el logo', requerido: true, ancho: 'c2', placeholder: 'Hasta 4 letras', ayuda: 'Se ve dentro del círculo' },
+        { k: 'color', label: 'Color', tipo: 'color', valor: '#6B5CA5', ancho: 'c2' },
+        { k: 'palabras', label: 'Otras formas de escribirlo', placeholder: 'Separadas por coma', ayuda: 'Para reconocerlo solo en el nombre de los medios de pago' },
+      ],
+      alGuardar: async d => {
+        let clave = slug(d.nombre) || 'propio'; if ((tipo === 'banco' ? M.BANCO : M.PROV)[clave]) clave += '_' + Math.floor(Math.random() * 900 + 100);
+        const r = await sb.from('medios_entidades').insert(APP.conEmpresa({ tipo, clave, nombre: d.nombre, sigla: String(d.sigla).toUpperCase().slice(0, 4), color: d.color || '#6B5CA5', palabras: String(d.palabras || '').split(',').map(x => x.trim()).filter(Boolean) }));
+        if (r.error) throw r.error; d.clave = clave;
+      }
+    });
+    if (!d) return null;
+    await M.cargar(sb, e); toast((tipo === 'banco' ? 'Banco' : 'Empresa') + ' agregado');
+    return { valor: d.clave, texto: d.nombre };
+  }
+  async function nuevaLista() {
+    const d = await APP.formulario({ titulo: 'Nueva lista de precios', campos: [{ k: 'nombre', label: 'Nombre', requerido: true, placeholder: 'Ej. Mayorista, Contado' }, { k: 'porcentaje', label: 'Porcentaje del precio base', tipo: 'number', valor: 100, ayuda: '80 = 20% de descuento · 110 = 10% de recargo' }],
+      alGuardar: async d => { const r = await sb.from('listas_precios').insert(APP.conEmpresa({ nombre: d.nombre, porcentaje: d.porcentaje ?? 100, orden: listas.length + 1 })).select().single(); if (r.error) throw r.error; d.id = r.data.id; } });
+    if (!d) return null; await cargarListas(); return { valor: d.id, texto: d.nombre };
+  }
+
+  // ---- listas de precios ----
   let listas = [];
   async function cargarListas() {
     listas = (await sb.from('listas_precios').select('*').eq('empresa_id', e).order('orden')).data || [];
     const tb = $('#tb-listas'); tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());
-    listas.forEach(l => tb.insertAdjacentHTML('beforeend', `<tr data-id="${l.id}"><td><input data-k="nombre" value="${esc(l.nombre)}"></td><td class="num"><input data-k="porcentaje" type="number" step="0.5" value="${l.porcentaje}"></td><td>${l.predeterminada ? '<span class="chip">base</span>' : ''}</td><td><select data-k="activa"><option value="true" ${l.activa ? 'selected' : ''}>Sí</option><option value="false" ${!l.activa ? 'selected' : ''}>No</option></select></td><td><button class="btn chico" data-guardar>Guardar</button></td></tr>`));
-    $$('[data-guardar]', tb).forEach(b => b.onclick = () => guardarFila(b, 'listas_precios', cargarListas));
+    listas.forEach(l => tb.insertAdjacentHTML('beforeend', `<tr data-id="${l.id}"><td><input data-k="nombre" value="${esc(l.nombre)}"></td><td class="num"><input data-k="porcentaje" type="number" step="0.5" value="${l.porcentaje}"></td><td>${l.predeterminada ? '<span class="chip">base</span>' : ''}</td><td>${siNo('activa', l.activa)}</td><td>${l.predeterminada ? '' : borrar}</td></tr>`));
+    APP.autoguardar(tb, 'listas_precios');
+    $$('[data-borrar]', tb).forEach(b => b.onclick = async () => { const tr = b.closest('tr'); if (await APP.eliminar('listas_precios', tr.dataset.id, { nombre: $('[data-k="nombre"]', tr).value })) { await cargarListas(); cargarFP(); } });
   }
+
+  // ---- formas de pago ----
+  const TIPO_DE = { efectivo: 'efectivo', transferencia: 'transferencia', debito: 'debito', credito: 'credito', billetera: 'otro', online: 'online', otro: 'otro' };
+  const opProv = () => [['', '—'], ...Object.entries(M.PROV).map(([k, v]) => [k, v.n])];
+  const opBanco = () => [['', '—'], ...Object.entries(M.BANCO).map(([k, v]) => [k, v.n])];
+  const opGrupo = () => Object.entries(M.GRUPO).map(([k, v]) => [k, v.n]);
+  const opLista = () => [['', 'La del cliente'], ...listas.map(l => [l.id, l.nombre])];
+  const conAgregar = cont => {
+    $$('select[data-k="proveedor"], select#f-proveedor', cont).forEach(s => APP.selectConAgregar(s, { texto: '+ Agregar empresa…', crear: () => nuevaEntidad('proveedor') }));
+    $$('select[data-k="banco"], select#f-banco', cont).forEach(s => APP.selectConAgregar(s, { texto: '+ Agregar banco…', crear: () => nuevaEntidad('banco') }));
+    $$('select[data-k="lista_id"], select#f-lista_id', cont).forEach(s => APP.selectConAgregar(s, { texto: '+ Nueva lista…', crear: nuevaLista }));
+  };
   async function cargarFP() {
     const [{ data: fpsData }, { data: usos }] = await Promise.all([sb.from('formas_pago').select('*').eq('empresa_id', e).order('orden'), sb.rpc('formas_pago_uso', { e })]);
-    const M = window.MEDIOS, uso = Object.fromEntries((usos || []).map(x => [x.forma_pago_id, +x.usos]));
+    const uso = Object.fromEntries((usos || []).map(x => [x.forma_pago_id, +x.usos]));
     const fps = (fpsData || []).slice().sort((a, b) => (a.activa === b.activa ? 0 : a.activa ? -1 : 1) || M.ORDEN.indexOf(M.grupoDe(a)) - M.ORDEN.indexOf(M.grupoDe(b)) || String(a.proveedor || '').localeCompare(String(b.proveedor || '')) || (a.cuotas || 1) - (b.cuotas || 1));
     const tb = $('#tb-fp'); tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());
-    const opciones = (obj, val, vacio) => `<option value="">${vacio}</option>` + Object.entries(obj).map(([k, v]) => `<option value="${k}" ${val === k ? 'selected' : ''}>${esc(v.n)}</option>`).join('');
     fps.forEach(f => tb.insertAdjacentHTML('beforeend', `<tr data-id="${f.id}" style="${f.activa ? '' : 'opacity:.55'}"><td>${M.logo(f, true)}</td><td><input data-k="nombre" value="${esc(f.nombre)}" style="min-width:230px"></td>
-      <td><select data-k="grupo" style="min-width:150px">${Object.entries(M.GRUPO).map(([k, v]) => `<option value="${k}" ${M.grupoDe(f) === k ? 'selected' : ''}>${esc(v.n)}</option>`).join('')}</select></td>
-      <td><select data-k="proveedor" style="min-width:140px">${opciones(M.PROV, f.proveedor, '—')}</select></td>
-      <td><select data-k="banco" style="min-width:120px">${opciones(M.BANCO, f.banco, '—')}</select></td>
-      <td class="num"><input data-k="cuotas" type="number" min="1" value="${f.cuotas}" style="width:60px"></td>
-      <td class="num"><input data-k="recargo_pct" type="number" step="0.5" value="${+f.recargo_pct || 0}" style="width:70px"></td>
-      <td><select data-k="lista_id" style="min-width:130px"><option value="">La del cliente</option>${listas.map(l => `<option value="${l.id}" ${f.lista_id === l.id ? 'selected' : ''}>${esc(l.nombre)}</option>`).join('')}</select></td>
-      <td class="num mono">${fmt.num(uso[f.id] || 0)}</td>
-      <td><select data-k="activa" style="min-width:70px"><option value="true" ${f.activa ? 'selected' : ''}>Sí</option><option value="false" ${!f.activa ? 'selected' : ''}>No</option></select></td><td><button class="btn chico" data-guardar>Guardar</button></td></tr>`));
-    // el "tipo" que usa la caja (vuelto en efectivo, etc.) sigue al grupo
-    const TIPO_DE = { efectivo: 'efectivo', transferencia: 'transferencia', debito: 'debito', credito: 'credito', billetera: 'otro', online: 'online', otro: 'otro' };
-    $$('[data-guardar]', tb).forEach(b => b.onclick = async () => {
-      const tr = b.closest('tr'), d = {};
-      $$('[data-k]', tr).forEach(el => { let v = el.value; if (v === 'true') v = true; else if (v === 'false') v = false; else if (el.type === 'number') v = +v; else if (v === '') v = null; d[el.dataset.k] = v; });
-      d.tipo = TIPO_DE[d.grupo] || 'otro';
-      const r = await sb.from('formas_pago').update(d).eq('id', tr.dataset.id);
-      toast(r.error ? mensajeError(r.error) : 'Guardado', r.error ? 'error' : ''); if (!r.error) cargarFP();
-    });
+      <td>${sel('grupo', opGrupo(), M.grupoDe(f), 'min-width:150px')}</td><td>${sel('proveedor', opProv(), f.proveedor, 'min-width:140px')}</td><td>${sel('banco', opBanco(), f.banco, 'min-width:120px')}</td>
+      <td class="num"><input data-k="cuotas" type="number" min="1" value="${f.cuotas}" style="width:60px"></td><td class="num"><input data-k="recargo_pct" type="number" step="0.5" value="${+f.recargo_pct || 0}" style="width:70px"></td>
+      <td>${sel('lista_id', opLista(), f.lista_id, 'min-width:130px')}</td><td class="num mono">${fmt.num(uso[f.id] || 0)}</td><td>${siNo('activa', f.activa)}</td><td>${borrar}</td></tr>`));
+    conAgregar(tb);
+    // el "tipo" que usa la caja sigue al grupo; al cambiar nombre, empresa o banco se redibuja el logo
+    APP.autoguardar(tb, 'formas_pago', { transformar: d => (d.grupo ? Object.assign(d, { tipo: TIPO_DE[d.grupo] || 'otro' }) : d), alGuardar: (tr, d) => { if ('nombre' in d || 'proveedor' in d || 'banco' in d || 'grupo' in d || 'activa' in d) setTimeout(cargarFP, 300); } });
+    $$('[data-borrar]', tb).forEach(b => b.onclick = async () => { const tr = b.closest('tr'); if (await APP.eliminar('formas_pago', tr.dataset.id, { nombre: $('[data-k="nombre"]', tr).value })) cargarFP(); });
   }
+  async function nuevaFP() {
+    const pend = APP.formulario({
+      titulo: 'Nueva forma de pago', sub: 'La empresa y el banco se reconocen solos por el nombre (ej. "3 cuotas Santander - Payway").',
+      campos: [
+        { k: 'nombre', label: 'Nombre', requerido: true, placeholder: 'Ej. 3 cuotas - Mercado Pago' },
+        { k: 'grupo', label: 'Grupo', tipo: 'select', opciones: [['', 'Automático'], ...opGrupo()], ancho: 'c2' },
+        { k: 'proveedor', label: 'Empresa', tipo: 'select', opciones: [['', 'Automático'], ...opProv().slice(1)], ancho: 'c2' },
+        { k: 'banco', label: 'Banco', tipo: 'select', opciones: [['', 'Automático'], ...opBanco().slice(1)], ancho: 'c2' },
+        { k: 'lista_id', label: 'Lista que aplica', tipo: 'select', opciones: opLista(), ancho: 'c2' },
+        { k: 'cuotas', label: 'Cuotas', tipo: 'number', valor: 1, ancho: 'c2' },
+        { k: 'recargo_pct', label: 'Recargo %', tipo: 'number', valor: 0, ancho: 'c2' },
+      ],
+      alGuardar: async d => {
+        const fila = APP.conEmpresa({ nombre: d.nombre, cuotas: d.cuotas || 1, recargo_pct: d.recargo_pct || 0, lista_id: d.lista_id, orden: 99, grupo: d.grupo, proveedor: d.proveedor, banco: d.banco });
+        if (d.grupo) fila.tipo = TIPO_DE[d.grupo]; else if ((d.cuotas || 1) > 1) fila.tipo = 'credito';
+        const r = await sb.from('formas_pago').insert(fila); if (r.error) throw r.error;
+      }
+    });
+    conAgregar(document.querySelector('.con-formulario'));
+    if (await pend) { toast('Forma de pago agregada'); cargarFP(); }
+  }
+
+  // ---- depósitos ----
   async function cargarDep() {
     const deps = (await sb.from('depositos').select('*').eq('empresa_id', e).order('principal', { ascending: false })).data || [];
     const tb = $('#tb-dep'); tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());
-    deps.forEach(d => tb.insertAdjacentHTML('beforeend', `<tr data-id="${d.id}"><td><input data-k="codigo" value="${esc(d.codigo)}"></td><td><input data-k="nombre" value="${esc(d.nombre)}"></td><td><select data-k="principal"><option value="true" ${d.principal ? 'selected' : ''}>Sí</option><option value="false" ${!d.principal ? 'selected' : ''}>No</option></select></td><td><select data-k="activo"><option value="true" ${d.activo ? 'selected' : ''}>Sí</option><option value="false" ${!d.activo ? 'selected' : ''}>No</option></select></td><td><button class="btn chico" data-guardar>Guardar</button></td></tr>`));
-    $$('[data-guardar]', tb).forEach(b => b.onclick = () => guardarFila(b, 'depositos', cargarDep));
+    deps.forEach(d => tb.insertAdjacentHTML('beforeend', `<tr data-id="${d.id}"><td><input data-k="codigo" value="${esc(d.codigo)}"></td><td><input data-k="nombre" value="${esc(d.nombre)}"></td><td>${siNo('principal', d.principal)}</td><td>${siNo('activo', d.activo)}</td><td>${d.principal ? '' : borrar}</td></tr>`));
+    APP.autoguardar(tb, 'depositos');
+    $$('[data-borrar]', tb).forEach(b => b.onclick = async () => { const tr = b.closest('tr'); if (await APP.eliminar('depositos', tr.dataset.id, { nombre: $('[data-k="nombre"]', tr).value, campoActivo: 'activo' })) cargarDep(); });
   }
-  async function guardarFila(btn, tabla, recargar) {
-    const tr = btn.closest('tr'), d = {};
-    $$('[data-k]', tr).forEach(el => { let v = el.value; if (v === 'true') v = true; else if (v === 'false') v = false; else if (el.type === 'number') v = +v; else if (v === '') v = null; d[el.dataset.k] = v; });
-    const r = await sb.from(tabla).update(d).eq('id', tr.dataset.id);
-    toast(r.error ? mensajeError(r.error) : 'Guardado', r.error ? 'error' : ''); if (!r.error) recargar();
+  async function nuevoDep() {
+    const d = await APP.formulario({ titulo: 'Nuevo depósito', campos: [{ k: 'codigo', label: 'Código', requerido: true, ancho: 'c2', placeholder: 'Ej. LOC2' }, { k: 'nombre', label: 'Nombre', requerido: true, ancho: 'c2', placeholder: 'Ej. Local centro' }],
+      alGuardar: async d => { const r = await sb.from('depositos').insert(APP.conEmpresa({ codigo: String(d.codigo).toUpperCase(), nombre: d.nombre })); if (r.error) throw r.error; } });
+    if (d) { toast('Depósito agregado'); cargarDep(); }
   }
-  $('#btn-nueva-lista').onclick = async () => { const r = await sb.from('listas_precios').insert(APP.conEmpresa({ nombre: 'Nueva lista', porcentaje: 100, orden: listas.length + 1 })); if (r.error) toast(mensajeError(r.error), 'error'); cargarListas(); };
-  $('#btn-nueva-fp').onclick = async () => { const r = await sb.from('formas_pago').insert(APP.conEmpresa({ nombre: 'Nueva forma de pago', tipo: 'otro', orden: 99 })); if (r.error) toast(mensajeError(r.error), 'error'); cargarFP(); };
-  $('#btn-nuevo-dep').onclick = async () => { const r = await sb.from('depositos').insert(APP.conEmpresa({ codigo: 'NUEVO', nombre: 'Nuevo depósito' })); if (r.error) toast(mensajeError(r.error), 'error'); cargarDep(); };
+
+  $('#btn-nueva-lista').onclick = async () => { if (await nuevaLista()) toast('Lista agregada'); };
+  $('#btn-nueva-fp').onclick = nuevaFP;
+  $('#btn-nuevo-dep').onclick = nuevoDep;
   await cargarListas(); await Promise.all([cargarFP(), cargarDep()]);
 });
 </script>
