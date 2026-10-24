@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Producto · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610241603">
+<link rel="stylesheet" href="../shell/shell.css?v=202610241628">
 <style>
   .dos{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
   .precios-lista td,.precios-lista th{padding:7px 8px}
-  .precios-lista input{width:120px;text-align:right;border:1px solid var(--borde);padding:5px 8px;border-radius:2px}
+  .precios-lista input{width:120px;text-align:right;border:1px solid var(--linea);background:var(--superficie-2);border-radius:var(--radio-mini);height:34px;padding:0 10px;font-family:var(--f-mono)}
   .leyenda-matriz{display:flex;gap:14px;font-size:13px;color:var(--suave);margin-top:8px;flex-wrap:wrap}
   .leyenda-matriz i{display:inline-block;width:12px;height:12px;vertical-align:-1px;margin-right:5px;border-radius:2px}
   .mov-tabla td{padding:6px 8px}
@@ -19,6 +19,22 @@
   .aviso-chequear{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:#eef4ff;border:1px solid #c9dbff;color:#1b4f99;border-radius:10px;padding:8px 12px;margin-bottom:12px;font-size:13px}
   .aviso-chequear label{display:flex;gap:6px;align-items:center;font-weight:600;cursor:pointer}
   .celda small.m-falla{color:#8a6400;font-weight:700}.celda small.m-chq{color:#1b4f99;font-weight:700}
+  .av-sec{font:600 10.5px var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--tinta-3);margin:16px 0 8px}.av-sec small{text-transform:none;letter-spacing:0;font:500 12px var(--f-ui);margin-left:6px}
+  .av-escalas{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+  .av-esc{border:1px solid var(--linea);background:var(--superficie-2);border-radius:999px;height:32px;padding:0 14px;font:600 12.5px var(--f-ui);cursor:pointer;color:var(--tinta-2)}
+  .av-esc small{color:var(--tinta-4);font-weight:500;margin-left:4px}.av-esc.on{background:var(--acento);border-color:var(--acento);color:#fff}.av-esc.on small{color:rgba(255,255,255,.75)}
+  .av-chips{display:flex;flex-wrap:wrap;gap:6px}
+  .av-chip{min-width:44px;height:34px;padding:0 12px;border:1px solid var(--linea);border-radius:9px;background:var(--superficie-2);font:600 13px var(--f-ui);cursor:pointer;transition:background .12s,border-color .12s}
+  .av-chip.on{background:var(--lila);border-color:var(--acento);color:var(--acento)}.av-chip.todo{border-style:dashed;color:var(--tinta-3)}
+  .av-col{display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 10px 0 6px;border:1px solid var(--linea);border-radius:999px;background:var(--superficie-2);font:500 12.5px var(--f-ui);cursor:pointer}
+  .av-col i{width:18px;height:18px;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}.av-col.on{border-color:var(--acento);background:var(--lila);color:var(--acento);font-weight:600}
+  .av-elegidos{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+  .av-busca{width:100%;height:38px;border:1px solid var(--linea);border-radius:10px;padding:0 12px;background:var(--superficie-2);margin-bottom:6px}
+  .av-grupos{max-height:300px;overflow:auto;border:1px solid var(--linea-suave);border-radius:12px;padding:2px 12px}
+  .av-grupos details{border-top:1px solid var(--linea-suave)}.av-grupos details:first-child{border-top:0}
+  .av-grupos summary{cursor:pointer;padding:9px 0;font:650 13px var(--f-ui);list-style:none}.av-grupos summary::-webkit-details-marker{display:none}.av-grupos summary small{color:var(--tinta-3);font:500 11.5px var(--f-mono);margin-left:6px}
+  .av-grupos .av-chips{padding:0 0 10px}
+  .av-resumen{font-size:13px;color:var(--tinta-2)}
 </style>
 </head>
 <body data-page="productos" data-etq="Catálogo" data-title="Producto">
@@ -90,8 +106,8 @@
   </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610241603"></script>
-<script src="../shell/shell.js?v=202610241603"></script>
+<script src="../shared/supabase.js?v=202610241628"></script>
+<script src="../shell/shell.js?v=202610241628"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$ , toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -295,27 +311,47 @@ APP.ready.then(async () => {
   };
 
   // ---------- agregar variantes ----------
-  $('#btn-agregar-variantes').onclick = () => {
-    const tSel = new Set(variantes.map(v => v.talle)), cSel = new Set(variantes.map(v => v.color));
-    const m = modal(`<h2>Agregar talles y colores</h2><p class="sub">Se crean las combinaciones que falten.</p>
-      <div class="fila c2" style="margin-top:12px">
-        <div class="campo"><label>Talles</label><select id="a-t" multiple size="12">${talles.map(t => `<option value="${t.id}" ${tSel.has(t.codigo) ? 'selected' : ''}>${esc(t.nombre)}</option>`).join('')}</select></div>
-        <div class="campo"><label>Colores / estampas</label><select id="a-c" multiple size="12">${colores.map(c => `<option value="${c.id}" ${cSel.has(c.codigo) ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}</select></div>
-      </div><span class="ayuda">Mantené Ctrl apretado para elegir varios.</span>
-      <div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Crear combinaciones</button></div>`);
-    $('[data-no]', m).onclick = () => m.cerrar();
-    $('[data-si]', m).onclick = async () => {
-      const ts = [...$('#a-t', m).selectedOptions].map(o => o.value), cs = [...$('#a-c', m).selectedOptions].map(o => o.value);
-      if (!ts.length || !cs.length) { toast('Elegí al menos un talle y un color', 'error'); return; }
-      const existentes = new Set(variantes.map(v => `${v.talle}|${v.color}`));
-      const nuevas = [];
-      ts.forEach(t => cs.forEach(c => { const T = talles.find(x => x.id === t), C = colores.find(x => x.id === c); if (!existentes.has(`${T.codigo}|${C.codigo}`)) nuevas.push(APP.conEmpresa({ producto_id: id, talle_id: t, color_id: c, sku: `${producto.codigo}-${T.codigo}-${C.codigo}` })); }));
-      if (!nuevas.length) { toast('Esas combinaciones ya existen'); m.cerrar(); return; }
-      const r = await sb.from('variantes').insert(nuevas);
-      if (r.error) { toast(mensajeError(r.error), 'error'); return; }
-      if (!producto.tiene_variantes) await sb.from('productos').update({ tiene_variantes: true }).eq('id', id);
-      m.cerrar(); toast(`${nuevas.length} combinaciones creadas`); await cargar();
+  $('#btn-agregar-variantes').onclick = async () => {
+    const [{ data: escs }, { data: cat }] = await Promise.all([sb.from('talle_escalas').select('*').eq('empresa_id', e).eq('activa', true).order('orden'), producto && producto.categoria_id ? sb.from('categorias').select('escalas,nombre').eq('id', producto.categoria_id).maybeSingle() : Promise.resolve({ data: null })]);
+    const escalas = escs || [], deFam = (cat && cat.escalas) || [];
+    const ordenEsc = escalas.slice().sort((a, b) => (deFam.includes(b.id) ? 1 : 0) - (deFam.includes(a.id) ? 1 : 0) || a.orden - b.orden);
+    const usadosT = new Set(variantes.map(v => v.talle).filter(Boolean)), usadosC = new Set(variantes.map(v => v.color).filter(Boolean));
+    const selT = new Set(talles.filter(t => usadosT.has(t.codigo)).map(t => t.id)), selC = new Set(colores.filter(c => usadosC.has(c.codigo)).map(c => c.id));
+    let escActiva = (ordenEsc.find(s => talles.some(t => t.escala_id === s.id && selT.has(t.id))) || ordenEsc[0] || {}).id, busca = '';
+    const GRUPOS = ['Negros', 'Blancos y crudos', 'Grises', 'Nudes y marrones', 'Rojos', 'Rosas', 'Naranjas y corales', 'Amarillos y dorados', 'Verdes y aguas', 'Azules', 'Violetas y lilas', 'Combinados', 'Estampados', 'Otros'];
+    const nrm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const m = modal('<div id="av"></div>');
+    $('.modal', m).style.maxWidth = '820px';
+    const pintar = () => {
+      const tEsc = talles.filter(t => t.escala_id === escActiva).sort((a, b) => a.orden - b.orden);
+      const q = nrm(busca), cs = q ? colores.filter(c => nrm(c.nombre + ' ' + c.codigo).includes(q)) : colores;
+      const grupos = {}; cs.forEach(c => (grupos[c.grupo || 'Otros'] = grupos[c.grupo || 'Otros'] || []).push(c));
+      const nombresG = Object.keys(grupos).sort((a, b) => (GRUPOS.indexOf(a) + 1 || 99) - (GRUPOS.indexOf(b) + 1 || 99));
+      const tsN = [...selT], csN = [...selC], existentes = new Set(variantes.map(v => (v.talle || '') + '|' + (v.color || '')));
+      const combos = (tsN.length ? tsN : [null]).flatMap(t => (csN.length ? csN : [null]).map(c => [t, c])).filter(([t, c]) => (t || c) && !existentes.has(((talles.find(x => x.id === t) || {}).codigo || '') + '|' + ((colores.find(x => x.id === c) || {}).codigo || '')));
+      $('#av', m).innerHTML = `<h2>Agregar talles y colores</h2><p class="sub">Elegí la escala y los talles, después los colores. Se crean las combinaciones que falten.</p>
+        <div class="av-sec">Talles</div>
+        <div class="av-escalas">${ordenEsc.map(s => `<button type="button" class="av-esc${s.id === escActiva ? ' on' : ''}" data-esc="${s.id}">${esc(s.nombre)}${deFam.includes(s.id) ? ' <small>de la familia</small>' : ''}</button>`).join('')}</div>
+        <div class="av-chips">${tEsc.map(t => `<button type="button" class="av-chip${selT.has(t.id) ? ' on' : ''}" data-t="${t.id}">${esc(t.nombre)}</button>`).join('')}${tEsc.length ? `<button type="button" class="av-chip todo" data-todos>${tEsc.every(t => selT.has(t.id)) ? 'Ninguno' : 'Todos'}</button>` : '<span class="sub">Esta escala no tiene talles.</span>'}</div>
+        <div class="av-sec">Colores y estampas <small>${selC.size ? selC.size + ' elegidos' : 'sin color = producto sin colores'}</small></div>
+        <div class="av-elegidos">${[...selC].map(id => colores.find(c => c.id === id)).filter(Boolean).map(c => `<button type="button" class="av-col on" data-c="${c.id}"><i style="background:${esc(c.hex || '#E6DEF0')}"></i>${esc(c.nombre)} ✕</button>`).join('')}</div>
+        <input class="av-busca" id="av-busca" placeholder="Buscar color o estampa…" value="${esc(busca)}" autocomplete="off">
+        <div class="av-grupos">${nombresG.map(g => `<details ${q || nombresG.length < 4 ? 'open' : ''}><summary>${esc(g)} <small>${grupos[g].length}</small></summary><div class="av-chips">${grupos[g].sort((a, b) => a.nombre.localeCompare(b.nombre)).map(c => `<button type="button" class="av-col${selC.has(c.id) ? ' on' : ''}" data-c="${c.id}"><i style="background:${esc(c.hex || '#E6DEF0')}"></i>${esc(c.nombre)}</button>`).join('')}</div></details>`).join('') || '<p class="sub">Nada con ese nombre.</p>'}</div>
+        <div class="pie" style="justify-content:space-between;align-items:center"><span class="av-resumen">${combos.length ? '<b>' + combos.length + '</b> combinaciones nuevas' : 'No hay combinaciones nuevas'}</span><div style="display:flex;gap:8px"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si ${combos.length ? '' : 'disabled'}>Crear ${combos.length || ''}</button></div></div>`;
+      $$('[data-esc]', m).forEach(b => b.onclick = () => { escActiva = b.dataset.esc; pintar(); });
+      $$('[data-t]', m).forEach(b => b.onclick = () => { selT.has(b.dataset.t) ? selT.delete(b.dataset.t) : selT.add(b.dataset.t); pintar(); });
+      const todos = $('[data-todos]', m); if (todos) todos.onclick = () => { const all = tEsc.every(t => selT.has(t.id)); tEsc.forEach(t => all ? selT.delete(t.id) : selT.add(t.id)); pintar(); };
+      $$('[data-c]', m).forEach(b => b.onclick = () => { selC.has(b.dataset.c) ? selC.delete(b.dataset.c) : selC.add(b.dataset.c); const y = $('.av-grupos', m).scrollTop; pintar(); $('.av-grupos', m).scrollTop = y; });
+      const ib = $('#av-busca', m); ib.oninput = () => { busca = ib.value; const pos = ib.selectionStart; pintar(); const i2 = $('#av-busca', m); i2.focus(); i2.setSelectionRange(pos, pos); };
+      $('[data-no]', m).onclick = () => m.cerrar();
+      $('[data-si]', m).onclick = async () => {
+        const nuevas = combos.map(([t, c]) => { const T = talles.find(x => x.id === t), C = colores.find(x => x.id === c); return APP.conEmpresa({ producto_id: id, talle_id: t || null, color_id: c || null, sku: [producto.codigo, T && T.codigo, C && C.codigo].filter(Boolean).join('-') }); });
+        const r = await sb.from('variantes').insert(nuevas); if (r.error) { toast(mensajeError(r.error), 'error'); return; }
+        if (!producto.tiene_variantes) await sb.from('productos').update({ tiene_variantes: true }).eq('id', id);
+        m.cerrar(); toast(`${nuevas.length} combinaciones creadas`); await cargar();
+      };
     };
+    pintar();
   };
 
   // ---------- kit: componentes ----------

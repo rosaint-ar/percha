@@ -5,73 +5,321 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Talles, colores y familias · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610241603">
+<link rel="stylesheet" href="../shell/shell.css?v=202610241628">
 <style>
   .pestanas{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
   .pestanas a{font:600 13px var(--f-ui);color:var(--tinta);text-decoration:none;padding:8px 14px;border:1px solid var(--linea);background:var(--superficie-2);border-radius:10px}
   .pestanas a.on{background:var(--lila);border-color:transparent;color:var(--acento)}
-  .tres{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;align-items:start}
-  table.lista input{border:1px solid var(--borde);padding:4px 7px;border-radius:2px;width:100%}
-  table.lista td.num input{width:60px;text-align:right}
-  input[type=color]{width:34px;height:28px;padding:0;border:1px solid var(--borde)}
-  .alta{display:flex;gap:6px;margin-top:10px}
-  .alta input{flex:1;border:1px solid var(--borde);padding:7px 9px;border-radius:2px}
-  @media (max-width:1000px){.tres{grid-template-columns:1fr}}
+  /* escalas */
+  .escalas{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px}
+  .escala{border:1px solid var(--linea);border-radius:14px;background:var(--superficie-2);display:flex;flex-direction:column;overflow:hidden;transition:box-shadow .15s,border-color .15s}
+  .escala:hover{border-color:rgba(var(--acento-rgb),.25);box-shadow:0 6px 18px rgba(21,23,28,.06)}
+  .esc-cab{display:flex;align-items:flex-start;gap:10px;padding:14px 14px 8px}
+  .esc-ic{width:36px;height:36px;border-radius:10px;background:var(--lila);color:var(--acento);display:flex;align-items:center;justify-content:center;flex:none}
+  .esc-ic svg{width:20px;height:20px}
+  .esc-tit{min-width:0;flex:1}.esc-tit b{display:block;font:700 14.5px/1.25 var(--f-ui)}.esc-tit small{display:block;color:var(--tinta-3);font-size:12px;margin-top:2px}
+  .esc-cuerpo{padding:4px 14px 12px;flex:1}
+  .talles{display:flex;flex-wrap:wrap;gap:6px;min-height:34px}
+  .talle{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border:1px solid var(--linea);border-radius:9px;background:var(--superficie-2);font:600 13px var(--f-ui);cursor:grab;user-select:none;transition:transform .12s,box-shadow .12s,border-color .12s}
+  .talle:hover{border-color:rgba(var(--acento-rgb),.45);transform:translateY(-1px);box-shadow:0 3px 8px rgba(21,23,28,.08)}
+  .talle .n{font:500 10.5px var(--f-mono);color:var(--tinta-4)}
+  .talle.arrastrando{opacity:.35}
+  .talle.destino{box-shadow:-3px 0 0 var(--acento)}
+  .talle.mas{border-style:dashed;color:var(--tinta-3);cursor:pointer}
+  .talle.mas:hover{color:var(--acento)}
+  .esc-pie{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid var(--linea-suave);background:var(--relleno)}
+  .esc-pie .usa{font-size:12px;color:var(--tinta-3);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .esc-pie .usa b{color:var(--tinta-2);font-weight:600}
+  .tag-copa{font:700 10.5px var(--f-ui);color:var(--acento);background:var(--lila);border-radius:999px;padding:2px 8px;margin-left:6px;vertical-align:1px}
+  /* plantillas */
+  .plantillas{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+  .plantilla{border:1px solid var(--linea);border-radius:12px;padding:10px 12px;background:var(--superficie-2);cursor:pointer;text-align:left;font:inherit;color:inherit;transition:border-color .12s,background .12s}
+  .plantilla:hover,.plantilla.on{border-color:var(--acento);background:var(--lila)}
+  .plantilla b{display:block;font:650 13.5px var(--f-ui)}.plantilla small{display:block;color:var(--tinta-3);font:500 11.5px var(--f-mono);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* tabla de medidas */
+  .medidas{width:100%;border-collapse:collapse;margin-top:10px}
+  .medidas th,.medidas td{padding:5px 6px;border-bottom:1px solid var(--linea-suave);text-align:center}
+  .medidas th{font:600 10.5px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--tinta-3)}
+  .medidas td:first-child,.medidas th:first-child{text-align:left;font-weight:700}
+  .medidas input{width:100%;min-width:70px;height:32px;border:1px solid var(--linea);border-radius:8px;text-align:center;font:500 13px var(--f-mono);background:var(--superficie-2)}
+  .medidas .col-x{border:0;background:transparent;color:var(--tinta-4);cursor:pointer;font-size:12px;margin-left:4px}
+  /* colores y familias */
+  .dos-cols{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:14px;align-items:start;margin-top:14px}
+  .dos-cols>.card{margin-top:0}
+  .busca-color{width:100%;height:38px;border:1px solid var(--linea);border-radius:10px;padding:0 12px;background:var(--superficie-2);margin-bottom:10px}
+  .grupo-color{border-top:1px solid var(--linea-suave)}
+  .grupo-color summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:10px 2px;font:650 13.5px var(--f-ui)}
+  .grupo-color summary::-webkit-details-marker{display:none}
+  .grupo-color summary .muestra{display:flex}
+  .grupo-color summary .muestra i{width:14px;height:14px;border-radius:50%;margin-left:-4px;box-shadow:0 0 0 2px var(--superficie-2)}
+  .grupo-color summary .muestra i:first-child{margin-left:0}
+  .grupo-color summary .cant{margin-left:auto;font:600 11.5px var(--f-mono);color:var(--tinta-3);background:var(--relleno);border-radius:999px;padding:1px 9px}
+  .grupo-color summary::after{content:'▸';color:var(--tinta-4);font-size:12px;transition:transform .15s}
+  .grupo-color[open] summary::after{transform:rotate(90deg)}
+  .colores{display:flex;flex-wrap:wrap;gap:6px;padding:0 0 12px}
+  .color{display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 10px 0 6px;border:1px solid var(--linea);border-radius:999px;background:var(--superficie-2);font:500 12.5px var(--f-ui);cursor:pointer;transition:border-color .12s,transform .12s}
+  .color:hover{border-color:rgba(var(--acento-rgb),.45);transform:translateY(-1px)}
+  .color i{width:18px;height:18px;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12);flex:none}
+  .familia{display:grid;grid-template-columns:72px minmax(0,1fr) 32px;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--linea-suave)}
+  .familia:first-child{border-top:0}
+  .familia .esc-chips{grid-column:2/3;display:flex;flex-wrap:wrap;gap:4px;margin-top:-2px}
+  .esc-chip{font:600 11.5px var(--f-ui);border-radius:999px;padding:3px 9px;background:var(--lila);color:var(--acento);border:0;cursor:pointer}
+  .esc-chip.vacio{background:var(--relleno);color:var(--tinta-3)}
+  .check-lista label{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--linea-suave);cursor:pointer}
+  .check-lista label:last-child{border-bottom:0}
+  .check-lista input{width:18px;height:18px;accent-color:var(--acento)}
+  .check-lista small{margin-left:auto;color:var(--tinta-3);font-size:12px}
+  @media (max-width:1000px){.dos-cols{grid-template-columns:1fr}.plantillas{grid-template-columns:1fr}}
+  @media print{body *{visibility:hidden}#impresion,#impresion *{visibility:visible}#impresion{position:absolute;inset:0;padding:12mm;font:12pt/1.4 var(--f-ui);color:#000}#impresion table{width:100%;border-collapse:collapse}#impresion th,#impresion td{border:1px solid #999;padding:6px;text-align:center}#impresion h1{font-size:20pt;margin:0 0 4mm}}
 </style>
 </head>
-<body data-page="configuracion" data-etq="Configuración" data-title="Talles, colores y familias" data-subtitle="Los ejes con los que se arman las variantes">
+<body data-page="configuracion" data-etq="Configuración" data-title="Talles, colores y familias" data-subtitle="Escalas de talles por tipo de prenda, colores por familia de color y qué usa cada familia de productos">
 <main class="app">
   <div class="pestanas"><a href="empresa.html">Empresa</a><a class="on" href="atributos.html">Talles, colores y familias</a><a href="curvas.html">Curvas de talle</a><a href="promociones.html">Promociones</a><a href="usuarios.html">Usuarios</a></div>
-  <p class="sub" style="margin:0 2px 12px">Los cambios se guardan solos.</p>
-  <div class="tres">
-    <div class="card"><div class="card-cab"><div><h2>Talles</h2><p class="sub">En el orden de la matriz</p></div><div class="acciones"><button class="btn" id="btn-talle">+ Talle</button></div></div>
-      <table class="lista" id="tb-talle"><tr><th class="num">Orden</th><th>Código</th><th>Nombre</th><th></th></tr></table></div>
-    <div class="card"><div class="card-cab"><div><h2>Colores y estampas</h2><p class="sub">Con su color de referencia</p></div><div class="acciones"><button class="btn" id="btn-color">+ Color</button></div></div>
-      <table class="lista" id="tb-color"><tr><th>Código</th><th>Nombre</th><th>Color</th><th></th></tr></table></div>
-    <div class="card"><div class="card-cab"><div><h2>Familias</h2><p class="sub">Para agrupar y filtrar</p></div><div class="acciones"><button class="btn" id="btn-cat">+ Familia</button></div></div>
-      <table class="lista" id="tb-cat"><tr><th class="num">Orden</th><th>Nombre</th><th></th></tr></table></div>
+
+  <div class="card">
+    <div class="card-cab"><div><h2>Escalas de talles</h2><p class="sub">Una escala por tipo de prenda, con sus talles en orden. Arrastrá un talle para cambiarle el lugar; tocalo para editarlo.</p></div><div class="acciones"><button class="btn primario" id="btn-escala">+ Escala</button></div></div>
+    <div class="escalas" id="escalas"></div>
+  </div>
+
+  <div class="dos-cols">
+    <div class="card">
+      <div class="card-cab"><div><h2>Colores y estampas</h2><p class="sub" id="sub-colores">Agrupados por familia de color</p></div><div class="acciones"><button class="btn" id="btn-color">+ Color</button></div></div>
+      <input class="busca-color" id="busca-color" placeholder="Buscar un color o estampa…" autocomplete="off">
+      <div id="colores"></div>
+    </div>
+    <div class="card">
+      <div class="card-cab"><div><h2>Familias de productos</h2><p class="sub">Qué escalas usa cada una</p></div><div class="acciones"><button class="btn" id="btn-cat">+ Familia</button></div></div>
+      <div id="familias"></div>
+    </div>
   </div>
 </main>
+<div id="impresion" hidden></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610241603"></script>
-<script src="../shell/shell.js?v=202610241603"></script>
+<script src="../shared/supabase.js?v=202610241628"></script>
+<script src="../shell/shell.js?v=202610241628"></script>
 <script>
 APP.ready.then(async () => {
-  const { esc, $, $$, toast } = APP, e = APP.empresa.id;
+  const { esc, $, $$, toast, mensajeError, fmt, confirmar } = APP, e = APP.empresa.id;
   if (!APP.esAdmin) { document.querySelector('main').innerHTML = '<div class="card"><p>Esta sección es solo para administración.</p></div>'; return; }
-  const borrar = '<button class="btn-eliminar" data-borrar title="Eliminar">✕</button>';
-  async function cargarAtr(tipo, tb) {
-    const data = (await sb.from('atributos').select('*').eq('empresa_id', e).eq('tipo', tipo).eq('activo', true).order('orden').order('nombre')).data || [];
-    tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());
-    data.forEach(a => tb.insertAdjacentHTML('beforeend', tipo === 'talle'
-      ? `<tr data-id="${a.id}"><td class="num"><input data-k="orden" type="number" value="${a.orden}" style="width:88px"></td><td><input data-k="codigo" value="${esc(a.codigo)}"></td><td><input data-k="nombre" value="${esc(a.nombre)}"></td><td>${borrar}</td></tr>`
-      : `<tr data-id="${a.id}"><td><input data-k="codigo" value="${esc(a.codigo)}"></td><td><input data-k="nombre" value="${esc(a.nombre)}"></td><td><input data-k="hex" type="color" value="${a.hex || '#E6DEF0'}"></td><td>${borrar}</td></tr>`));
-    APP.autoguardar(tb, 'atributos');
-    $$('[data-borrar]', tb).forEach(b => b.onclick = async () => { const tr = b.closest('tr'); if (await APP.eliminar('atributos', tr.dataset.id, { nombre: $('[data-k="nombre"]', tr).value, campoActivo: 'activo' })) cargarAtr(tipo, tb); });
-  }
-  async function cargarCat() {
-    const tb = $('#tb-cat'), data = (await sb.from('categorias').select('*').eq('empresa_id', e).eq('activa', true).order('orden').order('nombre')).data || [];
-    tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());
-    data.forEach(c => tb.insertAdjacentHTML('beforeend', `<tr data-id="${c.id}"><td class="num"><input data-k="orden" type="number" value="${c.orden}" style="width:88px"></td><td><input data-k="nombre" value="${esc(c.nombre)}"></td><td>${borrar}</td></tr>`));
-    APP.autoguardar(tb, 'categorias');
-    $$('[data-borrar]', tb).forEach(b => b.onclick = async () => { const tr = b.closest('tr'); if (await APP.eliminar('categorias', tr.dataset.id, { nombre: $('[data-k="nombre"]', tr).value, campoActivo: 'activa' })) cargarCat(); });
-  }
-  $('#btn-talle').onclick = async () => {
-    const d = await APP.formulario({ titulo: 'Nuevo talle', campos: [{ k: 'codigo', label: 'Código', requerido: true, ancho: 'c2', placeholder: 'Ej. M, 95, XL/XXL' }, { k: 'nombre', label: 'Nombre', ancho: 'c2', placeholder: 'Si es igual al código, dejalo vacío' }, { k: 'orden', label: 'Orden en la matriz', tipo: 'number', valor: 999, ayuda: 'Más chico = más a la izquierda' }],
-      alGuardar: async d => { const r = await sb.from('atributos').insert(APP.conEmpresa({ tipo: 'talle', codigo: d.codigo, nombre: d.nombre || d.codigo, orden: d.orden ?? 999 })); if (r.error) throw r.error; } });
-    if (d) { toast('Talle agregado'); cargarAtr('talle', $('#tb-talle')); }
+
+  // ---------- íconos por tipo de escala ----------
+  const IC = {
+    letras: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3 4 6l2 3 2-1v13h8V8l2 1 2-3-4-3c-.6 1.7-2.2 3-4 3s-3.4-1.3-4-3Z"/></svg>',
+    contorno: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9c0 4 2.5 7 5 7 1.6 0 3-1 4-2.5 1 1.5 2.4 2.5 4 2.5 2.5 0 5-3 5-7"/><path d="M3 9h18M8 4v5M16 4v5"/></svg>',
+    calzado: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16V6l5 1 1 4 6 2c2.5.8 4 2 4 3v2H4Z"/><path d="M4 16h16"/></svg>',
+    medias: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6v9l3 4a3 3 0 0 1-5 3l-4-4V3Z"/><path d="M9 7h6"/></svg>',
+    numerado: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9h14M5 15h14M10 4 8 20M16 4l-2 16"/></svg>',
+    jeans: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l1 18h-5l-2-11-2 11H5L6 3Z"/><path d="M6 7h12"/></svg>',
+    ninos: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="3"/><path d="M7 21v-6a5 5 0 0 1 10 0v6"/></svg>',
+    unico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 8v8"/></svg>',
+    otro: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg>',
   };
-  $('#btn-color').onclick = async () => {
-    const d = await APP.formulario({ titulo: 'Nuevo color o estampa', campos: [{ k: 'nombre', label: 'Nombre', requerido: true, ancho: 'c2', placeholder: 'Ej. Rosa viejo' }, { k: 'codigo', label: 'Código', ancho: 'c2', placeholder: 'Ej. ROV (si lo dejás vacío se arma solo)' }, { k: 'hex', label: 'Color de referencia', tipo: 'color', valor: '#E6DEF0' }],
-      alGuardar: async d => { const cod = (d.codigo || String(d.nombre).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z]/g, '').slice(0, 3)).toUpperCase(); const r = await sb.from('atributos').insert(APP.conEmpresa({ tipo: 'color', codigo: cod, nombre: d.nombre, hex: d.hex, orden: 999 })); if (r.error) throw r.error; } });
-    if (d) { toast('Color agregado'); cargarAtr('color', $('#tb-color')); }
+  const TIPOS = { letras: 'Letras', contorno: 'Contorno (corpiño)', calzado: 'Calzado', medias: 'Medias y pantys', numerado: 'Numerado', jeans: 'Numérico / jeans', ninos: 'Niños y bebés', unico: 'Único', otro: 'Otro' };
+  // plantillas del rubro para crear una escala de una
+  const PLANTILLAS = [
+    { n: 'Letras', tipo: 'letras', d: 'Remeras, buzos, pijamas, ropa interior', t: ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'] },
+    { n: 'Letras dobles', tipo: 'letras', d: 'Prendas que abarcan dos talles', t: ['S/M', 'M/L', 'L/XL', 'XL/XXL'] },
+    { n: 'Contorno de corpiño', tipo: 'contorno', d: 'Corpiños, conjuntos, bodies', t: ['80', '85', '90', '95', '100', '105', '110', '115', '120'], copa: true },
+    { n: 'Numérico mujer', tipo: 'jeans', d: 'Pantalones, vestidos, faldas', t: ['36', '38', '40', '42', '44', '46', '48', '50'] },
+    { n: 'Jeans', tipo: 'jeans', d: 'Tiro / cintura', t: ['24', '26', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46'] },
+    { n: 'Calzado AR', tipo: 'calzado', d: 'Numeración argentina', t: ['34', '35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45'] },
+    { n: 'Niños', tipo: 'ninos', d: 'Por edad', t: ['2', '4', '6', '8', '10', '12', '14', '16'] },
+    { n: 'Bebés', tipo: 'ninos', d: 'Por meses', t: ['0-3 m', '3-6 m', '6-9 m', '9-12 m', '12-18 m', '18-24 m'] },
+    { n: 'Medias', tipo: 'medias', d: 'Por número de talle', t: ['1', '2', '3', '4', '5'] },
+    { n: 'Único', tipo: 'unico', d: 'Accesorios, talle único', t: ['Único'] },
+    { n: 'En blanco', tipo: 'otro', d: 'La armás vos', t: [] },
+  ];
+
+  let escalas = [], talles = [], colores = [], cats = [];
+  async function cargar() {
+    const [a, b, c] = await Promise.all([
+      sb.from('talle_escalas').select('*').eq('empresa_id', e).eq('activa', true).order('orden'),
+      sb.from('atributos').select('*').eq('empresa_id', e).eq('activo', true).order('orden').order('nombre'),
+      sb.from('categorias').select('*').eq('empresa_id', e).eq('activa', true).order('orden').order('nombre')]);
+    escalas = a.data || []; talles = (b.data || []).filter(x => x.tipo === 'talle'); colores = (b.data || []).filter(x => x.tipo === 'color'); cats = c.data || [];
+    pintarEscalas(); pintarColores(); pintarFamilias();
+  }
+
+  // ================= Escalas =================
+  const tallesDe = id => talles.filter(t => t.escala_id === id).sort((a, b) => a.orden - b.orden);
+  const familiasDe = id => cats.filter(c => (c.escalas || []).includes(id));
+  function pintarEscalas() {
+    const sinEscala = talles.filter(t => !t.escala_id || !escalas.some(s => s.id === t.escala_id));
+    const lista = escalas.map(s => ({ s, ts: tallesDe(s.id) }));
+    if (sinEscala.length) lista.push({ s: { id: '', nombre: 'Sin escala', descripcion: 'Talles que todavía no están en ninguna escala', tipo: 'otro' }, ts: sinEscala });
+    $('#escalas').innerHTML = lista.map(({ s, ts }) => {
+      const fams = s.id ? familiasDe(s.id) : [];
+      return `<div class="escala" data-escala="${s.id}">
+        <div class="esc-cab"><span class="esc-ic">${IC[s.tipo] || IC.otro}</span><div class="esc-tit"><b>${esc(s.nombre)}${s.admite_copa ? '<span class="tag-copa">con copa</span>' : ''}</b><small>${esc(s.descripcion || TIPOS[s.tipo] || '')} · ${ts.length} ${ts.length === 1 ? 'talle' : 'talles'}</small></div>
+          ${s.id ? `<button class="btn-eliminar" data-editar-escala="${s.id}" title="Editar escala">✎</button>` : ''}</div>
+        <div class="esc-cuerpo"><div class="talles" data-lista="${s.id}">${ts.map(t => `<span class="talle" draggable="true" data-talle="${t.id}" title="Arrastrá para ordenar · tocá para editar">${esc(t.nombre)}</span>`).join('')}${s.id ? `<span class="talle mas" data-nuevo-talle="${s.id}">+ Talle</span>` : ''}</div></div>
+        ${s.id ? `<div class="esc-pie"><span class="usa">${fams.length ? 'Usada en <b>' + fams.map(f => esc(f.nombre.charAt(0) + f.nombre.slice(1).toLowerCase())).join(', ') + '</b>' : 'Ninguna familia la usa todavía'}</span><button class="btn chico" data-medidas="${s.id}">Tabla de medidas</button></div>` : ''}
+      </div>`;
+    }).join('');
+    // arrastrar para ordenar dentro de la escala
+    let arr = null;
+    $$('.talle[data-talle]').forEach(el => {
+      el.addEventListener('dragstart', ev => { arr = el; el.classList.add('arrastrando'); ev.dataTransfer.effectAllowed = 'move'; });
+      el.addEventListener('dragend', () => { el.classList.remove('arrastrando'); $$('.talle.destino').forEach(x => x.classList.remove('destino')); });
+      el.addEventListener('dragover', ev => { if (!arr || arr === el || arr.parentNode !== el.parentNode) return; ev.preventDefault(); $$('.talle.destino').forEach(x => x.classList.remove('destino')); el.classList.add('destino'); });
+      el.addEventListener('drop', async ev => { ev.preventDefault(); if (!arr || arr === el || arr.parentNode !== el.parentNode) return; el.parentNode.insertBefore(arr, el); await guardarOrden(el.parentNode); });
+      el.addEventListener('click', () => editarTalle(talles.find(t => t.id === el.dataset.talle)));
+    });
+    $$('.talles').forEach(l => l.addEventListener('dragover', ev => { if (arr && arr.parentNode === l && ev.target === l) ev.preventDefault(); }));
+    $$('.talles').forEach(l => l.addEventListener('drop', async ev => { if (ev.target !== l || !arr || arr.parentNode !== l) return; ev.preventDefault(); l.insertBefore(arr, $('.talle.mas', l)); await guardarOrden(l); }));
+    $$('[data-nuevo-talle]').forEach(b => b.onclick = () => nuevoTalle(b.dataset.nuevoTalle));
+    $$('[data-editar-escala]').forEach(b => b.onclick = () => editarEscala(escalas.find(s => s.id === b.dataset.editarEscala)));
+    $$('[data-medidas]').forEach(b => b.onclick = () => tablaMedidas(escalas.find(s => s.id === b.dataset.medidas)));
+  }
+  async function guardarOrden(lista) {
+    const s = escalas.find(x => x.id === lista.dataset.lista), base = (s ? s.orden : 9) * 100;
+    const ids = $$('.talle[data-talle]', lista).map(x => x.dataset.talle);
+    const r = await Promise.all(ids.map((id, i) => sb.from('atributos').update({ orden: base + i + 1 }).eq('id', id)));
+    const err = r.find(x => x.error); if (err) { toast(mensajeError(err.error), 'error'); return; }
+    ids.forEach((id, i) => { const t = talles.find(x => x.id === id); if (t) t.orden = base + i + 1; });
+    toast('Orden guardado');
+  }
+  const codigoLibre = (nombre, sufijo) => {
+    let c = String(nombre).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, '').slice(0, 12) || 'T';
+    const usados = new Set(talles.map(t => t.codigo));
+    if (usados.has(c) && sufijo) c = (c + '-' + sufijo).slice(0, 16);
+    let k = 2, base = c; while (usados.has(c)) c = base + k++;
+    return c;
   };
+  async function nuevoTalle(escalaId) {
+    const s = escalas.find(x => x.id === escalaId), n = tallesDe(escalaId).length;
+    const d = await APP.formulario({ titulo: 'Nuevo talle · ' + s.nombre, campos: [{ k: 'nombre', label: 'Talle', requerido: true, placeholder: 'Ej. XL, 95, 38/39' }, { k: 'codigo', label: 'Código (opcional)', placeholder: 'Se arma solo', ayuda: 'Va en el código de cada variante (SKU)' }],
+      alGuardar: async d => { const r = await sb.from('atributos').insert(APP.conEmpresa({ tipo: 'talle', nombre: d.nombre, codigo: d.codigo || codigoLibre(d.nombre, s.tipo.slice(0, 3).toUpperCase()), escala_id: escalaId, orden: s.orden * 100 + n + 1 })); if (r.error) throw r.error; } });
+    if (d) { toast('Talle agregado'); cargar(); }
+  }
+  async function editarTalle(t) {
+    if (!t) return;
+    const pend = APP.formulario({ titulo: 'Talle ' + t.nombre, boton: 'Guardar',
+      campos: [{ k: 'nombre', label: 'Talle', requerido: true, valor: t.nombre, ancho: 'c2' }, { k: 'codigo', label: 'Código', requerido: true, valor: t.codigo, ancho: 'c2' },
+        { k: 'escala_id', label: 'Escala', tipo: 'select', opciones: escalas.map(s => [s.id, s.nombre]), valor: t.escala_id }],
+      alGuardar: async d => { const cambio = { nombre: d.nombre, codigo: d.codigo }; if (d.escala_id !== t.escala_id) { const s = escalas.find(x => x.id === d.escala_id); cambio.escala_id = d.escala_id; cambio.orden = s.orden * 100 + tallesDe(s.id).length + 1; } const r = await sb.from('atributos').update(cambio).eq('id', t.id); if (r.error) throw r.error; } });
+    const m = document.querySelector('.con-formulario'); const pie = m && m.querySelector('.pie');
+    if (pie) { pie.style.justifyContent = 'space-between'; pie.insertAdjacentHTML('afterbegin', '<button type="button" class="btn peligro" data-quitar>Eliminar</button>'); pie.querySelector('[data-quitar]').onclick = async () => { if (await APP.eliminar('atributos', t.id, { nombre: t.nombre, campoActivo: 'activo' })) { m.cerrar(); cargar(); } }; }
+    if (await pend) { toast('Guardado'); cargar(); }
+  }
+  async function editarEscala(s) {
+    const pend = APP.formulario({ titulo: 'Escala ' + s.nombre, boton: 'Guardar',
+      campos: [{ k: 'nombre', label: 'Nombre', requerido: true, valor: s.nombre }, { k: 'descripcion', label: 'Para qué prendas', valor: s.descripcion || '' },
+        { k: 'tipo', label: 'Tipo', tipo: 'select', opciones: Object.entries(TIPOS), valor: s.tipo, ancho: 'c2' }, { k: 'orden', label: 'Orden en la pantalla', tipo: 'number', valor: s.orden, ancho: 'c2' },
+        { k: 'admite_copa', label: '¿Lleva copa? (corpiños)', tipo: 'select', opciones: [['false', 'No'], ['true', 'Sí, contorno + copa']], valor: String(!!s.admite_copa) }],
+      alGuardar: async d => { const r = await sb.from('talle_escalas').update({ nombre: d.nombre, descripcion: d.descripcion, tipo: d.tipo, orden: Math.round(d.orden || 0), admite_copa: d.admite_copa === 'true' }).eq('id', s.id); if (r.error) throw r.error; } });
+    const m = document.querySelector('.con-formulario'); const pie = m && m.querySelector('.pie');
+    if (pie) { pie.style.justifyContent = 'space-between'; pie.insertAdjacentHTML('afterbegin', '<button type="button" class="btn peligro" data-quitar>Eliminar escala</button>'); pie.querySelector('[data-quitar]').onclick = async () => {
+      if (tallesDe(s.id).length) { toast('Primero pasá sus talles a otra escala o eliminalos', 'error'); return; }
+      if (!await confirmar('¿Eliminar la escala "' + s.nombre + '"?', 'Eliminar')) return;
+      const r = await sb.from('talle_escalas').update({ activa: false }).eq('id', s.id); if (r.error) { toast(mensajeError(r.error), 'error'); return; } m.cerrar(); cargar(); }; }
+    if (await pend) { toast('Guardado'); cargar(); }
+  }
+  // + Escala: elegir una plantilla del rubro (o en blanco)
+  function nuevaEscala() {
+    let elegida = PLANTILLAS[0];
+    const m = APP.modal(`<h2>Nueva escala de talles</h2><p class="sub">Elegí una plantilla y ajustala. Después podés renombrar, agregar u ordenar talles.</p>
+      <div class="plantillas">${PLANTILLAS.map((p, i) => `<button type="button" class="plantilla${i ? '' : ' on'}" data-p="${i}"><b>${esc(p.n)}</b><small>${esc(p.t.length ? p.t.join(' · ') : p.d)}</small></button>`).join('')}</div>
+      <div class="campo" style="margin-top:14px"><label>Nombre</label><input id="ne-nombre" value="${esc(elegida.n)}"></div>
+      <div class="campo"><label>Talles (en orden, separados por coma)</label><input id="ne-talles" value="${esc(elegida.t.join(', '))}"></div>
+      <div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Crear escala</button></div>`);
+    $('.modal', m).style.maxWidth = '620px';
+    $$('[data-p]', m).forEach(b => b.onclick = () => { elegida = PLANTILLAS[+b.dataset.p]; $$('[data-p]', m).forEach(x => x.classList.toggle('on', x === b)); $('#ne-nombre', m).value = elegida.n; $('#ne-talles', m).value = elegida.t.join(', '); });
+    $('[data-no]', m).onclick = () => m.cerrar();
+    $('[data-si]', m).onclick = async () => {
+      const nombre = $('#ne-nombre', m).value.trim(); if (!nombre) { toast('Falta el nombre', 'error'); return; }
+      const lista = $('#ne-talles', m).value.split(',').map(x => x.trim()).filter(Boolean);
+      const orden = Math.max(0, ...escalas.map(s => s.orden)) + 1;
+      const r = await sb.from('talle_escalas').insert(APP.conEmpresa({ nombre, descripcion: elegida.d, tipo: elegida.tipo, orden, admite_copa: !!elegida.copa })).select().single();
+      if (r.error) { toast(mensajeError(r.error), 'error'); return; }
+      const filas = lista.map((t, i) => APP.conEmpresa({ tipo: 'talle', nombre: t, codigo: '', escala_id: r.data.id, orden: orden * 100 + i + 1 }));
+      filas.forEach(f => { f.codigo = codigoLibre(f.nombre, elegida.tipo.slice(0, 3).toUpperCase()); talles.push({ codigo: f.codigo }); });
+      if (filas.length) { const r2 = await sb.from('atributos').insert(filas); if (r2.error) { toast(mensajeError(r2.error), 'error'); } }
+      m.cerrar(); toast('Escala creada'); cargar();
+    };
+  }
+  // tabla de medidas de una escala (Ley de Talles: tenerla a la vista en el local)
+  function tablaMedidas(s) {
+    const ts = tallesDe(s.id), med = JSON.parse(JSON.stringify(s.medidas || {})); med.columnas = med.columnas && med.columnas.length ? med.columnas : ({ contorno: ['Contorno bajo busto', 'Busto'], calzado: ['Largo del pie'], medias: ['Calzado'], jeans: ['Cintura', 'Cadera', 'Tiro', 'Largo de pierna'], ninos: ['Edad', 'Altura', 'Pecho'], numerado: ['Cadera', 'Altura'], unico: [] }[s.tipo] || ['Busto', 'Cintura', 'Cadera']); med.filas = med.filas || {};
+    const m = APP.modal('<div id="tm"></div>');
+    $('.modal', m).style.maxWidth = '760px';
+    let tGuardar;
+    const guardar = () => { clearTimeout(tGuardar); tGuardar = setTimeout(async () => { const r = await sb.from('talle_escalas').update({ medidas: med }).eq('id', s.id); if (r.error) toast(mensajeError(r.error), 'error'); else { s.medidas = JSON.parse(JSON.stringify(med)); $('#tm-est', m).textContent = 'Guardado ✓'; setTimeout(() => { const x = $('#tm-est', m); if (x) x.textContent = 'Se guarda solo · medidas en cm'; }, 1500); } }, 500); };
+    const pintar = () => {
+      $('#tm', m).innerHTML = `<h2>Tabla de medidas · ${esc(s.nombre)}</h2><p class="sub" id="tm-est">Se guarda solo · medidas en cm</p>
+        <div style="overflow-x:auto"><table class="medidas"><tr><th>Talle</th>${med.columnas.map((c, i) => `<th>${esc(c)}<button class="col-x" data-quitar-col="${i}" title="Quitar columna">✕</button></th>`).join('')}</tr>
+        ${ts.map(t => `<tr><td>${esc(t.nombre)}</td>${med.columnas.map(c => `<td><input data-t="${t.id}" data-c="${esc(c)}" value="${esc(((med.filas[t.id] || {})[c]) || '')}" placeholder="—"></td>`).join('')}</tr>`).join('')}</table></div>
+        <div class="pie" style="justify-content:space-between"><button class="btn" data-col>+ Columna</button><div style="display:flex;gap:8px"><button class="btn" data-imprimir>Imprimir para el local</button><button class="btn primario" data-listo>Listo</button></div></div>`;
+      $$('input[data-t]', m).forEach(i => i.oninput = () => { (med.filas[i.dataset.t] = med.filas[i.dataset.t] || {})[i.dataset.c] = i.value.trim(); guardar(); });
+      $$('[data-quitar-col]', m).forEach(b => b.onclick = () => { med.columnas.splice(+b.dataset.quitarCol, 1); guardar(); pintar(); });
+      $('[data-col]', m).onclick = async () => { const d = await APP.formulario({ titulo: 'Nueva columna', campos: [{ k: 'n', label: 'Medida', requerido: true, placeholder: 'Ej. Largo, Tiro, Contorno de cadera' }] }); if (d) { med.columnas.push(d.n); guardar(); pintar(); } };
+      $('[data-listo]', m).onclick = () => m.cerrar();
+      $('[data-imprimir]', m).onclick = () => { const p = $('#impresion'); p.hidden = false; p.innerHTML = `<h1>${esc(APP.empresa.nombre)} · Tabla de talles</h1><h2>${esc(s.nombre)}</h2><table><tr><th>Talle</th>${med.columnas.map(c => `<th>${esc(c)} (cm)</th>`).join('')}</tr>${ts.map(t => `<tr><td><b>${esc(t.nombre)}</b></td>${med.columnas.map(c => `<td>${esc(((med.filas[t.id] || {})[c]) || '—')}</td>`).join('')}</tr>`).join('')}</table>`; window.print(); setTimeout(() => { p.hidden = true; }, 500); };
+    };
+    pintar();
+  }
+
+  // ================= Colores =================
+  const ORDEN_GRUPOS = ['Negros', 'Blancos y crudos', 'Grises', 'Nudes y marrones', 'Rojos', 'Rosas', 'Naranjas y corales', 'Amarillos y dorados', 'Verdes y aguas', 'Azules', 'Violetas y lilas', 'Combinados', 'Estampados', 'Otros'];
+  const nrm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  function pintarColores() {
+    const q = nrm($('#busca-color').value.trim());
+    const lista = q ? colores.filter(c => nrm(c.nombre + ' ' + c.codigo).includes(q)) : colores;
+    const grupos = {}; lista.forEach(c => { (grupos[c.grupo || 'Otros'] = grupos[c.grupo || 'Otros'] || []).push(c); });
+    const nombres = Object.keys(grupos).sort((a, b) => (ORDEN_GRUPOS.indexOf(a) + 1 || 99) - (ORDEN_GRUPOS.indexOf(b) + 1 || 99) || a.localeCompare(b));
+    $('#sub-colores').textContent = `${colores.length} colores y estampas, agrupados por familia de color`;
+    $('#colores').innerHTML = nombres.map(g => { const cs = grupos[g].sort((a, b) => a.nombre.localeCompare(b.nombre));
+      return `<details class="grupo-color" ${q ? 'open' : ''}><summary><span class="muestra">${cs.slice(0, 5).map(c => `<i style="background:${esc(c.hex || '#E6DEF0')}"></i>`).join('')}</span>${esc(g)}<span class="cant">${cs.length}</span></summary>
+        <div class="colores">${cs.map(c => `<span class="color" data-color="${c.id}" title="${esc(c.codigo)}"><i style="background:${esc(c.hex || '#E6DEF0')}"></i>${esc(c.nombre)}</span>`).join('')}</div></details>`; }).join('') || '<p class="vacio">Nada con ese nombre.</p>';
+    $$('[data-color]').forEach(el => el.onclick = () => editarColor(colores.find(c => c.id === el.dataset.color)));
+  }
+  let tBusca; $('#busca-color').oninput = () => { clearTimeout(tBusca); tBusca = setTimeout(pintarColores, 150); };
+  const gruposExistentes = () => [...new Set(ORDEN_GRUPOS.concat(colores.map(c => c.grupo).filter(Boolean)))];
+  async function editarColor(c) {
+    const nuevo = !c;
+    const pend = APP.formulario({ titulo: nuevo ? 'Nuevo color o estampa' : c.nombre, boton: nuevo ? 'Agregar' : 'Guardar',
+      campos: [{ k: 'nombre', label: 'Nombre', requerido: true, valor: nuevo ? '' : c.nombre, ancho: 'c2', placeholder: 'Ej. Rosa viejo' }, { k: 'codigo', label: 'Código', valor: nuevo ? '' : c.codigo, ancho: 'c2', placeholder: 'Se arma solo' },
+        { k: 'grupo', label: 'Familia de color', tipo: 'select', opciones: gruposExistentes().map(g => [g, g]), valor: nuevo ? 'Otros' : (c.grupo || 'Otros'), ancho: 'c2' }, { k: 'hex', label: 'Color de referencia', tipo: 'color', valor: nuevo ? '#E6DEF0' : (c.hex || '#E6DEF0'), ancho: 'c2' }],
+      alGuardar: async d => {
+        const cod = (d.codigo || nrm(d.nombre).replace(/[^a-z]/g, '').slice(0, 3)).toUpperCase();
+        const fila = { nombre: d.nombre, codigo: cod, grupo: d.grupo, hex: d.hex };
+        const r = nuevo ? await sb.from('atributos').insert(APP.conEmpresa(Object.assign({ tipo: 'color', orden: 999 }, fila))) : await sb.from('atributos').update(fila).eq('id', c.id);
+        if (r.error) throw r.error; } });
+    const m = document.querySelector('.con-formulario');
+    APP.selectConAgregar(m.querySelector('#f-grupo'), { texto: '+ Nueva familia de color…', crear: async () => { const d = await APP.formulario({ titulo: 'Nueva familia de color', campos: [{ k: 'n', label: 'Nombre', requerido: true, placeholder: 'Ej. Pasteles, Metalizados' }] }); return d ? { valor: d.n, texto: d.n } : null; } });
+    if (!nuevo) { const pie = m.querySelector('.pie'); pie.style.justifyContent = 'space-between'; pie.insertAdjacentHTML('afterbegin', '<button type="button" class="btn peligro" data-quitar>Eliminar</button>'); pie.querySelector('[data-quitar]').onclick = async () => { if (await APP.eliminar('atributos', c.id, { nombre: c.nombre, campoActivo: 'activo' })) { m.cerrar(); cargar(); } }; }
+    if (await pend) { toast('Guardado'); cargar(); }
+  }
+  $('#btn-color').onclick = () => editarColor(null);
+
+  // ================= Familias =================
+  function pintarFamilias() {
+    $('#familias').innerHTML = cats.map(c => { const es = escalas.filter(s => (c.escalas || []).includes(s.id));
+      return `<div class="familia fila-edit" data-id="${c.id}"><input data-k="orden" type="number" value="${c.orden}" aria-label="Orden"><input data-k="nombre" value="${esc(c.nombre)}" aria-label="Nombre"><button class="btn-eliminar" data-borrar title="Eliminar">✕</button>
+        <div class="esc-chips">${es.length ? es.map(s => `<button class="esc-chip" data-esc-fam="${c.id}">${esc(s.nombre)}</button>`).join('') : `<button class="esc-chip vacio" data-esc-fam="${c.id}">Elegir escalas</button>`}</div></div>`; }).join('');
+    APP.autoguardar($('#familias'), 'categorias');
+    $$('#familias [data-borrar]').forEach(b => b.onclick = async () => { const f = b.closest('.familia'); if (await APP.eliminar('categorias', f.dataset.id, { nombre: $('[data-k="nombre"]', f).value, campoActivo: 'activa' })) cargar(); });
+    $$('[data-esc-fam]').forEach(b => b.onclick = () => escalasDeFamilia(cats.find(c => c.id === b.dataset.escFam)));
+  }
+  function escalasDeFamilia(c) {
+    const m = APP.modal(`<h2>${esc(c.nombre)}</h2><p class="sub">Qué escalas de talles usan sus productos. Al crear un producto de esta familia se ofrecen estos talles.</p>
+      <div class="check-lista ed-listas" style="margin-top:12px;border:1px solid var(--linea);border-radius:12px;padding:2px 12px">${escalas.map(s => `<label><input type="checkbox" data-s="${s.id}" ${(c.escalas || []).includes(s.id) ? 'checked' : ''}>${esc(s.nombre)}<small>${tallesDe(s.id).map(t => t.nombre).slice(0, 6).join(' · ')}${tallesDe(s.id).length > 6 ? '…' : ''}</small></label>`).join('')}</div>
+      <div class="pie"><button class="btn primario" data-listo>Listo</button></div>`);
+    $$('[data-s]', m).forEach(x => x.onchange = async () => {
+      const sel = $$('[data-s]', m).filter(y => y.checked).map(y => y.dataset.s);
+      const r = await sb.from('categorias').update({ escalas: sel.length ? sel : null }).eq('id', c.id); if (r.error) { toast(mensajeError(r.error), 'error'); return; }
+      c.escalas = sel; pintarFamilias(); pintarEscalas();
+    });
+    $('[data-listo]', m).onclick = () => m.cerrar();
+  }
   $('#btn-cat').onclick = async () => {
-    const d = await APP.formulario({ titulo: 'Nueva familia', campos: [{ k: 'nombre', label: 'Nombre', requerido: true, placeholder: 'Ej. MEDIAS' }],
-      alGuardar: async d => { const r = await sb.from('categorias').insert(APP.conEmpresa({ nombre: d.nombre, orden: 999 })); if (r.error) throw r.error; } });
-    if (d) { toast('Familia agregada'); cargarCat(); }
+    const d = await APP.formulario({ titulo: 'Nueva familia de productos', campos: [{ k: 'nombre', label: 'Nombre', requerido: true, placeholder: 'Ej. Jeans, Camperas' }],
+      alGuardar: async d => { const r = await sb.from('categorias').insert(APP.conEmpresa({ nombre: d.nombre.toUpperCase(), orden: Math.max(0, ...cats.map(c => c.orden || 0)) + 1 })); if (r.error) throw r.error; } });
+    if (d) { toast('Familia agregada'); cargar(); }
   };
-  await Promise.all([cargarAtr('talle', $('#tb-talle')), cargarAtr('color', $('#tb-color')), cargarCat()]);
+  $('#btn-escala').onclick = nuevaEscala;
+  await cargar();
 });
 </script>
 </body>

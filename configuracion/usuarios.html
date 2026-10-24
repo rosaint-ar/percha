@@ -5,12 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Usuarios · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610241603">
+<link rel="stylesheet" href="../shell/shell.css?v=202610241628">
 <style>
   .pestanas{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
   .pestanas a{font:600 13px var(--f-ui);color:var(--tinta);text-decoration:none;padding:8px 14px;border:1px solid var(--linea);background:var(--superficie-2);border-radius:10px}
   .pestanas a.on{background:var(--lila);border-color:transparent;color:var(--acento)}
-  table.lista select{border:1px solid var(--borde);padding:5px 8px;border-radius:2px}
+  table.lista select{width:auto;min-width:150px}
   .clave{font:600 18px var(--f-ui);letter-spacing:.04em;background:var(--lila);padding:8px 12px;display:inline-block;margin:8px 0}
 </style>
 </head>
@@ -23,8 +23,8 @@
   </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610241603"></script>
-<script src="../shell/shell.js?v=202610241603"></script>
+<script src="../shared/supabase.js?v=202610241628"></script>
+<script src="../shell/shell.js?v=202610241628"></script>
 <script>
 APP.ready.then(async () => {
   const { esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;

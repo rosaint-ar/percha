@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Catálogo · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610241603">
+<link rel="stylesheet" href="../shell/shell.css?v=202610241628">
 <style>
   .filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
-  .filtros select{border:1px solid var(--borde);background:var(--papel);padding:9px 11px;border-radius:2px}
+  .filtros select{border:1px solid var(--linea);background:var(--superficie-2);border-radius:var(--radio-mini);height:34px;padding:0 10px;height:38px}
   .filtros label.chk{display:flex;align-items:center;gap:6px;font:600 14px var(--f-ui);color:var(--tinta)}
   .resumen{font-size:14px;color:var(--suave);margin-left:auto}
   td .cod{font:600 12px var(--f-ui);color:var(--suave);letter-spacing:.04em}
@@ -33,8 +33,8 @@
   </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610241603"></script>
-<script src="../shell/shell.js?v=202610241603"></script>
+<script src="../shared/supabase.js?v=202610241628"></script>
+<script src="../shell/shell.js?v=202610241628"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$ } = APP, e = APP.empresa.id, PAG = 100;
