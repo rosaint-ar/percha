@@ -51,8 +51,9 @@
     return s.length >= 2 ? s : f.nombre;
   }
   function detalle(f, listaDe) {
-    const l = listaDe ? listaDe(f) : null;
-    return [f.cuotas > 1 ? f.cuotas + ' cuotas' : '', f.recargo_pct ? '+' + f.recargo_pct + '%' : '', l && !l.predeterminada ? 'precio ' + l.nombre : ''].filter(Boolean).join(' · ');
+    const ls = (f.listas && f.listas.length ? f.listas : f.lista_id ? [f.lista_id] : []).map(id => (window.MEDIOS.listas || {})[id]).filter(Boolean);
+    const txtListas = ls.length === 1 ? 'precio ' + ls[0].nombre : ls.length > 1 ? 'precios ' + ls.map(x => x.nombre).join(' / ') : '';
+    return [f.cuotas > 1 ? f.cuotas + ' cuotas' : '', f.recargo_pct ? '+' + f.recargo_pct + '%' : '', txtListas].filter(Boolean).join(' · ');
   }
   // botonera de cobro (data-f = id del medio; data-cred = nota de crédito / gift card)
   function botonera(formas, usos, listaDe) {

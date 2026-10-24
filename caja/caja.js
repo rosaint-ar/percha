@@ -25,7 +25,7 @@ APP.ready.then(async () => {
       sb.from('cajas').select('*').eq('empresa_id', e).eq('activa', true).order('nombre').limit(1),
       sb.from('clientes').select('id,nombre,telefono,lista_id').eq('empresa_id', e).eq('activo', true).eq('generico', false).order('nombre').limit(1000)
     ]);
-    listas = l.data || []; formas = f.data || []; if (window.MEDIOS) MEDIOS.cargar(sb, e); sb.rpc('formas_pago_uso', { e }).then(({ data }) => { usosFormas = Object.fromEntries((data || []).map(x => [x.forma_pago_id, +x.usos])); }); promos = p.data || []; vendedoras = v.data || []; caja = (c.data || [])[0]; clientes = cl.data || [];
+    listas = l.data || []; formas = f.data || []; if (window.MEDIOS) { MEDIOS.cargar(sb, e); MEDIOS.listas = Object.fromEntries(listas.map(x => [x.id, x])); } sb.rpc('formas_pago_uso', { e }).then(({ data }) => { usosFormas = Object.fromEntries((data || []).map(x => [x.forma_pago_id, +x.usos])); }); promos = p.data || []; vendedoras = v.data || []; caja = (c.data || [])[0]; clientes = cl.data || [];
     carrito.lista = carrito.lista || (listas.find(x => x.predeterminada) || listas[0] || {}).id;
     // arranque rápido: si hay catálogo guardado de hace menos de 12 h, se usa ya y se refresca en segundo plano
     const guardado = JSON.parse(localStorage.getItem(LS('catalogo')) || 'null');
@@ -398,7 +398,12 @@ APP.ready.then(async () => {
   $('#sel-vendedora').onchange = ev => carrito.vendedora = ev.target.value;
 
   // ================= Cobro =================
-  function listaDeForma(f) { return f && f.lista_id ? listas.find(l => l.id === f.lista_id) : null; }
+  // a qué lista pasa el ticket al cobrar con este medio: si el medio vale para todas o para la del ticket, no cambia; si no, va a la primera que admite
+  function listaDeForma(f) {
+    const ls = f && f.listas && f.listas.length ? f.listas : (f && f.lista_id ? [f.lista_id] : null);
+    if (!ls || ls.includes(carrito.lista)) return null;
+    return listas.find(l => l.id === ls[0]) || null;
+  }
   async function cobrar(modoSena) {
     const c = calcular(); if (!c.lineas.length) return;
     if (!turno && !reservado) { toast('Primero abrí la caja', 'error'); abrirTurno(); return; }
