@@ -36,12 +36,29 @@
   const ORDEN = ['efectivo', 'transferencia', 'debito', 'credito', 'billetera', 'online', 'otro'];
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const grupoDe = f => GRUPO[f.grupo] ? f.grupo : (f.tipo === 'efectivo' ? 'efectivo' : f.tipo === 'transferencia' ? 'transferencia' : f.tipo === 'online' ? 'online' : 'otro');
-  // el "logo": círculo con la sigla de la empresa (o del banco, o del grupo) en su color
-  function logo(f, chico) {
+  // el "logo": círculo con imagen o sigla. Prioridad: ícono propio del medio → empresa → banco → grupo.
+  function circulo(x, chico, titulo) {
+    const cls = 'mp-logo' + (chico ? ' chico' : '');
+    if (x.img) return `<span class="${cls} img" title="${esc(titulo || '')}"><img src="${esc(x.img)}" alt=""></span>`;
+    const t = String(x.t || '•'), largo = t.length >= 4 ? ' largo' : t.length === 3 ? ' medio' : '';
+    return `<span class="${cls}${largo}" style="background:${esc(x.bg || '#94A3B8')};color:${esc(x.fg || '#fff')}" title="${esc(titulo || '')}">${esc(t)}</span>`;
+  }
+  function baseDe(f) {
     const p = PROV[f.proveedor], b = BANCO[f.banco], g = GRUPO[grupoDe(f)];
-    const x = p || (b ? { t: b.t, bg: b.bg, fg: '#fff' } : { t: g.t, bg: g.bg, fg: '#fff' });
-    const largo = x.t.length >= 4 ? ' largo' : x.t.length === 3 ? ' medio' : '';
-    return `<span class="mp-logo${chico ? ' chico' : ''}${largo}" style="background:${x.bg};color:${x.fg || '#fff'}" title="${esc(p ? p.n : b ? b.n : g.n)}">${esc(x.t)}</span>`;
+    if (p) return { t: p.t, bg: p.bg, fg: p.fg, img: p.img, n: p.n };
+    if (b) return { t: b.t, bg: b.bg, fg: '#fff', img: b.img, n: b.n };
+    return { t: g.t, bg: g.bg, fg: '#fff', img: g.img, n: g.n };
+  }
+  function logo(f, chico) {
+    const base = baseDe(f);
+    if (f.icono_url) return circulo({ img: f.icono_url }, chico, f.nombre);
+    if (f.icono_texto || f.icono_color) return circulo({ t: f.icono_texto || base.t, bg: f.icono_color || base.bg, fg: '#fff' }, chico, f.nombre);
+    return circulo(base, chico, base.n);
+  }
+  // logo de una empresa, banco o grupo (para los encabezados)
+  function logoEntidad(tipo, clave, chico) {
+    const x = tipo === 'banco' ? BANCO[clave] : tipo === 'grupo' ? GRUPO[clave] : PROV[clave];
+    return x ? circulo({ t: x.t, bg: x.bg, fg: x.fg || '#fff', img: x.img }, chico, x.n) : '';
   }
   // nombre corto para el botón: sin el nombre de la empresa repetido ("3 cuotas - Mercado Pago" → "3 cuotas")
   function corto(f) {
@@ -61,8 +78,10 @@
     const boton = (f, grande) => `<button type="button" class="mp-btn${grande ? ' grande' : ''}" data-f="${f.id}">${logo(f)}<span class="mp-txt"><b>${esc(grupoDe(f) === 'credito' && PROV[f.proveedor] ? PROV[f.proveedor].n + ' · ' + corto(f) : f.nombre)}</b>${detalle(f, listaDe) ? `<small>${esc(detalle(f, listaDe))}</small>` : ''}</span></button>`;
     const cred = '<button type="button" class="mp-btn" data-cred><span class="mp-logo" style="background:#B45309;color:#fff">NC</span><span class="mp-txt"><b>Nota de crédito / gift card</b><small>con código</small></span></button>';
     if (formas.length <= 6) return `<div class="mp"><div class="mp-grid">${formas.map(f => boton(f, true)).join('')}${cred}</div></div>`;
-    const top = formas.filter(f => grupoDe(f) !== 'online').slice().sort((a, b) => (usos[b.id] || 0) - (usos[a.id] || 0) || (a.orden || 0) - (b.orden || 0)).slice(0, 4).filter(f => (usos[f.id] || 0) > 0);
-    let h = top.length ? `<div class="mp-tit">Más usados</div><div class="mp-grid mp-top">${top.map(f => boton(f, true)).join('')}</div>` : '';
+    const destacados = formas.filter(f => f.destacado);
+    const porUso = formas.filter(f => !f.destacado && grupoDe(f) !== 'online' && (usos[f.id] || 0) > 0).sort((a, b) => (usos[b.id] || 0) - (usos[a.id] || 0) || (a.orden || 0) - (b.orden || 0));
+    const top = destacados.concat(porUso).slice(0, Math.max(4, destacados.length));
+    let h = top.length ? `<div class="mp-tit">${destacados.length ? 'Destacados y más usados' : 'Más usados'}</div><div class="mp-grid mp-top">${top.map(f => boton(f, true)).join('')}</div>` : '';
     h += '<div class="mp-tit">Todos</div>';
     const ordenar = (a, b) => ORDEN.indexOf(grupoDe(a)) - ORDEN.indexOf(grupoDe(b)) || (a.cuotas || 1) - (b.cuotas || 1) || (a.orden || 0) - (b.orden || 0);
     // básicos (efectivo, transferencia, débito, billeteras): juntos en una grilla, cada uno con su logo
@@ -102,6 +121,7 @@
       .mp-txt b{font:650 13.5px/1.25 var(--f-ui)}
       .mp-txt small{font:500 11px var(--f-mono);color:var(--tinta-3);margin-top:2px}
       .mp-logo{width:32px;height:32px;border-radius:50%;flex:none;display:inline-flex;align-items:center;justify-content:center;font:800 12px/1 var(--f-ui);letter-spacing:-.02em;box-shadow:inset 0 0 0 1px rgba(0,0,0,.06)}
+      .mp-logo.img{background:#fff;overflow:hidden;box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}.mp-logo.img img{width:100%;height:100%;object-fit:cover;display:block}
       .mp-logo.medio{font-size:10.5px}.mp-logo.largo{font-size:8.5px;letter-spacing:0}
       .mp-logo.chico{width:24px;height:24px;font-size:9.5px}.mp-logo.chico.largo{font-size:7px}
       .mp-grupos{display:grid;gap:8px}
@@ -123,14 +143,19 @@
     document.head.appendChild(st);
   }
   // empresas y bancos propios de la empresa (tabla medios_entidades): se suman a los conocidos
+  // empresas, bancos y grupos propios, o cambios (nombre, sigla, color, imagen) a los que Percha ya conoce
+  const ORIGINAL = { PROV: JSON.parse(JSON.stringify(PROV)), BANCO: JSON.parse(JSON.stringify(BANCO)), GRUPO: JSON.parse(JSON.stringify(GRUPO)) };
   async function cargar(sb, e) {
     try {
       const { data } = await sb.from('medios_entidades').select('*').eq('empresa_id', e);
+      // se parte de lo original (así, restablecer funciona sin recargar)
+      for (const [dic, orig] of [[PROV, ORIGINAL.PROV], [BANCO, ORIGINAL.BANCO], [GRUPO, ORIGINAL.GRUPO]]) { Object.keys(dic).forEach(k => { if (!orig[k]) delete dic[k]; }); Object.entries(orig).forEach(([k, v]) => { dic[k] = JSON.parse(JSON.stringify(v)); }); }
       (data || []).forEach(x => {
-        if (x.tipo === 'banco') BANCO[x.clave] = { n: x.nombre, t: x.sigla, bg: x.color, propio: true };
-        else PROV[x.clave] = { n: x.nombre, t: x.sigla, bg: x.color, fg: '#fff', alias: (x.palabras || []).map(w => String(w).toLowerCase()).concat(String(x.nombre).toLowerCase()), propio: true };
+        const dic = x.tipo === 'banco' ? BANCO : x.tipo === 'grupo' ? GRUPO : PROV, prev = dic[x.clave] || {};
+        dic[x.clave] = Object.assign({}, prev, { n: x.nombre || prev.n, t: x.sigla || prev.t || String(x.nombre || '?').slice(0, 2).toUpperCase(), bg: x.color || prev.bg || '#6B5CA5', fg: '#fff', img: x.icono_url || null,
+          alias: (prev.alias || []).concat((x.palabras || []).map(w => String(w).toLowerCase()), String(x.nombre || '').toLowerCase()), propio: !ORIGINAL[x.tipo === 'banco' ? 'BANCO' : x.tipo === 'grupo' ? 'GRUPO' : 'PROV'][x.clave], cambiado: true, id: x.id });
       });
     } catch (_) {}
   }
-  window.MEDIOS = { PROV, BANCO, GRUPO, ORDEN, logo, corto, botonera, grupoDe, cargar };
+  window.MEDIOS = { PROV, BANCO, GRUPO, ORDEN, ORIGINAL, logo, logoEntidad, circulo, corto, botonera, grupoDe, cargar };
 })();

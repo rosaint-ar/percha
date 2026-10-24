@@ -255,6 +255,23 @@
     toast(mensajeError(r.error), 'error'); return null;
   };
 
+  // 5) Subir una imagen (logo, ícono): se achica en el navegador (lado máx. 'lado' px) y se guarda en la carpeta de la empresa. Devuelve la URL pública.
+  APP.subirImagen = async (archivo, carpeta = 'imagenes', lado = 256) => {
+    if (!archivo || !String(archivo.type).startsWith('image/')) throw new Error('Elegí una imagen (PNG, JPG, SVG o WebP)');
+    let blob = archivo, ext = (archivo.name.split('.').pop() || 'png').toLowerCase();
+    if (archivo.type !== 'image/svg+xml') {
+      const img = await new Promise((ok, mal) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => mal(new Error('No se pudo leer la imagen')); i.src = URL.createObjectURL(archivo); });
+      const k = Math.min(1, lado / Math.max(img.width, img.height)), c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k));
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      blob = await new Promise(ok => c.toBlob(ok, 'image/png')); ext = 'png';
+    }
+    const ruta = `${APP.empresa.id}/${carpeta}/${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
+    const r = await sb.storage.from('percha').upload(ruta, blob, { contentType: blob.type || 'image/png', upsert: false });
+    if (r.error) throw r.error;
+    return sb.storage.from('percha').getPublicUrl(ruta).data.publicUrl;
+  };
+
   // 4) Listas desplegables con "+ Agregar…": al elegirla se abre la ventana para crear el valor nuevo y queda elegido.
   //    APP.selectConAgregar(select, { texto: '+ Agregar empresa…', crear: async () => ({ valor, texto }) | null })
   APP.selectConAgregar = (sel, { texto, crear }) => {

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Caja · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css">
+<link rel="stylesheet" href="../shell/shell.css?v=202610241603">
 <style>
   main.app{max-width:none;padding-top:0}
   .cab-pagina{display:none}
@@ -32,7 +32,8 @@
   .recientes{margin-top:18px}
   .recientes h3{margin-bottom:8px;color:var(--tinta-3);font-size:11px;font-family:var(--f-mono);letter-spacing:.1em;text-transform:uppercase}
   /* ---- derecha: ticket ---- */
-  .ticket{position:sticky;top:64px;display:flex;flex-direction:column;max-height:calc(100vh - 80px)}
+  .estado-caja{padding-top:16px}
+  .ticket{position:sticky;top:16px;display:flex;flex-direction:column;max-height:calc(100vh - 80px)}
   .ticket .lineas{flex:1;overflow:auto;margin:0 -8px;padding:0 8px}
   .linea{display:grid;grid-template-columns:1fr auto;gap:6px 10px;padding:9px 0;border-bottom:1px solid var(--linea-suave)}
   .linea .n{font-weight:600;font-size:13px;line-height:1.25}
@@ -117,9 +118,9 @@
 </head>
 <body data-page="caja" data-title="Caja">
 <main class="app">
+  <div class="estado-caja" id="estado-caja"></div>
   <div class="pos">
     <section class="panel-busqueda">
-      <div class="estado-caja" id="estado-caja"></div>
       <div class="buscador"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" placeholder="Escaneá el código o escribí el nombre…" autocomplete="off" autofocus><kbd>/</kbd></div>
       <div id="resultados" class="resultados"></div>
       <div class="recientes" id="recientes"></div>
@@ -144,9 +145,9 @@
 </main>
 <div id="impresion"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js"></script>
-<script src="../shell/shell.js"></script>
-<script src="../shared/medios-pago.js"></script>
-<script src="caja.js"></script>
+<script src="../shared/supabase.js?v=202610241603"></script>
+<script src="../shell/shell.js?v=202610241603"></script>
+<script src="../shared/medios-pago.js?v=202610241603"></script>
+<script src="caja.js?v=202610241603"></script>
 </body>
 </html>

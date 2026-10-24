@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Talles, colores y familias · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css">
+<link rel="stylesheet" href="../shell/shell.css?v=202610241603">
 <style>
   .pestanas{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
   .pestanas a{font:600 13px var(--f-ui);color:var(--tinta);text-decoration:none;padding:8px 14px;border:1px solid var(--linea);background:var(--superficie-2);border-radius:10px}
@@ -22,18 +22,19 @@
 <body data-page="configuracion" data-etq="Configuración" data-title="Talles, colores y familias" data-subtitle="Los ejes con los que se arman las variantes">
 <main class="app">
   <div class="pestanas"><a href="empresa.html">Empresa</a><a class="on" href="atributos.html">Talles, colores y familias</a><a href="curvas.html">Curvas de talle</a><a href="promociones.html">Promociones</a><a href="usuarios.html">Usuarios</a></div>
+  <p class="sub" style="margin:0 2px 12px">Los cambios se guardan solos.</p>
   <div class="tres">
-    <div class="card"><div class="card-cab"><div><h2>Talles</h2><p class="sub">El orden es el de la matriz · se guarda solo</p></div><div class="acciones"><button class="btn" id="btn-talle">+ Talle</button></div></div>
+    <div class="card"><div class="card-cab"><div><h2>Talles</h2><p class="sub">En el orden de la matriz</p></div><div class="acciones"><button class="btn" id="btn-talle">+ Talle</button></div></div>
       <table class="lista" id="tb-talle"><tr><th class="num">Orden</th><th>Código</th><th>Nombre</th><th></th></tr></table></div>
-    <div class="card"><div class="card-cab"><div><h2>Colores y estampas</h2><p class="sub">Con un color de referencia · se guarda solo</p></div><div class="acciones"><button class="btn" id="btn-color">+ Color</button></div></div>
+    <div class="card"><div class="card-cab"><div><h2>Colores y estampas</h2><p class="sub">Con su color de referencia</p></div><div class="acciones"><button class="btn" id="btn-color">+ Color</button></div></div>
       <table class="lista" id="tb-color"><tr><th>Código</th><th>Nombre</th><th>Color</th><th></th></tr></table></div>
-    <div class="card"><div class="card-cab"><div><h2>Familias</h2><p class="sub">Para agrupar y filtrar · se guarda solo</p></div><div class="acciones"><button class="btn" id="btn-cat">+ Familia</button></div></div>
+    <div class="card"><div class="card-cab"><div><h2>Familias</h2><p class="sub">Para agrupar y filtrar</p></div><div class="acciones"><button class="btn" id="btn-cat">+ Familia</button></div></div>
       <table class="lista" id="tb-cat"><tr><th class="num">Orden</th><th>Nombre</th><th></th></tr></table></div>
   </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js"></script>
-<script src="../shell/shell.js"></script>
+<script src="../shared/supabase.js?v=202610241603"></script>
+<script src="../shell/shell.js?v=202610241603"></script>
 <script>
 APP.ready.then(async () => {
   const { esc, $, $$, toast } = APP, e = APP.empresa.id;
@@ -43,7 +44,7 @@ APP.ready.then(async () => {
     const data = (await sb.from('atributos').select('*').eq('empresa_id', e).eq('tipo', tipo).eq('activo', true).order('orden').order('nombre')).data || [];
     tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());
     data.forEach(a => tb.insertAdjacentHTML('beforeend', tipo === 'talle'
-      ? `<tr data-id="${a.id}"><td class="num"><input data-k="orden" type="number" value="${a.orden}" style="width:64px"></td><td><input data-k="codigo" value="${esc(a.codigo)}"></td><td><input data-k="nombre" value="${esc(a.nombre)}"></td><td>${borrar}</td></tr>`
+      ? `<tr data-id="${a.id}"><td class="num"><input data-k="orden" type="number" value="${a.orden}" style="width:88px"></td><td><input data-k="codigo" value="${esc(a.codigo)}"></td><td><input data-k="nombre" value="${esc(a.nombre)}"></td><td>${borrar}</td></tr>`
       : `<tr data-id="${a.id}"><td><input data-k="codigo" value="${esc(a.codigo)}"></td><td><input data-k="nombre" value="${esc(a.nombre)}"></td><td><input data-k="hex" type="color" value="${a.hex || '#E6DEF0'}"></td><td>${borrar}</td></tr>`));
     APP.autoguardar(tb, 'atributos');
     $$('[data-borrar]', tb).forEach(b => b.onclick = async () => { const tr = b.closest('tr'); if (await APP.eliminar('atributos', tr.dataset.id, { nombre: $('[data-k="nombre"]', tr).value, campoActivo: 'activo' })) cargarAtr(tipo, tb); });
@@ -51,7 +52,7 @@ APP.ready.then(async () => {
   async function cargarCat() {
     const tb = $('#tb-cat'), data = (await sb.from('categorias').select('*').eq('empresa_id', e).eq('activa', true).order('orden').order('nombre')).data || [];
     tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());
-    data.forEach(c => tb.insertAdjacentHTML('beforeend', `<tr data-id="${c.id}"><td class="num"><input data-k="orden" type="number" value="${c.orden}" style="width:64px"></td><td><input data-k="nombre" value="${esc(c.nombre)}"></td><td>${borrar}</td></tr>`));
+    data.forEach(c => tb.insertAdjacentHTML('beforeend', `<tr data-id="${c.id}"><td class="num"><input data-k="orden" type="number" value="${c.orden}" style="width:88px"></td><td><input data-k="nombre" value="${esc(c.nombre)}"></td><td>${borrar}</td></tr>`));
     APP.autoguardar(tb, 'categorias');
     $$('[data-borrar]', tb).forEach(b => b.onclick = async () => { const tr = b.closest('tr'); if (await APP.eliminar('categorias', tr.dataset.id, { nombre: $('[data-k="nombre"]', tr).value, campoActivo: 'activa' })) cargarCat(); });
   }

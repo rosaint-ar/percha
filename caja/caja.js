@@ -537,7 +537,7 @@ APP.ready.then(async () => {
     const emp = APP.empresa, num = res.numero_mostrar ? res.numero_mostrar : res.numero ? '#' + String(res.numero).padStart(6, '0') : 'pendiente';
     const lineas = p.lineas.map(l => `<tr><td>${l.cantidad}× ${esc(l.descripcion)}${l.falla ? ' ◆' : ''}<br><small>${esc([l.talle, l.color].filter(Boolean).join(' · '))}${l.promocion_nombre ? ' · ' + esc(l.promocion_nombre) : ''}</small></td><td class="r">${fmt.pesos(l.total)}</td></tr>`).join('');
     const pagos = extra.pagos.map(pg => `<tr><td>${esc(pg.nombre)}${pg.cuotas > 1 ? ' (' + pg.cuotas + ' cuotas)' : ''}</td><td class="r">${fmt.pesos(pg.monto)}</td></tr>`).join('');
-    const html = `<h2 class="c">${esc(emp.nombre)}</h2><div class="c">${esc([emp.domicilio, emp.localidad].filter(Boolean).join(' · '))}<br>${esc(emp.telefono || '')}</div><hr>
+    const html = `${emp.logo_url ? `<div class="c"><img src="${esc(emp.logo_url)}" alt="" style="max-width:42mm;max-height:20mm;margin:0 auto 4px;display:block"></div>` : ''}<h2 class="c">${esc(emp.nombre)}</h2><div class="c">${esc([emp.domicilio, emp.localidad].filter(Boolean).join(' · '))}<br>${esc(emp.telefono || '')}</div><hr>
       <div>Ticket ${num} · ${new Date().toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}</div>
       <div>Atendió: ${esc((vendedoras.find(v => v.user_id === p.vendedora_id) || {}).nombre || '')}</div><hr>
       <table>${lineas}</table><hr>

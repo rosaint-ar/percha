@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ventas · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css">
+<link rel="stylesheet" href="../shell/shell.css?v=202610241603">
 <style>
   .filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
   .filtros input[type=date],.filtros select{border:1px solid var(--linea);background:var(--superficie-2);padding:8px 10px;border-radius:var(--radio-mini)}
@@ -53,8 +53,8 @@
 </main>
 <div id="impresion"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js"></script>
-<script src="../shell/shell.js"></script>
+<script src="../shared/supabase.js?v=202610241603"></script>
+<script src="../shell/shell.js?v=202610241603"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -193,7 +193,7 @@ APP.ready.then(async () => {
   }
   function imprimir(v, ls, ps) {
     const emp = APP.empresa;
-    $('#impresion').innerHTML = `<h2 class="c">${esc(emp.nombre)}</h2><div class="c">${esc([emp.domicilio, emp.localidad].filter(Boolean).join(' · '))}</div><hr><div>Ticket #${String(v.numero).padStart(6, '0')} · ${fmt.fechaHora(v.fecha)} (reimpresión)</div><hr>
+    $('#impresion').innerHTML = `${emp.logo_url ? `<div class="c"><img src="${esc(emp.logo_url)}" alt="" style="max-width:42mm;max-height:20mm;margin:0 auto 4px;display:block"></div>` : ''}<h2 class="c">${esc(emp.nombre)}</h2><div class="c">${esc([emp.domicilio, emp.localidad].filter(Boolean).join(' · '))}</div><hr><div>Ticket #${String(v.numero).padStart(6, '0')} · ${fmt.fechaHora(v.fecha)} (reimpresión)</div><hr>
       <table>${ls.map(l => `<tr><td>${l.cantidad}× ${esc(l.descripcion)}<br><small>${esc([l.talle, l.color].filter(Boolean).join(' · '))}</small></td><td class="r">${fmt.pesos(l.total)}</td></tr>`).join('')}</table><hr>
       <table><tr><td><b>TOTAL</b></td><td class="r"><b>${fmt.pesos(v.total)}</b></td></tr>${ps.map(p => `<tr><td>${esc(p.formas_pago ? p.formas_pago.nombre : 'Crédito')}</td><td class="r">${fmt.pesos(p.monto)}</td></tr>`).join('')}${+v.saldo ? `<tr><td><b>SALDO</b></td><td class="r"><b>${fmt.pesos(v.saldo)}</b></td></tr>` : ''}</table><hr><div class="c">Cambios con este ticket dentro de los 30 días.</div>`;
   }
