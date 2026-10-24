@@ -7,6 +7,7 @@ APP.ready.then(async () => {
   const r2 = n => Math.round((+n || 0) * 100) / 100;
 
   // ================= Datos base =================
+  let usosFormas = {};
   let catalogo = [], productos = {}, listas = [], formas = [], promos = [], vendedoras = [], caja = null, turno = null, clientes = [];
   let carrito = { lineas: [], lista: null, cliente: null, vendedora: APP.user.id, descPct: 0, nota: '', cambio: null };
 
@@ -24,7 +25,7 @@ APP.ready.then(async () => {
       sb.from('cajas').select('*').eq('empresa_id', e).eq('activa', true).order('nombre').limit(1),
       sb.from('clientes').select('id,nombre,telefono,lista_id').eq('empresa_id', e).eq('activo', true).eq('generico', false).order('nombre').limit(1000)
     ]);
-    listas = l.data || []; formas = f.data || []; promos = p.data || []; vendedoras = v.data || []; caja = (c.data || [])[0]; clientes = cl.data || [];
+    listas = l.data || []; formas = f.data || []; sb.rpc('formas_pago_uso', { e }).then(({ data }) => { usosFormas = Object.fromEntries((data || []).map(x => [x.forma_pago_id, +x.usos])); }); promos = p.data || []; vendedoras = v.data || []; caja = (c.data || [])[0]; clientes = cl.data || [];
     carrito.lista = carrito.lista || (listas.find(x => x.predeterminada) || listas[0] || {}).id;
     // arranque rápido: si hay catálogo guardado de hace menos de 12 h, se usa ya y se refresca en segundo plano
     const guardado = JSON.parse(localStorage.getItem(LS('catalogo')) || 'null');
@@ -406,10 +407,11 @@ APP.ready.then(async () => {
     const total = () => { const cc = calcular(); const recargo = pagos.reduce((s, p) => s + r2(p.monto * (p.recargo_pct || 0) / 100), 0); return { ...cc, recargo: r2(recargo), aPagar: r2(cc.total + recargo) }; };
     const m = modal(`<h2>${modoSena ? 'Dejar seña' : (c.total < 0 ? 'Devolver dinero' : 'Cobrar')} <span class="mono" id="cb-total" style="float:right"></span></h2>
       <p class="sub">${modoSena ? 'Pago a cuenta; el resto queda como saldo.' : 'Tocá un medio de pago: se completa con lo que falta. Podés combinar varios.'}</p>
-      <div class="formas" style="margin-top:12px">${formas.map(f => `<button data-f="${f.id}">${esc(f.nombre)}<small>${f.cuotas > 1 ? f.cuotas + ' cuotas' : ''}${f.recargo_pct ? ' · +' + f.recargo_pct + '%' : ''}${listaDeForma(f) ? ' · ' + listaDeForma(f).nombre : ''}</small></button>`).join('')}<button data-cred>Nota de crédito / gift card<small>con código</small></button></div>
+      ${window.MEDIOS ? MEDIOS.botonera(formas, usosFormas, listaDeForma) : `<div class="formas" style="margin-top:12px">${formas.map(f => `<button data-f="${f.id}">${esc(f.nombre)}</button>`).join('')}<button data-cred>Nota de crédito / gift card</button></div>`}
       <div class="pagos-lista" id="cb-pagos"></div>
       <div class="resto" id="cb-resto"></div>
       <div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si disabled>Confirmar</button></div>`, { fijo: true });
+    { const caja_ = $('.modal', m); if (caja_ && window.MEDIOS) caja_.style.maxWidth = '660px'; }
     const pintarPagos = () => {
       const t = total(); $('#cb-total', m).textContent = fmt.pesos(t.aPagar);
       const pagado = r2(pagos.reduce((s, p) => s + p.monto, 0)); const resto = r2(t.aPagar - pagado);
