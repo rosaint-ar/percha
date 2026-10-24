@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pasar de bolsa a modelo · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610241651">
+<link rel="stylesheet" href="../shell/shell.css?v=202610241703">
 <style>
   .origen{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center}
   .origen select{border:1px solid var(--linea);background:var(--superficie-2);border-radius:10px;padding:10px 12px;font-size:14px;width:100%}
@@ -37,9 +37,9 @@
   .pestanas-inv a.on{background:var(--superficie-2);color:var(--tinta);box-shadow:0 1px 2px rgba(21,23,28,.08)}
 </style>
 </head>
-<body data-page="inventario" data-etq="Catálogo" data-title="Inventario" data-subtitle="Pasar de bolsa a modelo: las prendas cargadas en una bolsa genérica (ej. MERCADERÍA) se reparten a su modelo, talle y color reales. Cada pase queda registrado.">
+<body data-page="inventario" data-etq="Catálogo" data-title="Inventario" data-subtitle="De bolsa a modelo: las prendas cargadas en una bolsa genérica (ej. MERCADERÍA) se reparten a su modelo, talle y color reales. Cada pase queda registrado.">
 <main class="app">
-  <nav class="pestanas-inv"><a href="inventario.html#recuentos">Recuentos</a><a href="inventario.html#ajustar">Ajustar stock</a><a class="on" href="conteo.html">Pasar de bolsa a modelo</a><a href="inventario.html#movimientos">Movimientos</a></nav>
+  <nav class="pestanas-inv"><a href="inventario.html#stock">Stock</a><a href="inventario.html#fallas">Con falla</a><a href="inventario.html#recuentos">Recuentos</a><a class="on" href="conteo.html">De bolsa a modelo</a><a href="inventario.html#movimientos">Movimientos</a></nav>
   <div class="card">
     <div class="origen">
       <div><label class="etq">De dónde salen las unidades</label><select id="sel-bolsa"></select></div>
@@ -52,8 +52,8 @@
   <div class="card" id="card-hoy" style="display:none"><div class="card-cab"><h2>Contado en esta sesión</h2><span class="sub" id="hoy-total"></span></div><table class="lista hoy" id="tb-hoy"></table></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610241651"></script>
-<script src="../shell/shell.js?v=202610241651"></script>
+<script src="../shared/supabase.js?v=202610241703"></script>
+<script src="../shell/shell.js?v=202610241703"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, mensajeError } = APP, e = APP.empresa.id;

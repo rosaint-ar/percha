@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Catálogo · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610241651">
+<link rel="stylesheet" href="../shell/shell.css?v=202610241703">
 <style>
   .filtros{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
   .filtros .buscador{flex:1 1 260px;min-width:0}
@@ -65,7 +65,7 @@
   @media (max-width:700px){.cp-grid,.cp-res{grid-template-columns:1fr}.filtros select{max-width:none;flex:1 1 140px}.col-opc{display:none}}
 </style>
 </head>
-<body data-page="productos" data-etq="Catálogo" data-title="Productos" data-subtitle="Prendas, talles, colores, stock y precios">
+<body data-page="productos" data-etq="Catálogo" data-title="Productos" data-subtitle="Qué vendés: cada prenda con sus talles, colores, fotos y precios. Para contar o corregir stock, Inventario.">
 <main class="app">
   <div class="filtros">
     <div class="buscador"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" placeholder="Buscar por nombre, código o código de barras" autofocus></div>
@@ -86,8 +86,8 @@
   <div class="barra-sel" id="barra-sel" hidden></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610241651"></script>
-<script src="../shell/shell.js?v=202610241651"></script>
+<script src="../shared/supabase.js?v=202610241703"></script>
+<script src="../shell/shell.js?v=202610241703"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id, PAG = 100, admin = APP.esAdmin;
@@ -213,7 +213,7 @@ APP.ready.then(async () => {
   function cambiarPrecios() {
     let red0 = '100'; try { red0 = localStorage.getItem('percha_redondeo') || '100'; } catch (_) { }
     const st = { campo: 'precio', op: 'sube', valor: '', red: red0, arriba: true, desc: '' };
-    const OPS = { sube: ['Subir %', '%'], baja: ['Bajar %', '%'], suma: ['Sumar $', '$'], resta: ['Restar $', '$'], fijar: ['Dejar en $', '$'], markup: ['Costo ×', '×'] };
+    const OPS = { sube: ['Subir %', '%'], baja: ['Bajar %', '%'], suma: ['Sumar $', '$'], resta: ['Restar $', '$'], fijar: ['Dejar en $', '$'], markup: ['Según el costo', 'veces'] };
     const m = modal('<div id="cp"></div>'); $('.modal', m).style.maxWidth = '760px';
     let ultimo = null, tSim;
     const payload = simular => {
@@ -221,7 +221,7 @@ APP.ready.then(async () => {
       const op = { sube: 'porcentaje', baja: 'porcentaje', suma: 'monto', resta: 'monto', fijar: 'fijar', markup: 'markup' }[st.op];
       const valor = st.op === 'baja' || st.op === 'resta' ? -v : v;
       const red = st.red === 'no' ? 'no' : st.red + (st.arriba ? '+' : '');
-      const desc = st.desc || `${OPS[st.op][0].replace(/ [%$×]$/, '')} ${st.op === 'markup' ? '×' + fmt.dec(v) : OPS[st.op][1] === '%' ? fmt.dec(v) + '%' : fmt.pesos(v)} · ${st.campo === 'precio' ? 'precio de venta' : 'costo'}${red !== 'no' ? ' · redondeo ' + $('#cp-red option:checked', m).textContent.toLowerCase() : ''} · ${fmt.num(elegidos.size)} productos`;
+      const desc = st.desc || `${OPS[st.op][0].replace(/ [%$]$/, '')} ${st.op === 'markup' ? fmt.dec(v) + ' veces el costo' : OPS[st.op][1] === '%' ? fmt.dec(v) + '%' : fmt.pesos(v)} · ${st.campo === 'precio' ? 'precio de venta' : 'costo'}${red !== 'no' ? ' · redondeo ' + $('#cp-red option:checked', m).textContent.toLowerCase() : ''} · ${fmt.num(elegidos.size)} productos`;
       return { empresa_id: e, productos: [...elegidos], campo: st.campo, operacion: op, valor, redondeo: red, simular, descripcion: desc };
     };
     const pintar = () => {
@@ -229,7 +229,7 @@ APP.ready.then(async () => {
         <div class="cp-grid" style="margin-top:14px">
           <div class="campo"><label>Qué cambiás</label><div class="seg" id="cp-campo"><button data-v="precio" class="${st.campo === 'precio' ? 'on' : ''}">Precio de venta</button><button data-v="costo" class="${st.campo === 'costo' ? 'on' : ''}">Costo</button></div></div>
           <div class="campo"><label>Cómo</label><div class="seg" id="cp-op">${Object.entries(OPS).filter(([k]) => st.campo === 'precio' || k !== 'markup').map(([k, [t]]) => `<button data-v="${k}" class="${st.op === k ? 'on' : ''}">${t}</button>`).join('')}</div></div>
-          <div class="campo"><label>${st.op === 'markup' ? 'Multiplicar el costo por' : 'Valor'}</label><div class="cp-valor"><span>${OPS[st.op][1]}</span><input id="cp-val" inputmode="decimal" value="${esc(st.valor)}" placeholder="${st.op === 'markup' ? '2,5' : st.op.match(/sube|baja/) ? '15' : '1000'}"></div></div>
+          <div class="campo"><label>${st.op === 'markup' ? 'Precio = el costo por… (2 = el doble del costo)' : 'Valor'}</label><div class="cp-valor"><span>${OPS[st.op][1]}</span><input id="cp-val" inputmode="decimal" value="${esc(st.valor)}" placeholder="${st.op === 'markup' ? '2' : st.op.match(/sube|baja/) ? '15' : '1000'}"></div></div>
           <div class="campo"><label>Redondeo</label><div style="display:flex;gap:8px;align-items:center"><select id="cp-red" style="flex:1;height:42px;border:1px solid var(--linea);border-radius:10px;padding:0 10px;background:var(--superficie-2)">
             ${[['no', 'Sin redondeo'], ['100', 'A $100'], ['500', 'A $500'], ['1000', 'A $1.000'], ['990', 'Terminado en 990'], ['900', 'Terminado en 900']].map(([v, t]) => `<option value="${v}" ${st.red === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
             <label class="chk-linea" style="margin:0;white-space:nowrap" title="Si no, al más cercano"><input type="checkbox" id="cp-arriba" ${st.arriba ? 'checked' : ''} ${st.red === 'no' ? 'disabled' : ''}> Hacia arriba</label></div></div>

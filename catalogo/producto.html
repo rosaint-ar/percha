@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Producto · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610241651">
+<link rel="stylesheet" href="../shell/shell.css?v=202610241703">
 <style>
   .dos{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
   .dos>.card{min-width:0;overflow-x:auto}
@@ -73,24 +73,6 @@
   .hist-precios .hp b{font:700 12.5px var(--f-mono)}
   .hist-precios .hp em{font-style:normal;color:var(--tinta-3);margin-left:auto;font-size:11.5px}
   .ficha-producto>.card+.card{margin-top:14px}
-  .va-bloques{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-top:14px}
-  .va-b{border:1px solid var(--linea);border-radius:14px;padding:12px;display:grid;gap:8px;justify-items:center;text-align:center;transition:border-color .15s,background .15s}
-  .va-b.cambio{border-color:var(--acento);background:var(--lila-suave)}
-  .va-b.va-falla.activa{border-color:#d9b25a;background:#fff8e6}
-  .va-et{font:600 10.5px var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--tinta-3)}
-  .va-et b{color:var(--acento);letter-spacing:0}
-  .va-b small{color:var(--tinta-3);font-size:11.5px}
-  .stepper{display:flex;align-items:center;gap:6px}
-  .stepper button{width:44px;height:44px;border-radius:12px;border:1px solid var(--linea);background:var(--superficie-2);font:700 20px var(--f-ui);cursor:pointer;color:var(--tinta-2);transition:background .12s,transform .08s}
-  .stepper button:hover{background:var(--lila);color:var(--acento)}.stepper button:active{transform:scale(.94)}
-  .stepper input{width:76px;height:48px;border:1px solid var(--linea);border-radius:12px;text-align:center;font:800 24px var(--f-mono);background:var(--superficie-2)}
-  .va-motivo{margin-top:12px;display:grid;gap:8px;animation:aparecer .15s ease-out}
-  .va-motivo .motivos{display:flex;flex-wrap:wrap;gap:6px}
-  .motivo{border:1px solid var(--linea);background:var(--superficie-2);border-radius:999px;padding:7px 12px;font:600 12.5px var(--f-ui);cursor:pointer}
-  .motivo.on{background:var(--acento);border-color:var(--acento);color:#fff}
-  .va-nota{height:38px;border:1px solid var(--linea);border-radius:10px;padding:0 12px;background:var(--superficie-2)}
-  .va-mas{margin-top:14px;border-top:1px solid var(--linea-suave);padding-top:10px}
-  .va-mas summary{cursor:pointer;font:600 13px var(--f-ui);color:var(--tinta-2)}
 </style>
 </head>
 <body data-page="productos" data-etq="Catálogo" data-title="Producto">
@@ -119,7 +101,7 @@
     <p class="sub" id="kit-resumen" style="margin-top:10px"></p>
   </div>
   <div class="card" id="card-matriz">
-    <div class="card-cab"><div><h2>Talles y colores</h2><p class="sub">Stock de cada combinación. Tocá una celda para ajustar stock, cargar el código de barras o imprimir etiquetas.</p></div>
+    <div class="card-cab"><div><h2>Talles y colores</h2><p class="sub">Tocá una celda para corregir el stock, marcar una prenda con falla o imprimir etiquetas.</p></div>
       <div class="acciones"><button class="btn" id="btn-etiquetas-todas">Etiquetas de todo el stock</button><button class="btn primario solo-admin" id="btn-agregar-variantes">+ Agregar talles / colores</button></div></div>
     <div class="matriz" id="matriz"></div>
     <div class="leyenda-matriz"><span><i style="background:var(--lila-suave)"></i>con stock</span><span><i style="background:var(--papel);border:1px solid var(--grilla)"></i>sin stock</span><span><i style="background:var(--error-fondo)"></i>negativo</span></div>
@@ -174,8 +156,9 @@
   </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610241651"></script>
-<script src="../shell/shell.js?v=202610241651"></script>
+<script src="../shared/supabase.js?v=202610241703"></script>
+<script src="../shared/prenda.js?v=202610241703"></script>
+<script src="../shell/shell.js?v=202610241703"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$ , toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -299,7 +282,7 @@ APP.ready.then(async () => {
     if (!c || !pr) { m.className = 'margen'; m.innerHTML = '—'; return; }
     const pct = 100 * (pr - c) / pr;
     m.className = 'margen ' + (pct < 40 ? 'bajo' : 'ok');
-    m.innerHTML = `${fmt.pct(pct)} <small>× ${fmt.dec(pr / c)} sobre el costo</small>`;
+    m.innerHTML = pr >= c ? `${fmt.num(Math.round(pct))}% <small>ganás ${fmt.pesos(pr - c)} por prenda</small>` : `Pérdida <small>se vende ${fmt.pesos(c - pr)} por debajo del costo</small>`;
   }
   form.costo.addEventListener('input', pintarMargen); form.precio.addEventListener('input', pintarMargen);
 
@@ -448,75 +431,8 @@ APP.ready.then(async () => {
     $$('.celda', m).forEach(c => c.onclick = () => abrirVariante(variantes.find(x => x.id === c.dataset.v)));
   }
 
-  // ---------- variante: stock, falla, código de barras, etiquetas ----------
-  const MOTIVOS = ['Rotura o falla', 'Faltante / robo', 'Regalo o canje', 'Uso interno', 'Error de carga', 'Devolución de clienta', 'Devolución a proveedor', 'Recuento', 'Otro'];
-  async function abrirVariante(v) {
-    if (!v) return;
-    const { data: st } = await sb.from('stock').select('deposito_id,cantidad').eq('variante_id', v.id);
-    const porDep = depositos.map(d => ({ d, c: +((st || []).find(s => s.deposito_id === d.id) || {}).cantidad || 0 }));
-    const nombre = [producto.nombre, v.talle_nombre, v.color_nombre].filter(Boolean).join(' · ');
-    const actual = Math.round(+v.stock || 0), falla0 = Math.round(+v.fallas || 0), puede = APP.rol !== 'visor';
-    let nuevo = actual, fallas = falla0, motivo = null;
-    const m = modal(`<h2>${esc(nombre)}</h2>
-      <p class="sub">${esc(v.sku || '')}${v.ean ? ' · código de barras ' + esc(v.ean) : ' · sin código de barras'}</p>
-      ${v.chequear ? `<div class="aviso-chequear" style="margin-top:10px"><span>🔎 ${esc(v.chequear)}</span>${APP.esAdmin ? '<label><input type="checkbox" id="v-chequeado"> Ya está chequeado</label>' : ''}</div>` : ''}
-      <div class="va-bloques">
-        <div class="va-b"><span class="va-et">Stock</span>
-          <div class="stepper"><button type="button" data-paso="stock:-1" ${puede ? '' : 'disabled'}>−</button><input id="va-stock" type="number" inputmode="numeric" value="${actual}" ${puede ? '' : 'disabled'}><button type="button" data-paso="stock:1" ${puede ? '' : 'disabled'}>+</button></div>
-          <small id="va-stock-txt">${porDep.length > 1 ? porDep.map(x => esc(x.d.nombre) + ' ' + fmt.num(x.c)).join(' · ') : 'en el local'}</small></div>
-        <div class="va-b va-falla"><span class="va-et">◆ Con falla</span>
-          <div class="stepper"><button type="button" data-paso="falla:-1" ${APP.esAdmin ? '' : 'disabled'}>−</button><input id="va-falla" type="number" inputmode="numeric" value="${falla0}" ${APP.esAdmin ? '' : 'disabled'}><button type="button" data-paso="falla:1" ${APP.esAdmin ? '' : 'disabled'}>+</button></div>
-          <small>se venden en el local, no en la web</small></div>
-      </div>
-      <div id="va-motivo" class="va-motivo" hidden><span class="va-et">¿Por qué cambia el stock? <b id="va-dif"></b></span><div class="motivos">${MOTIVOS.map(x => `<button type="button" class="motivo" data-mo="${esc(x)}">${esc(x)}</button>`).join('')}</div>
-        <input id="va-nota" class="va-nota" placeholder="Nota (opcional)"></div>
-      <div id="va-falla-w" class="campo" ${falla0 ? '' : 'hidden'} style="margin-top:12px"><label>Qué falla tiene</label><input id="v-falla-nota" value="${esc(v.falla_nota || '')}" placeholder="Ej. hilo suelto en el bretel" ${APP.esAdmin ? '' : 'disabled'}></div>
-      <details class="va-mas"><summary>Código de barras, precio propio y etiquetas</summary>
-        <div class="fila c2" style="margin-top:10px">
-          <div class="campo"><label>Código de barras</label><input id="v-ean" value="${esc(v.ean || '')}" ${APP.esAdmin ? '' : 'disabled'}><span class="ayuda">13 dígitos (EAN) o el de la etiqueta del proveedor</span></div>
-          <div class="campo"><label>Precio propio</label><input id="v-precio" type="number" step="0.01" value="${v.precio != null && +v.precio !== +producto.precio ? v.precio : ''}" placeholder="igual al producto" ${APP.esAdmin ? '' : 'disabled'}></div>
-        </div>
-        ${porDep.length > 1 && puede ? `<div class="campo"><label>Depósito donde se ajusta</label><select id="v-dep">${depositos.map(d => `<option value="${d.id}" ${d.id === depPrincipal.id ? 'selected' : ''}>${esc(d.nombre)}</option>`).join('')}</select></div>` : ''}
-        <div style="display:flex;gap:8px;align-items:flex-end"><div class="campo" style="margin:0;width:140px"><label>Etiquetas</label><input id="v-etq" type="number" min="1" value="${Math.max(1, actual)}"></div><button type="button" class="btn" data-etq>Agregar a etiquetas</button></div>
-      </details>
-      <div class="pie"><button class="btn" data-cerrar>Cerrar</button>${puede ? '<button class="btn primario" data-guardar>Guardar</button>' : ''}</div>`);
-    const iS = $('#va-stock', m), iF = $('#va-falla', m);
-    const refrescar = () => {
-      nuevo = Math.round(+iS.value || 0); fallas = Math.max(0, Math.round(+iF.value || 0));
-      const dif = nuevo - actual; $('#va-motivo', m).hidden = !dif;
-      $('#va-dif', m).textContent = dif ? `(${dif > 0 ? '+' : ''}${fmt.num(dif)})` : '';
-      $('#va-falla-w', m).hidden = !fallas;
-      iF.closest('.va-b').classList.toggle('activa', fallas > 0);
-      iS.closest('.va-b').classList.toggle('cambio', dif !== 0);
-    };
-    $$('[data-paso]', m).forEach(b => b.onclick = () => { const [k, d] = b.dataset.paso.split(':'), inp = k === 'stock' ? iS : iF; inp.value = Math.max(k === 'falla' ? 0 : -9999, Math.round(+inp.value || 0) + +d); refrescar(); });
-    iS.oninput = refrescar; iF.oninput = refrescar;
-    $$('.motivo', m).forEach(b => b.onclick = () => { motivo = b.dataset.mo; $$('.motivo', m).forEach(x => x.classList.toggle('on', x === b)); });
-    $('[data-cerrar]', m).onclick = () => m.cerrar();
-    $('[data-etq]', m).onclick = () => { agregarEtiquetas([{ variante_id: v.id, cantidad: +$('#v-etq', m).value || 1 }]); toast('Agregado a la cola de etiquetas'); };
-    const g = $('[data-guardar]', m); if (g) g.onclick = async () => {
-      refrescar();
-      if (nuevo !== actual && !motivo) { toast('Elegí por qué cambia el stock', 'error'); $('#va-motivo', m).scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
-      if (fallas > Math.max(0, nuevo)) { toast('No puede haber más prendas con falla que stock', 'error'); return; }
-      g.disabled = true;
-      if (nuevo !== actual) {
-        const dep = $('#v-dep', m);
-        const r = await sb.rpc('stock_ajustar', { p: { variante_id: v.id, modo: 'fijar', cantidad: nuevo, motivo, nota: $('#va-nota', m).value.trim(), deposito_id: dep ? dep.value : null } });
-        if (r.error) { toast(mensajeError(r.error), 'error'); g.disabled = false; return; }
-      }
-      if (APP.esAdmin) {
-        const ean = $('#v-ean', m).value.trim() || null, precio = $('#v-precio', m).value === '' ? null : +$('#v-precio', m).value;
-        const fallaNota = $('#v-falla-nota', m).value.trim() || null, chk = $('#v-chequeado', m), cambios = {};
-        if (ean !== (v.ean || null)) cambios.ean = ean;
-        if (precio !== (v.precio != null && +v.precio !== +producto.precio ? +v.precio : null)) cambios.precio = precio;
-        if (fallas !== falla0 || (fallas && fallaNota !== (v.falla_nota || null))) { cambios.fallas = fallas; cambios.falla_nota = fallas ? fallaNota : null; }
-        if (chk && chk.checked) cambios.chequear = null;
-        if (Object.keys(cambios).length) { const r = await sb.from('variantes').update(cambios).eq('id', v.id); if (r.error) { toast(mensajeError(r.error), 'error'); g.disabled = false; return; } }
-      }
-      m.cerrar(); toast(nuevo !== actual ? `Stock: ${fmt.num(actual)} → ${fmt.num(nuevo)}` : 'Guardado'); await cargar();
-    };
-    setTimeout(() => { if (puede) { iS.focus(); iS.select(); } }, 40);
-  }
+  // ---------- un talle·color: la misma ventana que en Inventario ----------
+  function abrirVariante(v) { if (v) PRENDA.abrir(v.id, { desdeFicha: true, alGuardar: cargar }); }
 
   function agregarEtiquetas(items) {
     const cola = JSON.parse(localStorage.getItem('augusta_etiquetas') || '[]');

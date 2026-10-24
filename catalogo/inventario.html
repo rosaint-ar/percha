@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Inventario · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610241651">
+<link rel="stylesheet" href="../shell/shell.css?v=202610241703">
 <style>
   .tiles-inv{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:16px}
   .tiles-inv .t span,.tiles-inv .t small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -85,6 +85,22 @@
   .motivo.on{background:var(--acento);border-color:var(--acento);color:#fff}
   .resultado{display:flex;align-items:baseline;gap:8px;font-size:13px;color:var(--tinta-3);margin-top:4px}
   .resultado b{font:800 22px var(--f-mono);color:var(--tinta)}
+  /* para revisar y con falla */
+  .rev-lista{display:grid;gap:8px}
+  .rev{display:grid;grid-template-columns:44px minmax(150px,1.2fr) minmax(0,2fr) auto;gap:12px;align-items:center;text-align:left;border:1px solid var(--linea);border-radius:14px;background:var(--superficie-2);padding:8px 14px 8px 8px;cursor:pointer;font:inherit;color:inherit;transition:border-color .12s,box-shadow .12s,transform .08s}
+  .rev:hover{border-color:rgba(var(--acento-rgb),.4);box-shadow:0 6px 16px rgba(21,23,28,.06);transform:translateY(-1px)}
+  .rev.falla{border-color:#ecd391;background:#fffaf0}
+  .rev-t b{display:block;font:650 13.5px var(--f-ui)}.rev-t small{color:var(--tinta-3);font-size:12px}
+  .rev-q{font-size:12.5px;color:var(--tinta-2)}.rev-q small{color:var(--tinta-3)}
+  .rev-s{font:700 13px var(--f-mono);white-space:nowrap;text-align:right}.rev-s small{font:500 11.5px var(--f-ui);color:var(--tinta-3)}
+  .rev-s .off{color:#8a6400}
+  .mini{width:44px;height:44px;border-radius:10px;object-fit:cover;display:block;background:var(--relleno)}
+  .mini.sf{display:grid;place-items:center;font:700 12px var(--f-titulo);color:var(--acento);background:linear-gradient(145deg,rgba(var(--acento-rgb),.14),rgba(var(--acento-rgb),.04))}
+  .sug .mini{width:32px;height:32px;border-radius:7px}
+  .vchip.neg small{color:var(--error)}
+  .n-tab{font:700 10.5px var(--f-mono);background:#f6d98a;color:#5a4100;border-radius:999px;padding:1px 6px;margin-left:4px}
+  .n-tab:empty{display:none}
+  @media (max-width:700px){.rev{grid-template-columns:44px minmax(0,1fr) auto}.rev-q{grid-column:2/4}}
   /* movimientos */
   .filtros-mov{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
   .filtros-mov input,.filtros-mov select{height:36px;border:1px solid var(--linea);border-radius:10px;padding:0 10px;background:var(--superficie-2)}
@@ -94,20 +110,22 @@
   @media (max-width:1000px){.rec{grid-template-columns:1fr auto}.rec .barra-w{display:none}.aj{grid-template-columns:1fr}.it{grid-template-columns:1fr 130px}.it .sis,.it .dif{display:none}}
 </style>
 </head>
-<body data-page="inventario" data-etq="Catálogo" data-title="Inventario" data-subtitle="Recuentos, ajustes con motivo y el historial de cada movimiento de stock">
+<body data-page="inventario" data-etq="Catálogo" data-title="Inventario" data-subtitle="Cuántas prendas tenés y en qué estado: corregir stock, fallas, recuentos y el historial de cada movimiento">
 <main class="app">
   <section class="tiles-inv" id="tiles"></section>
   <nav class="pestanas-inv" id="tabs">
-    <button data-tab="recuentos" class="on">Recuentos</button>
-    <button data-tab="ajustar">Ajustar stock</button>
-    <a href="conteo.html">Pasar de bolsa a modelo</a>
+    <button data-tab="stock" class="on">Stock</button>
+    <button data-tab="fallas">Con falla <span class="n-tab" id="n-fallas"></span></button>
+    <button data-tab="recuentos">Recuentos</button>
+    <a href="conteo.html">De bolsa a modelo</a>
     <button data-tab="movimientos">Movimientos</button>
   </nav>
   <div id="vista"></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610241651"></script>
-<script src="../shell/shell.js?v=202610241651"></script>
+<script src="../shared/supabase.js?v=202610241703"></script>
+<script src="../shared/prenda.js?v=202610241703"></script>
+<script src="../shell/shell.js?v=202610241703"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -127,8 +145,8 @@ APP.ready.then(async () => {
   }
 
   // ---------- pestañas ----------
-  let tab = (location.hash || '#recuentos').slice(1);
-  const ir = t => { tab = t; history.replaceState(null, '', '#' + t); $$('#tabs [data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === t)); ({ recuentos: vistaRecuentos, ajustar: vistaAjustar, movimientos: vistaMovimientos })[t.split(':')[0]]?.(t.split(':')[1]); };
+  let tab = (location.hash || '#stock').slice(1);
+  const ir = t => { tab = t; history.replaceState(null, '', '#' + t); $$('#tabs [data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === t.split(':')[0] || (b.dataset.tab === 'stock' && t === 'ajustar'))); ({ stock: vistaStock, ajustar: vistaStock, fallas: vistaFallas, recuentos: vistaRecuentos, movimientos: vistaMovimientos })[t.split(':')[0]]?.(t.split(':')[1]); };
   $$('#tabs [data-tab]').forEach(b => b.onclick = () => ir(b.dataset.tab));
 
   // ================= RECUENTOS =================
@@ -257,71 +275,74 @@ APP.ready.then(async () => {
     pintar();
   }
 
-  // ================= AJUSTAR STOCK =================
-  const MOTIVOS = ['Rotura o falla', 'Faltante / robo', 'Regalo o canje', 'Uso interno', 'Error de carga', 'Devolución a proveedor', 'Ingreso sin compra', 'Otro'];
+  // ================= STOCK: buscar una prenda y corregirla (la misma ventana que en Catálogo) =================
   let catalogo = null;
   async function cargarCatalogo() {
     if (catalogo) return catalogo; let todo = [], d = 0;
-    while (true) { const { data } = await sb.from('v_variantes').select('id,producto_id,producto_codigo,producto_nombre,producto_tipo,talle_nombre,talle_orden,color_nombre,sku,ean,stock').eq('empresa_id', e).eq('activa', true).neq('producto_tipo', 'kit').order('producto_nombre').range(d, d + 999); todo = todo.concat(data || []); if (!data || data.length < 1000) break; d += 1000; }
-    const { data: fp } = await sb.from('productos').select('id,imagen_url').eq('empresa_id', e); const F = Object.fromEntries((fp || []).map(p => [p.id, p.imagen_url]));
-    todo.forEach(v => v.foto = F[v.producto_id]); return catalogo = todo;
+    while (true) { const { data } = await sb.from('v_variantes').select('id,producto_id,producto_codigo,producto_nombre,producto_tipo,talle_nombre,talle_orden,color_nombre,sku,ean,stock,fallas,foto').eq('empresa_id', e).eq('activa', true).neq('producto_tipo', 'kit').order('producto_nombre').range(d, d + 999); todo = todo.concat(data || []); if (!data || data.length < 1000) break; d += 1000; }
+    return catalogo = todo;
   }
-  async function vistaAjustar() {
-    $('#vista').innerHTML = `<div class="vista aj">
-      <div class="card"><div class="card-cab"><div><h2>Ajustar stock</h2><p class="sub">Para una prenda puntual: rotura, faltante, regalo, error de carga. Queda registrado con su motivo.</p></div></div>
-        <div class="busca-prod"><input id="aj-q" placeholder="Cargando el catálogo…" autocomplete="off" disabled><div class="sug" id="aj-sug" hidden></div></div>
-        <div id="aj-prod"></div></div>
-      <div class="card"><div class="card-cab"><div><h2>Últimos ajustes</h2><p class="sub">Lo cargado a mano en los últimos 30 días</p></div></div><div id="aj-ult"></div></div></div>`;
-    pintarUltimos();
-    const cat = await cargarCatalogo();
-    $('#aj-q').disabled = false; $('#aj-q').placeholder = 'Buscá la prenda por nombre, código o escaneá';
-    const sug = $('#aj-sug'); let tq;
-    $('#aj-q').oninput = ev => { clearTimeout(tq); tq = setTimeout(() => { const qq = nrm(ev.target.value.trim()); if (qq.length < 2) { sug.hidden = true; return; }
-      const exacta = cat.find(v => nrm(v.ean) === qq || nrm(v.sku) === qq); if (exacta) { sug.hidden = true; elegirProd(exacta.producto_id, exacta.id); return; }
+  const refrescar = () => { catalogo = null; pintarTiles(); contarFallas(); ir(tab); };
+  const abrirPrenda = vid => PRENDA.abrir(vid, { alGuardar: refrescar });
+  const fotoMini = (url, nombre) => url ? `<img class="mini" src="${esc(url)}" alt="" loading="lazy">` : `<span class="mini sf">${esc(APP.iniciales(String(nombre).replace(/[«»\[\]]/g, '')))}</span>`;
+  const tyc = x => esc([x.talle_nombre, x.color_nombre].filter(Boolean).join(' · ') || 'Único');
+
+  async function vistaStock() {
+    $('#vista').innerHTML = `<div class="vista">
+      <div class="card"><div class="card-cab"><div><h2>Corregir una prenda</h2><p class="sub">Buscala o escaneala: se abre su ventana para corregir el stock, marcar fallas o imprimir etiquetas. Es la misma que en el catálogo.</p></div></div>
+        <div class="busca-prod"><input id="st-q" placeholder="Cargando el catálogo…" autocomplete="off" disabled><div class="sug" id="st-sug" hidden></div></div>
+        <div id="st-prod"></div></div>
+      <div class="card" style="margin-top:14px"><div class="card-cab"><div><h2>Para revisar</h2><p class="sub">Lo que la caja avisó al vender, el stock negativo y lo marcado "a chequear". Tocá una para corregirla.</p></div></div><div id="st-rev"><p class="sub">Buscando…</p></div></div>
+    </div>`;
+    pintarRevisar();
+    const cat = await cargarCatalogo(), inp = $('#st-q'), sug = $('#st-sug'); if (!inp) return;
+    inp.disabled = false; inp.placeholder = 'Nombre, código o escaneá la etiqueta'; inp.focus();
+    let tq;
+    inp.oninput = () => { clearTimeout(tq); tq = setTimeout(() => {
+      const qq = nrm(inp.value.trim()); if (qq.length < 2) { sug.hidden = true; return; }
       const porP = new Map(); cat.forEach(v => { if (qq.split(/\s+/).every(w => nrm(`${v.producto_nombre} ${v.producto_codigo}`).includes(w))) { if (!porP.has(v.producto_id)) porP.set(v.producto_id, []); porP.get(v.producto_id).push(v); } });
-      const ps = [...porP.values()].slice(0, 12);
-      sug.innerHTML = ps.map(vs => `<button data-p="${vs[0].producto_id}">${vs[0].foto ? `<img src="${esc(vs[0].foto)}" alt="">` : '<span class="sf"></span>'}<span>${esc(vs[0].producto_nombre)}</span><small>${fmt.num(vs.reduce((s, v) => s + Math.max(0, +v.stock), 0))} u.</small></button>`).join('') || '<div class="sub" style="padding:10px 12px">Nada con ese nombre</div>';
+      sug.innerHTML = [...porP.values()].slice(0, 12).map(vs => `<button data-p="${vs[0].producto_id}">${fotoMini(vs[0].foto, vs[0].producto_nombre)}<span>${esc(vs[0].producto_nombre)}</span><small>${fmt.num(vs.reduce((s, v) => s + Math.max(0, +v.stock), 0))} u.</small></button>`).join('') || '<div class="sub" style="padding:10px 12px">Nada con ese nombre</div>';
       sug.hidden = false; $$('[data-p]', sug).forEach(b => b.onclick = () => { sug.hidden = true; elegirProd(b.dataset.p); }); }, 150); };
-    $('#aj-q').focus();
+    // escáner o código exacto: abre directo la prenda
+    inp.onkeydown = ev => { if (ev.key !== 'Enter') return; const c = nrm(inp.value.trim()); const v = cat.find(x => nrm(x.ean) === c || nrm(x.sku) === c);
+      if (v) { ev.preventDefault(); sug.hidden = true; inp.value = ''; elegirProd(v.producto_id); abrirPrenda(v.id); } else { const b = $('[data-p]', sug); if (b) b.click(); } };
   }
-  function elegirProd(pid, vid) {
+  function elegirProd(pid) {
     const vs = catalogo.filter(v => v.producto_id === pid).sort((a, b) => (a.talle_orden ?? 999) - (b.talle_orden ?? 999) || String(a.color_nombre || '').localeCompare(b.color_nombre || ''));
-    let sel = vid || (vs.length === 1 ? vs[0].id : null), modo = 'sumar', motivo = null;
-    $('#aj-q').value = vs[0].producto_nombre;
-    const pintarF = () => {
-      const v = vs.find(x => x.id === sel), nota = ($('#aj-nota') || {}).value || '', cant = +(($('#aj-cant') || {}).value || 0), actual = v ? +v.stock : 0;
-      const final = modo === 'fijar' ? cant : modo === 'restar' ? actual - cant : actual + cant;
-      $('#aj-prod').innerHTML = `<div class="vchips">${vs.map(x => `<button class="vchip${x.id === sel ? ' on' : ''}" data-v="${x.id}">${esc([x.talle_nombre, x.color_nombre].filter(Boolean).join(' · ') || 'Único')}<small>${fmt.num(x.stock)} u.</small></button>`).join('')}</div>
-        ${v ? `<div class="aj-form" style="margin-top:16px">
-          <div class="fila c2"><div class="campo"><label>Qué hacés</label><div class="seg" id="aj-modo"><button type="button" data-m="sumar" class="${modo === 'sumar' ? 'on' : ''}">Sumar</button><button type="button" data-m="restar" class="${modo === 'restar' ? 'on' : ''}">Restar</button><button type="button" data-m="fijar" class="${modo === 'fijar' ? 'on' : ''}">Dejar en</button></div></div>
-          <div class="campo"><label>Cantidad</label><input id="aj-cant" type="number" min="0" value="${cant || ''}" placeholder="0" style="text-align:right;font-family:var(--f-mono);font-size:16px"></div></div>
-          <div class="campo"><label>Motivo</label><div class="motivos">${MOTIVOS.map(mo => `<button type="button" class="motivo${motivo === mo ? ' on' : ''}" data-mo="${esc(mo)}">${esc(mo)}</button>`).join('')}</div></div>
-          <div class="campo"><label>Nota (opcional)</label><input id="aj-nota" placeholder="Detalle para el historial" value="${esc(nota)}"></div>
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:6px"><div class="resultado">Queda en <b>${fmt.num(final)}</b> <span>(hoy ${fmt.num(actual)})</span></div><button class="btn primario" id="aj-ok">Aplicar ajuste</button></div></div>` : '<p class="sub" style="margin-top:12px">Elegí el talle y color.</p>'}`;
-      $$('[data-v]', $('#aj-prod')).forEach(b => b.onclick = () => { sel = b.dataset.v; pintarF(); });
-      $$('#aj-modo button').forEach(b => b.onclick = () => { modo = b.dataset.m; pintarF(); });
-      $$('.motivo').forEach(b => b.onclick = () => { motivo = b.dataset.mo; pintarF(); });
-      const ci = $('#aj-cant'); if (ci) ci.oninput = () => { const c = +ci.value || 0, a = v ? +v.stock : 0; $('.resultado b').textContent = fmt.num(modo === 'fijar' ? c : modo === 'restar' ? a - c : a + c); };
-      const ok = $('#aj-ok'); if (ok) ok.onclick = async () => {
-        const cantidad = +$('#aj-cant').value; if (!cantidad && modo !== 'fijar') { toast('Poné la cantidad', 'error'); return; } if (!motivo) { toast('Elegí el motivo', 'error'); return; }
-        ok.disabled = true;
-        const { data, error } = await sb.rpc('stock_ajustar', { p: { variante_id: sel, modo: modo === 'restar' ? 'sumar' : modo, cantidad: modo === 'restar' ? -cantidad : cantidad, motivo, nota: $('#aj-nota').value.trim() } });
-        if (error) { toast(mensajeError(error), 'error'); ok.disabled = false; return; }
-        v.stock = data.stock; toast(`Ajustado: queda en ${fmt.num(data.stock)}`); pintarTiles(); pintarUltimos(); $('#aj-nota').value = ''; $('#aj-cant').value = ''; pintarF();
-      };
-    };
-    pintarF();
+    $('#st-q').value = vs[0].producto_nombre;
+    $('#st-prod').innerHTML = `<div class="vchips">${vs.map(x => `<button class="vchip${+x.stock < 0 ? ' neg' : ''}" data-v="${x.id}">${tyc(x)}<small>${fmt.num(x.stock)} u.${+x.fallas > 0 ? ' · ◆' + fmt.num(x.fallas) : ''}</small></button>`).join('')}</div>
+      <p class="sub" style="margin-top:8px">Tocá el talle y color para corregirlo. <a href="producto.html?id=${pid}">Ver la ficha del producto</a></p>`;
+    $$('#st-prod [data-v]').forEach(b => b.onclick = () => abrirPrenda(b.dataset.v));
+    if (vs.length === 1) abrirPrenda(vs[0].id);
   }
-  async function pintarUltimos() {
-    const desde = new Date(Date.now() - 30 * 864e5).toISOString();
-    const { data } = await sb.from('v_movimientos').select('*').eq('empresa_id', e).eq('tipo', 'ajuste').gte('fecha', desde).order('fecha', { ascending: false }).limit(25);
-    const c = $('#aj-ult'); if (!c) return;
-    c.innerHTML = (data || []).length ? `<table class="lista"><tr><th>Fecha</th><th>Prenda</th><th>Motivo</th><th class="num">Cant.</th></tr>${data.map(m => `<tr><td>${fmt.fechaHora(m.fecha)}</td><td><b style="font-weight:600">${esc(m.producto_nombre)}</b><br><small style="color:var(--tinta-3)">${esc([m.talle_nombre, m.color_nombre].filter(Boolean).join(' · '))}</small></td><td>${esc(m.motivo || m.nota || '—')}${m.usuario ? `<br><small style="color:var(--tinta-3)">${esc(m.usuario)}</small>` : ''}</td><td class="num"><span class="cant-mov ${m.cantidad > 0 ? 'pos' : 'neg'}">${m.cantidad > 0 ? '+' : ''}${fmt.num(m.cantidad)}</span></td></tr>`).join('')}</table>` : '<div class="vacio-grande"><b>Sin ajustes en los últimos 30 días</b></div>';
+  async function pintarRevisar() {
+    const [{ data: rev }, { data: neg }, { data: chq }] = await Promise.all([
+      sb.from('v_stock_revisar').select('*').eq('empresa_id', e).is('resuelto', null).order('creado', { ascending: false }),
+      sb.from('v_variantes').select('id,producto_nombre,talle_nombre,color_nombre,stock,foto').eq('empresa_id', e).eq('activa', true).lt('stock', 0).neq('producto_tipo', 'kit'),
+      sb.from('v_variantes').select('id,producto_nombre,talle_nombre,color_nombre,stock,foto,chequear').eq('empresa_id', e).eq('activa', true).not('chequear', 'is', null)]);
+    const filas = new Map();
+    (rev || []).forEach(r => { const x = filas.get(r.variante_id) || { id: r.variante_id, nombre: r.producto_nombre, t: r, stock: r.stock, foto: null, que: [] }; x.que.push((r.motivo === 'falla' ? '◆ ' : '⚠ ') + (r.detalle || 'Se vendió sin stock')); x.fecha = x.fecha || r.creado; filas.set(r.variante_id, x); });
+    (neg || []).forEach(v => { const x = filas.get(v.id) || { id: v.id, nombre: v.producto_nombre, t: v, stock: v.stock, que: [] }; x.foto = v.foto; x.que.push('Stock negativo: el sistema dice ' + fmt.num(v.stock)); filas.set(v.id, x); });
+    (chq || []).forEach(v => { const x = filas.get(v.id) || { id: v.id, nombre: v.producto_nombre, t: v, stock: v.stock, que: [] }; x.foto = v.foto; x.que.push('🔎 ' + v.chequear); filas.set(v.id, x); });
+    const c = $('#st-rev'); if (!c) return;
+    c.innerHTML = filas.size ? `<div class="rev-lista">${[...filas.values()].map(x => `<button class="rev" data-v="${x.id}">${fotoMini(x.foto, x.nombre)}<span class="rev-t"><b>${esc(x.nombre)}</b><small>${tyc(x.t)}</small></span><span class="rev-q">${x.que.map(esc).join('<br>')}</span><span class="rev-s">${fmt.num(x.stock)} u.</span></button>`).join('')}</div>`
+      : '<div class="vacio-grande" style="padding:18px"><b>Nada para revisar</b>Cuando la caja venda algo sin stock o una falla sin marcar, aparece acá.</div>';
+    $$('.rev', c).forEach(b => b.onclick = () => abrirPrenda(b.dataset.v));
+  }
+
+  // ================= CON FALLA =================
+  async function contarFallas() { const { count } = await sb.from('variante_fallas').select('id', { count: 'exact', head: true }).eq('empresa_id', e).eq('estado', 'disponible'); const n = $('#n-fallas'); if (n) n.textContent = count ? fmt.num(count) : ''; }
+  async function vistaFallas() {
+    const { data } = await sb.from('v_fallas').select('*').eq('empresa_id', e).eq('estado', 'disponible').order('creado', { ascending: false });
+    $('#vista').innerHTML = `<div class="vista card"><div class="card-cab"><div><h2>Prendas con falla</h2><p class="sub">Una fila por prenda. Se venden en el local (con su descuento, si tiene) y no se ofrecen en la web. Tocá una para cambiar la nota, el descuento o marcarla arreglada.</p></div></div>
+      ${(data || []).length ? `<div class="rev-lista">${data.map(f => `<button class="rev falla" data-v="${f.variante_id}">${fotoMini(f.foto, f.producto_nombre)}<span class="rev-t"><b>${esc(f.producto_nombre)}</b><small>${tyc(f)}</small></span><span class="rev-q">◆ ${esc(f.nota || 'Sin detalle')}<br><small>desde ${fmt.fecha ? fmt.fecha(f.creado) : fmt.fechaHora(f.creado)}</small></span><span class="rev-s">${+f.descuento_pct ? '<b class="off">' + fmt.dec(f.descuento_pct) + '% off</b>' : '<small>sin descuento</small>'}</span></button>`).join('')}</div>`
+        : '<div class="vacio-grande"><b>No hay prendas con falla</b>Se marcan desde la ventana de cada prenda: "+ Marcar una con falla".</div>'}</div>`;
+    $$('.rev', $('#vista')).forEach(b => b.onclick = () => abrirPrenda(b.dataset.v));
   }
 
   // ================= MOVIMIENTOS =================
   const TIPOS_MOV = { venta: 'Venta', devolucion: 'Devolución', ajuste: 'Ajuste', recuento: 'Recuento', compra: 'Compra', transferencia: 'Traspaso', inicial: 'Inicial' };
-  let movFiltro = null;
+  let movFiltro = new URLSearchParams(location.search).get('q') ? { texto: new URLSearchParams(location.search).get('q') } : null;
   async function vistaMovimientos() {
     const hoy = new Date(), d = n => { const x = new Date(hoy); x.setDate(x.getDate() - n); return x.toISOString().slice(0, 10); };
     $('#vista').innerHTML = `<div class="vista card"><div class="card-cab"><div><h2>Movimientos de stock</h2><p class="sub">Todo lo que entró y salió, quién lo hizo y por qué</p></div><div class="acciones"><button class="btn" id="mv-csv">Descargar (CSV)</button></div></div>
@@ -345,11 +366,11 @@ APP.ready.then(async () => {
       const lin = filas.map(m => [new Date(m.fecha).toLocaleString('es-AR'), m.sku || m.producto_codigo, m.producto_nombre, m.talle_nombre || '', m.color_nombre || '', TIPOS_MOV[m.tipo] || m.tipo, String(m.cantidad).replace('.', ','), m.motivo || '', m.venta_numero ? 'Ticket #' + m.venta_numero : (m.recuento_nombre || m.nota || ''), m.usuario || '']);
       const csv = '﻿' + [cab, ...lin].map(r => r.map(x => '"' + String(x).replace(/"/g, '""') + '"').join(';')).join('\r\n');
       const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = `movimientos-${$('#mv-desde').value}-a-${$('#mv-hasta').value}.csv`; a.click(); };
-    if (movFiltro && movFiltro.ref) { $('#mv-desde').value = '2020-01-01'; }
+    if (movFiltro) { $('#mv-desde').value = '2020-01-01'; }
     cargarMov();
   }
 
-  pintarTiles();
+  pintarTiles(); contarFallas();
   ir(tab);
 });
 </script>

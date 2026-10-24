@@ -28,12 +28,13 @@ APP.ready.then(async () => {
     listas = l.data || []; formas = f.data || []; if (window.MEDIOS) { MEDIOS.cargar(sb, e); MEDIOS.listas = Object.fromEntries(listas.map(x => [x.id, x])); } sb.rpc('formas_pago_uso', { e }).then(({ data }) => { usosFormas = Object.fromEntries((data || []).map(x => [x.forma_pago_id, +x.usos])); }); promos = p.data || []; vendedoras = v.data || []; caja = (c.data || [])[0]; clientes = cl.data || [];
     carrito.lista = carrito.lista || (listas.find(x => x.predeterminada) || listas[0] || {}).id;
     // arranque rápido: si hay catálogo guardado de hace menos de 12 h, se usa ya y se refresca en segundo plano
+    cargarFallas();
     const guardado = JSON.parse(localStorage.getItem(LS('catalogo')) || 'null');
     const fresco = guardado && Date.now() - guardado.t < 12 * 3600 * 1000;
     if (fresco) { catalogo = guardado.vars; productos = Object.fromEntries(guardado.prods.map(x => [x.id, x])); }
     const traer = async () => {
       const [vars, prods] = await Promise.all([
-        paginar(() => sb.from('v_variantes').select('id,producto_id,producto_codigo,producto_nombre,producto_tipo,sku,ean,talle,talle_nombre,talle_orden,color,color_nombre,color_hex,precio,costo,stock,fallas,falla_nota,activa').eq('empresa_id', e).eq('activa', true).order('producto_nombre').order('talle_orden')),
+        paginar(() => sb.from('v_variantes').select('id,producto_id,producto_codigo,producto_nombre,producto_tipo,sku,ean,talle,talle_nombre,talle_orden,color,color_nombre,color_hex,precio,costo,stock,fallas,falla_nota,activa,foto').eq('empresa_id', e).eq('activa', true).order('producto_nombre').order('talle_orden')),
         paginar(() => sb.from('productos').select('id,categoria_id,tipo,activo,imagen_url,es_generico,generico_filtro').eq('empresa_id', e).eq('activo', true))
       ]);
       productos = Object.fromEntries(prods.map(x => [x.id, x]));
@@ -50,6 +51,33 @@ APP.ready.then(async () => {
     }
     const selV = $('#sel-vendedora'); selV.innerHTML = vendedoras.map(x => `<option value="${x.user_id}" ${x.user_id === APP.user.id ? 'selected' : ''}>${esc(x.nombre)}</option>`).join('');
     $('#dl-clientes').innerHTML = clientes.map(x => `<option value="${esc(x.nombre)}">${esc(x.telefono || '')}</option>`).join('');
+  }
+
+  // Prendas con falla, una por una (nota, descuento y a qué listas)
+  var fallasU;   // var: la carga del catálogo puede llamar a cargarFallas antes de llegar a esta línea
+  async function cargarFallas() {
+    const { data } = await sb.from('variante_fallas').select('id,variante_id,nota,descuento_pct,listas').eq('empresa_id', e).eq('estado', 'disponible').order('creado');
+    fallasU = new Map(); (data || []).forEach(f => { if (!fallasU.has(f.variante_id)) fallasU.set(f.variante_id, []); fallasU.get(f.variante_id).push(f); });
+  }
+  const unidadesLibres = (v, salvo) => ((fallasU && fallasU.get(v.id)) || []).filter(u => !carrito.lineas.some(l => l !== salvo && l.fallaU && l.fallaU.id === u.id));
+  const descFalla = l => { const u = l.fallaU; if (!u || !+u.descuento_pct) return 0; if (u.listas && u.listas.length && !u.listas.includes(carrito.lista)) return 0; return +u.descuento_pct; };
+  // "es la de la falla": cada prenda fallada queda en su propia línea, con su nota y su descuento
+  function marcarFalla(l) {
+    return new Promise(res => {
+      const libres = unidadesLibres(l.variante, l);
+      const asignar = u => {
+        if (l.cantidad > 1) { l.cantidad -= 1; carrito.lineas.splice(carrito.lineas.indexOf(l) + 1, 0, Object.assign({}, l, { cantidad: 1, falla: true, fallaU: u || null })); }
+        else { l.falla = true; l.fallaU = u || null; }
+        pintar(); res();
+      };
+      if (libres.length <= 1 || libres.every(u => (u.nota || '') === (libres[0].nota || '') && +u.descuento_pct === +libres[0].descuento_pct)) { asignar(libres[0]); return; }
+      const m = modal(`<h2>¿Cuál de las fallas es?</h2><p class="sub">${esc([l.variante.producto_nombre, l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · '))}</p>
+        <div class="cl-res">${libres.map((u, i) => `<button data-u="${i}"><span>◆ ${esc(u.nota || 'Sin detalle')}</span><small>${+u.descuento_pct ? fmt.dec(u.descuento_pct) + '% off' : 'sin descuento'}</small></button>`).join('')}</div>`, { fijo: true });
+      $$('[data-u]', m).forEach(b => b.onclick = () => { m.cerrar(); asignar(libres[+b.dataset.u]); });
+    });
+  }
+  async function marcarFallas(v, n) {
+    for (let k = 0; k < n; k++) { const l = carrito.lineas.find(x => x.variante.id === v.id && !x.devuelta && !x.falla); if (!l) break; await marcarFalla(l); }
   }
 
   // ================= Turno de caja =================
@@ -144,7 +172,19 @@ APP.ready.then(async () => {
   function elegirProducto(pid) {
     const vars = catalogo.filter(v => v.producto_id === pid);
     if (vars.length === 1 && !vars[0].talle && !vars[0].color) { agregar(vars[0]); return; }
+    const porColor = [...new Map(vars.map(v => [v.color || '', v])).values()], prod = productos[pid] || {};
+    if (porColor.length > 1 && vars.some(v => v.foto && v.foto !== prod.imagen_url)) { elegirConFotos(vars, porColor); return; }
     const m = modal(`<h2>${esc(vars[0].producto_nombre)}</h2><p class="sub">Elegí talle y color</p><div class="matriz-pick">${vars.sort((a, b) => (a.talle_orden ?? 999) - (b.talle_orden ?? 999) || String(a.color_nombre).localeCompare(b.color_nombre)).map(v => `<button data-v="${v.id}" class="${+v.stock > 0 ? '' : 'sin'}">${esc([v.talle_nombre, v.color_nombre].filter(Boolean).join(' · ') || 'único')}<small>${fmt.num(v.stock)} u.${+v.fallas > 0 ? ' · ◆' + fmt.num(v.fallas) + ' con falla' : ''}</small></button>`).join('')}</div>`);
+    $$('[data-v]', m).forEach(b => b.onclick = () => { agregar(catalogo.find(v => v.id === b.dataset.v)); m.cerrar(); });
+    buscadorPick(m);
+  }
+  function elegirConFotos(vars, porColor) {
+    const orden = (a, b) => (a.talle_orden ?? 999) - (b.talle_orden ?? 999);
+    const m = modal(`<h2>${esc(vars[0].producto_nombre)}</h2><p class="sub">Elegí el color y el talle</p><div class="matriz-pick por-color">${porColor.sort((a, b) => String(a.color_nombre || '').localeCompare(b.color_nombre || '')).map(c => {
+      const vs = vars.filter(v => (v.color || '') === (c.color || '')).sort(orden), st = vs.reduce((s, v) => s + Math.max(+v.stock || 0, 0), 0);
+      return `<div class="pc-col${st > 0 ? '' : ' sin'}"><div class="pc-foto">${c.foto ? `<img src="${esc(c.foto)}" alt="" loading="lazy">` : `<i style="background:${esc(c.color_hex || '#E6DEF0')}"></i>`}</div><b>${esc(c.color_nombre || 'Sin color')}</b>
+        <div class="pc-talles">${vs.map(v => `<button data-v="${v.id}" data-txt="${esc([v.talle_nombre, v.color_nombre].filter(Boolean).join(' '))}" class="${+v.stock > 0 ? '' : 'sin'}">${esc(v.talle_nombre || 'único')}<small>${fmt.num(v.stock)} u.${+v.fallas > 0 ? ' · ◆' : ''}</small></button>`).join('')}</div></div>`; }).join('')}</div>`);
+    $('.modal', m).style.maxWidth = '760px';
     $$('[data-v]', m).forEach(b => b.onclick = () => { agregar(catalogo.find(v => v.id === b.dataset.v)); m.cerrar(); });
     buscadorPick(m);
   }
@@ -158,7 +198,7 @@ APP.ready.then(async () => {
       if (v.id !== l.variante.id) {
         const otra = carrito.lineas.find(x => x !== l && x.variante.id === v.id && !x.devuelta);
         if (otra) { otra.cantidad += l.cantidad; carrito.lineas.splice(carrito.lineas.indexOf(l), 1); }
-        else { l.variante = v; l.falla = false; delete l.componentes; delete l.componentes_ok; }
+        else { l.variante = v; l.falla = false; delete l.fallaU; delete l.componentes; delete l.componentes_ok; }
         recientes(v); toast('Cambiado por ' + [v.producto_nombre, v.talle_nombre, v.color_nombre].filter(Boolean).join(' · '));
       }
       m.cerrar(); pintar();
@@ -236,9 +276,10 @@ APP.ready.then(async () => {
     const botones = $$('button[data-v]', grilla); if (botones.length < 7) return;
     grilla.insertAdjacentHTML('beforebegin', '<input class="pick-busca" placeholder="Escribí el talle o el color (ej. 100, negro, 90 bla)" autocomplete="off">');
     const inp = $('.pick-busca', m), nrm = s => String(s || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
-    const textos = botones.map(b => nrm(b.firstChild ? b.firstChild.textContent : b.textContent).split(/[\s·/]+/).filter(Boolean));
+    const textos = botones.map(b => nrm(b.dataset.txt || (b.firstChild ? b.firstChild.textContent : b.textContent)).split(/[\s·/]+/).filter(Boolean));
     const filtrar = () => { const qs = nrm(inp.value).split(/\s+/).filter(Boolean);
-      botones.forEach((b, i) => { b.style.display = qs.every(x => textos[i].some(t => t.startsWith(x))) ? '' : 'none'; }); };
+      botones.forEach((b, i) => { b.style.display = qs.every(x => textos[i].some(t => t.startsWith(x))) ? '' : 'none'; });
+      $$('.pc-col', grilla).forEach(c => { c.style.display = $$('button[data-v]', c).some(b => b.style.display !== 'none') ? '' : 'none'; }); };
     inp.addEventListener('input', filtrar);
     inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); const vis = botones.filter(b => b.style.display !== 'none'); const conStock = vis.filter(b => !b.classList.contains('sin')); const uno = vis.length === 1 ? vis[0] : (conStock.length === 1 ? conStock[0] : null); if (uno) uno.click(); } });
     setTimeout(() => inp.focus(), 30);
@@ -265,13 +306,9 @@ APP.ready.then(async () => {
         $('#rs', m).innerHTML = `<h2>⚠ Revisá antes de cobrar</h2><div class="rs-lista">${ps.map((p, i) => p.tipo === 'falla'
           ? `<div class="rs-item falla"><div><b>${nombre(p.x.v)}</b><span>${p.buenas ? `Hay ${p.buenas} sin falla y estás vendiendo ${p.x.normal}.` : 'La que queda tiene falla.'} ¿Es la de la falla?</span></div><button class="btn primario" data-es-falla="${i}">◆ Sí, es la de la falla</button></div>`
           : `<div class="rs-item sin"><div><b>${nombre(p.x.v)}</b><span>${p.st ? `El sistema dice que hay ${p.st} y estás vendiendo ${p.n}.` : 'El sistema dice que no hay.'}</span></div></div>`).join('')}</div>
-          <p class="rs-nota">Si seguís, la venta se hace igual y queda un aviso en <b>Ventas → Stock a revisar</b> para corregir el stock.</p>
+          <p class="rs-nota">Si seguís, la venta se hace igual y queda un aviso en <b>Inventario → Stock → Para revisar</b> para corregir el stock.</p>
           <div class="pie"><button class="btn" data-volver>Volver al ticket</button><button class="btn peligro" data-seguir>Vender igual</button></div>`;
-        $$('[data-es-falla]', m).forEach(b => b.onclick = () => { const p = ps[+b.dataset.esFalla]; let resta = p.cuantas;
-          p.x.lineas.filter(l => !l.falla).forEach(l => { if (resta <= 0) return;
-            if (l.cantidad <= resta) { l.falla = true; resta -= l.cantidad; }
-            else { l.cantidad -= resta; carrito.lineas.splice(carrito.lineas.indexOf(l) + 1, 0, Object.assign({}, l, { cantidad: resta, falla: true })); resta = 0; } });
-          pintar(); pintarRs(); });
+        $$('[data-es-falla]', m).forEach(b => b.onclick = async () => { const p = ps[+b.dataset.esFalla]; await marcarFallas(p.x.v, p.cuantas); pintar(); pintarRs(); });
         $('[data-volver]', m).onclick = () => { m.cerrar(); resolve(false); };
         $('[data-seguir]', m).onclick = () => { m.cerrar(); carrito.avisos = ps.length; resolve(true); };
       };
@@ -315,16 +352,14 @@ APP.ready.then(async () => {
     if (lleva <= st && !soloFalla) return;
     const nom = esc([v.producto_nombre, v.talle_nombre, v.color_nombre].filter(Boolean).join(' · '));
     const m = modal(soloFalla
-      ? `<h2>◆ La que queda tiene falla</h2><p><b>${nom}</b></p><p class="sub">${st - f > 0 ? 'Hay ' + (st - f) + ' sin falla y ' + f + ' con falla.' : 'La única que hay en el sistema tiene falla.'} ¿Es la de la falla?</p>
+      ? `<h2>◆ La que queda tiene falla</h2><p><b>${nom}</b></p><p class="sub">${st - f > 0 ? 'Hay ' + (st - f) + ' sin falla y ' + f + ' con falla.' : (f > 1 ? 'Las ' + f + ' que hay tienen falla.' : 'La única que hay en el sistema tiene falla.')} ¿Es la de la falla?</p>
          <div class="pie" style="justify-content:space-between"><button class="btn" data-sacar>Sacarla del ticket</button><div style="display:flex;gap:6px"><button class="btn" data-dejar>No, es otra</button><button class="btn primario" data-falla-si>◆ Sí, es la de la falla</button></div></div>`
       : `<h2>⚠ No hay stock en el sistema</h2><p><b>${nom}</b></p><p class="sub">${st ? 'El sistema dice que hay ' + st + ' y estás llevando ' + lleva + '.' : 'El sistema dice que no hay ninguna.'} Si la tenés en la mano, dejala: queda un aviso para corregir el stock.</p>
          <div class="pie" style="justify-content:space-between"><button class="btn" data-sacar>Sacarla del ticket</button><button class="btn primario" data-dejar>Sí, dejarla</button></div>`, { fijo: true });
     const linea = () => carrito.lineas.find(l => l.variante.id === v.id && !l.devuelta && !l.falla) || carrito.lineas.find(l => l.variante.id === v.id && !l.devuelta);
     $('[data-sacar]', m).onclick = () => { const l = linea(); if (l) { l.cantidad -= cantidad; if (l.cantidad <= 0) carrito.lineas.splice(carrito.lineas.indexOf(l), 1); } m.cerrar(); pintar(); };
     $('[data-dejar]', m).onclick = () => { m.cerrar(); $('#q').focus(); };
-    const fs1 = $('[data-falla-si]', m); if (fs1) fs1.onclick = () => { const l = linea();
-      if (l && !l.falla) { const n = Math.min(cantidad, f - conFalla); if (l.cantidad <= n) l.falla = true; else { l.cantidad -= n; carrito.lineas.splice(carrito.lineas.indexOf(l) + 1, 0, Object.assign({}, l, { cantidad: n, falla: true })); } }
-      m.cerrar(); pintar(); };
+    const fs1 = $('[data-falla-si]', m); if (fs1) fs1.onclick = async () => { m.cerrar(); await marcarFallas(v, Math.min(cantidad, f - conFalla)); pintar(); };
     setTimeout(() => (fs1 || $('[data-dejar]', m)).focus(), 30);
   }
   function recientes(v) {
@@ -349,7 +384,7 @@ APP.ready.then(async () => {
   }
   function calcular() {
     // precio base por lista, descuento de línea, luego la mejor promo por línea (sin acumular)
-    const lineas = carrito.lineas.map(l => { const pl = precioLista(l.variante); const pu = r2(pl * (1 - (l.descPct || 0) / 100)); return Object.assign(l, { precioLista: pl, precioUnit: pu, promo: null, descPromo: 0 }); });
+    const lineas = carrito.lineas.map(l => { const pl = precioLista(l.variante), df = l.falla ? descFalla(l) : 0; const pu = r2(pl * (1 - Math.max(l.descPct || 0, df) / 100)); return Object.assign(l, { precioLista: pl, precioUnit: pu, descFalla: df, promo: null, descPromo: 0 }); });
     promos.forEach(p => {
       const grupo = lineas.filter(l => l.cantidad > 0 && promoAplica(p, l.variante));
       if (!grupo.length) return;
@@ -377,7 +412,7 @@ APP.ready.then(async () => {
     const c = calcular(), cont = $('#lineas');
     if (!c.lineas.length) cont.innerHTML = '<div class="vacio-ticket">Escaneá o buscá una prenda para empezar.</div>';
     else cont.innerHTML = c.lineas.map((l, i) => `<div class="linea">
-      <div><div class="n">${l.devuelta ? esc(l.variante.producto_nombre) : `<span class="cambiable" data-cambiar="${i}" title="Tocá para cambiar el talle, el color o la prenda">${esc(l.variante.producto_nombre)} <span class="lapiz">✎</span></span>`}${l.devuelta ? ' <span class="chip error">devuelve</span>' : ''}</div><div class="v">${l.devuelta ? esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || l.variante.sku || '') : `<span class="cambiable" data-cambiar="${i}">${esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || 'único')}</span>`} · ${fmt.pesos(l.precioLista)}${l.descPct ? ' −' + l.descPct + '%' : ''}${!l.devuelta && controlaStock(l.variante) && llevando(l.variante) > Math.max(+l.variante.stock || 0, 0) ? '<span class="sinstock-chip" title="El sistema dice que no hay suficiente">⚠ sin stock</span>' : ''}</div>${l.promo ? `<div class="promo">★ ${esc(l.promo.nombre)} · −${fmt.pesos(l.descPromo)}/u</div>` : ''}${+l.variante.fallas > 0 && !l.devuelta ? `<button class="falla ${l.falla ? 'on' : ''}" data-falla="${i}" title="${esc(l.variante.falla_nota || '')}">${l.falla ? '◆ Es la que tiene falla' : '◆ Hay ' + fmt.num(l.variante.fallas) + ' con falla · ¿es esta?'}</button>` : ''}</div>
+      <div><div class="n">${l.devuelta ? esc(l.variante.producto_nombre) : `<span class="cambiable" data-cambiar="${i}" title="Tocá para cambiar el talle, el color o la prenda">${esc(l.variante.producto_nombre)} <span class="lapiz">✎</span></span>`}${l.devuelta ? ' <span class="chip error">devuelve</span>' : ''}</div><div class="v">${l.devuelta ? esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || l.variante.sku || '') : `<span class="cambiable" data-cambiar="${i}">${esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || 'único')}</span>`} · ${fmt.pesos(l.precioLista)}${l.descPct ? ' −' + l.descPct + '%' : ''}${!l.devuelta && controlaStock(l.variante) && llevando(l.variante) > Math.max(+l.variante.stock || 0, 0) ? '<span class="sinstock-chip" title="El sistema dice que no hay suficiente">⚠ sin stock</span>' : ''}</div>${l.promo ? `<div class="promo">★ ${esc(l.promo.nombre)} · −${fmt.pesos(l.descPromo)}/u</div>` : ''}${(+l.variante.fallas > 0 || l.falla) && !l.devuelta ? `<button class="falla ${l.falla ? 'on' : ''}" data-falla="${i}" title="${l.falla ? 'Tocá para desmarcar' : esc(l.variante.falla_nota || '')}">${l.falla ? '◆ Con falla' + (l.fallaU && l.fallaU.nota ? ': ' + esc(l.fallaU.nota) : '') + (l.descFalla ? ' · ' + fmt.dec(l.descFalla) + '% off' : '') : '◆ Hay ' + fmt.num(l.variante.fallas) + ' con falla · ¿es esta?'}</button>` : ''}</div>
       <div class="t">${fmt.pesos(l.total)}</div>
       <div class="ctrl"><button data-i="${i}" data-d="-1">−</button><input data-i="${i}" data-q value="${l.cantidad}"><button data-i="${i}" data-d="1">+</button><span class="desc">desc % <input data-i="${i}" data-desc type="number" min="0" max="100" value="${l.descPct || 0}"></span><button class="quitar" data-i="${i}" data-x title="Quitar">×</button></div></div>`).join('');
     $$('[data-d]', cont).forEach(b => b.onclick = () => { const l = carrito.lineas[+b.dataset.i]; l.cantidad += +b.dataset.d * (l.devuelta ? -1 : 1); if ((l.devuelta ? -l.cantidad : l.cantidad) <= 0) carrito.lineas.splice(+b.dataset.i, 1); pintar(); });
@@ -385,7 +420,7 @@ APP.ready.then(async () => {
     $$('[data-desc]', cont).forEach(i => i.onchange = () => { if (!APP.esAdmin && +i.value > 0) { toast('Los descuentos los habilita administración', 'error'); i.value = 0; return; } carrito.lineas[+i.dataset.i].descPct = Math.min(100, Math.max(0, +i.value || 0)); pintar(); });
     $$('[data-x]', cont).forEach(b => b.onclick = () => { carrito.lineas.splice(+b.dataset.i, 1); pintar(); });
     $$('[data-cambiar]', cont).forEach(el => el.onclick = ev => { ev.stopPropagation(); cambiarLinea(+el.dataset.cambiar); });
-    $$('[data-falla]', cont).forEach(b => b.onclick = ev => { ev.stopPropagation(); const l = carrito.lineas[+b.dataset.falla]; l.falla = !l.falla; pintar(); });
+    $$('[data-falla]', cont).forEach(b => b.onclick = ev => { ev.stopPropagation(); const l = carrito.lineas[+b.dataset.falla]; if (l.falla) { l.falla = false; delete l.fallaU; pintar(); } else marcarFalla(l); });
     $('#listas').innerHTML = listas.map(l => `<button class="${l.id === carrito.lista ? 'on' : ''}" data-l="${l.id}" title="${l.porcentaje}% del precio de lista">${esc(l.nombre)}</button>`).join('');
     $$('#listas button').forEach(b => b.onclick = () => { carrito.lista = b.dataset.l; pintar(); });
     $('#totales').innerHTML = `<div><span>Subtotal</span><span class="mono">${fmt.pesos(c.subtotal)}</span></div>${c.descuento ? `<div><span>Descuento ${carrito.descPct}%</span><span class="mono">−${fmt.pesos(c.descuento)}</span></div>` : ''}<div class="gran"><span>Total</span><span>${fmt.pesos(c.total)}</span></div>`;
@@ -477,14 +512,15 @@ APP.ready.then(async () => {
         caja_id: reservado ? null : caja.id, turno_id: reservado ? null : turno.id, reservada: !!reservado, pin: reservado || undefined, cliente_id: cliente, vendedora_id: carrito.vendedora, lista_id: carrito.lista,
         descuento_pct: carrito.descPct || 0, descuento: t.descuento, recargo: t.recargo, nota: $('#nota').value.trim() || null,
         venta_origen_id: carrito.cambio ? carrito.cambio.id : null, origen: ($('#sel-origen') || {}).value || 'local',
-        lineas: t.lineas.map(l => ({ variante_id: l.variante.id, producto_id: l.variante.producto_id, descripcion: l.variante.producto_nombre, talle: l.variante.talle_nombre, color: l.variante.color_nombre, cantidad: l.cantidad, precio_lista: l.precioLista, precio_unit: l.precioFinal, descuento_pct: l.descPct || 0, promocion_id: l.promo ? l.promo.id : null, promocion_nombre: l.promo ? l.promo.nombre : null, total: l.total, costo_unit: +l.variante.costo || 0, componentes: l.componentes && l.componentes.length ? l.componentes : null, falla: !!l.falla })),
+        lineas: t.lineas.map(l => ({ variante_id: l.variante.id, producto_id: l.variante.producto_id, descripcion: l.variante.producto_nombre, talle: l.variante.talle_nombre, color: l.variante.color_nombre, cantidad: l.cantidad, precio_lista: l.precioLista, precio_unit: l.precioFinal, descuento_pct: l.descPct || 0, promocion_id: l.promo ? l.promo.id : null, promocion_nombre: l.promo ? l.promo.nombre : null, total: l.total, costo_unit: +l.variante.costo || 0, componentes: l.componentes && l.componentes.length ? l.componentes : null, falla: !!l.falla, falla_id: l.fallaU ? l.fallaU.id : null })),
         pagos: pagosFinal.filter(p => p.monto !== 0).map(p => ({ forma_pago_id: p.forma_pago_id || null, credito_id: p.credito_id || null, monto: p.monto, cuotas: p.cuotas || 1, recargo_pct: p.recargo_pct || 0 })),
         creditos_a_emitir
       };
       m.cerrar();
       const res = await enviarVenta(payload);
       mostrarTicket(payload, res, { vuelto: vuelto > 0 ? vuelto : 0, pagos: pagosFinal, total: t });
-      if (carrito.avisos) { toast('Venta hecha. Quedó un aviso para corregir el stock en Ventas → Stock a revisar', 'error'); carrito.avisos = 0; setTimeout(pintarAvisosStock, 1500); }
+      cargarFallas();
+      if (carrito.avisos) { toast('Venta hecha. Quedó un aviso para corregir el stock en Inventario', 'error'); carrito.avisos = 0; setTimeout(pintarAvisosStock, 1500); }
       carrito.lineas = []; carrito.cambio = null; carrito.descPct = 0; $('#desc-general').value = 0; $('#nota').value = ''; $('#sel-cliente').value = ''; if ($('#sel-origen')) $('#sel-origen').value = 'local';
       carrito.lista = (listas.find(x => x.predeterminada) || listas[0] || {}).id;   // la próxima venta arranca con la lista base
       // el stock del catálogo en memoria
@@ -597,7 +633,7 @@ APP.ready.then(async () => {
     const { count } = await sb.from('stock_revisar').select('id', { count: 'exact', head: true }).eq('empresa_id', e).is('resuelto', null);
     let b = document.getElementById('aviso-stock');
     if (!count) { if (b) b.remove(); return; }
-    if (!b) { const sub = document.getElementById('ticket-sub'); if (!sub) return; sub.insertAdjacentHTML('afterend', '<a id="aviso-stock" class="aviso-stock" href="ventas.html#revisar"></a>'); b = document.getElementById('aviso-stock'); }
+    if (!b) { const sub = document.getElementById('ticket-sub'); if (!sub) return; sub.insertAdjacentHTML('afterend', '<a id="aviso-stock" class="aviso-stock" href="../catalogo/inventario.html#stock"></a>'); b = document.getElementById('aviso-stock'); }
     b.textContent = '⚠ ' + count + ' para corregir stock'; b.title = 'Prendas vendidas sin stock en el sistema. Tocá para revisarlas.';
   }
   await cargarBase(); await cargarTurno(); pintar(); pintarRecientes(); sincronizar(); pintarAvisosStock();

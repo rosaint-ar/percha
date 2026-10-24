@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Punto de venta · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610241651">
+<link rel="stylesheet" href="../shell/shell.css?v=202610241703">
 <style>
   /* ===== Punto de venta: pantalla completa, pensada para tocar y vender rápido ===== */
   body.con-lateral{grid-template-columns:1fr}
@@ -235,6 +235,15 @@
   .rv-venta summary{display:flex;gap:12px;align-items:center;cursor:pointer;font-size:13.5px}.rv-venta summary b{margin-left:auto}
   .rv-det{padding:8px 0 4px;display:grid;gap:4px;font-size:13px}.rv-det>div{display:flex;gap:8px}.rv-det>div .mono{margin-left:auto}
   .rv-pagos{color:var(--tinta-3);font-size:12.5px;margin:4px 0}
+  .matriz-pick.por-color{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+  .pc-col{border:1px solid var(--linea);border-radius:14px;padding:8px;display:grid;gap:7px;align-content:start;background:var(--superficie-2)}
+  .pc-col.sin{opacity:.55}
+  .pc-foto{aspect-ratio:1/1;border-radius:10px;overflow:hidden;background:var(--relleno);display:grid;place-items:center}
+  .pc-foto img{width:100%;height:100%;object-fit:cover;display:block}.pc-foto i{width:46px;height:46px;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
+  .pc-col>b{font:650 13px var(--f-ui);padding:0 2px}
+  .pc-talles{display:flex;flex-wrap:wrap;gap:6px}
+  .matriz-pick.por-color .pc-talles button{flex:1 0 50px;min-height:44px;padding:6px 8px}
+  body.reservado .pc-col{background:#221e29;border-color:var(--linea)}
 </style>
 </head>
 <body data-page="pos" data-title="Punto de venta">
@@ -275,10 +284,10 @@
 </main>
 <div id="impresion"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610241651"></script>
-<script src="../shell/shell.js?v=202610241651"></script>
-<script src="../shared/medios-pago.js?v=202610241651"></script>
-<script src="caja.js?v=202610241651"></script>
-<script src="pos.js?v=202610241651"></script>
+<script src="../shared/supabase.js?v=202610241703"></script>
+<script src="../shell/shell.js?v=202610241703"></script>
+<script src="../shared/medios-pago.js?v=202610241703"></script>
+<script src="caja.js?v=202610241703"></script>
+<script src="pos.js?v=202610241703"></script>
 </body>
 </html>

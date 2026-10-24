@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ventas · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610241651">
+<link rel="stylesheet" href="../shell/shell.css?v=202610241703">
 <style>
   .filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
   .filtros input[type=date],.filtros select{border:1px solid var(--linea);background:var(--superficie-2);padding:8px 10px;border-radius:var(--radio-mini)}
@@ -35,11 +35,12 @@
   .ed-dif{color:var(--error);font-weight:600}.ed-dif.ok{color:var(--ok)}
   #impresion{display:none}
   @media print{body.con-lateral>*{display:none!important}#impresion{display:block!important;font:12px/1.35 var(--f-mono);color:#000;width:72mm;padding:2mm}#impresion h2{font:700 15px var(--f-ui);margin:0 0 2px}#impresion .c{text-align:center}#impresion .r{text-align:right}#impresion table{width:100%;border-collapse:collapse}#impresion td{padding:2px 0;vertical-align:top}#impresion hr{border:0;border-top:1px dashed #000;margin:6px 0}@page{size:80mm auto;margin:0}}
+  .aviso-revisar{margin-left:auto;align-self:center;font:600 12.5px var(--f-ui);color:var(--error);background:var(--error-fondo);border-radius:999px;padding:6px 12px;text-decoration:none;white-space:nowrap}
 </style>
 </head>
 <body data-page="ventas" data-etq="Caja" data-title="Ventas" data-subtitle="Tickets, señas, cambios y cierres de caja">
 <main class="app">
-  <div class="pestanas"><button class="on" data-t="ventas">Ventas</button><button data-t="senas">Señas pendientes</button><button data-t="cierres">Cierres de caja</button><button data-t="creditos">Créditos y gift cards</button><button data-t="revisar">Stock a revisar <span class="chip error" id="n-revisar" style="display:none"></span></button></div>
+  <div class="pestanas"><button class="on" data-t="ventas">Ventas</button><button data-t="senas">Señas pendientes</button><button data-t="cierres">Cierres de caja</button><button data-t="creditos">Créditos y gift cards</button><a class="aviso-revisar" id="n-revisar" href="../catalogo/inventario.html#stock" style="display:none"></a></div>
   <section id="t-ventas">
     <div class="filtros"><input type="date" id="f-desde"><span class="sub">a</span><input type="date" id="f-hasta"><select id="f-estado"><option value="">Todas</option><option value="completada">Completadas</option><option value="senada">Señadas</option><option value="anulada">Anuladas</option></select><select id="f-origen"><option value="">Local y online</option><option value="local">Solo local</option><option value="online">Solo online (Tienda Nube, WhatsApp…)</option><option value="tiendanube">Tienda Nube</option><option value="whatsapp">WhatsApp</option><option value="factusol">FactuSOL</option></select><span class="sub" id="resumen" style="margin-left:auto"></span></div>
     <div class="sub" id="fs-estado" style="display:none;margin:-6px 0 12px;align-items:center;gap:10px"></div>
@@ -48,13 +49,12 @@
   </section>
   <section id="t-senas" style="display:none"><div class="card" style="padding:0"><table class="lista" id="tb-senas"><thead><tr><th>Ticket</th><th>Fecha</th><th>Clienta</th><th class="num">Total</th><th class="num">Pagado</th><th class="num">Saldo</th><th></th></tr></thead><tbody></tbody></table></div></section>
   <section id="t-cierres" style="display:none"><div class="card" style="padding:0"><table class="lista" id="tb-cierres"><thead><tr><th>Caja</th><th>Abierta</th><th>Cerrada</th><th class="num">Ventas</th><th class="num">Diferencia</th><th></th></tr></thead><tbody></tbody></table></div></section>
-  <section id="t-revisar" style="display:none"><p class="sub" style="margin:0 0 10px">Prendas que se vendieron aunque el sistema decía que no había (o sin marcar la falla). Contá cuántas hay y corregí.</p><div class="card" style="padding:0"><table class="lista" id="tb-revisar"><thead><tr><th>Cuándo</th><th>Prenda</th><th>Qué pasó</th><th class="num">Stock ahora</th><th></th></tr></thead><tbody></tbody></table></div></section>
   <section id="t-creditos" style="display:none"><div class="card" style="padding:0"><table class="lista" id="tb-creditos"><thead><tr><th>Código</th><th>Tipo</th><th>Clienta</th><th>Emitido</th><th class="num">Monto</th><th class="num">Saldo</th><th>Estado</th></tr></thead><tbody></tbody></table></div></section>
 </main>
 <div id="impresion"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610241651"></script>
-<script src="../shell/shell.js?v=202610241651"></script>
+<script src="../shared/supabase.js?v=202610241703"></script>
+<script src="../shell/shell.js?v=202610241703"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -72,7 +72,7 @@ APP.ready.then(async () => {
     const [v, c, f] = await Promise.all([sb.from('v_vendedoras').select('*').eq('empresa_id', e).order('nombre'), sb.from('clientes').select('id,nombre').eq('empresa_id', e).order('nombre').limit(2000), sb.from('formas_pago').select('*').eq('empresa_id', e).eq('activa', true).order('orden')]);
     vendedoras = v.data || []; clientes = c.data || []; formas = f.data || [];
   }
-  $$('.pestanas button').forEach(b => b.onclick = () => { $$('.pestanas button').forEach(x => x.classList.toggle('on', x === b)); ['ventas', 'senas', 'cierres', 'creditos', 'revisar'].forEach(t => $('#t-' + t).style.display = t === b.dataset.t ? '' : 'none'); ({ ventas: cargar, senas: cargarSenas, cierres: cargarCierres, creditos: cargarCreditos, revisar: cargarRevisar })[b.dataset.t](); });
+  $$('.pestanas button').forEach(b => b.onclick = () => { $$('.pestanas button').forEach(x => x.classList.toggle('on', x === b)); ['ventas', 'senas', 'cierres', 'creditos'].forEach(t => $('#t-' + t).style.display = t === b.dataset.t ? '' : 'none'); ({ ventas: cargar, senas: cargarSenas, cierres: cargarCierres, creditos: cargarCreditos })[b.dataset.t](); });
 
   async function cargar() {
     let c = sb.from('v_ventas').select('*').eq('empresa_id', e).gte('fecha', $('#f-desde').value + 'T00:00:00').lte('fecha', $('#f-hasta').value + 'T23:59:59').order('fecha', { ascending: false }).limit(500);
@@ -238,35 +238,14 @@ APP.ready.then(async () => {
     const b = $('#fs-traer'); if (b) b.onclick = async () => { b.disabled = true; const { data, error } = await sb.rpc('factusol_importar_ventas'); if (error) { toast(mensajeError(error), 'error'); b.disabled = false; return; }
       toast(`${(data.importados || []).length} tickets traídos de FactuSOL`); estadoFactusol(); cargar(); };
   }
-  // ---------- Stock a revisar ----------
+  // ---------- avisos de stock: se corrigen en Inventario ----------
   async function contarRevisar() {
     const { count } = await sb.from('stock_revisar').select('id', { count: 'exact', head: true }).eq('empresa_id', e).is('resuelto', null);
-    const n = $('#n-revisar'); n.textContent = count || ''; n.style.display = count ? '' : 'none';
-  }
-  async function cargarRevisar() {
-    const { data } = await sb.from('v_stock_revisar').select('*').eq('empresa_id', e).is('resuelto', null).order('creado', { ascending: false });
-    const tb = $('#tb-revisar tbody'); const ds = data || [];
-    tb.innerHTML = ds.map(r => `<tr><td>${fmt.fechaHora(r.creado)}</td><td><b>${esc(r.producto_nombre)}</b><br><small>${esc([r.talle_nombre, r.color_nombre].filter(Boolean).join(' · '))}</small></td><td>${r.motivo === 'falla' ? '◆ ' : '⚠ '}${esc(r.detalle || '')}</td><td class="num num-f">${fmt.num(r.stock)}${+r.fallas ? ' <small>(◆' + fmt.num(r.fallas) + ')</small>' : ''}</td><td><button class="btn chico primario" data-corr="${r.id}">Corregir</button></td></tr>`).join('') || '<tr><td colspan="5" class="vacio">No hay nada para revisar. 👌</td></tr>';
-    $$('[data-corr]', tb).forEach(b => b.onclick = () => corregirRevisar(ds.find(x => String(x.id) === b.dataset.corr)));
-    contarRevisar();
-  }
-  function corregirRevisar(r) {
-    const m = modal(`<h2>${esc(r.producto_nombre)}</h2><p class="sub">${esc([r.talle_nombre, r.color_nombre].filter(Boolean).join(' · '))} · ${esc(r.detalle || '')}</p>
-      <div class="fila c2" style="margin-top:12px"><div class="campo"><label>¿Cuántas hay ahora en el local?</label><input id="rv-n" type="number" min="0" step="1" value="${Math.max(0, +r.stock || 0)}"></div>
-      <div class="campo"><label>◆ ¿Cuántas de esas tienen falla?</label><input id="rv-f" type="number" min="0" step="1" value="${Math.min(+r.fallas || 0, Math.max(0, +r.stock || 0))}"></div></div>
-      <div class="campo"><label>Nota</label><input id="rv-nota" placeholder="Opcional (ej. estaban en la vidriera)"></div>
-      <div class="pie" style="justify-content:space-between"><button class="btn" data-visto>Está bien así</button><div style="display:flex;gap:6px"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Guardar lo contado</button></div></div>`);
-    const enviar = async contado => {
-      const f = +$('#rv-f', m).value || 0, n = +$('#rv-n', m).value || 0;
-      if (contado && f > n) { toast('No puede haber más con falla que las que hay', 'error'); return; }
-      const { error } = await sb.rpc('stock_revisar_resolver', { p_id: r.id, p_contado: contado ? n : null, p_fallas: contado ? f : null, p_nota: $('#rv-nota', m).value.trim() || null });
-      if (error) { toast(mensajeError(error), 'error'); return; } m.cerrar(); toast(contado ? 'Stock corregido' : 'Listo'); cargarRevisar();
-    };
-    $('[data-no]', m).onclick = () => m.cerrar(); $('[data-si]', m).onclick = () => enviar(true); $('[data-visto]', m).onclick = () => enviar(false);
+    const n = $('#n-revisar'); n.textContent = count ? `⚠ ${count} ${count === 1 ? 'prenda' : 'prendas'} para corregir stock → Inventario` : ''; n.style.display = count ? '' : 'none';
   }
   contarRevisar();
   estadoFactusol();
-  if (location.hash === '#revisar') { const b = $('.pestanas [data-t="revisar"]'); if (b) b.click(); }
+  if (location.hash === '#revisar') location.href = '../catalogo/inventario.html#stock';
   await cargar();
 });
 </script>
