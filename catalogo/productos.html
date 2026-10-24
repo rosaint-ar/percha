@@ -5,14 +5,64 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Catálogo · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610241628">
+<link rel="stylesheet" href="../shell/shell.css?v=202610241651">
 <style>
-  .filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
-  .filtros select{border:1px solid var(--linea);background:var(--superficie-2);border-radius:var(--radio-mini);height:34px;padding:0 10px;height:38px}
-  .filtros label.chk{display:flex;align-items:center;gap:6px;font:600 14px var(--f-ui);color:var(--tinta)}
-  .resumen{font-size:14px;color:var(--suave);margin-left:auto}
-  td .cod{font:600 12px var(--f-ui);color:var(--suave);letter-spacing:.04em}
+  .filtros{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+  .filtros .buscador{flex:1 1 260px;min-width:0}
+  .filtros select{border:1px solid var(--linea);background:var(--superficie-2);border-radius:10px;height:38px;padding:0 10px;font:500 13.5px var(--f-ui);max-width:200px}
+  .filtros label.chk{display:flex;align-items:center;gap:6px;font:600 13px var(--f-ui);color:var(--tinta-2);white-space:nowrap}
+  .resumen{font-size:13px;color:var(--tinta-3);margin-left:auto;white-space:nowrap}
+  .tabla-wrap{overflow-x:auto}
+  #tabla td{vertical-align:middle}
+  #tabla .sel{width:34px;text-align:center}
+  #tabla .sel input,#todos{width:17px;height:17px;accent-color:var(--acento);cursor:pointer}
+  .mini{width:40px;height:40px;border-radius:9px;object-fit:cover;display:block;background:var(--relleno)}
+  .mini.sf{display:grid;place-items:center;font:700 12px var(--f-titulo);color:var(--acento);background:linear-gradient(145deg,rgba(var(--acento-rgb),.14),rgba(var(--acento-rgb),.04))}
+  td .nom{font-weight:600}
+  td .cod{font:500 11.5px var(--f-mono);color:var(--tinta-3)}
+  td .temp{font:600 11px var(--f-ui);color:var(--tinta-3)}
   .inactivo td{opacity:.5}
+  tr.marcado td{background:var(--lila-suave)}
+  /* barra de acciones sobre lo elegido */
+  .barra-sel{position:sticky;bottom:14px;z-index:6;display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:rgba(21,23,28,.92);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);color:#fff;border-radius:16px;padding:10px 12px 10px 16px;margin-top:12px;box-shadow:var(--sombra-flotante);animation:subir .18s ease-out}
+  @keyframes subir{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+  .barra-sel .cuantos{font:700 13.5px var(--f-ui);margin-right:4px}
+  .barra-sel .todos-filtro{background:none;border:0;color:#C9B8F0;font:600 12.5px var(--f-ui);cursor:pointer;text-decoration:underline;padding:0 6px}
+  .barra-sel .btn{background:rgba(255,255,255,.1);color:#fff;border-color:rgba(255,255,255,.14)}
+  .barra-sel .btn:hover{background:rgba(255,255,255,.2)}
+  .barra-sel .btn.primario{background:var(--acento);border-color:var(--acento)}
+  .barra-sel .cerrar{margin-left:auto}
+  /* cambio de precios */
+  .seg{display:inline-flex;background:var(--relleno);border-radius:10px;padding:3px;gap:2px;flex-wrap:wrap}
+  .seg button{border:0;background:transparent;padding:7px 12px;border-radius:8px;font:600 12.5px var(--f-ui);color:var(--tinta-2);cursor:pointer}
+  .seg button.on{background:var(--superficie-2);color:var(--tinta);box-shadow:0 1px 2px rgba(21,23,28,.08)}
+  .cp-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+  .cp-valor{display:flex;align-items:center;border:1px solid var(--linea);border-radius:10px;background:var(--superficie-2);height:42px;overflow:hidden}
+  .cp-valor span{padding:0 12px;font:700 15px var(--f-mono);color:var(--tinta-3)}
+  .cp-valor input{flex:1;min-width:0;border:0;outline:0;background:transparent;height:100%;font:700 18px var(--f-mono);text-align:right;padding-right:6px}
+  .cp-res{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0 10px}
+  .cp-res div{border:1px solid var(--linea);border-radius:12px;padding:10px 12px}
+  .cp-res span{display:block;font:600 10.5px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--tinta-3)}
+  .cp-res b{font:800 19px var(--f-titulo);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+  .cp-tabla{max-height:260px;overflow:auto;border:1px solid var(--linea-suave);border-radius:12px}
+  .cp-tabla table{width:100%;border-collapse:collapse;font-size:12.5px}
+  .cp-tabla td{padding:6px 10px;border-bottom:1px solid var(--linea-suave)}
+  .cp-tabla td.n{text-align:right;font-family:var(--f-mono);white-space:nowrap}
+  .sube{color:var(--ok)}.baja{color:var(--error)}
+  .cp-cargando{opacity:.5;transition:opacity .15s}
+  /* importar */
+  .imp-pasos{display:grid;gap:10px}
+  .imp-caja{border:1.5px dashed var(--linea);border-radius:14px;padding:22px;text-align:center;cursor:pointer;transition:border-color .12s,background .12s}
+  .imp-caja:hover,.imp-caja.sobre{border-color:var(--acento);background:var(--lila-suave)}
+  .imp-caja b{display:block;font-size:14.5px;margin-bottom:4px}.imp-caja span{font-size:12.5px;color:var(--tinta-3)}
+  .imp-cols{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+  .imp-cols span{font:600 11.5px var(--f-ui);border-radius:999px;padding:4px 10px;background:var(--ok-fondo);color:var(--ok)}
+  .imp-cols span.no{background:var(--relleno);color:var(--tinta-3);text-decoration:line-through}
+  .imp-err{max-height:160px;overflow:auto;font-size:12.5px;border:1px solid var(--error-fondo);border-radius:10px;padding:6px 10px;color:var(--error)}
+  .imp-nuevos{font-size:12.5px;color:var(--tinta-2);margin:6px 0}
+  .lote{display:grid;grid-template-columns:110px minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--linea-suave);font-size:13px}
+  .lote small{display:block;color:var(--tinta-3);font-size:11.5px}
+  @media (max-width:700px){.cp-grid,.cp-res{grid-template-columns:1fr}.filtros select{max-width:none;flex:1 1 140px}.col-opc{display:none}}
 </style>
 </head>
 <body data-page="productos" data-etq="Catálogo" data-title="Productos" data-subtitle="Prendas, talles, colores, stock y precios">
@@ -20,71 +70,315 @@
   <div class="filtros">
     <div class="buscador"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" placeholder="Buscar por nombre, código o código de barras" autofocus></div>
     <select id="f-cat"><option value="">Todas las familias</option></select>
-    <label class="chk"><input type="checkbox" id="f-stock"> Solo con stock</label>
-    <label class="chk"><input type="checkbox" id="f-inactivos"> Ver inactivos</label>
+    <select id="f-tem"><option value="">Todas las temporadas</option><option value="-">Sin temporada</option></select>
+    <select id="f-mar"><option value="">Todas las marcas</option></select>
+    <select id="f-stock"><option value="">Con y sin stock</option><option value="con">Con stock</option><option value="sin">Sin stock</option><option value="neg">Stock negativo</option></select>
+    <label class="chk"><input type="checkbox" id="f-inactivos"> Inactivos</label>
     <span class="resumen" id="resumen"></span>
   </div>
   <div class="card" style="padding:0">
-    <table class="lista" id="tabla">
-      <thead><tr><th>Producto</th><th>Familia</th><th class="num">Variantes</th><th class="num">Stock</th><th class="num">Precio lista</th><th class="num solo-admin">Costo</th><th></th></tr></thead>
+    <div class="tabla-wrap"><table class="lista" id="tabla">
+      <thead><tr><th class="sel solo-admin"><input type="checkbox" id="todos" title="Elegir todos los de la lista"></th><th style="width:52px"></th><th>Producto</th><th class="col-opc">Familia</th><th class="num col-opc">Variantes</th><th class="num">Stock</th><th class="num">Precio</th><th class="num solo-admin col-opc">Costo</th><th class="col-opc"></th></tr></thead>
       <tbody></tbody>
-    </table>
+    </table></div>
     <div id="mas" style="padding:12px;text-align:center;display:none"><button class="btn" id="btn-mas">Ver más</button></div>
   </div>
+  <div class="barra-sel" id="barra-sel" hidden></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610241628"></script>
-<script src="../shell/shell.js?v=202610241628"></script>
+<script src="../shared/supabase.js?v=202610241651"></script>
+<script src="../shell/shell.js?v=202610241651"></script>
 <script>
 APP.ready.then(async () => {
-  const { fmt, esc, $, $$ } = APP, e = APP.empresa.id, PAG = 100;
-  if (!APP.esAdmin) $$('.solo-admin').forEach(x => x.style.display = 'none');
-  else $('#acciones-pagina').innerHTML = `<a class="btn primario" href="producto.html?nuevo=1">+ Nuevo producto</a>`;
+  const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id, PAG = 100, admin = APP.esAdmin;
+  if (!admin) $$('.solo-admin').forEach(x => x.style.display = 'none');
+  else $('#acciones-pagina').innerHTML = `<button class="btn" id="btn-excel">Importar / exportar</button><button class="btn" id="btn-hist">Cambios de precio</button><a class="btn primario" href="producto.html?nuevo=1">+ Nuevo producto</a>`;
+  const nrm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 
-  const { data: cats } = await sb.from('categorias').select('id,nombre').eq('empresa_id', e).order('nombre');
-  (cats || []).forEach(c => $('#f-cat').insertAdjacentHTML('beforeend', `<option value="${c.id}">${esc(c.nombre)}</option>`));
+  const [{ data: cats }, { data: tems }, { data: mars }] = await Promise.all([
+    sb.from('categorias').select('id,nombre').eq('empresa_id', e).eq('activa', true).order('orden'),
+    sb.from('temporadas').select('id,nombre').eq('empresa_id', e).eq('activa', true).order('orden'),
+    sb.from('marcas').select('id,nombre').eq('empresa_id', e).eq('activa', true).order('orden').order('nombre')]);
+  const nice = s => s.charAt(0) + s.slice(1).toLowerCase();
+  (cats || []).forEach(c => $('#f-cat').insertAdjacentHTML('beforeend', `<option value="${c.id}">${esc(nice(c.nombre))}</option>`));
+  (tems || []).forEach(c => $('#f-tem').insertAdjacentHTML('beforeend', `<option value="${c.id}">${esc(c.nombre)}</option>`));
+  (mars || []).forEach(c => $('#f-mar').insertAdjacentHTML('beforeend', `<option value="${c.id}">${esc(c.nombre)}</option>`));
+  if ((mars || []).length < 2) $('#f-mar').style.display = 'none';
 
-  let desde = 0, ultimaConsulta = 0;
+  // ---------- lista ----------
+  let desde = 0, ultimaConsulta = 0, filas = new Map();
+  const elegidos = new Set();
+  function consulta(campos, opciones) {
+    let c = sb.from('v_productos').select(campos, opciones).eq('empresa_id', e);
+    const q = $('#q').value.trim();
+    // cada palabra tiene que aparecer en el nombre o en el código ("pijama clara" encuentra PIJAMA «CLARA»)
+    q.split(/\s+/).filter(Boolean).forEach(w => { const s = w.replace(/[%,()]/g, ''); if (s) c = c.or(`nombre.ilike.%${s}%,codigo.ilike.%${s}%`); });
+    if ($('#f-cat').value) c = c.eq('categoria_id', $('#f-cat').value);
+    if ($('#f-tem').value === '-') c = c.is('temporada_id', null); else if ($('#f-tem').value) c = c.eq('temporada_id', $('#f-tem').value);
+    if ($('#f-mar').value) c = c.eq('marca_id', $('#f-mar').value);
+    const st = $('#f-stock').value; if (st === 'con') c = c.gt('stock', 0); else if (st === 'sin') c = c.eq('stock', 0); else if (st === 'neg') c = c.lt('stock', 0);
+    if (!$('#f-inactivos').checked) c = c.eq('activo', true);
+    return c;
+  }
   async function cargar(reiniciar) {
     const id = ++ultimaConsulta;
-    if (reiniciar) { desde = 0; $('#tabla tbody').innerHTML = ''; }
+    if (reiniciar) { desde = 0; $('#tabla tbody').innerHTML = ''; filas.clear(); }
     const q = $('#q').value.trim();
     // Un número largo es un código de barras: abre directo la variante
     if (reiniciar && /^\d{8,14}$/.test(q)) {
       const { data: v } = await sb.from('variantes').select('producto_id').eq('empresa_id', e).eq('ean', q).maybeSingle();
       if (v) { location.href = `producto.html?id=${v.producto_id}&ean=${q}`; return; }
     }
-    let c = sb.from('v_productos').select('*').eq('empresa_id', e).order('nombre').range(desde, desde + PAG - 1);
-    // cada palabra tiene que aparecer en el nombre o en el código ("pijama clara" encuentra PIJAMA «CLARA»)
-    q.split(/\s+/).filter(Boolean).forEach(w => { const s = w.replace(/[%,()]/g, ''); if (s) c = c.or(`nombre.ilike.%${s}%,codigo.ilike.%${s}%`); });
-    if ($('#f-cat').value) c = c.eq('categoria_id', $('#f-cat').value);
-    if ($('#f-stock').checked) c = c.gt('stock', 0);
-    if (!$('#f-inactivos').checked) c = c.eq('activo', true);
-    const { data, error } = await c;
+    const { data, error } = await consulta('*').order('nombre').range(desde, desde + PAG - 1);
     if (id !== ultimaConsulta) return;
-    if (error) { APP.toast(APP.mensajeError(error), 'error'); return; }
+    if (error) { toast(mensajeError(error), 'error'); return; }
     const tb = $('#tabla tbody');
     (data || []).forEach(p => {
+      filas.set(p.id, p);
       const st = +p.stock || 0;
-      tb.insertAdjacentHTML('beforeend', `<tr class="clic ${p.activo ? '' : 'inactivo'}" data-id="${p.id}">
-        <td><div>${esc(p.nombre)}${p.tipo === 'kit' ? ' <span class="chip">kit</span>' : ''}</div><span class="cod">${esc(p.codigo)}${p.tipo !== 'prenda' && p.tipo !== 'kit' ? ' · ' + esc(p.tipo) : ''}</span></td>
-        <td>${esc(p.categoria || '')}</td>
-        <td class="num">${p.tiene_variantes ? fmt.num(p.variantes) : '<span class="chip gris">único</span>'}</td>
+      tb.insertAdjacentHTML('beforeend', `<tr class="clic ${p.activo ? '' : 'inactivo'} ${elegidos.has(p.id) ? 'marcado' : ''}" data-id="${p.id}">
+        ${admin ? `<td class="sel"><input type="checkbox" data-sel ${elegidos.has(p.id) ? 'checked' : ''}></td>` : ''}
+        <td>${p.imagen_url ? `<img class="mini" src="${esc(p.imagen_url)}" alt="" loading="lazy">` : `<span class="mini sf">${esc(APP.iniciales(p.nombre.replace(/[«»\[\]]/g, '')))}</span>`}</td>
+        <td><div class="nom">${esc(p.nombre)}${p.tipo === 'kit' ? ' <span class="chip">kit</span>' : ''}</div><span class="cod">${esc(p.codigo)}</span>${p.temporada ? ` <span class="temp">· ${esc(p.temporada)}</span>` : ''}${p.marca && (mars || []).length > 1 ? ` <span class="temp">· ${esc(p.marca)}</span>` : ''}</td>
+        <td class="col-opc">${esc(p.categoria ? nice(p.categoria) : '')}</td>
+        <td class="num col-opc">${p.tiene_variantes ? fmt.num(p.variantes) : '<span class="chip gris">único</span>'}</td>
         <td class="num ${st > 0 ? 'num-f' : ''}">${st > 0 ? fmt.num(st) : (st < 0 ? '<span class="chip error">' + fmt.num(st) + '</span>' : '<span class="chip gris">sin stock</span>')}</td>
         <td class="num">${fmt.pesos(p.precio)}</td>
-        <td class="num solo-admin" ${APP.esAdmin ? '' : 'style="display:none"'}>${fmt.pesos(p.costo)}</td>
-        <td>${p.activo ? '' : '<span class="chip gris">inactivo</span>'}</td></tr>`);
+        ${admin ? `<td class="num col-opc">${fmt.pesos(p.costo)}</td>` : ''}
+        <td class="col-opc">${p.activo ? '' : '<span class="chip gris">inactivo</span>'}</td></tr>`);
     });
-    if (!tb.children.length) tb.innerHTML = '<tr><td colspan="7" class="vacio">No hay productos con ese filtro.</td></tr>';
+    if (!tb.children.length) tb.innerHTML = '<tr><td colspan="9" class="vacio">No hay productos con ese filtro.</td></tr>';
     $('#mas').style.display = (data || []).length === PAG ? 'block' : 'none';
     desde += (data || []).length;
-    $('#resumen').textContent = `${fmt.num(tb.querySelectorAll('tr[data-id]').length)} productos`;
+    const { count } = reiniciar ? await consulta('id', { count: 'exact', head: true }) : { count: null };
+    if (count != null) totalFiltro = count;
+    $('#resumen').textContent = `${fmt.num(totalFiltro)} productos`;
+    pintarSel();
   }
-  $('#tabla').addEventListener('click', ev => { const tr = ev.target.closest('tr[data-id]'); if (tr) location.href = `producto.html?id=${tr.dataset.id}`; });
+  let totalFiltro = 0;
+  $('#tabla').addEventListener('click', ev => {
+    const tr = ev.target.closest('tr[data-id]'); if (!tr) return;
+    if (ev.target.closest('.sel')) { const cb = $('[data-sel]', tr); if (ev.target !== cb) cb.checked = !cb.checked; elegir(tr.dataset.id, cb.checked, tr); return; }
+    location.href = `producto.html?id=${tr.dataset.id}`;
+  });
   let t; $('#q').addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => cargar(true), 250); });
   $('#q').addEventListener('keydown', ev => { if (ev.key === 'Enter') { clearTimeout(t); cargar(true); } });
-  ['#f-cat', '#f-stock', '#f-inactivos'].forEach(s => $(s).addEventListener('change', () => cargar(true)));
+  ['#f-cat', '#f-tem', '#f-mar', '#f-stock', '#f-inactivos'].forEach(s => $(s).addEventListener('change', () => cargar(true)));
   $('#btn-mas').onclick = () => cargar(false);
+
+  // ---------- selección ----------
+  function elegir(id, si, tr) { si ? elegidos.add(id) : elegidos.delete(id); if (tr) tr.classList.toggle('marcado', si); pintarSel(); }
+  const todosCb = $('#todos');
+  if (todosCb) todosCb.onchange = () => { $$('#tabla tr[data-id]').forEach(tr => { $('[data-sel]', tr).checked = todosCb.checked; elegir(tr.dataset.id, todosCb.checked, tr); }); };
+  async function elegirTodoElFiltro() {
+    let d = 0; while (true) { const { data } = await consulta('id').order('nombre').range(d, d + 999); (data || []).forEach(x => elegidos.add(x.id)); if (!data || data.length < 1000) break; d += 1000; }
+    $$('#tabla tr[data-id]').forEach(tr => { $('[data-sel]', tr).checked = true; tr.classList.add('marcado'); }); pintarSel();
+  }
+  function pintarSel() {
+    const b = $('#barra-sel'); if (!admin) return;
+    if (!elegidos.size) { b.hidden = true; if (todosCb) todosCb.checked = false; return; }
+    b.hidden = false;
+    b.innerHTML = `<span class="cuantos">${fmt.num(elegidos.size)} elegido${elegidos.size === 1 ? '' : 's'}</span>${totalFiltro > elegidos.size ? `<button class="todos-filtro" data-a="todo">Elegir los ${fmt.num(totalFiltro)} del filtro</button>` : ''}
+      <button class="btn primario" data-a="precios">Cambiar precios</button><button class="btn" data-a="temporada">Temporada</button><button class="btn" data-a="marca">Marca</button><button class="btn" data-a="familia">Familia</button><button class="btn" data-a="activo">Activar / desactivar</button>
+      <button class="btn cerrar" data-a="nada" title="Quitar la selección">✕</button>`;
+    $$('[data-a]', b).forEach(x => x.onclick = () => ({ todo: elegirTodoElFiltro, precios: cambiarPrecios, temporada: () => asignar('temporada_id', 'temporadas', 'Temporada', tems), marca: () => asignar('marca_id', 'marcas', 'Marca', mars), familia: () => asignar('categoria_id', 'categorias', 'Familia', cats), activo: activar,
+      nada: () => { elegidos.clear(); $$('#tabla tr[data-id]').forEach(tr => { $('[data-sel]', tr).checked = false; tr.classList.remove('marcado'); }); pintarSel(); } })[x.dataset.a]());
+  }
+  async function actualizarEnTandas(cambios) {
+    const ids = [...elegidos];
+    for (let i = 0; i < ids.length; i += 150) { const r = await sb.from('productos').update(cambios).in('id', ids.slice(i, i + 150)); if (r.error) throw r.error; }
+  }
+  async function asignar(campo, tabla, titulo, lista) {
+    const m = modal(`<h2>${titulo} de ${fmt.num(elegidos.size)} productos</h2><p class="sub">Se cambia en todos los elegidos.</p>
+      <div class="campo" style="margin-top:12px"><label>${titulo}</label><select id="as-sel"><option value="">${campo === 'temporada_id' ? 'Sin temporada' : '—'}</option>${(lista || []).map(x => `<option value="${x.id}">${esc(campo === 'categoria_id' ? nice(x.nombre) : x.nombre)}</option>`).join('')}</select></div>
+      <div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Aplicar</button></div>`);
+    const sel = $('#as-sel', m);
+    APP.selectConAgregar(sel, { texto: `+ ${campo === 'temporada_id' ? 'Nueva temporada' : campo === 'marca_id' ? 'Nueva marca' : 'Nueva familia'}…`, crear: async () => {
+      const d = await APP.formulario({ titulo: 'Nueva ' + titulo.toLowerCase(), campos: [{ k: 'nombre', label: 'Nombre', requerido: true }] }); if (!d) return null;
+      const r = await sb.from(tabla).insert(APP.conEmpresa({ nombre: campo === 'categoria_id' ? d.nombre.toUpperCase() : d.nombre })).select().single(); if (r.error) { toast(mensajeError(r.error), 'error'); return null; }
+      lista.push(r.data); return { valor: r.data.id, texto: r.data.nombre }; } });
+    $('[data-no]', m).onclick = () => m.cerrar();
+    $('[data-si]', m).onclick = async () => { const b = $('[data-si]', m); b.disabled = true;
+      try { await actualizarEnTandas({ [campo]: sel.value || null }); } catch (err) { toast(mensajeError(err), 'error'); b.disabled = false; return; }
+      m.cerrar(); toast(`${titulo} aplicada a ${fmt.num(elegidos.size)} productos`); cargar(true); };
+  }
+  async function activar() {
+    const m = modal(`<h2>${fmt.num(elegidos.size)} productos</h2><p class="sub">Los inactivos no aparecen en la caja ni en los recuentos. No se borra nada.</p>
+      <div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn" data-v="false">Desactivar</button><button class="btn primario" data-v="true">Activar</button></div>`);
+    $('[data-no]', m).onclick = () => m.cerrar();
+    $$('[data-v]', m).forEach(b => b.onclick = async () => { try { await actualizarEnTandas({ activo: b.dataset.v === 'true' }); } catch (err) { toast(mensajeError(err), 'error'); return; } m.cerrar(); toast('Listo'); cargar(true); });
+  }
+
+  // ---------- cambiar precios en masa ----------
+  function cambiarPrecios() {
+    let red0 = '100'; try { red0 = localStorage.getItem('percha_redondeo') || '100'; } catch (_) { }
+    const st = { campo: 'precio', op: 'sube', valor: '', red: red0, arriba: true, desc: '' };
+    const OPS = { sube: ['Subir %', '%'], baja: ['Bajar %', '%'], suma: ['Sumar $', '$'], resta: ['Restar $', '$'], fijar: ['Dejar en $', '$'], markup: ['Costo ×', '×'] };
+    const m = modal('<div id="cp"></div>'); $('.modal', m).style.maxWidth = '760px';
+    let ultimo = null, tSim;
+    const payload = simular => {
+      const v = +String(st.valor).replace(',', '.') || 0;
+      const op = { sube: 'porcentaje', baja: 'porcentaje', suma: 'monto', resta: 'monto', fijar: 'fijar', markup: 'markup' }[st.op];
+      const valor = st.op === 'baja' || st.op === 'resta' ? -v : v;
+      const red = st.red === 'no' ? 'no' : st.red + (st.arriba ? '+' : '');
+      const desc = st.desc || `${OPS[st.op][0].replace(/ [%$×]$/, '')} ${st.op === 'markup' ? '×' + fmt.dec(v) : OPS[st.op][1] === '%' ? fmt.dec(v) + '%' : fmt.pesos(v)} · ${st.campo === 'precio' ? 'precio de venta' : 'costo'}${red !== 'no' ? ' · redondeo ' + $('#cp-red option:checked', m).textContent.toLowerCase() : ''} · ${fmt.num(elegidos.size)} productos`;
+      return { empresa_id: e, productos: [...elegidos], campo: st.campo, operacion: op, valor, redondeo: red, simular, descripcion: desc };
+    };
+    const pintar = () => {
+      $('#cp', m).innerHTML = `<h2>Cambiar precios · ${fmt.num(elegidos.size)} productos</h2><p class="sub">Primero ves cómo queda; recién al aplicar se cambia. Después se puede deshacer.</p>
+        <div class="cp-grid" style="margin-top:14px">
+          <div class="campo"><label>Qué cambiás</label><div class="seg" id="cp-campo"><button data-v="precio" class="${st.campo === 'precio' ? 'on' : ''}">Precio de venta</button><button data-v="costo" class="${st.campo === 'costo' ? 'on' : ''}">Costo</button></div></div>
+          <div class="campo"><label>Cómo</label><div class="seg" id="cp-op">${Object.entries(OPS).filter(([k]) => st.campo === 'precio' || k !== 'markup').map(([k, [t]]) => `<button data-v="${k}" class="${st.op === k ? 'on' : ''}">${t}</button>`).join('')}</div></div>
+          <div class="campo"><label>${st.op === 'markup' ? 'Multiplicar el costo por' : 'Valor'}</label><div class="cp-valor"><span>${OPS[st.op][1]}</span><input id="cp-val" inputmode="decimal" value="${esc(st.valor)}" placeholder="${st.op === 'markup' ? '2,5' : st.op.match(/sube|baja/) ? '15' : '1000'}"></div></div>
+          <div class="campo"><label>Redondeo</label><div style="display:flex;gap:8px;align-items:center"><select id="cp-red" style="flex:1;height:42px;border:1px solid var(--linea);border-radius:10px;padding:0 10px;background:var(--superficie-2)">
+            ${[['no', 'Sin redondeo'], ['100', 'A $100'], ['500', 'A $500'], ['1000', 'A $1.000'], ['990', 'Terminado en 990'], ['900', 'Terminado en 900']].map(([v, t]) => `<option value="${v}" ${st.red === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
+            <label class="chk-linea" style="margin:0;white-space:nowrap" title="Si no, al más cercano"><input type="checkbox" id="cp-arriba" ${st.arriba ? 'checked' : ''} ${st.red === 'no' ? 'disabled' : ''}> Hacia arriba</label></div></div>
+        </div>
+        <div class="campo"><label>Motivo (opcional)</label><input id="cp-desc" value="${esc(st.desc)}" placeholder="Ej. aumento de proveedor de noviembre"></div>
+        <div id="cp-prev"><p class="sub" style="text-align:center;padding:20px 0">Escribí el valor para ver cómo quedan los precios.</p></div>
+        <div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si disabled>Aplicar</button></div>`;
+      $$('#cp-campo button', m).forEach(b => b.onclick = () => { st.campo = b.dataset.v; if (st.campo === 'costo' && st.op === 'markup') st.op = 'sube'; pintar(); simular(); });
+      $$('#cp-op button', m).forEach(b => b.onclick = () => { st.op = b.dataset.v; pintar(); simular(); $('#cp-val', m).focus(); });
+      const iv = $('#cp-val', m); iv.oninput = () => { st.valor = iv.value; simular(); };
+      $('#cp-red', m).onchange = ev => { st.red = ev.target.value; try { localStorage.setItem('percha_redondeo', st.red); } catch (_) { } $('#cp-arriba', m).disabled = st.red === 'no'; simular(); };
+      $('#cp-arriba', m).onchange = ev => { st.arriba = ev.target.checked; simular(); };
+      $('#cp-desc', m).oninput = ev => { st.desc = ev.target.value.trim(); };
+      $('[data-no]', m).onclick = () => m.cerrar();
+      $('[data-si]', m).onclick = aplicar;
+      if (ultimo) mostrar(ultimo);
+    };
+    const simular = () => { clearTimeout(tSim); tSim = setTimeout(async () => {
+      const v = +String(st.valor).replace(',', '.'); if (!v && st.op !== 'fijar') { ultimo = null; $('#cp-prev', m).innerHTML = '<p class="sub" style="text-align:center;padding:20px 0">Escribí el valor para ver cómo quedan los precios.</p>'; $('[data-si]', m).disabled = true; return; }
+      $('#cp-prev', m).classList.add('cp-cargando');
+      const { data, error } = await sb.rpc('precios_masivo', { p: payload(true) });
+      $('#cp-prev', m).classList.remove('cp-cargando');
+      if (error) { toast(mensajeError(error), 'error'); return; }
+      ultimo = data; mostrar(data); }, 350); };
+    const mostrar = d => {
+      const dif = (+d.valor_stock_despues || 0) - (+d.valor_stock_antes || 0);
+      $('#cp-prev', m).innerHTML = `<div class="cp-res"><div><span>Cambian</span><b>${fmt.num(d.productos)}</b></div><div><span>Cambio promedio</span><b class="${d.suba_promedio >= 0 ? 'sube' : 'baja'}">${d.suba_promedio == null ? '—' : (d.suba_promedio > 0 ? '+' : '') + fmt.dec(d.suba_promedio) + '%'}</b></div><div><span>${st.campo === 'precio' ? 'El stock vale' : 'El stock cuesta'}</span><b>${dif >= 0 ? '+' : '−'}${fmt.pesos(Math.abs(dif))}</b></div></div>
+        ${d.fijos_sin_tocar ? `<p class="sub">Hay ${fmt.num(d.fijos_sin_tocar)} precios fijados a mano por lista que quedan como están.</p>` : ''}
+        <div class="cp-tabla"><table>${(d.filas || []).map(f => { const p = f.antes ? 100 * (f.despues - f.antes) / f.antes : null; return `<tr><td>${esc(f.nombre)} <small style="color:var(--tinta-3);font-family:var(--f-mono)">${esc(f.codigo)}</small></td><td class="n">${fmt.pesos(f.antes)}</td><td class="n">→ <b>${fmt.pesos(f.despues)}</b></td><td class="n ${p >= 0 ? 'sube' : 'baja'}">${p == null ? '' : (p > 0 ? '+' : '') + fmt.dec(p) + '%'}</td></tr>`; }).join('') || '<tr><td class="vacio">Ningún precio cambia con estos valores.</td></tr>'}</table></div>
+        ${(d.filas || []).length >= 400 ? '<p class="sub">Se muestran los primeros 400.</p>' : ''}`;
+      $('[data-si]', m).disabled = !d.productos; $('[data-si]', m).textContent = d.productos ? `Aplicar a ${fmt.num(d.productos)}` : 'Aplicar';
+    };
+    const aplicar = async () => {
+      const b = $('[data-si]', m); b.disabled = true; b.textContent = 'Aplicando…';
+      const { data, error } = await sb.rpc('precios_masivo', { p: payload(false) });
+      if (error) { toast(mensajeError(error), 'error'); b.disabled = false; return; }
+      $('#cp', m).innerHTML = `<div style="text-align:center;padding:10px 0"><div class="tilde-ok">✓</div><h2>Precios cambiados</h2><p class="sub">${fmt.num(data.productos)} productos${data.variantes ? ` · ${fmt.num(data.variantes)} talles o colores con precio propio` : ''}${data.listas ? ` · ${fmt.num(data.listas)} precios de lista` : ''}. Quedó en el historial.</p></div>
+        <div class="pie" style="justify-content:center"><button class="btn" data-deshacer>Deshacer</button><button class="btn primario" data-ok>Listo</button></div>`;
+      $('[data-ok]', m).onclick = () => m.cerrar();
+      $('[data-deshacer]', m).onclick = async () => { const r = await sb.rpc('precios_deshacer', { p_lote: data.lote }); if (r.error) { toast(mensajeError(r.error), 'error'); return; } toast(`Deshecho: ${fmt.num(r.data.vueltos)} precios volvieron`); m.cerrar(); cargar(true); };
+      cargar(true);
+    };
+    pintar(); setTimeout(() => $('#cp-val', m).focus(), 40);
+  }
+
+  // ---------- historial de cambios masivos ----------
+  async function historial() {
+    const { data } = await sb.from('v_precio_lotes').select('*').eq('empresa_id', e).order('fecha', { ascending: false }).limit(40);
+    const m = modal(`<h2>Cambios de precio</h2><p class="sub">Los cambios en masa. Se pueden deshacer: vuelve cada precio a como estaba, salvo los que se cambiaron después.</p>
+      <div style="margin-top:10px">${(data || []).map(l => `<div class="lote"><span>${fmt.fechaHora(l.fecha)}<small>${esc(l.usuario || '')}</small></span><span>${esc(l.descripcion || 'Cambio de precios')}<small>${fmt.num(l.cambios || 0)} cambios</small></span>
+        ${l.deshecho ? '<span class="chip gris">deshecho</span>' : `<button class="btn chico" data-l="${l.id}">Deshacer</button>`}</div>`).join('') || '<p class="vacio">Todavía no hubo cambios en masa.</p>'}</div>
+      <div class="pie"><button class="btn" data-no>Cerrar</button></div>`);
+    $('[data-no]', m).onclick = () => m.cerrar();
+    $$('[data-l]', m).forEach(b => b.onclick = async () => { if (!await confirmar('¿Deshacer este cambio de precios?', 'Deshacer')) return; const r = await sb.rpc('precios_deshacer', { p_lote: b.dataset.l }); if (r.error) { toast(mensajeError(r.error), 'error'); return; } toast(`${fmt.num(r.data.vueltos)} precios volvieron${r.data.saltados ? ` · ${fmt.num(r.data.saltados)} ya se habían vuelto a cambiar` : ''}`); m.cerrar(); historial(); cargar(true); });
+  }
+
+  // ---------- Excel: exportar, plantilla, importar ----------
+  const COLS = [['codigo', 'Código'], ['nombre', 'Nombre'], ['familia', 'Familia'], ['temporada', 'Temporada'], ['marca', 'Marca'], ['proveedor', 'Proveedor'], ['descripcion', 'Descripción'], ['costo', 'Costo'], ['precio', 'Precio'], ['talle', 'Talle'], ['color', 'Color'], ['ean', 'Código de barras'], ['stock', 'Stock']];
+  const SINONIMOS = { codigo: ['codigo', 'cod', 'sku', 'articulo', 'código', 'codigo de producto'], nombre: ['nombre', 'producto', 'descripcion corta', 'articulo nombre', 'titulo'], familia: ['familia', 'categoria', 'rubro', 'tipo de prenda', 'linea'], temporada: ['temporada', 'coleccion', 'colección'], marca: ['marca'], proveedor: ['proveedor', 'fabricante'], descripcion: ['descripcion', 'descripción', 'detalle'], costo: ['costo', 'precio de costo', 'costo unitario'], precio: ['precio', 'precio de venta', 'pvp', 'precio lista', 'precio de lista'], talle: ['talle', 'talla', 'size', 'medida'], color: ['color', 'colour', 'estampa'], ean: ['codigo de barras', 'ean', 'barcode', 'cod barras', 'gtin'], stock: ['stock', 'cantidad', 'existencia', 'unidades'] };
+  let XLSXlib = null;
+  const cargarXLSX = () => XLSXlib ? Promise.resolve(XLSXlib) : new Promise((ok, mal) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; s.onload = () => ok(XLSXlib = window.XLSX); s.onerror = () => mal(new Error('No se pudo cargar el lector de Excel')); document.head.appendChild(s); });
+  const descargar = (X, filas, nombre) => { const ws = X.utils.aoa_to_sheet(filas); ws['!cols'] = filas[0].map((h, i) => ({ wch: i === 1 ? 34 : i === 6 ? 30 : 14 })); const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, ws, 'Catálogo'); X.writeFile(wb, nombre); };
+  async function exportar(soloFiltro) {
+    const X = await cargarXLSX();
+    let prods = [], d = 0; while (true) { const { data } = await (soloFiltro ? consulta('*') : sb.from('v_productos').select('*').eq('empresa_id', e).eq('activo', true)).order('nombre').range(d, d + 999); prods = prods.concat(data || []); if (!data || data.length < 1000) break; d += 1000; }
+    const P = new Map(prods.map(p => [p.id, p])), ids = prods.map(p => p.id);
+    let vars = []; for (let i = 0; i < ids.length; i += 200) { let k = 0; while (true) { const { data } = await sb.from('v_variantes').select('producto_id,talle_nombre,talle_orden,color_nombre,ean,stock,precio,costo').in('producto_id', ids.slice(i, i + 200)).eq('activa', true).range(k, k + 999); vars = vars.concat(data || []); if (!data || data.length < 1000) break; k += 1000; } }
+    vars.sort((a, b) => P.get(a.producto_id).nombre.localeCompare(P.get(b.producto_id).nombre) || (a.talle_orden ?? 999) - (b.talle_orden ?? 999) || String(a.color_nombre || '').localeCompare(b.color_nombre || ''));
+    const filas = [COLS.map(c => c[1])].concat(vars.map(v => { const p = P.get(v.producto_id); return [p.codigo, p.nombre, p.categoria || '', p.temporada || '', p.marca || '', p.proveedor || '', p.descripcion || '', +p.costo || 0, +p.precio || 0, v.talle_nombre || '', v.color_nombre || '', v.ean || '', +v.stock || 0]; }));
+    descargar(X, filas, `catalogo-${APP.empresa.nombre.replace(/\W+/g, '-').toLowerCase()}-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    toast(`${fmt.num(vars.length)} filas exportadas`);
+  }
+  // CSV: primero UTF-8; si no, la codificación de Excel en Windows (acentos y ñ)
+  function abrirLibro(X, buf, nombre) {
+    if (!/\.(csv|txt)$/i.test(nombre)) return X.read(buf, { type: 'array' });
+    let txt; try { txt = new TextDecoder('utf-8', { fatal: true }).decode(buf); } catch (_) { txt = new TextDecoder('windows-1252').decode(buf); }
+    return X.read(txt.replace(/^\ufeff/, ''), { type: 'string', raw: true });
+  }
+  function leerFilas(X, buf, nombre) {
+    const wb = abrirLibro(X, buf, nombre), ws = wb.Sheets[wb.SheetNames[0]];
+    const crudo = X.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
+    const iCab = crudo.findIndex(r => r.filter(x => String(x).trim()).length >= 2); if (iCab < 0) throw new Error('El archivo está vacío');
+    const cab = crudo[iCab].map(h => nrm(h)), mapa = {};
+    Object.entries(SINONIMOS).forEach(([k, alias]) => { const i = cab.findIndex(h => alias.map(nrm).includes(h)); if (i >= 0) mapa[k] = i; });
+    // números como se escriben acá: 25.990 · $ 25.990,50 · 25990 · 25,5
+    const num = s => { let t = String(s).replace(/[$\s]/g, ''); if (!t) return '';
+      if (t.includes(',') && t.includes('.')) t = t.lastIndexOf(',') > t.lastIndexOf('.') ? t.replace(/\./g, '').replace(',', '.') : t.replace(/,/g, '');
+      else if (t.includes(',')) t = /,\d{1,2}$/.test(t) ? t.replace(',', '.') : t.replace(/,/g, '');
+      else if (/^-?\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, '');
+      return isNaN(+t) ? '' : String(+t); };
+    const filas = crudo.slice(iCab + 1).map(r => { const o = {}; Object.entries(mapa).forEach(([k, i]) => { let v = String(r[i] ?? '').trim(); if (['costo', 'precio', 'stock'].includes(k)) v = num(v); o[k] = v; }); return o; }).filter(o => o.codigo || o.nombre);
+    return { filas, mapa };
+  }
+  function importarExportar() {
+    const m = modal('<div id="ie"></div>'); $('.modal', m).style.maxWidth = '640px';
+    let archivo = null, filas = [], mapa = {}, opc = { actualizar: true, stock: false };
+    const inicio = () => {
+      $('#ie', m).innerHTML = `<h2>Importar / exportar</h2><p class="sub">Para cargar un catálogo entero o cambiar muchos datos de una vez: exportás, editás en Excel y volvés a importar.</p>
+        <div class="imp-pasos" style="margin-top:14px">
+          <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-x="todo">⬇ Exportar todo el catálogo</button><button class="btn" data-x="filtro">⬇ Exportar lo filtrado</button><button class="btn" data-x="plantilla">⬇ Plantilla vacía</button></div>
+          <label class="imp-caja" id="imp-caja"><b>Importar un Excel o CSV</b><span>Una fila por talle y color. Columnas: Código, Nombre, Familia, Temporada, Marca, Proveedor, Costo, Precio, Talle, Color, Código de barras, Stock. Las que falten se dejan como están.</span><input type="file" accept=".xlsx,.xls,.csv,.ods" hidden id="imp-file"></label>
+        </div>
+        <div class="pie"><button class="btn" data-no>Cerrar</button></div>`;
+      $('[data-no]', m).onclick = () => m.cerrar();
+      $$('[data-x]', m).forEach(b => b.onclick = async () => { b.disabled = true; try { if (b.dataset.x === 'plantilla') { const X = await cargarXLSX(); descargar(X, [COLS.map(c => c[1]), ['', 'REMERA «EJEMPLO»', 'Remeras', 'Primavera-Verano 2026/27', '', '', 'Algodón peinado', 8000, 19990, 'M', 'Negro', '', 3], ['', 'REMERA «EJEMPLO»', 'Remeras', 'Primavera-Verano 2026/27', '', '', '', 8000, 19990, 'L', 'Negro', '', 2]], 'plantilla-catalogo.xlsx'); } else await exportar(b.dataset.x === 'filtro'); } catch (err) { toast(mensajeError(err), 'error'); } b.disabled = false; });
+      const caja = $('#imp-caja', m), inp = $('#imp-file', m);
+      caja.addEventListener('dragover', ev => { ev.preventDefault(); caja.classList.add('sobre'); }); caja.addEventListener('dragleave', () => caja.classList.remove('sobre'));
+      caja.addEventListener('drop', ev => { ev.preventDefault(); caja.classList.remove('sobre'); if (ev.dataTransfer.files[0]) leer(ev.dataTransfer.files[0]); });
+      inp.onchange = () => inp.files[0] && leer(inp.files[0]);
+    };
+    const leer = async file => {
+      try { const X = await cargarXLSX(); archivo = file.name; ({ filas, mapa } = leerFilas(X, await file.arrayBuffer(), file.name)); }
+      catch (err) { toast(mensajeError(err), 'error'); return; }
+      if (!filas.length) { toast('No encontré filas con código o nombre', 'error'); return; }
+      if (!('codigo' in mapa) && !('nombre' in mapa)) { toast('Falta una columna Código o Nombre', 'error'); return; }
+      revisar();
+    };
+    // las filas de un mismo producto van juntas en la misma tanda
+    const tandas = () => { const g = new Map(); filas.forEach(f => { const k = f.codigo || 'n:' + nrm(f.nombre); if (!g.has(k)) g.set(k, []); g.get(k).push(f); }); const out = []; let cur = []; g.forEach(v => { if (cur.length + v.length > 400 && cur.length) { out.push(cur); cur = []; } cur = cur.concat(v); }); if (cur.length) out.push(cur); return out; };
+    const correr = async simular => { const tot = { filas: 0, productos_nuevos: 0, productos_actualizados: 0, variantes_nuevas: 0, stock_ajustados: 0, nuevos: [], errores: [] }; let base = 0;
+      for (const t of tandas()) { const { data, error } = await sb.rpc('catalogo_importar', { p: { empresa_id: e, filas: t, simular, actualizar: opc.actualizar, stock: opc.stock } }); if (error) throw error;
+        ['filas', 'productos_nuevos', 'productos_actualizados', 'variantes_nuevas', 'stock_ajustados'].forEach(k => tot[k] += data[k] || 0); tot.nuevos = [...new Set(tot.nuevos.concat(data.nuevos || []))]; tot.errores = tot.errores.concat((data.errores || []).map(x => ({ ...x, fila: x.fila + base }))); base += t.length; }
+      return tot; };
+    const revisar = async () => {
+      $('#ie', m).innerHTML = `<h2>Importar · ${esc(archivo)}</h2><p class="sub">${fmt.num(filas.length)} filas. Columnas que reconocí:</p>
+        <div class="imp-cols">${COLS.map(([k, t]) => `<span class="${k in mapa ? '' : 'no'}">${t}</span>`).join('')}</div>
+        <label class="chk-linea"><input type="checkbox" id="o-act" ${opc.actualizar ? 'checked' : ''}> Actualizar los productos que ya existen (nombre, familia, precios…)</label>
+        ${'stock' in mapa ? `<label class="chk-linea"><input type="checkbox" id="o-stock" ${opc.stock ? 'checked' : ''}> Dejar el stock como dice la columna Stock</label><p class="sub" style="margin:-4px 0 8px 27px">Solo si el archivo es un conteo nuevo: si lo exportaste antes, lo vendido desde entonces volvería.</p>` : ''}
+        <div id="imp-res"><p class="sub" style="text-align:center;padding:16px 0">Revisando el archivo…</p></div>
+        <div class="pie"><button class="btn" data-volver>Elegir otro archivo</button><button class="btn primario" data-si disabled>Importar</button></div>`;
+      $('[data-volver]', m).onclick = inicio;
+      $('#o-act', m).onchange = ev => { opc.actualizar = ev.target.checked; revisar(); };
+      const os = $('#o-stock', m); if (os) os.onchange = ev => { opc.stock = ev.target.checked; revisar(); };
+      let r; try { r = await correr(true); } catch (err) { $('#imp-res', m).innerHTML = `<p class="imp-err">${esc(mensajeError(err))}</p>`; return; }
+      $('#imp-res', m).innerHTML = resumenHtml(r, 'Si importás:');
+      const b = $('[data-si]', m); b.disabled = !(r.productos_nuevos || r.productos_actualizados || r.variantes_nuevas || r.stock_ajustados);
+      b.onclick = async () => { b.disabled = true; b.textContent = 'Importando…';
+        let fin; try { fin = await correr(false); } catch (err) { toast(mensajeError(err), 'error'); b.disabled = false; b.textContent = 'Importar'; return; }
+        $('#ie', m).innerHTML = `<div style="text-align:center;padding:6px 0"><div class="tilde-ok">✓</div><h2>Catálogo importado</h2></div>${resumenHtml(fin, '')}<div class="pie" style="justify-content:center"><button class="btn primario" data-ok>Listo</button></div>`;
+        $('[data-ok]', m).onclick = () => m.cerrar(); cargar(true); };
+    };
+    const resumenHtml = (r, titulo) => `${titulo ? `<p style="font-weight:600;margin:10px 0 4px">${titulo}</p>` : ''}<div class="cp-res"><div><span>Productos nuevos</span><b>${fmt.num(r.productos_nuevos)}</b></div><div><span>Actualizados</span><b>${fmt.num(r.productos_actualizados)}</b></div><div><span>Talles · colores nuevos</span><b>${fmt.num(r.variantes_nuevas)}</b></div></div>
+      ${r.stock_ajustados ? `<p class="imp-nuevos">Stock: ${fmt.num(r.stock_ajustados)} talles · colores cambian (queda registrado como ajuste "Importación").</p>` : ''}
+      ${r.nuevos.length ? `<p class="imp-nuevos">Se crean: ${r.nuevos.slice(0, 30).map(esc).join(' · ')}${r.nuevos.length > 30 ? ` y ${r.nuevos.length - 30} más` : ''}</p>` : ''}
+      ${r.errores.length ? `<p style="font-weight:600;color:var(--error);margin:8px 0 4px">${fmt.num(r.errores.length)} filas con problemas (no se importan):</p><div class="imp-err">${r.errores.map(x => `Fila ${x.fila}${x.codigo ? ' · ' + esc(x.codigo) : ''}: ${esc(x.error)}`).join('<br>')}</div>` : ''}`;
+    inicio();
+  }
+
+  if (admin) { $('#btn-excel').onclick = importarExportar; $('#btn-hist').onclick = historial; }
   cargar(true);
 });
 </script>

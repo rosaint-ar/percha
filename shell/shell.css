@@ -210,6 +210,7 @@ tr.error-guardar td{background:var(--error-fondo)}
 .card-cab{flex-wrap:nowrap;align-items:flex-start}
 .card-cab>div:first-child{min-width:0}
 .card-cab .acciones{flex:none;display:flex;gap:8px;align-items:center}
+@media (max-width:700px){.card-cab{flex-wrap:wrap}.card-cab .acciones{flex:1 1 100%;flex-wrap:wrap}}
 /* campos dentro de tablas y filas editables: el mismo aspecto que en los formularios */
 table.lista input:not([type=checkbox]):not([type=radio]):not([type=color]),table.lista select,.fila-edit input:not([type=checkbox]):not([type=color]),.fila-edit select{
   width:100%;height:34px;border:1px solid var(--linea);background:var(--superficie-2);border-radius:var(--radio-mini);padding:0 10px;font-size:13.5px;transition:border-color .15s,box-shadow .15s}
@@ -230,3 +231,10 @@ table.lista th.centro,table.lista td.centro{text-align:center}
 /* botón de eliminar y de más opciones, del mismo tamaño en todas las tablas */
 .btn-eliminar{width:32px;height:32px;border-radius:8px}
 table.lista th.num{font:600 10.5px var(--f-mono);letter-spacing:.1em}
+
+/* casilla con texto en una línea (ventanas) */
+.chk-linea{display:flex;align-items:center;gap:9px;font:500 13.5px var(--f-ui);margin:8px 0;cursor:pointer;color:var(--tinta)}
+.chk-linea input{width:18px;height:18px;accent-color:var(--acento);flex:none}
+/* tilde de "listo" con movimiento (confirmaciones) */
+.tilde-ok{width:56px;height:56px;margin:4px auto 10px;border-radius:50%;display:grid;place-items:center;background:var(--ok-fondo);color:var(--ok);font:800 28px var(--f-ui);animation:tilde .45s cubic-bezier(.2,1.4,.4,1) both}
+@keyframes tilde{0%{transform:scale(.3);opacity:0}100%{transform:none;opacity:1}}

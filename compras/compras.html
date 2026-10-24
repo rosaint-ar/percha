@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Compras · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610241628">
+<link rel="stylesheet" href="../shell/shell.css?v=202610241651">
 <style>
   .filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
   .filtros select{border:1px solid var(--linea);background:var(--superficie-2);padding:8px 10px;border-radius:var(--radio-mini)}
@@ -18,8 +18,8 @@
   <div class="card" style="padding:0"><table class="lista" id="tb"><thead><tr><th>Orden</th><th>Fecha</th><th>Proveedor</th><th>Referencia</th><th class="num">Unidades</th><th class="num">Total</th><th>Estado</th></tr></thead><tbody></tbody></table></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610241628"></script>
-<script src="../shell/shell.js?v=202610241628"></script>
+<script src="../shared/supabase.js?v=202610241651"></script>
+<script src="../shell/shell.js?v=202610241651"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, mensajeError } = APP, e = APP.empresa.id;

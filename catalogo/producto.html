@@ -5,9 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Producto · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610241628">
+<link rel="stylesheet" href="../shell/shell.css?v=202610241651">
 <style>
-  .dos{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+  .dos{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
+  .dos>.card{min-width:0;overflow-x:auto}
   .precios-lista td,.precios-lista th{padding:7px 8px}
   .precios-lista input{width:120px;text-align:right;border:1px solid var(--linea);background:var(--superficie-2);border-radius:var(--radio-mini);height:34px;padding:0 10px;font-family:var(--f-mono)}
   .leyenda-matriz{display:flex;gap:14px;font-size:13px;color:var(--suave);margin-top:8px;flex-wrap:wrap}
@@ -15,7 +16,7 @@
   .mov-tabla td{padding:6px 8px}
   .volver{font:600 14px var(--f-ui);text-decoration:none;color:var(--suave)}
   .campo input[readonly]{background:var(--blanco);color:var(--suave)}
-  @media (max-width:900px){.dos{grid-template-columns:1fr}}
+  @media (max-width:900px){.dos{grid-template-columns:minmax(0,1fr)}}
   .aviso-chequear{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:#eef4ff;border:1px solid #c9dbff;color:#1b4f99;border-radius:10px;padding:8px 12px;margin-bottom:12px;font-size:13px}
   .aviso-chequear label{display:flex;gap:6px;align-items:center;font-weight:600;cursor:pointer}
   .celda small.m-falla{color:#8a6400;font-weight:700}.celda small.m-chq{color:#1b4f99;font-weight:700}
@@ -35,47 +36,66 @@
   .av-grupos summary{cursor:pointer;padding:9px 0;font:650 13px var(--f-ui);list-style:none}.av-grupos summary::-webkit-details-marker{display:none}.av-grupos summary small{color:var(--tinta-3);font:500 11.5px var(--f-mono);margin-left:6px}
   .av-grupos .av-chips{padding:0 0 10px}
   .av-resumen{font-size:13px;color:var(--tinta-2)}
+  .margen{height:38px;display:flex;align-items:center;gap:8px;font:700 15px var(--f-mono)}
+  .margen small{font:500 12px var(--f-ui);color:var(--tinta-3)}
+  .margen.bajo{color:var(--error)}.margen.ok{color:var(--ok)}
+  .acc-estado{font:600 12px var(--f-ui);color:var(--tinta-3);display:inline-flex;align-items:center;gap:6px;min-width:84px;justify-content:flex-end}
+  .acc-estado.ok{color:var(--ok)}.acc-estado.mal{color:var(--error)}
+  .fotos-grupo{border-top:1px solid var(--linea-suave);padding:12px 0}.fotos-grupo:first-child{border-top:0;padding-top:0}
+  .fotos-grupo h3{display:flex;align-items:center;gap:8px;margin:0 0 8px;font:650 13px var(--f-ui)}
+  .fotos-grupo h3 i{width:14px;height:14px;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(0,0,0,.15)}
+  .fotos-grupo h3 small{font:500 11.5px var(--f-mono);color:var(--tinta-3)}
+  .fotos-fila{display:flex;flex-wrap:wrap;gap:10px;min-height:96px;border-radius:12px;transition:background .12s}
+  .fotos-fila.sobre{background:var(--lila-suave);outline:2px dashed rgba(var(--acento-rgb),.4);outline-offset:4px}
+  .foto-t{position:relative;width:96px;height:96px;border-radius:12px;overflow:hidden;background:var(--relleno);cursor:grab;box-shadow:0 1px 3px rgba(21,23,28,.12);transition:transform .12s,box-shadow .12s}
+  .foto-t:hover{transform:translateY(-2px);box-shadow:0 8px 18px rgba(21,23,28,.16)}
+  .foto-t img{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
+  .foto-t.arrastrando{opacity:.35}
+  .foto-t .portada{position:absolute;left:6px;top:6px;font:700 9.5px var(--f-ui);letter-spacing:.04em;text-transform:uppercase;background:var(--acento);color:#fff;border-radius:6px;padding:2px 6px}
+  .foto-t .acc{position:absolute;inset:auto 6px 6px 6px;display:flex;justify-content:space-between;opacity:0;transition:opacity .12s}
+  .foto-t:hover .acc{opacity:1}
+  .foto-t .acc button{width:28px;height:28px;border-radius:8px;border:0;background:rgba(255,255,255,.94);cursor:pointer;display:grid;place-items:center;font:700 13px var(--f-ui);color:var(--tinta-2);box-shadow:0 1px 3px rgba(0,0,0,.18)}
+  .foto-t .acc button:hover{color:var(--acento)}.foto-t .acc button.x:hover{color:var(--error)}
+  .foto-mas{width:96px;height:96px;border-radius:12px;border:1.5px dashed var(--linea);background:transparent;display:grid;place-items:center;cursor:pointer;color:var(--tinta-3);transition:border-color .12s,color .12s,background .12s}
+  .foto-mas:hover{border-color:var(--acento);color:var(--acento);background:var(--lila-suave)}
+  .foto-mas svg{width:22px;height:22px}
+  .foto-mas.subiendo,.foto-chip.subiendo{animation:pulso 1s ease-in-out infinite}
+  .fotos-sin{display:flex;flex-wrap:wrap;gap:6px}
+  .foto-chip{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 12px 0 7px;border:1px dashed var(--linea);border-radius:999px;font:600 12.5px var(--f-ui);color:var(--tinta-2);cursor:pointer;transition:border-color .12s,background .12s}
+  .foto-chip:hover,.foto-chip.sobre{border-color:var(--acento);background:var(--lila-suave);color:var(--acento)}
+  .foto-chip i{width:18px;height:18px;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(0,0,0,.14)}
+  .foto-chip b{font-size:15px;line-height:1}
+  @keyframes pulso{50%{opacity:.45}}
+  .hist-precios{margin-top:12px}
+  .hist-precios h3{font:600 10.5px var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--tinta-3);margin:0 0 6px}
+  .hist-precios .hp{display:flex;align-items:center;gap:10px;padding:6px 0;border-top:1px solid var(--linea-suave);font-size:12.5px}
+  .hist-precios .hp span{color:var(--tinta-3);font:500 11.5px var(--f-mono);min-width:92px}
+  .hist-precios .hp b{font:700 12.5px var(--f-mono)}
+  .hist-precios .hp em{font-style:normal;color:var(--tinta-3);margin-left:auto;font-size:11.5px}
+  .ficha-producto>.card+.card{margin-top:14px}
+  .va-bloques{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-top:14px}
+  .va-b{border:1px solid var(--linea);border-radius:14px;padding:12px;display:grid;gap:8px;justify-items:center;text-align:center;transition:border-color .15s,background .15s}
+  .va-b.cambio{border-color:var(--acento);background:var(--lila-suave)}
+  .va-b.va-falla.activa{border-color:#d9b25a;background:#fff8e6}
+  .va-et{font:600 10.5px var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--tinta-3)}
+  .va-et b{color:var(--acento);letter-spacing:0}
+  .va-b small{color:var(--tinta-3);font-size:11.5px}
+  .stepper{display:flex;align-items:center;gap:6px}
+  .stepper button{width:44px;height:44px;border-radius:12px;border:1px solid var(--linea);background:var(--superficie-2);font:700 20px var(--f-ui);cursor:pointer;color:var(--tinta-2);transition:background .12s,transform .08s}
+  .stepper button:hover{background:var(--lila);color:var(--acento)}.stepper button:active{transform:scale(.94)}
+  .stepper input{width:76px;height:48px;border:1px solid var(--linea);border-radius:12px;text-align:center;font:800 24px var(--f-mono);background:var(--superficie-2)}
+  .va-motivo{margin-top:12px;display:grid;gap:8px;animation:aparecer .15s ease-out}
+  .va-motivo .motivos{display:flex;flex-wrap:wrap;gap:6px}
+  .motivo{border:1px solid var(--linea);background:var(--superficie-2);border-radius:999px;padding:7px 12px;font:600 12.5px var(--f-ui);cursor:pointer}
+  .motivo.on{background:var(--acento);border-color:var(--acento);color:#fff}
+  .va-nota{height:38px;border:1px solid var(--linea);border-radius:10px;padding:0 12px;background:var(--superficie-2)}
+  .va-mas{margin-top:14px;border-top:1px solid var(--linea-suave);padding-top:10px}
+  .va-mas summary{cursor:pointer;font:600 13px var(--f-ui);color:var(--tinta-2)}
 </style>
 </head>
 <body data-page="productos" data-etq="Catálogo" data-title="Producto">
-<main class="app">
-  <div class="card" id="ficha">
-    <div class="card-cab"><div><h2>Ficha</h2></div><div class="acciones" id="acc-ficha"></div></div>
-    <form id="form" autocomplete="off">
-      <div class="fila c4">
-        <div class="campo"><label>Código</label><input name="codigo" required></div>
-        <div class="campo" style="grid-column:span 2"><label>Nombre</label><input name="nombre" required></div>
-        <div class="campo"><label>Tipo</label><select name="tipo"><option value="prenda">Prenda</option><option value="kit">Kit / box (armado con otras prendas)</option><option value="varios">Varios</option><option value="servicio">Servicio</option><option value="sena">Seña</option><option value="gift_card">Gift card</option></select></div>
-      </div>
-      <div class="fila c4">
-        <div class="campo"><label>Familia</label><select name="categoria_id"><option value="">—</option></select></div>
-        <div class="campo"><label>Proveedor</label><select name="proveedor_id"><option value="">—</option></select></div>
-        <div class="campo"><label>Costo</label><input name="costo" type="number" step="0.01" min="0"></div>
-        <div class="campo"><label>Precio de lista</label><input name="precio" type="number" step="0.01" min="0" required></div>
-      </div>
-      <div class="fila c4">
-        <div class="campo"><label>Código de barras</label><input name="ean" placeholder="Solo si no tiene variantes"><span class="ayuda" id="ayuda-ean"></span></div>
-        <div class="campo"><label>Variantes</label><select name="tiene_variantes"><option value="false">No, es un artículo único</option><option value="true">Sí, por talle y color</option></select></div>
-        <div class="campo"><label>Estado</label><select name="activo"><option value="true">Activo</option><option value="false">Inactivo</option></select></div>
-        <div class="campo"><label>Genérico</label><select name="es_generico" title="Se vende rápido como «varias» y al cobrar el POS pregunta qué modelos se lleva"><option value="false">No</option><option value="true">Sí: al cobrar pregunta el modelo</option></select></div>
-        <div class="campo"><label>Stock total</label><input id="stock-total" readonly></div>
-      </div>
-      <div class="campo"><label>Descripción</label><textarea name="descripcion" rows="2"></textarea></div>
-    </form>
-  </div>
-
-  <div class="dos" style="margin-top:14px">
-    <div class="card">
-      <div class="card-cab"><div><h2>Precios por lista</h2><p class="sub">Se calculan desde el precio de lista; se puede fijar uno distinto</p></div></div>
-      <table class="lista precios-lista" id="tb-precios"><tr><th>Lista</th><th class="num">Porcentaje</th><th class="num">Precio</th><th></th></tr></table>
-    </div>
-    <div class="card">
-      <div class="card-cab"><div><h2>Movimientos de stock</h2><p class="sub">Los últimos 15 de este producto</p></div></div>
-      <table class="lista mov-tabla" id="tb-mov"><tr><th>Cuándo</th><th>Variante</th><th class="num">Cant.</th><th>Motivo</th></tr></table>
-    </div>
-  </div>
-
-  <div class="card" id="card-generico" style="margin-top:14px;display:none">
+<main class="app ficha-producto">
+  <div class="card" id="card-generico" style="display:none">
     <div class="card-cab"><div><h2>Qué incluye este genérico</h2><p class="sub">Se vende rápido como «varias» y al cobrar el POS pregunta el modelo. Acá se define entre qué prendas elegir.</p></div></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
       <div class="campo" style="margin:0;min-width:150px"><label>Familia</label><select id="gf-cat"><option value="">Todas</option></select></div>
@@ -84,7 +104,7 @@
       <button class="btn primario" id="gf-guardar" type="button">Guardar filtro</button><span class="sub" id="gf-cuenta"></span>
     </div>
   </div>
-  <div class="card" id="card-kit" style="margin-top:14px;display:none">
+  <div class="card" id="card-kit" style="display:none">
     <div class="card-cab"><div><h2>Qué lleva este kit</h2><p class="sub">No tiene stock propio: se puede vender mientras haya de cada componente, y al venderlo se descuentan todos.</p></div></div>
     <div class="agregar" style="position:relative;margin-bottom:10px"><div class="buscador" style="min-width:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="kit-q" placeholder="Buscar prenda, talle o color para agregar…" autocomplete="off"></div><div id="kit-sug" class="sugerencias" style="display:none;position:absolute;z-index:5;background:var(--superficie-2);border:1px solid var(--linea);border-radius:var(--radio-chico);box-shadow:var(--sombra-flotante);max-height:260px;overflow:auto;width:min(520px,90vw)"></div></div>
     <div id="kit-filtro" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin:0 0 12px;padding:10px 12px;background:var(--lila-suave);border-radius:10px">
@@ -98,16 +118,64 @@
     <table class="lista" id="tb-kit"><tr><th>Componente</th><th>Talle · color</th><th class="num">Cantidad</th><th class="num">Stock</th><th class="num">Costo</th><th></th></tr></table>
     <p class="sub" id="kit-resumen" style="margin-top:10px"></p>
   </div>
-  <div class="card" id="card-matriz" style="margin-top:14px">
+  <div class="card" id="card-matriz">
     <div class="card-cab"><div><h2>Talles y colores</h2><p class="sub">Stock de cada combinación. Tocá una celda para ajustar stock, cargar el código de barras o imprimir etiquetas.</p></div>
       <div class="acciones"><button class="btn" id="btn-etiquetas-todas">Etiquetas de todo el stock</button><button class="btn primario solo-admin" id="btn-agregar-variantes">+ Agregar talles / colores</button></div></div>
     <div class="matriz" id="matriz"></div>
     <div class="leyenda-matriz"><span><i style="background:var(--lila-suave)"></i>con stock</span><span><i style="background:var(--papel);border:1px solid var(--grilla)"></i>sin stock</span><span><i style="background:var(--error-fondo)"></i>negativo</span></div>
   </div>
+
+  <div class="card" id="ficha">
+    <div class="card-cab"><div><h2>Ficha</h2></div><div class="acciones" id="acc-ficha"></div></div>
+    <form id="form" autocomplete="off">
+      <div class="fila c4">
+        <div class="campo"><label>Código</label><input name="codigo" required></div>
+        <div class="campo" style="grid-column:span 2"><label>Nombre</label><input name="nombre" required></div>
+        <div class="campo"><label>Tipo</label><select name="tipo"><option value="prenda">Prenda</option><option value="kit">Kit / box (armado con otras prendas)</option><option value="varios">Varios</option><option value="servicio">Servicio</option><option value="sena">Seña</option><option value="gift_card">Gift card</option></select></div>
+      </div>
+      <div class="fila c4">
+        <div class="campo"><label>Familia</label><select name="categoria_id"><option value="">—</option></select></div>
+        <div class="campo"><label>Temporada</label><select name="temporada_id"><option value="">Sin temporada</option></select></div>
+        <div class="campo"><label>Marca</label><select name="marca_id"><option value="">—</option></select></div>
+        <div class="campo"><label>Proveedor</label><select name="proveedor_id"><option value="">—</option></select></div>
+      </div>
+      <div class="fila c4">
+        <div class="campo solo-admin"><label>Costo</label><input name="costo" type="number" step="0.01" min="0"></div>
+        <div class="campo"><label>Precio de lista</label><input name="precio" type="number" step="0.01" min="0" required></div>
+        <div class="campo solo-admin"><label>Margen</label><div class="margen" id="margen">—</div></div>
+        <div class="campo"><label>Stock total</label><input id="stock-total" readonly></div>
+      </div>
+      <div class="fila c4">
+        <div class="campo"><label>Código de barras</label><input name="ean" placeholder="Solo si no tiene variantes"><span class="ayuda" id="ayuda-ean"></span></div>
+        <div class="campo"><label>Variantes</label><select name="tiene_variantes"><option value="false">No, es un artículo único</option><option value="true">Sí, por talle y color</option></select></div>
+        <div class="campo"><label>Estado</label><select name="activo"><option value="true">Activo</option><option value="false">Inactivo</option></select></div>
+        <div class="campo"><label>Genérico</label><select name="es_generico" title="Se vende rápido como «varias» y al cobrar el POS pregunta qué modelos se lleva"><option value="false">No</option><option value="true">Sí: al cobrar pregunta el modelo</option></select></div>
+      </div>
+      <div class="campo"><label>Descripción</label><textarea name="descripcion" rows="2"></textarea></div>
+    </form>
+  </div>
+
+
+  <div class="card" id="card-fotos">
+    <div class="card-cab"><div><h2>Fotos</h2><p class="sub">Generales y por color: en la caja, al elegir el color se ve su foto. Arrastrá para ordenar o para pasar una foto a otro color.</p></div></div>
+    <div id="fotos"></div>
+  </div>
+
+
+  <div class="card">
+    <div class="card-cab"><div><h2>Precios por lista</h2><p class="sub">Se calculan desde el precio de lista; se puede fijar uno distinto</p></div></div>
+    <table class="lista precios-lista" id="tb-precios"><tr><th>Lista</th><th class="num">Porcentaje</th><th class="num">Precio</th><th></th></tr></table>
+    <div class="hist-precios" id="hist-precios"></div>
+  </div>
+
+  <div class="card" id="card-movs">
+    <div class="card-cab"><div><h2>Movimientos de stock</h2><p class="sub">Los últimos 15 · <a href="inventario.html#movimientos" id="ver-movs">ver todos</a></p></div></div>
+    <table class="lista mov-tabla" id="tb-mov"><tr><th>Cuándo</th><th>Variante</th><th class="num">Cant.</th><th>Motivo</th></tr></table>
+  </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610241628"></script>
-<script src="../shell/shell.js?v=202610241628"></script>
+<script src="../shared/supabase.js?v=202610241651"></script>
+<script src="../shell/shell.js?v=202610241651"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$ , toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -117,13 +185,25 @@ APP.ready.then(async () => {
   if (!APP.esAdmin) { $$('#form input, #form select, #form textarea').forEach(x => x.disabled = true); $$('.solo-admin').forEach(x => x.style.display = 'none'); }
 
   // ---------- catálogos de apoyo ----------
-  const [c1, c2, c3, c4, c5] = await Promise.all([
+  const [c1, c2, c3, c4, c5, c6, c7] = await Promise.all([
     sb.from('categorias').select('id,nombre').eq('empresa_id', e).eq('activa', true).order('nombre'),
     sb.from('proveedores').select('id,nombre').eq('empresa_id', e).eq('activo', true).order('nombre'),
     sb.from('listas_precios').select('*').eq('empresa_id', e).eq('activa', true).order('orden'),
     sb.from('depositos').select('*').eq('empresa_id', e).eq('activo', true).order('principal', { ascending: false }),
-    sb.from('atributos').select('*').eq('empresa_id', e).eq('activo', true).order('orden')
+    sb.from('atributos').select('*').eq('empresa_id', e).eq('activo', true).order('orden'),
+    sb.from('temporadas').select('id,nombre').eq('empresa_id', e).eq('activa', true).order('orden'),
+    sb.from('marcas').select('id,nombre').eq('empresa_id', e).eq('activa', true).order('orden').order('nombre')
   ]);
+  (c6.data || []).forEach(c => form.temporada_id.insertAdjacentHTML('beforeend', `<option value="${c.id}">${esc(c.nombre)}</option>`));
+  (c7.data || []).forEach(c => form.marca_id.insertAdjacentHTML('beforeend', `<option value="${c.id}">${esc(c.nombre)}</option>`));
+  if (APP.esAdmin) {
+    const alta = (tabla, titulo, extra) => async () => { const d = await APP.formulario({ titulo, campos: [{ k: 'nombre', label: 'Nombre', requerido: true }], boton: 'Agregar' }); if (!d || !d.nombre) return null;
+      const r = await sb.from(tabla).insert(APP.conEmpresa({ nombre: d.nombre, ...(extra || {}) })).select().single(); if (r.error) { toast(mensajeError(r.error), 'error'); return null; } return { valor: r.data.id, texto: r.data.nombre }; };
+    APP.selectConAgregar(form.temporada_id, { texto: '+ Nueva temporada…', crear: alta('temporadas', 'Nueva temporada', { orden: 99 }) });
+    APP.selectConAgregar(form.marca_id, { texto: '+ Nueva marca…', crear: alta('marcas', 'Nueva marca') });
+    APP.selectConAgregar(form.categoria_id, { texto: '+ Nueva familia…', crear: alta('categorias', 'Nueva familia', { orden: 99 }) });
+    APP.selectConAgregar(form.proveedor_id, { texto: '+ Nuevo proveedor…', crear: alta('proveedores', 'Nuevo proveedor') });
+  }
   (c1.data || []).forEach(c => form.categoria_id.insertAdjacentHTML('beforeend', `<option value="${c.id}">${esc(c.nombre)}</option>`));
   (c2.data || []).forEach(c => form.proveedor_id.insertAdjacentHTML('beforeend', `<option value="${c.id}">${esc(c.nombre)}</option>`));
   listas = c3.data || []; depositos = c4.data || [];
@@ -134,8 +214,8 @@ APP.ready.then(async () => {
   async function cargar() {
     if (!id) { // nuevo
       $('h1').innerHTML = 'Nuevo <em>producto</em>'; form.tiene_variantes.value = 'true'; form.activo.value = 'true';
-      $('#card-matriz').style.display = 'none'; $('#tb-mov').parentElement.style.display = 'none';
-      pintarPrecios(); pintarAcciones(); return;
+      $('#card-matriz').style.display = 'none'; $('#tb-mov').parentElement.style.display = 'none'; $('#card-fotos').style.display = 'none';
+      pintarPrecios(); pintarAcciones(); pintarMargen(); return;
     }
     const [p, v, pr] = await Promise.all([
       sb.from('productos').select('*').eq('id', id).single(),
@@ -144,14 +224,14 @@ APP.ready.then(async () => {
     ]);
     if (p.error) { toast('No se encontró el producto', 'error'); return; }
     producto = p.data; variantes = v.data || []; precios = pr.data || [];
-    const mv = variantes.length ? await sb.from('stock_movimientos').select('*').in('variante_id', variantes.map(x => x.id)).order('fecha', { ascending: false }).limit(15) : { data: [] };
+    const mv = await sb.from('v_movimientos').select('*').eq('producto_id', id).order('fecha', { ascending: false }).limit(15);
     $('h1').innerHTML = `${esc(producto.nombre)}`;
     document.title = producto.nombre + ' · ' + APP.empresa.nombre;
-    ['codigo', 'nombre', 'tipo', 'categoria_id', 'proveedor_id', 'costo', 'precio', 'ean', 'descripcion'].forEach(k => form[k].value = producto[k] ?? '');
+    ['codigo', 'nombre', 'tipo', 'categoria_id', 'proveedor_id', 'temporada_id', 'marca_id', 'costo', 'precio', 'ean', 'descripcion'].forEach(k => form[k].value = producto[k] ?? '');
     form.tiene_variantes.value = String(producto.tiene_variantes); form.activo.value = String(producto.activo); form.es_generico.value = String(!!producto.es_generico);
     $('#stock-total').value = fmt.num(variantes.reduce((s, x) => s + (+x.stock || 0), 0));
     $('#ayuda-ean').textContent = producto.tiene_variantes ? 'Con variantes, el código de barras va en cada talle y color.' : '';
-    pintarPrecios(); pintarAcciones();
+    pintarPrecios(); pintarAcciones(); pintarMargen(); pintarFotos(); pintarHistorial();
     pintarGenerico();
     if (producto.tipo === 'kit') { $('#card-matriz').style.display = 'none'; $('#card-kit').style.display = ''; await pintarKit(); }
     else { $('#card-matriz').style.display = ''; $('#card-kit').style.display = 'none'; pintarMatriz(); }
@@ -160,36 +240,157 @@ APP.ready.then(async () => {
   }
 
   function pintarAcciones() {
-    const a = $('#acc-ficha'); a.innerHTML = `<a class="volver" href="productos.html">← Volver al catálogo</a>`;
-    if (APP.esAdmin) a.insertAdjacentHTML('beforeend', ` <button class="btn primario" id="btn-guardar">Guardar</button>`);
-    const g = $('#btn-guardar'); if (g) g.onclick = guardar;
+    const a = $('#acc-ficha'), cab = $('#acciones-pagina'); a.innerHTML = '';
+    if (cab) cab.innerHTML = `<a class="btn" href="productos.html">← Catálogo</a>${APP.esAdmin && id ? '<button class="btn" id="btn-duplicar">Duplicar</button>' : ''}`;
+    if (!APP.esAdmin) return;
+    if (id) a.innerHTML = '<span class="acc-estado" id="acc-estado">Se guarda solo</span>';
+    else a.innerHTML = '<button class="btn primario" id="btn-guardar">Crear producto</button>';
+    const g = $('#btn-guardar'); if (g) g.onclick = () => guardar();
+    const dup = $('#btn-duplicar'); if (dup) dup.onclick = duplicar;
   }
+  const estado = (txt, cls) => { const s = $('#acc-estado'); if (s) { s.textContent = txt; s.className = 'acc-estado ' + (cls || ''); } };
 
-  async function guardar() {
+  function datosForm() {
     const d = {
       codigo: form.codigo.value.trim(), nombre: form.nombre.value.trim(), tipo: form.tipo.value,
-      categoria_id: form.categoria_id.value || null, proveedor_id: form.proveedor_id.value || null,
+      categoria_id: form.categoria_id.value || null, proveedor_id: form.proveedor_id.value || null, temporada_id: form.temporada_id.value || null, marca_id: form.marca_id.value || null,
       costo: +form.costo.value || 0, precio: +form.precio.value || 0, ean: form.ean.value.trim() || null,
       tiene_variantes: form.tiene_variantes.value === 'true', activo: form.activo.value === 'true', es_generico: form.es_generico.value === 'true', descripcion: form.descripcion.value.trim() || null
     };
     if (d.tipo === 'kit') { d.tiene_variantes = false; form.tiene_variantes.value = 'false'; }
+    return d;
+  }
+  // Producto nuevo: se crea con el botón. Producto existente: cada cambio se guarda solo.
+  async function guardar() {
+    const d = datosForm();
     if (!d.codigo || !d.nombre) { toast('Completá código y nombre', 'error'); return; }
-    let r;
-    if (id) r = await sb.from('productos').update(d).eq('id', id).select().single();
-    else r = await sb.from('productos').insert(APP.conEmpresa(d)).select().single();
+    if (id) return autoguardar();
+    const r = await sb.from('productos').insert(APP.conEmpresa(d)).select().single();
     if (r.error) { toast(mensajeError(r.error), 'error'); return; }
-    if (!id) {
-      id = r.data.id;
-      // artículo único o kit: su variante "sin talle ni color" para que el stock (o el disponible) tenga dónde colgar
-      if (!d.tiene_variantes || d.tipo === 'kit') await sb.from('variantes').insert(APP.conEmpresa({ producto_id: id, sku: d.codigo, ean: d.ean }));
-      history.replaceState(null, '', `producto.html?id=${id}`);
-      toast('Producto creado'); $('#card-matriz').style.display = ''; $('#tb-mov').parentElement.style.display = '';
-    } else {
-      toast('Guardado');
-      // si es único, el EAN del producto es el de su variante
-      if (!d.tiene_variantes && variantes.length === 1) await sb.from('variantes').update({ ean: d.ean, sku: d.codigo }).eq('id', variantes[0].id);
-    }
+    id = r.data.id;
+    // artículo único o kit: su variante "sin talle ni color" para que el stock (o el disponible) tenga dónde colgar
+    if (!d.tiene_variantes || d.tipo === 'kit') await sb.from('variantes').insert(APP.conEmpresa({ producto_id: id, sku: d.codigo, ean: d.ean }));
+    history.replaceState(null, '', `producto.html?id=${id}`);
+    toast('Producto creado'); $('#card-matriz').style.display = ''; $('#tb-mov').parentElement.style.display = ''; $('#card-fotos').style.display = '';
     await cargar();
+  }
+  let tAuto, guardando = Promise.resolve();
+  async function autoguardar() {
+    const d = datosForm();
+    if (!d.codigo || !d.nombre) { estado('Falta código o nombre', 'mal'); return; }
+    const cambios = {}; Object.keys(d).forEach(k => { if ((producto[k] ?? null) !== (d[k] ?? null) && String(producto[k] ?? '') !== String(d[k] ?? '')) cambios[k] = d[k]; });
+    if (!Object.keys(cambios).length) { estado('Guardado ✓', 'ok'); return; }
+    estado('Guardando…');
+    const r = await sb.from('productos').update(cambios).eq('id', id).select().single();
+    if (r.error) { estado('No se guardó', 'mal'); toast(mensajeError(r.error), 'error'); return; }
+    const antes = producto; producto = r.data; estado('Guardado ✓', 'ok');
+    // si es único, el código de barras y el código del producto son los de su variante
+    if (!d.tiene_variantes && variantes.length === 1 && ('ean' in cambios || 'codigo' in cambios)) await sb.from('variantes').update({ ean: d.ean, sku: d.codigo }).eq('id', variantes[0].id);
+    if ('nombre' in cambios) { $('h1').textContent = producto.nombre; document.title = producto.nombre + ' · ' + APP.empresa.nombre; }
+    if ('precio' in cambios || 'costo' in cambios) pintarHistorial();
+    if (['tipo', 'tiene_variantes', 'es_generico'].some(k => k in cambios) || (antes.tipo !== producto.tipo)) await cargar();
+  }
+  form.addEventListener('input', ev => { if (!id || !APP.esAdmin || ev.target.matches('select')) return; clearTimeout(tAuto); estado('Escribiendo…'); tAuto = setTimeout(() => { guardando = guardando.then(autoguardar); }, 700); });
+  form.addEventListener('change', ev => { if (!id || !APP.esAdmin || ev.target.value === '__nuevo__') return; clearTimeout(tAuto); guardando = guardando.then(autoguardar); });
+  form.addEventListener('submit', ev => ev.preventDefault());
+
+  function pintarMargen() {
+    const c = +form.costo.value || 0, pr = +form.precio.value || 0, m = $('#margen');
+    if (!c || !pr) { m.className = 'margen'; m.innerHTML = '—'; return; }
+    const pct = 100 * (pr - c) / pr;
+    m.className = 'margen ' + (pct < 40 ? 'bajo' : 'ok');
+    m.innerHTML = `${fmt.pct(pct)} <small>× ${fmt.dec(pr / c)} sobre el costo</small>`;
+  }
+  form.costo.addEventListener('input', pintarMargen); form.precio.addEventListener('input', pintarMargen);
+
+  async function duplicar() {
+    const { data: sug } = await sb.rpc('proximo_codigo', { e, p_base: producto.codigo });
+    const m = modal(`<h2>Duplicar producto</h2><p class="sub">Se crea uno nuevo con la misma familia, temporada, precios y talles · colores. Sin stock ni códigos de barras.</p>
+      <div class="fila c2" style="margin-top:12px"><div class="campo"><label>Código</label><input id="d-cod" value="${esc(sug || '')}"></div><div class="campo"><label>Nombre</label><input id="d-nom" value="${esc(producto.nombre)}"></div></div>
+      <label class="chk-linea"><input type="checkbox" id="d-var" checked> Copiar talles y colores (${fmt.num(variantes.length)})</label>
+      <label class="chk-linea"><input type="checkbox" id="d-fot"> Copiar las fotos</label>
+      <div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Duplicar</button></div>`);
+    const nom = $('#d-nom', m); nom.focus(); nom.select();
+    $('[data-no]', m).onclick = () => m.cerrar();
+    $('[data-si]', m).onclick = async () => {
+      if (nom.value.trim() === producto.nombre && !await confirmar('El nombre es igual al original. ¿Duplicar igual?', 'Duplicar')) return;
+      const b = $('[data-si]', m); b.disabled = true;
+      const { data, error } = await sb.rpc('producto_duplicar', { p: { producto_id: id, codigo: $('#d-cod', m).value.trim(), nombre: nom.value.trim(), variantes: $('#d-var', m).checked, fotos: $('#d-fot', m).checked } });
+      if (error) { toast(mensajeError(error), 'error'); b.disabled = false; return; }
+      m.cerrar(); toast('Producto duplicado'); setTimeout(() => location.href = 'producto.html?id=' + data, 300);
+    };
+  }
+
+  // ---------- fotos: generales y por color ----------
+  let fotos = [];
+  const IC_MAS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
+  async function pintarFotos() {
+    const cont = $('#fotos'); if (!producto) return;
+    fotos = (await sb.from('producto_fotos').select('*').eq('producto_id', id).order('orden').order('creado')).data || [];
+    const colores = [...new Map(variantes.filter(v => v.color).map(v => [v.color, { id: (colores_attr.find(c => c.codigo === v.color) || {}).id, nombre: v.color_nombre, hex: v.color_hex }])).values()].filter(c => c.id).sort((a, b) => a.nombre.localeCompare(b.nombre));
+    const conFoto = new Set(fotos.map(f => f.color_id || ''));
+    const grupos = [{ id: '', nombre: 'Generales', hex: null }].concat(colores.filter(c => conFoto.has(c.id))), sinFoto = colores.filter(c => !conFoto.has(c.id));
+    cont.innerHTML = grupos.map(g => { const fs2 = fotos.filter(f => (f.color_id || '') === g.id);
+      return `<div class="fotos-grupo"><h3>${g.hex ? `<i style="background:${esc(g.hex)}"></i>` : ''}${esc(g.nombre)} <small>${fs2.length ? fmt.num(fs2.length) : g.id ? 'usa las generales' : 'sin fotos'}</small></h3>
+        <div class="fotos-fila" data-grupo="${g.id}">${fs2.map(f => `<div class="foto-t" draggable="${APP.esAdmin}" data-f="${f.id}"><img src="${esc(f.url)}" alt="" loading="lazy">${f.url === producto.imagen_url ? '<span class="portada">Portada</span>' : ''}
+          ${APP.esAdmin ? `<div class="acc"><button type="button" data-portada="${f.id}" title="Usar de portada">★</button><button type="button" class="x" data-borrar="${f.id}" title="Quitar">✕</button></div>` : ''}</div>`).join('')}
+          ${APP.esAdmin ? `<label class="foto-mas" title="Subir fotos">${IC_MAS}<input type="file" accept="image/*" multiple hidden data-subir="${g.id}"></label>` : ''}</div></div>`; }).join('')
+      + (sinFoto.length ? `<div class="fotos-grupo"><h3>Colores que usan las fotos generales <small>${fmt.num(sinFoto.length)}</small></h3><div class="fotos-sin">${sinFoto.map(c => `<label class="foto-chip" data-grupo="${c.id}" title="${APP.esAdmin ? 'Subí una foto de este color o arrastrá una foto acá' : ''}"><i style="background:${esc(c.hex || '#E6DEF0')}"></i>${esc(c.nombre)}${APP.esAdmin ? ` <b>+</b><input type="file" accept="image/*" multiple hidden data-subir="${c.id}">` : ''}</label>`).join('')}</div></div>` : '');
+    $$('[data-subir]', cont).forEach(inp => inp.onchange = async () => {
+      const lab = inp.closest('.foto-mas,.foto-chip'); lab.classList.add('subiendo');
+      try {
+        let orden = Math.max(0, ...fotos.map(f => f.orden || 0));
+        for (const file of inp.files) {
+          const url = await APP.subirImagen(file, 'productos', 1200);
+          const r = await sb.from('producto_fotos').insert(APP.conEmpresa({ producto_id: id, color_id: inp.dataset.subir || null, url, orden: ++orden }));
+          if (r.error) throw r.error;
+          if (!producto.imagen_url) { await sb.from('productos').update({ imagen_url: url }).eq('id', id); producto.imagen_url = url; }
+        }
+        toast(inp.files.length > 1 ? `${inp.files.length} fotos subidas` : 'Foto subida');
+      } catch (err) { toast(mensajeError(err), 'error'); }
+      pintarFotos();
+    });
+    $$('[data-portada]', cont).forEach(b => b.onclick = async () => { const f = fotos.find(x => x.id === b.dataset.portada); const r = await sb.from('productos').update({ imagen_url: f.url }).eq('id', id); if (r.error) { toast(mensajeError(r.error), 'error'); return; } producto.imagen_url = f.url; toast('Portada cambiada'); pintarFotos(); });
+    $$('[data-borrar]', cont).forEach(b => b.onclick = async () => {
+      const f = fotos.find(x => x.id === b.dataset.borrar);
+      if (!await confirmar('¿Quitar esta foto del producto?', 'Quitar')) return;
+      const r = await sb.from('producto_fotos').delete().eq('id', f.id); if (r.error) { toast(mensajeError(r.error), 'error'); return; }
+      if (f.url === producto.imagen_url) { const otra = fotos.find(x => x.id !== f.id && !x.color_id) || fotos.find(x => x.id !== f.id); await sb.from('productos').update({ imagen_url: otra ? otra.url : null }).eq('id', id); producto.imagen_url = otra ? otra.url : null; }
+      pintarFotos();
+    });
+    // arrastrar: ordenar dentro del grupo o pasar a otro color
+    let arr = null;
+    $$('.foto-t', cont).forEach(t => {
+      t.addEventListener('dragstart', ev => { arr = t; t.classList.add('arrastrando'); ev.dataTransfer.effectAllowed = 'move'; });
+      t.addEventListener('dragend', () => { t.classList.remove('arrastrando'); $$('.fotos-fila', cont).forEach(x => x.classList.remove('sobre')); });
+    });
+    $$('.foto-chip', cont).forEach(chip => {
+      chip.addEventListener('dragover', ev => { if (!arr) return; ev.preventDefault(); chip.classList.add('sobre'); });
+      chip.addEventListener('dragleave', () => chip.classList.remove('sobre'));
+      chip.addEventListener('drop', async ev => { ev.preventDefault(); if (!arr) return; const f = arr.dataset.f; arr = null; const r = await sb.from('producto_fotos').update({ color_id: chip.dataset.grupo, orden: 1 }).eq('id', f); if (r.error) toast(mensajeError(r.error), 'error'); pintarFotos(); });
+    });
+    $$('.fotos-fila', cont).forEach(fila => {
+      fila.addEventListener('dragover', ev => { if (!arr) return; ev.preventDefault(); fila.classList.add('sobre');
+        const despues = [...fila.querySelectorAll('.foto-t:not(.arrastrando)')].find(x => { const r = x.getBoundingClientRect(); return ev.clientX < r.left + r.width / 2 && ev.clientY < r.bottom; });
+        fila.insertBefore(arr, despues || fila.querySelector('.foto-mas')); });
+      fila.addEventListener('dragleave', ev => { if (!fila.contains(ev.relatedTarget)) fila.classList.remove('sobre'); });
+      fila.addEventListener('drop', async ev => { ev.preventDefault(); if (!arr) return; arr = null;
+        const cambios = [];
+        $$('.fotos-fila', cont).forEach(fl => $$('.foto-t', fl).forEach((t, i) => { const f = fotos.find(x => x.id === t.dataset.f), g = fl.dataset.grupo || null;
+          if (f.orden !== i + 1 || (f.color_id || null) !== g) cambios.push(sb.from('producto_fotos').update({ orden: i + 1, color_id: g }).eq('id', f.id)); }));
+        const rs = await Promise.all(cambios); const mal = rs.find(r => r.error); if (mal) toast(mensajeError(mal.error), 'error');
+        pintarFotos(); });
+    });
+  }
+  const colores_attr = colores;
+
+  // ---------- historial de precios ----------
+  async function pintarHistorial() {
+    const c = $('#hist-precios'); if (!id) { c.innerHTML = ''; return; }
+    const { data } = await sb.from('precio_cambios').select('fecha,campo,antes,despues,variante_id,lista_id,lote_id').eq('producto_id', id).order('fecha', { ascending: false }).limit(8);
+    if (!(data || []).length) { c.innerHTML = ''; return; }
+    const qué = x => x.campo === 'costo' ? 'Costo' : x.lista_id ? 'Precio fijo ' + esc((listas.find(l => l.id === x.lista_id) || {}).nombre || 'lista') : x.variante_id ? 'Precio de un talle · color' : 'Precio';
+    c.innerHTML = `<h3>Últimos cambios de precio</h3>` + data.map(x => `<div class="hp"><span>${fmt.fechaHora(x.fecha)}</span>${qué(x)} <b>${x.antes == null ? '—' : fmt.pesos(x.antes)} → ${x.despues == null ? '—' : fmt.pesos(x.despues)}</b>${x.lote_id ? '<em>cambio masivo</em>' : ''}</div>`).join('');
   }
 
   // ---------- precios ----------
@@ -247,56 +448,74 @@ APP.ready.then(async () => {
     $$('.celda', m).forEach(c => c.onclick = () => abrirVariante(variantes.find(x => x.id === c.dataset.v)));
   }
 
-  // ---------- variante: ajustar stock, EAN, etiquetas ----------
+  // ---------- variante: stock, falla, código de barras, etiquetas ----------
+  const MOTIVOS = ['Rotura o falla', 'Faltante / robo', 'Regalo o canje', 'Uso interno', 'Error de carga', 'Devolución de clienta', 'Devolución a proveedor', 'Recuento', 'Otro'];
   async function abrirVariante(v) {
     if (!v) return;
     const { data: st } = await sb.from('stock').select('deposito_id,cantidad').eq('variante_id', v.id);
     const porDep = depositos.map(d => ({ d, c: +((st || []).find(s => s.deposito_id === d.id) || {}).cantidad || 0 }));
     const nombre = [producto.nombre, v.talle_nombre, v.color_nombre].filter(Boolean).join(' · ');
+    const actual = Math.round(+v.stock || 0), falla0 = Math.round(+v.fallas || 0), puede = APP.rol !== 'visor';
+    let nuevo = actual, fallas = falla0, motivo = null;
     const m = modal(`<h2>${esc(nombre)}</h2>
-      <p class="sub">SKU ${esc(v.sku || '—')}</p>
-      <div class="fila c2" style="margin-top:12px">
-        <div class="campo"><label>Código de barras</label><input id="v-ean" value="${esc(v.ean || '')}" ${APP.esAdmin ? '' : 'disabled'}><span class="ayuda">13 dígitos (EAN) o el que venga en la etiqueta del proveedor</span></div>
-        <div class="campo"><label>Precio propio</label><input id="v-precio" type="number" step="0.01" value="${v.precio != null && +v.precio !== +producto.precio ? v.precio : ''}" placeholder="igual al producto" ${APP.esAdmin ? '' : 'disabled'}></div>
+      <p class="sub">${esc(v.sku || '')}${v.ean ? ' · código de barras ' + esc(v.ean) : ' · sin código de barras'}</p>
+      ${v.chequear ? `<div class="aviso-chequear" style="margin-top:10px"><span>🔎 ${esc(v.chequear)}</span>${APP.esAdmin ? '<label><input type="checkbox" id="v-chequeado"> Ya está chequeado</label>' : ''}</div>` : ''}
+      <div class="va-bloques">
+        <div class="va-b"><span class="va-et">Stock</span>
+          <div class="stepper"><button type="button" data-paso="stock:-1" ${puede ? '' : 'disabled'}>−</button><input id="va-stock" type="number" inputmode="numeric" value="${actual}" ${puede ? '' : 'disabled'}><button type="button" data-paso="stock:1" ${puede ? '' : 'disabled'}>+</button></div>
+          <small id="va-stock-txt">${porDep.length > 1 ? porDep.map(x => esc(x.d.nombre) + ' ' + fmt.num(x.c)).join(' · ') : 'en el local'}</small></div>
+        <div class="va-b va-falla"><span class="va-et">◆ Con falla</span>
+          <div class="stepper"><button type="button" data-paso="falla:-1" ${APP.esAdmin ? '' : 'disabled'}>−</button><input id="va-falla" type="number" inputmode="numeric" value="${falla0}" ${APP.esAdmin ? '' : 'disabled'}><button type="button" data-paso="falla:1" ${APP.esAdmin ? '' : 'disabled'}>+</button></div>
+          <small>se venden en el local, no en la web</small></div>
       </div>
-      <table class="lista" style="margin-bottom:12px"><tr><th>Depósito</th><th class="num">Stock</th></tr>${porDep.map(x => `<tr><td>${esc(x.d.nombre)}</td><td class="num num-f">${fmt.num(x.c)}</td></tr>`).join('')}</table>
-      ${v.chequear ? `<div class="aviso-chequear"><span>🔎 ${esc(v.chequear)}</span>${APP.esAdmin ? '<label><input type="checkbox" id="v-chequeado"> Ya está chequeado</label>' : ''}</div>` : ''}
-      <div class="fila c2">
-        <div class="campo"><label>◆ Con falla (solo local)</label><input id="v-fallas" type="number" min="0" step="1" value="${+v.fallas || 0}" ${APP.esAdmin ? '' : 'disabled'}><span class="ayuda">Cuentan en el local pero no se ofrecen en la web</span></div>
-        <div class="campo"><label>Qué falla tiene</label><input id="v-falla-nota" value="${esc(v.falla_nota || '')}" placeholder="Ej. hilo suelto en el bretel" ${APP.esAdmin ? '' : 'disabled'}></div>
-      </div>
-      ${APP.rol !== 'visor' ? `<div class="fila c3">
-        <div class="campo"><label>Ajustar stock</label><input id="v-cant" type="number" step="1" placeholder="+5 entra · -2 sale"></div>
-        <div class="campo"><label>Depósito</label><select id="v-dep">${depositos.map(d => `<option value="${d.id}" ${d.id === depPrincipal.id ? 'selected' : ''}>${esc(d.nombre)}</option>`).join('')}</select></div>
-        <div class="campo"><label>Motivo</label><select id="v-tipo"><option value="ajuste">Ajuste / recuento</option><option value="compra">Compra</option><option value="devolucion">Devolución</option><option value="venta">Venta (sin caja)</option></select></div>
-      </div><div class="campo"><label>Nota</label><input id="v-nota" placeholder="Opcional"></div>` : ''}
-      <div class="fila c2"><div class="campo"><label>Etiquetas a imprimir</label><input id="v-etq" type="number" min="1" value="${Math.max(1, porDep.reduce((s, x) => s + x.c, 0))}"></div></div>
-      <div class="pie"><button class="btn" data-cerrar>Cerrar</button><button class="btn suave" data-etq>Agregar a etiquetas</button>${APP.rol !== 'visor' ? '<button class="btn primario" data-guardar>Guardar</button>' : ''}</div>`);
+      <div id="va-motivo" class="va-motivo" hidden><span class="va-et">¿Por qué cambia el stock? <b id="va-dif"></b></span><div class="motivos">${MOTIVOS.map(x => `<button type="button" class="motivo" data-mo="${esc(x)}">${esc(x)}</button>`).join('')}</div>
+        <input id="va-nota" class="va-nota" placeholder="Nota (opcional)"></div>
+      <div id="va-falla-w" class="campo" ${falla0 ? '' : 'hidden'} style="margin-top:12px"><label>Qué falla tiene</label><input id="v-falla-nota" value="${esc(v.falla_nota || '')}" placeholder="Ej. hilo suelto en el bretel" ${APP.esAdmin ? '' : 'disabled'}></div>
+      <details class="va-mas"><summary>Código de barras, precio propio y etiquetas</summary>
+        <div class="fila c2" style="margin-top:10px">
+          <div class="campo"><label>Código de barras</label><input id="v-ean" value="${esc(v.ean || '')}" ${APP.esAdmin ? '' : 'disabled'}><span class="ayuda">13 dígitos (EAN) o el de la etiqueta del proveedor</span></div>
+          <div class="campo"><label>Precio propio</label><input id="v-precio" type="number" step="0.01" value="${v.precio != null && +v.precio !== +producto.precio ? v.precio : ''}" placeholder="igual al producto" ${APP.esAdmin ? '' : 'disabled'}></div>
+        </div>
+        ${porDep.length > 1 && puede ? `<div class="campo"><label>Depósito donde se ajusta</label><select id="v-dep">${depositos.map(d => `<option value="${d.id}" ${d.id === depPrincipal.id ? 'selected' : ''}>${esc(d.nombre)}</option>`).join('')}</select></div>` : ''}
+        <div style="display:flex;gap:8px;align-items:flex-end"><div class="campo" style="margin:0;width:140px"><label>Etiquetas</label><input id="v-etq" type="number" min="1" value="${Math.max(1, actual)}"></div><button type="button" class="btn" data-etq>Agregar a etiquetas</button></div>
+      </details>
+      <div class="pie"><button class="btn" data-cerrar>Cerrar</button>${puede ? '<button class="btn primario" data-guardar>Guardar</button>' : ''}</div>`);
+    const iS = $('#va-stock', m), iF = $('#va-falla', m);
+    const refrescar = () => {
+      nuevo = Math.round(+iS.value || 0); fallas = Math.max(0, Math.round(+iF.value || 0));
+      const dif = nuevo - actual; $('#va-motivo', m).hidden = !dif;
+      $('#va-dif', m).textContent = dif ? `(${dif > 0 ? '+' : ''}${fmt.num(dif)})` : '';
+      $('#va-falla-w', m).hidden = !fallas;
+      iF.closest('.va-b').classList.toggle('activa', fallas > 0);
+      iS.closest('.va-b').classList.toggle('cambio', dif !== 0);
+    };
+    $$('[data-paso]', m).forEach(b => b.onclick = () => { const [k, d] = b.dataset.paso.split(':'), inp = k === 'stock' ? iS : iF; inp.value = Math.max(k === 'falla' ? 0 : -9999, Math.round(+inp.value || 0) + +d); refrescar(); });
+    iS.oninput = refrescar; iF.oninput = refrescar;
+    $$('.motivo', m).forEach(b => b.onclick = () => { motivo = b.dataset.mo; $$('.motivo', m).forEach(x => x.classList.toggle('on', x === b)); });
     $('[data-cerrar]', m).onclick = () => m.cerrar();
     $('[data-etq]', m).onclick = () => { agregarEtiquetas([{ variante_id: v.id, cantidad: +$('#v-etq', m).value || 1 }]); toast('Agregado a la cola de etiquetas'); };
     const g = $('[data-guardar]', m); if (g) g.onclick = async () => {
+      refrescar();
+      if (nuevo !== actual && !motivo) { toast('Elegí por qué cambia el stock', 'error'); $('#va-motivo', m).scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
+      if (fallas > Math.max(0, nuevo)) { toast('No puede haber más prendas con falla que stock', 'error'); return; }
       g.disabled = true;
-      if (APP.esAdmin) {
-        const ean = $('#v-ean', m).value.trim() || null, precio = $('#v-precio', m).value === '' ? null : +$('#v-precio', m).value;
-        if (ean !== (v.ean || null) || precio !== (v.precio != null && +v.precio !== +producto.precio ? +v.precio : null)) {
-          const r = await sb.from('variantes').update({ ean, precio }).eq('id', v.id);
-          if (r.error) { toast(mensajeError(r.error), 'error'); g.disabled = false; return; }
-        }
-        const fallas = Math.max(0, parseInt($('#v-fallas', m).value) || 0), fallaNota = $('#v-falla-nota', m).value.trim() || null, chk = $('#v-chequeado', m);
-        if (fallas > Math.max(0, +v.stock || 0) + (+($('#v-cant', m) || {}).value || 0)) { toast('No puede haber más prendas con falla que stock', 'error'); g.disabled = false; return; }
-        if (fallas !== (+v.fallas || 0) || fallaNota !== (v.falla_nota || null) || (chk && chk.checked)) {
-          const cambios = { fallas, falla_nota: fallas ? fallaNota : null }; if (chk && chk.checked) cambios.chequear = null;
-          const r = await sb.from('variantes').update(cambios).eq('id', v.id);
-          if (r.error) { toast(mensajeError(r.error), 'error'); g.disabled = false; return; }
-        }
-      }
-      const cant = +$('#v-cant', m).value || 0;
-      if (cant) {
-        const r = await sb.from('stock_movimientos').insert(APP.conEmpresa({ variante_id: v.id, deposito_id: $('#v-dep', m).value, cantidad: cant, tipo: $('#v-tipo', m).value, nota: $('#v-nota', m).value.trim() || null }));
+      if (nuevo !== actual) {
+        const dep = $('#v-dep', m);
+        const r = await sb.rpc('stock_ajustar', { p: { variante_id: v.id, modo: 'fijar', cantidad: nuevo, motivo, nota: $('#va-nota', m).value.trim(), deposito_id: dep ? dep.value : null } });
         if (r.error) { toast(mensajeError(r.error), 'error'); g.disabled = false; return; }
       }
-      m.cerrar(); toast('Guardado'); await cargar();
+      if (APP.esAdmin) {
+        const ean = $('#v-ean', m).value.trim() || null, precio = $('#v-precio', m).value === '' ? null : +$('#v-precio', m).value;
+        const fallaNota = $('#v-falla-nota', m).value.trim() || null, chk = $('#v-chequeado', m), cambios = {};
+        if (ean !== (v.ean || null)) cambios.ean = ean;
+        if (precio !== (v.precio != null && +v.precio !== +producto.precio ? +v.precio : null)) cambios.precio = precio;
+        if (fallas !== falla0 || (fallas && fallaNota !== (v.falla_nota || null))) { cambios.fallas = fallas; cambios.falla_nota = fallas ? fallaNota : null; }
+        if (chk && chk.checked) cambios.chequear = null;
+        if (Object.keys(cambios).length) { const r = await sb.from('variantes').update(cambios).eq('id', v.id); if (r.error) { toast(mensajeError(r.error), 'error'); g.disabled = false; return; } }
+      }
+      m.cerrar(); toast(nuevo !== actual ? `Stock: ${fmt.num(actual)} → ${fmt.num(nuevo)}` : 'Guardado'); await cargar();
     };
+    setTimeout(() => { if (puede) { iS.focus(); iS.select(); } }, 40);
   }
 
   function agregarEtiquetas(items) {
@@ -414,10 +633,10 @@ APP.ready.then(async () => {
 
   function pintarMovimientos(movs) {
     const tb = $('#tb-mov'); tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());
-    const motivo = { inicial: 'Carga inicial', compra: 'Compra', venta: 'Venta', devolucion: 'Devolución', ajuste: 'Ajuste', transferencia: 'Transferencia' };
+    const motivo = { inicial: 'Carga inicial', compra: 'Compra', venta: 'Venta', devolucion: 'Devolución', ajuste: 'Ajuste', transferencia: 'Transferencia', recuento: 'Recuento' };
     if (!movs.length) { tb.insertAdjacentHTML('beforeend', '<tr><td colspan="4" class="vacio">Sin movimientos todavía.</td></tr>'); return; }
     movs.forEach(mv => { const v = variantes.find(x => x.id === mv.variante_id) || {};
-      tb.insertAdjacentHTML('beforeend', `<tr><td>${fmt.fechaHora(mv.fecha)}</td><td>${esc([v.talle_nombre, v.color_nombre].filter(Boolean).join(' · ') || 'único')}</td><td class="num">${+mv.cantidad > 0 ? '+' : ''}${fmt.dec(mv.cantidad)}</td><td>${esc(motivo[mv.tipo] || mv.tipo)}${mv.nota ? ' · <small>' + esc(mv.nota) + '</small>' : ''}</td></tr>`); });
+      tb.insertAdjacentHTML('beforeend', `<tr><td>${fmt.fechaHora(mv.fecha)}</td><td>${esc([v.talle_nombre, v.color_nombre].filter(Boolean).join(' · ') || 'único')}</td><td class="num">${+mv.cantidad > 0 ? '+' : ''}${fmt.dec(mv.cantidad)}</td><td>${mv.venta_numero ? 'Venta #' + String(mv.venta_numero).padStart(6, '0') : esc(motivo[mv.tipo] || mv.tipo)}${mv.motivo && mv.motivo !== mv.tipo ? ' · ' + esc(mv.motivo) : ''}${mv.nota && !mv.venta_numero ? ' · <small>' + esc(mv.nota) + '</small>' : ''}${mv.usuario ? ' <small style="color:var(--tinta-3)">· ' + esc(mv.usuario) + '</small>' : ''}</td></tr>`); });
   }
 
   await cargar();
