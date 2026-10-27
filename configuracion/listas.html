@@ -5,105 +5,149 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Listas de precios · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610272012">
+<link rel="stylesheet" href="../shell/shell.css?v=202610272021">
 <style>
   .pestanas{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
   .pestanas a{font:600 13px var(--f-ui);color:var(--tinta);text-decoration:none;padding:8px 14px;border:1px solid var(--linea);background:var(--superficie-2);border-radius:10px}
   .pestanas a.on{background:var(--lila);border-color:transparent;color:var(--acento)}
-  .regla{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:13px}
-  .regla input{width:74px;height:36px;border:1px solid var(--linea);border-radius:10px;text-align:center;font:700 14px var(--f-mono);background:var(--superficie-2)}
-  .regla select,.td-red select{height:36px;border:1px solid var(--linea);border-radius:10px;background:var(--superficie-2);padding:0 8px;font:500 13px var(--f-ui)}
-  .nom-lista{border:1px solid transparent;background:transparent;font:700 14px var(--f-ui);padding:6px 8px;border-radius:8px;width:100%;max-width:180px}
-  .nom-lista:hover,.nom-lista:focus{border-color:var(--linea);background:var(--superficie-2)}
-  .formas{display:flex;flex-wrap:wrap;gap:4px}
-  .formas .chip{font-size:11px}
-  .switch{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer}
-  .switch input{width:18px;height:18px}
+  /* una tarjeta por lista */
+  .listas{display:grid;gap:12px}
+  .lp{border:1px solid var(--linea);border-radius:16px;padding:14px 16px;background:var(--superficie-2)}
+  .lp.base{border-color:rgba(var(--acento-rgb),.35);background:var(--lila)}
+  .lp-cab{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .lp-cab input{field-sizing:content;font:700 17px var(--f-titulo);border:1px solid transparent;background:transparent;border-radius:10px;padding:5px 8px;margin-left:-8px;min-width:120px;flex:0 1 auto;max-width:320px;color:var(--tinta)}
+  .lp-cab input:hover{border-color:var(--linea)}.lp-cab input:focus{outline:0;border-color:rgba(var(--acento-rgb),.6);background:var(--superficie)}
+  .lp-cab .mover{margin-left:auto;display:flex;gap:4px}
+  .lp-cab .mover button{width:32px;height:32px;border:1px solid var(--linea);background:var(--superficie);border-radius:9px;cursor:pointer;color:var(--tinta-2);font-size:14px}
+  .lp-cab .mover button:disabled{opacity:.35;cursor:default}
+  .lp-grid{display:grid;grid-template-columns:minmax(260px,1.4fr) minmax(200px,1fr) minmax(200px,1fr);gap:14px 18px;align-items:start}
+  @media (max-width:860px){.lp-grid{grid-template-columns:1fr}}
+  .lp .campo{margin:0}
+  .regla{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .regla input{width:84px!important;text-align:center;font:700 16px var(--f-mono)!important}
+  .regla select{width:auto!important}
+  .ejemplo{font-size:12.5px;color:var(--tinta-3);margin-top:6px}
+  .ejemplo b{color:var(--tinta);font-family:var(--f-mono)}
+  .fila-sw{display:flex;align-items:center;gap:10px;min-height:38px;font-size:13.5px}
+  .excep{margin-top:12px;padding-top:12px;border-top:1px dashed var(--linea)}
+  .excep h4{font:600 11.5px var(--f-ui);color:var(--tinta-3);margin:0 0 8px}
+  .ex-fila{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:5px 0;font-size:13.5px}
+  .ex-fila .que{flex:1;min-width:180px}
+  .ex-fila input{width:74px;height:32px;border:1px solid var(--linea);border-radius:8px;text-align:center;font:700 13px var(--f-mono);background:var(--superficie)}
+  .ex-fila select{height:32px;border:1px solid var(--linea);border-radius:8px;background:var(--superficie);font:500 12.5px var(--f-ui);padding:0 6px}
+  /* formas de pago */
+  .formas{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px}
+  .forma{display:flex;align-items:center;gap:10px;border:1px solid var(--linea-suave);border-radius:12px;padding:8px 10px;background:var(--superficie-2)}
+  .forma span{flex:1;font-size:13.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .forma select{height:34px;border:1px solid var(--linea);border-radius:9px;background:var(--superficie);font:500 13px var(--f-ui);padding:0 8px;max-width:150px}
   .muestra td.num{white-space:nowrap}
   .muestra s{color:var(--tinta-3);font-weight:400;font-size:11.5px;display:block}
   .tabla-scroll{overflow-x:auto}
-  @media (max-width:700px){.oculta-cel{display:none}}
 </style>
 </head>
 <body data-page="configuracion" data-etq="Configuración" data-title="Listas de precios" data-subtitle="Una lista base y las demás se calculan solas con su regla">
 <main class="app">
   <div class="pestanas"><a href="empresa.html">Empresa</a><a href="atributos.html">Talles, colores y familias</a><a href="curvas.html">Curvas de talle</a><a class="on" href="listas.html">Listas de precios</a><a href="promociones.html">Promociones</a><a href="facturacion.html">Facturación</a><a href="usuarios.html">Usuarios</a></div>
 
-  <div class="card"><div class="card-cab"><div><h2>Listas</h2><p class="sub">La lista <b>base</b> es el precio de cada prenda (el que se carga en la ficha y el que va a la web). Las demás salen de ese precio con su regla. Los cambios se guardan solos.</p></div><div class="acciones"><button class="btn" id="btn-nueva">+ Agregar lista</button></div></div>
-    <div class="tabla-scroll"><table class="lista" id="tb-listas"><tr><th>Lista</th><th>Regla</th><th>Redondeo</th><th>Rebajas</th><th class="oculta-cel">Se usa con</th><th></th></tr></table></div>
-    <p class="sub" style="margin-top:10px">Las <b>rebajas</b> (precio tachado, por ejemplo Magnolia de $75.000 a $59.990) se arman en <a href="promociones.html">Promociones</a> y bajan el precio antes de la lista: Contado = precio rebajado −20%.</p>
+  <div class="card"><div class="card-cab"><div><h2>Listas</h2><p class="sub">La <b>base</b> es el precio de cada prenda (el de la ficha). Las demás se calculan solas desde ese precio. Todo se guarda al cambiarlo.</p></div><div class="acciones"><button class="btn primario" id="btn-nueva">+ Agregar lista</button></div></div>
+    <div class="listas" id="listas"></div>
   </div>
 
-  <div class="card"><div class="card-cab"><div><h2>Excepciones</h2><p class="sub">Una familia o un producto con otra regla en una lista. El precio fijo de un producto puntual se pone en su ficha.</p></div><div class="acciones"><button class="btn" id="btn-excep">+ Agregar excepción</button></div></div>
-    <table class="lista" id="tb-excep"><tr><th>Lista</th><th>Para</th><th>Regla</th><th></th></tr></table>
+  <div class="card"><div class="card-cab"><div><h2>Qué lista usa cada forma de pago</h2><p class="sub">En la caja, al elegir la forma de pago el ticket pasa solo a su lista. "Cualquiera" no cambia la lista.</p></div></div>
+    <div class="formas" id="formas"></div>
   </div>
 
-  <div class="card"><div class="card-cab"><div><h2>Cómo quedan</h2><p class="sub">El precio de hoy en cada lista, con rebajas y redondeo.</p></div><div class="acciones"><input id="q" placeholder="Buscar producto o código" style="height:36px;border:1px solid var(--linea);border-radius:10px;padding:0 10px;background:var(--superficie-2);min-width:200px"></div></div>
+  <div class="card"><div class="card-cab"><div><h2>Cómo quedan</h2><p class="sub">El precio de hoy en cada lista, con rebajas y redondeo. Las rebajas se arman en <a href="promociones.html">Promociones</a>.</p></div><div class="acciones"><input id="q" placeholder="Buscar producto o código" style="height:36px;border:1px solid var(--linea);border-radius:10px;padding:0 10px;background:var(--superficie-2);min-width:200px"></div></div>
     <div class="tabla-scroll"><table class="lista muestra" id="tb-muestra"></table></div>
   </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610272012"></script>
-<script src="../shared/precios.js?v=202610272012"></script>
-<script src="../shell/shell.js?v=202610272012"></script>
+<script src="../shared/supabase.js?v=202610272021"></script>
+<script src="../shared/precios.js?v=202610272021"></script>
+<script src="../shell/shell.js?v=202610272021"></script>
 <script>
 APP.ready.then(async () => {
   const { esc, $, $$, toast, modal, confirmar, mensajeError, fmt } = APP, e = APP.empresa.id;
   if (!APP.esAdmin) { document.querySelector('main').innerHTML = '<div class="card"><p>Esta sección es solo para administración.</p></div>'; return; }
   const nice = s => s ? s.charAt(0) + s.slice(1).toLowerCase() : '';
-  const [{ data: cats }, { data: formas }, prods] = await Promise.all([
+  const [{ data: cats }, prods] = await Promise.all([
     sb.from('categorias').select('id,nombre').eq('empresa_id', e).eq('activa', true).order('orden'),
-    sb.from('formas_pago').select('id,nombre,listas,lista_id').eq('empresa_id', e).eq('activa', true).order('orden'),
     (async () => { let d = 0, t = []; while (true) { const { data } = await sb.from('productos').select('id,codigo,nombre,precio,categoria_id,tipo').eq('empresa_id', e).eq('activo', true).order('nombre').range(d, d + 999); t = t.concat(data || []); if (!data || data.length < 1000) break; d += 1000; } return t; })()]);
-  let ctx = null;
-  const difTxt = pct => +pct === 100 ? 'igual a Lista' : +pct < 100 ? fmt.dec(100 - pct) + '% menos que Lista' : fmt.dec(pct - 100) + '% más que Lista';
-  const difDe = pct => Math.round((+pct - 100) * 1000) / 1000;   // 80 → −20
-  async function recargar() { ctx = await PRECIOS.cargar(sb, e); pintarListas(); pintarExcep(); pintarMuestra(); }
-  async function guardar(id, d, msg) { const r = await sb.from('listas_precios').update(d).eq('id', id); if (r.error) { toast(mensajeError(r.error), 'error'); return false; } toast(msg || 'Guardado'); await recargar(); return true; }
+  let ctx = null, formas = [];
+  const EJ = 50000;   // precio de ejemplo para mostrar cada regla
+  const num = s => parseFloat(String(s).replace(',', '.').replace('−', '-'));
+  const reglaTxt = pct => +pct === 100 ? 'igual que la base' : +pct < 100 ? fmt.dec(100 - pct) + '% menos que la base' : fmt.dec(pct - 100) + '% más que la base';
+  // regla en dos controles: [20] [% menos ▾] — el % sobre la base se guarda como 80
+  const reglaControles = (pct, k) => { const dif = Math.round(Math.abs(100 - +pct) * 1000) / 1000, sentido = +pct > 100 ? 'mas' : +pct < 100 ? 'menos' : 'igual';
+    return `<div class="regla"><input data-${k}-n inputmode="decimal" value="${sentido === 'igual' ? '' : fmt.dec(dif)}" ${sentido === 'igual' ? 'disabled' : ''}><select data-${k}-s><option value="menos" ${sentido === 'menos' ? 'selected' : ''}>% menos que la base</option><option value="mas" ${sentido === 'mas' ? 'selected' : ''}>% más que la base</option><option value="igual" ${sentido === 'igual' ? 'selected' : ''}>igual que la base</option></select></div>`; };
+  const leerRegla = (cont, k) => { const s = $(`[data-${k}-s]`, cont).value, n = num($(`[data-${k}-n]`, cont).value); if (s === 'igual') return 100; if (isNaN(n) || n <= 0) return null; if (s === 'menos' && n >= 100) return null; return s === 'menos' ? 100 - n : 100 + n; };
+  const ejemplo = l => { const c = PRECIOS.calcular({ id: '', producto_id: '', precio: EJ }, l.id, ctx, {}); return `Ej.: una prenda de <b>${fmt.pesos(EJ)}</b> sale <b>${fmt.pesos(c.precio)}</b>`; };
+
+  async function recargar() {
+    const [c, f] = await Promise.all([PRECIOS.cargar(sb, e), sb.from('formas_pago').select('id,nombre,listas').eq('empresa_id', e).eq('activa', true).order('orden')]);
+    ctx = c; formas = f.data || []; pintarListas(); pintarFormas(); pintarMuestra();
+  }
+  async function guardarLista(id, d, msg) { const r = await sb.from('listas_precios').update(d).eq('id', id); if (r.error) { toast(mensajeError(r.error), 'error'); await recargar(); return; } if (msg) toast(msg); await recargar(); }
 
   function pintarListas() {
-    const tb = $('#tb-listas'); tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());
-    ctx.listas.forEach(l => {
-      const usan = (formas || []).filter(f => (f.listas && f.listas.length ? f.listas : f.lista_id ? [f.lista_id] : []).includes(l.id));
-      const libres = (formas || []).filter(f => !(f.listas && f.listas.length) && !f.lista_id);
-      tb.insertAdjacentHTML('beforeend', `<tr data-l="${l.id}">
-        <td><input class="nom-lista" data-nom value="${esc(l.nombre)}">${l.predeterminada ? ' <span class="chip">base</span>' : ''}</td>
-        <td>${l.predeterminada ? '<span class="sub">el precio de cada prenda</span>' : `<div class="regla"><input data-dif inputmode="decimal" value="${difDe(l.porcentaje) > 0 ? '+' : ''}${fmt.dec(difDe(l.porcentaje))}"> % <span class="sub">${difTxt(l.porcentaje)}</span></div>`}</td>
-        <td class="td-red"><select data-red>${PRECIOS.REDONDEOS.map(([k, t]) => `<option value="${k}" ${(l.redondeo || '10+') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></td>
-        <td><label class="switch" title="Si está apagado, esta lista parte siempre del precio sin rebaja"><input type="checkbox" data-reb ${l.toma_rebajas !== false ? 'checked' : ''}> ${l.toma_rebajas !== false ? 'Las toma' : 'No las toma'}</label></td>
-        <td class="oculta-cel"><div class="formas">${usan.map(f => `<span class="chip">${esc(f.nombre)}</span>`).join('') || (l.predeterminada && libres.length ? `<span class="sub">${libres.length} formas sin lista propia</span>` : '<span class="sub">—</span>')}</div></td>
-        <td>${l.predeterminada ? '' : `<button class="btn-eliminar" data-quitar title="Quitar la lista">✕</button>`}</td></tr>`);
-    });
-    $$('#tb-listas tr[data-l]').forEach(tr => {
-      const l = ctx.listas.find(x => x.id === tr.dataset.l);
-      $('[data-nom]', tr).onchange = ev => { const n = ev.target.value.trim(); if (!n) { ev.target.value = l.nombre; return; } guardar(l.id, { nombre: n }); };
-      const dif = $('[data-dif]', tr); if (dif) dif.onchange = () => {
-        const x = parseFloat(String(dif.value).replace(',', '.').replace('−', '-'));
-        if (isNaN(x) || x <= -100 || x > 500) { toast('Poné cuánto cambia contra Lista: −20 es 20% menos, +10 es 10% más', 'error'); dif.value = fmt.dec(difDe(l.porcentaje)); return; }
-        guardar(l.id, { porcentaje: 100 + x }, `${l.nombre}: ${difTxt(100 + x)}`);
-      };
-      $('[data-red]', tr).onchange = ev => guardar(l.id, { redondeo: ev.target.value });
-      $('[data-reb]', tr).onchange = ev => guardar(l.id, { toma_rebajas: ev.target.checked }, ev.target.checked ? `${l.nombre} toma las rebajas` : `${l.nombre} parte siempre del precio sin rebaja`);
-      const q = $('[data-quitar]', tr); if (q) q.onclick = async () => { if (!(await confirmar(`¿Quitar la lista ${l.nombre}? Las ventas hechas con ella no cambian.`, 'Quitar'))) return; guardar(l.id, { activa: false }, 'Lista quitada'); };
+    const cont = $('#listas'), ls = ctx.listas;
+    cont.innerHTML = ls.map((l, i) => {
+      const ex = (ctx.datos.excep || []).filter(x => x.lista_id === l.id);
+      return `<div class="lp${l.predeterminada ? ' base' : ''}" data-l="${l.id}">
+        <div class="lp-cab"><input data-nom value="${esc(l.nombre)}" aria-label="Nombre de la lista">${l.predeterminada ? '<span class="chip">base</span>' : ''}
+          <div class="mover"><button data-sube ${i === 0 ? 'disabled' : ''} title="Subir">↑</button><button data-baja ${i === ls.length - 1 ? 'disabled' : ''} title="Bajar">↓</button>${l.predeterminada ? '' : '<button data-quitar title="Quitar la lista">✕</button>'}</div></div>
+        <div class="lp-grid">
+          <div class="campo"><label>Precio</label>${l.predeterminada ? '<p style="margin:6px 0 0;font-size:13.5px">El que tiene cada prenda en su ficha.</p><p class="ejemplo">Es el que va a la web y desde el que se calculan las demás listas.</p>' : reglaControles(l.porcentaje, 'r') + `<p class="ejemplo">${ejemplo(l)}</p>`}</div>
+          <div class="campo"><label>Redondeo</label><select data-red>${PRECIOS.REDONDEOS.map(([k, t]) => `<option value="${k}" ${(l.redondeo || '10+') === k ? 'selected' : ''}>${t}</option>`).join('')}</select>${l.predeterminada ? '<p class="ejemplo">Para las rebajas en %.</p>' : ''}</div>
+          <div class="campo"><label>Rebajas</label>${l.predeterminada ? '<p style="margin:6px 0 0;font-size:13.5px">Siempre las toma.</p>' : `<div class="fila-sw"><label class="switch"><input type="checkbox" data-reb ${l.toma_rebajas !== false ? 'checked' : ''}><span></span></label> ${l.toma_rebajas !== false ? 'Parte del precio rebajado' : 'Parte siempre del precio sin rebaja'}</div>`}</div>
+        </div>
+        ${l.predeterminada ? '' : `<div class="excep"><h4>EXCEPCIONES${ex.length ? '' : ' · ninguna: todas las prendas siguen la regla de arriba'}</h4>
+          ${ex.map(x => { const p = x.producto_id ? prods.find(y => y.id === x.producto_id) : null, c = x.categoria_id ? (cats || []).find(y => y.id === x.categoria_id) : null;
+            return `<div class="ex-fila" data-ex="${x.id}"><span class="que">${p ? esc(p.nombre) + ' <small class="mono">' + esc(p.codigo) + '</small>' : 'Familia <b>' + esc(nice(c && c.nombre)) + '</b>'}</span>${reglaControles(x.porcentaje, 'x')}<button class="btn-eliminar" data-ex-del title="Quitar la excepción">✕</button></div>`; }).join('')}
+          <button class="btn chico" data-ex-mas style="margin-top:4px">+ Agregar excepción</button></div>`}
+      </div>`;
+    }).join('');
+
+    $$('.lp', cont).forEach(card => {
+      const l = ctx.listas.find(x => x.id === card.dataset.l), idx = ctx.listas.indexOf(l);
+      $('[data-nom]', card).onchange = ev => { const n = ev.target.value.trim(); if (!n) { ev.target.value = l.nombre; return; } guardarLista(l.id, { nombre: n }, 'Nombre guardado'); };
+      const s = $('[data-r-s]', card), n = $('[data-r-n]', card);
+      if (s) { const guardar = () => { const pct = leerRegla(card, 'r'); if (pct == null) { toast('Poné un número: cuánto % menos o más que la base', 'error'); return; } if (pct !== +l.porcentaje) guardarLista(l.id, { porcentaje: pct }, `${l.nombre}: ${reglaTxt(pct)}`); };
+        s.onchange = () => { n.disabled = s.value === 'igual'; if (s.value !== 'igual' && !n.value) { n.focus(); return; } guardar(); }; n.onchange = guardar; }
+      $('[data-red]', card).onchange = ev => guardarLista(l.id, { redondeo: ev.target.value }, 'Redondeo guardado');
+      const rb = $('[data-reb]', card); if (rb) rb.onchange = () => guardarLista(l.id, { toma_rebajas: rb.checked }, rb.checked ? `${l.nombre} parte del precio rebajado` : `${l.nombre} parte siempre del precio sin rebaja`);
+      const mover = async d => { const otro = ctx.listas[idx + d]; if (!otro) return; const a = +l.orden || idx, b = +otro.orden || idx + d;
+        await sb.from('listas_precios').update({ orden: a === b ? idx + d : b }).eq('id', l.id); await sb.from('listas_precios').update({ orden: a === b ? idx : a }).eq('id', otro.id); recargar(); };
+      $('[data-sube]', card).onclick = () => mover(-1); $('[data-baja]', card).onclick = () => mover(1);
+      const q = $('[data-quitar]', card); if (q) q.onclick = async () => { if (!(await confirmar(`¿Quitar la lista ${l.nombre}? Las ventas ya hechas no cambian.`, 'Quitar'))) return; guardarLista(l.id, { activa: false }, 'Lista quitada'); };
+      // excepciones
+      $$('[data-ex]', card).forEach(f => {
+        const id = f.dataset.ex, x = ctx.datos.excep.find(y => y.id === id);
+        const guardar = async () => { const pct = leerRegla(f, 'x'); if (pct == null) { toast('Poné un número: cuánto % menos o más que la base', 'error'); return; } if (pct === +x.porcentaje) return;
+          const r = await sb.from('lista_excepciones').update({ porcentaje: pct }).eq('id', id); if (r.error) toast(mensajeError(r.error), 'error'); else toast('Excepción guardada'); recargar(); };
+        const xs = $('[data-x-s]', f), xn = $('[data-x-n]', f);
+        xs.onchange = () => { xn.disabled = xs.value === 'igual'; if (xs.value !== 'igual' && !xn.value) { xn.focus(); return; } guardar(); }; xn.onchange = guardar;
+        $('[data-ex-del]', f).onclick = async () => { const r = await sb.from('lista_excepciones').delete().eq('id', id); if (r.error) toast(mensajeError(r.error), 'error'); else { toast('Excepción quitada'); recargar(); } };
+      });
+      const mas = $('[data-ex-mas]', card); if (mas) mas.onclick = () => nuevaExcepcion(l);
     });
   }
 
-  function pintarExcep() {
-    const tb = $('#tb-excep'); tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());
-    const filas = ctx.datos.excep || [];
-    if (!filas.length) tb.insertAdjacentHTML('beforeend', '<tr><td colspan="4" class="vacio">Sin excepciones: todas las prendas siguen la regla de su lista.</td></tr>');
-    filas.forEach(x => {
-      const l = ctx.listas.find(y => y.id === x.lista_id), p = x.producto_id ? prods.find(y => y.id === x.producto_id) : null, c = x.categoria_id ? cats.find(y => y.id === x.categoria_id) : null;
-      tb.insertAdjacentHTML('beforeend', `<tr><td><b>${esc(l ? l.nombre : '—')}</b></td><td>${p ? esc(p.nombre) + ' <small class="mono">' + esc(p.codigo) + '</small>' : 'Familia ' + esc(nice(c && c.nombre))}</td><td>${difTxt(x.porcentaje)}</td><td><button class="btn-eliminar" data-del-ex="${x.id}" title="Quitar">✕</button></td></tr>`);
-    });
-    $$('[data-del-ex]', tb).forEach(b => b.onclick = async () => { const r = await sb.from('lista_excepciones').delete().eq('id', b.dataset.delEx); if (r.error) toast(mensajeError(r.error), 'error'); else { toast('Excepción quitada'); recargar(); } });
+  function pintarFormas() {
+    const cont = $('#formas');
+    if (!formas.length) { cont.innerHTML = '<p class="sub">No hay formas de pago cargadas.</p>'; return; }
+    cont.innerHTML = formas.map(f => { const ls = f.listas || [], varias = ls.length > 1;
+      return `<div class="forma" data-f="${f.id}"><span title="${esc(f.nombre)}">${esc(f.nombre)}</span><select>${varias ? `<option value="varias" selected>${esc(ls.map(id => (ctx.listas.find(l => l.id === id) || {}).nombre).filter(Boolean).join(' o '))}</option>` : ''}<option value="" ${!ls.length ? 'selected' : ''}>Cualquiera</option>${ctx.listas.map(l => `<option value="${l.id}" ${!varias && ls[0] === l.id ? 'selected' : ''}>${esc(l.nombre)}</option>`).join('')}</select></div>`; }).join('');
+    $$('.forma', cont).forEach(d => { const sel = $('select', d); sel.onchange = async () => {
+      if (sel.value === 'varias') return;
+      const r = await sb.from('formas_pago').update({ listas: sel.value ? [sel.value] : null }).eq('id', d.dataset.f);
+      if (r.error) toast(mensajeError(r.error), 'error'); else toast('Guardado'); recargar(); }; });
   }
 
   function pintarMuestra() {
     const q = $('#q').value.trim().toLowerCase(), pal = q.split(/\s+/).filter(Boolean);
     const lista = prods.filter(p => +p.precio > 0 && pal.every(w => (p.nombre + ' ' + p.codigo).toLowerCase().includes(w))).slice(0, 25);
-    const tb = $('#tb-muestra');
-    tb.innerHTML = `<tr><th>Producto</th>${ctx.listas.map(l => `<th class="num">${esc(l.nombre)}</th>`).join('')}</tr>` + (lista.length ? lista.map(p => {
+    $('#tb-muestra').innerHTML = `<tr><th>Producto</th>${ctx.listas.map(l => `<th class="num">${esc(l.nombre)}</th>`).join('')}</tr>` + (lista.length ? lista.map(p => {
       const v = { id: '', producto_id: p.id, precio: +p.precio };
       return `<tr><td><a href="../catalogo/producto.html?id=${p.id}">${esc(p.nombre)}</a><br><small class="mono">${esc(p.codigo)}</small></td>${ctx.listas.map(l => { const c = PRECIOS.calcular(v, l.id, ctx, { categoria_id: p.categoria_id, tipo: p.tipo });
         return `<td class="num">${c.rebaja && l.predeterminada ? `<s>${fmt.pesos(c.base)}</s>` : ''}<b>${fmt.pesos(c.precio)}</b>${c.rebaja && l.predeterminada ? `<br><small style="color:var(--acento)">▼ ${esc(c.rebaja.nombre)}</small>` : ''}${c.fijo ? ' <span class="chip aviso">fijo</span>' : ''}</td>`; }).join('')}</tr>`;
@@ -115,45 +159,44 @@ APP.ready.then(async () => {
   $('#btn-nueva').onclick = () => {
     const m = modal(`<h2>Nueva lista de precios</h2>
       <div class="campo"><label>Nombre</label><input id="n-nom" placeholder="Ej. Revendedoras"></div>
-      <div class="campo"><label>Regla: cuánto cambia contra Lista</label><div class="regla"><input id="n-dif" inputmode="decimal" value="-10"> % <span class="sub">−10 = 10% menos · +15 = 15% más</span></div></div>
+      <div class="campo"><label>Precio</label>${reglaControles(90, 'r')}</div>
       <div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Agregar</button></div>`);
+    $('[data-r-s]', m).onchange = ev => { $('[data-r-n]', m).disabled = ev.target.value === 'igual'; };
     $('[data-no]', m).onclick = () => m.cerrar();
     $('[data-si]', m).onclick = async () => {
-      const nombre = $('#n-nom', m).value.trim(), x = parseFloat(String($('#n-dif', m).value).replace(',', '.').replace('−', '-'));
-      if (!nombre) { toast('Ponele un nombre', 'error'); return; } if (isNaN(x) || x <= -100) { toast('Revisá la regla', 'error'); return; }
+      const nombre = $('#n-nom', m).value.trim(), pct = leerRegla(m, 'r');
+      if (!nombre) { toast('Ponele un nombre', 'error'); return; } if (pct == null) { toast('Revisá el porcentaje', 'error'); return; }
       const orden = Math.max(0, ...ctx.listas.map(l => +l.orden || 0)) + 1;
-      const r = await sb.from('listas_precios').insert(APP.conEmpresa({ nombre, porcentaje: 100 + x, orden, redondeo: '10+', toma_rebajas: true }));
+      const r = await sb.from('listas_precios').insert(APP.conEmpresa({ nombre, porcentaje: pct, orden, redondeo: '10+', toma_rebajas: true }));
       if (r.error) { toast(/duplicate|unique/i.test(r.error.message) ? 'Ya hay una lista con ese nombre (puede estar quitada)' : mensajeError(r.error), 'error'); return; }
       m.cerrar(); toast('Lista agregada'); recargar();
     };
     setTimeout(() => $('#n-nom', m).focus(), 30);
   };
 
-  // alta de excepción (en ventana)
-  $('#btn-excep').onclick = () => {
-    const otras = ctx.listas.filter(l => !l.predeterminada);
-    if (!otras.length) { toast('Primero agregá una lista además de la base', 'error'); return; }
+  // alta de excepción para una lista (en ventana)
+  function nuevaExcepcion(l) {
     let para = 'familia';
-    const m = modal(`<h2>Nueva excepción</h2>
-      <div class="campo"><label>Lista</label><select id="x-lista">${otras.map(l => `<option value="${l.id}">${esc(l.nombre)} (${difTxt(l.porcentaje)})</option>`).join('')}</select></div>
+    const m = modal(`<h2>Excepción en ${esc(l.nombre)}</h2><p class="sub">Hoy la regla es ${reglaTxt(l.porcentaje)}.</p>
       <div class="campo"><label>Para</label><div style="display:flex;gap:6px;margin-bottom:6px"><button type="button" class="btn chico" data-para="familia">Una familia</button><button type="button" class="btn chico" data-para="producto">Un producto</button></div>
         <select id="x-fam">${(cats || []).map(c => `<option value="${c.id}">${esc(nice(c.nombre))}</option>`).join('')}</select>
         <input id="x-prod" list="dl-prods" placeholder="Escribí el nombre o el código" style="display:none"><datalist id="dl-prods">${prods.map(p => `<option value="${esc(p.codigo)} · ${esc(p.nombre)}"></option>`).join('')}</datalist></div>
-      <div class="campo"><label>Regla: cuánto cambia contra Lista</label><div class="regla"><input id="x-dif" inputmode="decimal" value="-30"> %</div></div>
+      <div class="campo"><label>Precio</label>${reglaControles(l.porcentaje, 'r')}</div>
       <div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Agregar</button></div>`);
     const marcar = () => { $$('[data-para]', m).forEach(b => b.classList.toggle('primario', b.dataset.para === para)); $('#x-fam', m).style.display = para === 'familia' ? '' : 'none'; $('#x-prod', m).style.display = para === 'producto' ? '' : 'none'; };
     $$('[data-para]', m).forEach(b => b.onclick = () => { para = b.dataset.para; marcar(); }); marcar();
+    $('[data-r-s]', m).onchange = ev => { $('[data-r-n]', m).disabled = ev.target.value === 'igual'; };
     $('[data-no]', m).onclick = () => m.cerrar();
     $('[data-si]', m).onclick = async () => {
-      const x = parseFloat(String($('#x-dif', m).value).replace(',', '.').replace('−', '-')); if (isNaN(x) || x <= -100) { toast('Revisá la regla', 'error'); return; }
-      const d = { lista_id: $('#x-lista', m).value, porcentaje: 100 + x };
-      if (para === 'familia') d.categoria_id = $('#x-fam', m).value;
+      const pct = leerRegla(m, 'r'); if (pct == null) { toast('Revisá el porcentaje', 'error'); return; }
+      const d = { lista_id: l.id, porcentaje: pct };
+      if (para === 'familia') { d.categoria_id = $('#x-fam', m).value; if (!d.categoria_id) { toast('Elegí una familia', 'error'); return; } }
       else { const cod = $('#x-prod', m).value.split(' · ')[0].trim(); const p = prods.find(y => y.codigo === cod); if (!p) { toast('Elegí un producto de la lista', 'error'); return; } d.producto_id = p.id; }
       const r = await sb.from('lista_excepciones').insert(APP.conEmpresa(d));
       if (r.error) { toast(/duplicate|unique/i.test(r.error.message) ? 'Esa excepción ya existe' : mensajeError(r.error), 'error'); return; }
       m.cerrar(); toast('Excepción agregada'); recargar();
     };
-  };
+  }
 
   await recargar();
 });
