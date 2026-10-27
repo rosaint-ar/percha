@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
   }
   const simular = !!body.simular;
   const soloProductos: string[] = Array.isArray(body.solo_productos) ? body.solo_productos.map(String) : [];
-  let qc = admin.from("conexiones").select("id,empresa_id,externo_id,canal,empujar_stock,ultima_sync_pedidos,creada").eq("estado", "activa");
+  let qc = admin.from("conexiones").select("id,empresa_id,externo_id,canal,empujar_stock,ultima_sync_pedidos,creada,ultimo_refresco_web").eq("estado", "activa");
   if (!soloProductos.length && !simular) qc = qc.eq("empujar_stock", true);
   if (filtroEmpresa) qc = qc.eq("empresa_id", filtroEmpresa);
   const { data: conexiones } = await qc;
@@ -48,6 +48,29 @@ Deno.serve(async (req) => {
     if (!sec) continue;
     const headers = { Authentication: `bearer ${sec.access_token}`, "User-Agent": UA, "Content-Type": "application/json" };
     const base = `https://api.tiendanube.com/2025-03/${cx.externo_id}`;
+
+    // ---- una vez por hora: qué está visible en la web y con cuánto stock (en Tienda Nube también lo cambian a mano) ----
+    if (!simular && (body.refrescar || !cx.ultimo_refresco_web || Date.now() - new Date(cx.ultimo_refresco_web).getTime() > 60 * 60 * 1000)) {
+      const web = new Map<string, { pub: boolean; stock: number | null }>(); let completo = true;
+      for (let page = 1; page <= 50; page++) {
+        const r = await fetch(`${base}/products?per_page=200&page=${page}&fields=id,published,variants`, { headers });
+        if (r.status === 404) break; if (!r.ok) { completo = false; break; }
+        const lote = await r.json(); if (!Array.isArray(lote) || !lote.length) break;
+        for (const pr of lote) for (const v of pr.variants || []) web.set(String(v.id), { pub: pr.published !== false, stock: v.stock_management === false ? null : (v.stock != null ? +v.stock : null) });
+        if (lote.length < 200) break;
+      }
+      if (completo && web.size) {
+        const cache = await pag(() => admin.from("canal_items").select("id,empresa_id,variante_id,variante_ext,stock,publicado").eq("conexion_id", cx.id));
+        for (const c of cache) {
+          const w = web.get(String(c.variante_ext)); if (!w) continue;
+          const st = w.stock == null ? null : w.stock;
+          if (c.publicado === w.pub && (c.stock == null ? null : +c.stock) === st) continue;
+          await admin.from("canal_items").update({ publicado: w.pub, stock: st, actualizado: new Date().toISOString() }).eq("id", c.id);
+          if (w.pub && c.publicado === false && c.variante_id) await admin.rpc("encolar_canal", { e: c.empresa_id, v: c.variante_id });   // la volvieron a mostrar: que reciba el stock de Percha
+        }
+        await admin.from("conexiones").update({ ultimo_refresco_web: new Date().toISOString() }).eq("id", cx.id);
+      }
+    }
 
     // ---- qué variantes de Percha hay que mandar ----
     let variantes: string[] = []; let filas: any[] = [];
@@ -102,9 +125,10 @@ Deno.serve(async (req) => {
       reservar(String(p.pedido_ext), String(p.numero_ext), p.datos?.products || []);
     }
 
-    const items = await pag(() => admin.from("canal_items").select("id,variante_id,producto_ext,variante_ext,stock,talle_canal,color_canal").eq("conexion_id", cx.id).in("variante_id", variantes));
+    const items: any[] = [];   // de a tandas: una lista larga de ids no entra en la dirección de la consulta
+    for (let i = 0; i < variantes.length; i += 300) items.push(...await pag(() => admin.from("canal_items").select("id,variante_id,producto_ext,variante_ext,stock,talle_canal,color_canal,publicado").eq("conexion_id", cx.id).in("variante_id", variantes.slice(i, i + 300))));
     const stocks: any[] = [];
-    for (let i = 0; i < variantes.length; i += 300) { const { data } = await admin.from("v_variantes").select("id,producto_id,producto_tipo,stock,fallas,producto_nombre,talle_nombre,color_nombre").in("id", variantes.slice(i, i + 300)); stocks.push(...(data || [])); }
+    for (let i = 0; i < variantes.length; i += 300) { const { data } = await admin.from("v_variantes").select("id,producto_id,producto_tipo,sku,stock,fallas,producto_nombre,talle_nombre,color_nombre").in("id", variantes.slice(i, i + 300)); stocks.push(...(data || [])); }
     const infoVar = new Map(stocks.map((s: any) => [s.id, s]));
     // kits: componentes y variantes de los productos componentes (para resolver talle/color)
     const kitsIds = [...new Set(stocks.filter((s: any) => s.producto_tipo === "kit").map((s: any) => s.producto_id))];
@@ -140,14 +164,14 @@ Deno.serve(async (req) => {
     };
 
     // simulación: stock que tiene hoy la web, producto por producto
-    const enWeb = new Map<string, number | null>();
+    const enWeb = new Map<string, number | null>(); const visible = new Map<string, boolean>();
     if (simular) {
       const prods = [...new Set(items.map((d: any) => String(d.producto_ext)))];
       if (body.todo) {
         for (let page = 1; page <= 50; page++) {
-          const r = await fetch(`${base}/products?per_page=200&page=${page}&fields=id,variants`, { headers });
+          const r = await fetch(`${base}/products?per_page=200&page=${page}&fields=id,published,variants`, { headers });
           if (!r.ok) break; const lote = await r.json(); if (!Array.isArray(lote) || !lote.length) break;
-          for (const p of lote) for (const v of p.variants || []) enWeb.set(String(v.id), v.stock == null ? null : +v.stock);
+          for (const p of lote) for (const v of p.variants || []) { enWeb.set(String(v.id), v.stock == null ? null : +v.stock); visible.set(String(v.id), p.published !== false); }
           if (lote.length < 200) break;
         }
       } else {
@@ -155,25 +179,59 @@ Deno.serve(async (req) => {
       }
     }
 
-    let ok = 0, err = 0, frenado = false; const detalle: string[] = []; const diferencias: any[] = [];
+    // genéricos ("Bombis varias", bolsas sin definir): en la web son publicaciones sueltas que la web maneja sola; no se pisan
+    const genericos = new Set<string>();
+    const pidsVar = [...new Set(stocks.map((s: any) => s.producto_id))];
+    for (let i = 0; i < pidsVar.length; i += 300) { const { data } = await admin.from("productos").select("id").eq("es_generico", true).in("id", pidsVar.slice(i, i + 300)); for (const p of data || []) genericos.add(p.id); }
+    // un kit armado con genéricos ("Pack x3 bombis varias") tampoco: Percha no sabe cuántos se pueden armar
+    const compsIds = [...new Set([...comps.values()].flat().map((c: any) => c.comp_producto_id).filter(Boolean))];
+    const compGen = new Set<string>();
+    if (compsIds.length) { const { data } = await admin.from("productos").select("id").eq("es_generico", true).in("id", compsIds); for (const p of data || []) compGen.add(p.id); }
+    for (const [kit, cs] of comps) if (cs.some((c: any) => compGen.has(c.comp_producto_id))) genericos.add(kit);
+
+    let ok = 0, err = 0, frenado = false; const detalle: string[] = []; const diferencias: any[] = []; const sinTocar: any[] = [];
     const porVariante = new Map<string, any[]>();
     for (const d of items) { if (!porVariante.has(d.variante_id)) porVariante.set(d.variante_id, []); porVariante.get(d.variante_id)!.push(d); }
+    const webDe = (d: any) => simular ? (enWeb.has(String(d.variante_ext)) ? enWeb.get(String(d.variante_ext)) : undefined) : (d.stock == null ? null : +d.stock);
     for (const vid of variantes) {
       if (frenado) break;
-      const destinos = porVariante.get(vid) || []; if (!destinos.length) continue;
+      const todos = porVariante.get(vid) || []; if (!todos.length) continue;
       const v = infoVar.get(vid); const esKit = v?.producto_tipo === "kit";
+      if (!v || genericos.has(v.producto_id) || /-SD$/i.test(v.sku || "")) { if (simular) sinTocar.push({ producto: v?.producto_nombre, por: "genérico: la web lo maneja sola" }); else if (filas.length) await admin.from("canal_cola").update({ estado: "hecho", hecho: new Date().toISOString(), error: "genérico: no se manda" }).eq("conexion_id", cx.id).eq("variante_id", vid).eq("estado", "pendiente"); continue; }
+      // lo que está oculto en la web no se toca (publicaciones viejas o pausadas)
+      const oculto = (d: any) => simular && body.todo ? visible.get(String(d.variante_ext)) === false : d.publicado === false;
+      const ocultos = todos.filter(oculto);
+      if (ocultos.length === todos.length) { if (simular) sinTocar.push({ producto: v.producto_nombre, por: "oculto en la web" }); else await admin.from("canal_cola").update({ estado: "hecho", hecho: new Date().toISOString(), error: "oculto en la web: no se manda" }).eq("conexion_id", cx.id).eq("variante_id", vid).eq("estado", "pendiente"); continue; }
+      // las publicaciones sin límite de stock (gift cards, cajas sorpresa) no se tocan
+      let destinos = todos.filter((d: any) => !oculto(d) && webDe(d) !== null);
+      if (!destinos.length) { if (simular) sinTocar.push({ producto: v.producto_nombre, por: "sin límite de stock en la web" }); else await admin.from("canal_cola").update({ estado: "hecho", hecho: new Date().toISOString(), error: "sin límite en la web: no se manda" }).eq("conexion_id", cx.id).eq("variante_id", vid).eq("estado", "pendiente"); continue; }
+      // varias publicaciones de la web para una sola prenda de Percha (la web separa talles que Percha tiene juntos):
+      // el total de la web tiene que ser el de Percha; se respeta cómo lo reparte la web y solo se corrige la diferencia
+      const bolsa = !esKit && destinos.length > 1;
+      if (bolsa && !simular) {
+        const r = await fetch(`${base}/products/${destinos[0].producto_ext}?fields=id,variants`, { headers });   // lo de la web ahora, no lo último que se mandó
+        if (r.ok) { const p = await r.json(); const vivo = new Map((p.variants || []).map((x: any) => [String(x.id), x.stock == null ? null : +x.stock])); destinos = destinos.map((d: any) => vivo.has(String(d.variante_ext)) ? { ...d, stock: vivo.get(String(d.variante_ext)) } : d).filter((d: any) => d.stock !== null); }
+        if (!destinos.length) continue;
+      }
+      const valores = new Map<number, number>();
+      if (bolsa) {
+        const res = destinos.reduce((s: number, d: any) => s + (reservado.get(String(d.variante_ext)) || 0), 0);
+        const meta = Math.max(0, stockPara(destinos[0]) - res);
+        const act = destinos.map((d: any) => Math.max(0, Math.floor(+(webDe(d) ?? 0) || 0)));
+        let dif = meta - act.reduce((s: number, x: number) => s + x, 0);
+        while (dif < 0) { const i = act.indexOf(Math.max(...act)); if (act[i] <= 0) break; act[i]--; dif++; }   // falta: se saca de donde la web tiene más
+        if (dif > 0) { const i = act.indexOf(Math.max(...act)); act[i] += dif; }                                   // sobra: va a donde la web tiene más
+        act.forEach((x: number, i: number) => valores.set(i, x));
+      } else destinos.forEach((d: any, i: number) => valores.set(i, Math.max(0, stockPara(d) - (reservado.get(String(d.variante_ext)) || 0))));
       let fallo: string | null = null; const anterior = +destinos[0].stock;
       let enviado = 0;
       for (let k = 0; k < destinos.length; k++) {
         const d = destinos[k];
-        // varias variantes del canal apuntando a la misma de Percha (sin kit): el stock va a la primera y el resto en 0
-        const base_ = esKit ? stockPara(d) : (k === 0 ? stockPara(d) : 0);
-        const res = reservado.get(String(d.variante_ext)) || 0;
-        const valor = Math.max(0, base_ - res);
+        const valor = valores.get(k)!; const res = reservado.get(String(d.variante_ext)) || 0;
         if (k === 0) enviado = valor;
         if (simular) {
-          const web = enWeb.has(String(d.variante_ext)) ? enWeb.get(String(d.variante_ext)) : undefined;
-          if (web === undefined || web !== valor) diferencias.push({ producto: v?.producto_nombre, talle: d.talle_canal || v?.talle_nombre, color: d.color_canal || v?.color_nombre, web: web === undefined ? "no está en la web" : web === null ? "sin límite" : web, percha: base_, reservado: res, mandaria: valor });
+          const web = webDe(d);
+          if (web === undefined || web !== valor) diferencias.push({ producto: v.producto_nombre, talle: d.talle_canal || v.talle_nombre, color: d.color_canal || v.color_nombre, web: web === undefined ? "no está en la web" : web, percha: stockPara(d), reservado: res, mandaria: valor, bolsa });
           continue;
         }
         if (+d.stock === valor) continue;
@@ -190,7 +248,7 @@ Deno.serve(async (req) => {
       else { ok++; if (fila) await admin.from("canal_cola").update({ estado: "hecho", hecho: new Date().toISOString(), error: null, stock_anterior: anterior, stock_enviado: enviado }).eq("conexion_id", cx.id).eq("variante_id", vid).eq("estado", "pendiente");
              else await admin.from("canal_cola").update({ estado: "hecho", hecho: new Date().toISOString(), error: "enviado a pedido" }).eq("conexion_id", cx.id).eq("variante_id", vid).eq("estado", "pendiente"); }
     }
-    if (simular) { resumen.push({ conexion: cx.id, revisadas: variantes.length, pedidos_sin_cargar: pedidosReservando, diferencias }); continue; }
+    if (simular) { resumen.push({ conexion: cx.id, revisadas: variantes.length, items_canal: items.length, en_web: enWeb.size, pedidos_sin_cargar: pedidosReservando, diferencias, sin_tocar: sinTocar }); continue; }
     resumen.push({ conexion: cx.id, actualizadas: ok, errores: err, cambios: detalle, pedidos_sin_cargar: pedidosReservando });
   }
   return json({ ok: true, resumen });
