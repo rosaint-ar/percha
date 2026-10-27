@@ -115,7 +115,7 @@
       const b = $('[data-si]', m); b.disabled = true;
       const { data, error } = await sb.rpc('venta_definir', { p: { linea_id: x.linea_id, desde_variante_id: x.desde_variante_id, asignaciones: [...elegidas.values()].map(e => ({ variante_id: e.v.id, cantidad: e.n })) } });
       if (error) { toast(mensajeError(error), 'error'); b.disabled = false; return; }
-      m.cerrar(); toast(data.quedan ? `Listo: quedan ${data.quedan} por definir` : 'Listo: venta definida'); if (alTerminar) alTerminar();
+      m.cerrar(); empujarStock(); toast(data.quedan ? `Listo: quedan ${data.quedan} por definir` : 'Listo: venta definida'); if (alTerminar) alTerminar();
     };
     pintarEl();
     const cat = await cargarCatalogo();

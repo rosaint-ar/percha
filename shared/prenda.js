@@ -178,7 +178,7 @@
         }
         const visto = $('#pr-visto', m); if (visto && visto.checked) { const r = await sb.rpc('stock_revisar_visto', { p_variante: v.id, p_nota: dif ? `Corregido: ${actual} → ${nuevo}` : 'Revisado' }); if (r.error) throw r.error; }
       } catch (err) { toast(mensajeError(err), 'error'); g.disabled = false; g.textContent = 'Guardar'; return; }
-      m.cerrar(); toast(dif ? `Stock: ${fmt.num(actual)} → ${fmt.num(nuevo)}` : 'Guardado');
+      m.cerrar(); empujarStock(); toast(dif ? `Stock: ${fmt.num(actual)} → ${fmt.num(nuevo)}` : 'Guardado');
       if (op.alGuardar) op.alGuardar();
     }
     pintar();

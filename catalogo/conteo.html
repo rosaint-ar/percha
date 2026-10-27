@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pasar de bolsa a modelo · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610241809">
+<link rel="stylesheet" href="../shell/shell.css?v=202610271534">
 <style>
   .origen{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center}
   .origen select{border:1px solid var(--linea);background:var(--superficie-2);border-radius:10px;padding:10px 12px;font-size:14px;width:100%}
@@ -52,8 +52,8 @@
   <div class="card" id="card-hoy" style="display:none"><div class="card-cab"><h2>Contado en esta sesión</h2><span class="sub" id="hoy-total"></span></div><table class="lista hoy" id="tb-hoy"></table></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610241809"></script>
-<script src="../shell/shell.js?v=202610241809"></script>
+<script src="../shared/supabase.js?v=202610271534"></script>
+<script src="../shell/shell.js?v=202610271534"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, mensajeError } = APP, e = APP.empresa.id;
@@ -130,7 +130,7 @@ APP.ready.then(async () => {
       hoy.unshift({ v, n, hora: new Date() }); m.cerrar(); toast(`+${n} ${v.producto_nombre}`);
       pintarQueda(); pintarGrilla(); pintarHoy(); $('#q').focus(); $('#q').select();
       // lo contado sale a la tienda online (si el empuje está activo)
-      try { const { data: { session } } = await sb.auth.getSession(); fetch(`${SUPABASE_URL}/functions/v1/tn-push`, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SUPABASE_KEY, Authorization: `Bearer ${session.access_token}` }, body: JSON.stringify({ empresa_id: e }) }); } catch (_) {}
+      empujarStock(e);
     };
   }
   function pintarHoy() {

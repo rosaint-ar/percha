@@ -560,6 +560,7 @@ APP.ready.then(async () => {
     try {
       const { data, error } = await sb.rpc('caja_registrar_venta', { p: payload });
       if (error) { if (/fetch|network/i.test(error.message)) throw error; toast(mensajeError(error), 'error'); throw error; }
+      empujarStock();
       return data;
     } catch (err) {
       if (/fetch|network/i.test(err.message || '') && payload.reservada) { toast('Sin internet: la venta reservada no se guardó. Probá de nuevo.', 'error'); throw err; }
@@ -579,7 +580,7 @@ APP.ready.then(async () => {
       if (error) { toast(`Una venta guardada no se pudo subir: ${mensajeError(error)}`, 'error'); }
       cola = cola.filter(x => x.offline_id !== p.offline_id); localStorage.setItem(LS('cola_ventas'), JSON.stringify(cola));
     }
-    pintarEstado(); if (!colaPendiente().length) toast('Ventas pendientes subidas');
+    empujarStock(); pintarEstado(); if (!colaPendiente().length) toast('Ventas pendientes subidas');
   }
   function actualizarRed() { const p = $('#punto-red'); if (p) p.className = 'punto' + (navigator.onLine ? '' : ' off'); }
   window.addEventListener('online', () => { actualizarRed(); sincronizar(); }); window.addEventListener('offline', actualizarRed);
