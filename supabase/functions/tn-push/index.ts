@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
   }
   const simular = !!body.simular;
   const soloProductos: string[] = Array.isArray(body.solo_productos) ? body.solo_productos.map(String) : [];
-  let qc = admin.from("conexiones").select("id,empresa_id,externo_id,canal,empujar_stock,ultima_sync_pedidos,creada,ultimo_refresco_web").eq("estado", "activa");
+  let qc = admin.from("conexiones").select("id,empresa_id,externo_id,canal,empujar_stock,ultima_sync_pedidos,creada,ultimo_refresco_web,incluir_ocultos").eq("estado", "activa");
   if (!soloProductos.length && !simular) qc = qc.eq("empujar_stock", true);
   if (filtroEmpresa) qc = qc.eq("empresa_id", filtroEmpresa);
   const { data: conexiones } = await qc;
@@ -198,8 +198,8 @@ Deno.serve(async (req) => {
       const todos = porVariante.get(vid) || []; if (!todos.length) continue;
       const v = infoVar.get(vid); const esKit = v?.producto_tipo === "kit";
       if (!v || genericos.has(v.producto_id) || /-SD$/i.test(v.sku || "")) { if (simular) sinTocar.push({ producto: v?.producto_nombre, por: "genérico: la web lo maneja sola" }); else if (filas.length) await admin.from("canal_cola").update({ estado: "hecho", hecho: new Date().toISOString(), error: "genérico: no se manda" }).eq("conexion_id", cx.id).eq("variante_id", vid).eq("estado", "pendiente"); continue; }
-      // lo que está oculto en la web no se toca (publicaciones viejas o pausadas)
-      const oculto = (d: any) => simular && body.todo ? visible.get(String(d.variante_ext)) === false : d.publicado === false;
+      // lo que está oculto en la web no se toca (publicaciones viejas o pausadas), salvo que la conexión diga tener en cuenta los ocultos
+      const oculto = (d: any) => !cx.incluir_ocultos && (simular && body.todo ? visible.get(String(d.variante_ext)) === false : d.publicado === false);
       const ocultos = todos.filter(oculto);
       if (ocultos.length === todos.length) { if (simular) sinTocar.push({ producto: v.producto_nombre, por: "oculto en la web" }); else await admin.from("canal_cola").update({ estado: "hecho", hecho: new Date().toISOString(), error: "oculto en la web: no se manda" }).eq("conexion_id", cx.id).eq("variante_id", vid).eq("estado", "pendiente"); continue; }
       // las publicaciones sin límite de stock (gift cards, cajas sorpresa) no se tocan
