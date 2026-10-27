@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Producto · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610272021">
+<link rel="stylesheet" href="../shell/shell.css?v=202610272200">
 <style>
   .dos{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
   .dos>.card{min-width:0;overflow-x:auto}
@@ -157,10 +157,10 @@
   </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610272021"></script>
-<script src="../shared/precios.js?v=202610272021"></script>
-<script src="../shared/prenda.js?v=202610272021"></script>
-<script src="../shell/shell.js?v=202610272021"></script>
+<script src="../shared/supabase.js?v=202610272200"></script>
+<script src="../shared/precios.js?v=202610272200"></script>
+<script src="../shared/prenda.js?v=202610272200"></script>
+<script src="../shell/shell.js?v=202610272200"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$ , toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -390,7 +390,8 @@ APP.ready.then(async () => {
     return { base, precio: fijo ? +fijo.precio : Math.round(base * (+lista.porcentaje) / 100), pct: +lista.porcentaje, fijo: !!fijo, rebaja: null };
   }
   const precioDe = lista => calc(lista).precio;
-  const reglaTxt = (l, c) => c.fijo ? 'precio fijo' : l.predeterminada ? 'precio de la prenda' : (c.pct === 100 ? 'igual a Lista' : (c.pct < 100 ? '−' + fmt.dec(100 - c.pct) : '+' + fmt.dec(c.pct - 100)) + '% sobre Lista') + (c.pct !== +l.porcentaje ? ' <span class="chip" title="Excepción para esta familia o producto">excepción</span>' : '') + (l.toma_rebajas === false ? ' · sin rebajas' : '');
+  const reglaTxt = (l, c) => (l.canal ? '<b>web</b> · ' : '') + reglaTxt0(l, c);
+  const reglaTxt0 = (l, c) => c.fijo ? 'precio fijo' : l.predeterminada ? 'precio de la prenda' : (c.pct === 100 ? 'igual a Lista' : (c.pct < 100 ? '−' + fmt.dec(100 - c.pct) : '+' + fmt.dec(c.pct - 100)) + '% sobre Lista') + (c.pct !== +l.porcentaje ? ' <span class="chip" title="Excepción para esta familia o producto">excepción</span>' : '') + (l.toma_rebajas === false ? ' · sin rebajas' : '');
   function pintarPrecios() {
     const tb = $('#tb-precios'); tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());
     const lb = listas.find(l => l.predeterminada) || listas[0], cb = lb ? calc(lb) : null;
@@ -398,7 +399,7 @@ APP.ready.then(async () => {
     listas.forEach(l => {
       const c = calc(l), fijo = c.fijo;
       tb.insertAdjacentHTML('beforeend', `<tr><td>${esc(l.nombre)}${l.predeterminada ? ' <span class="chip">base</span>' : ''}</td><td><small>${reglaTxt(l, c)}</small></td>
-        <td class="num num-f">${c.rebaja ? `<s style="color:var(--tinta-3);font-weight:400">${fmt.pesos(l.predeterminada ? c.base : PRECIOS.calcular({ id: '', producto_id: id || '', precio: c.base }, l.id, PRECIOS.armar(Object.assign({}, pctx.datos, { rebajas: [] })), {}).precio)}</s> ` : ''}${fmt.pesos(c.precio)}${fijo ? ' <span class="chip aviso" title="Precio fijado a mano">fijo</span>' : ''}</td>
+        <td class="num num-f">${c.rebaja ? `<s style="color:var(--tinta-3);font-weight:400">${fmt.pesos(l.predeterminada ? c.base : PRECIOS.calcular({ id: '', producto_id: id || '', precio: c.base }, l.id, pctx, { sinRebajas: true, categoria_id: form.categoria_id.value || null }).precio)}</s> ` : ''}${fmt.pesos(c.precio)}${fijo ? ' <span class="chip aviso" title="Precio fijado a mano">fijo</span>' : ''}</td>
         <td>${APP.esAdmin && id ? `<button class="btn chico" data-fijar="${l.id}">${fijo ? 'Quitar fijo' : 'Fijar'}</button>` : ''}</td></tr>`);
     });
     $$('[data-fijar]', tb).forEach(b => b.onclick = async () => {

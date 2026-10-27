@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Listas de precios · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610272021">
+<link rel="stylesheet" href="../shell/shell.css?v=202610272200">
 <style>
   .pestanas{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
   .pestanas a{font:600 13px var(--f-ui);color:var(--tinta);text-decoration:none;padding:8px 14px;border:1px solid var(--linea);background:var(--superficie-2);border-radius:10px}
@@ -62,9 +62,9 @@
   </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610272021"></script>
-<script src="../shared/precios.js?v=202610272021"></script>
-<script src="../shell/shell.js?v=202610272021"></script>
+<script src="../shared/supabase.js?v=202610272200"></script>
+<script src="../shared/precios.js?v=202610272200"></script>
+<script src="../shell/shell.js?v=202610272200"></script>
 <script>
 APP.ready.then(async () => {
   const { esc, $, $$, toast, modal, confirmar, mensajeError, fmt } = APP, e = APP.empresa.id;
@@ -76,11 +76,7 @@ APP.ready.then(async () => {
   let ctx = null, formas = [];
   const EJ = 50000;   // precio de ejemplo para mostrar cada regla
   const num = s => parseFloat(String(s).replace(',', '.').replace('−', '-'));
-  const reglaTxt = pct => +pct === 100 ? 'igual que la base' : +pct < 100 ? fmt.dec(100 - pct) + '% menos que la base' : fmt.dec(pct - 100) + '% más que la base';
-  // regla en dos controles: [20] [% menos ▾] — el % sobre la base se guarda como 80
-  const reglaControles = (pct, k) => { const dif = Math.round(Math.abs(100 - +pct) * 1000) / 1000, sentido = +pct > 100 ? 'mas' : +pct < 100 ? 'menos' : 'igual';
-    return `<div class="regla"><input data-${k}-n inputmode="decimal" value="${sentido === 'igual' ? '' : fmt.dec(dif)}" ${sentido === 'igual' ? 'disabled' : ''}><select data-${k}-s><option value="menos" ${sentido === 'menos' ? 'selected' : ''}>% menos que la base</option><option value="mas" ${sentido === 'mas' ? 'selected' : ''}>% más que la base</option><option value="igual" ${sentido === 'igual' ? 'selected' : ''}>igual que la base</option></select></div>`; };
-  const leerRegla = (cont, k) => { const s = $(`[data-${k}-s]`, cont).value, n = num($(`[data-${k}-n]`, cont).value); if (s === 'igual') return 100; if (isNaN(n) || n <= 0) return null; if (s === 'menos' && n >= 100) return null; return s === 'menos' ? 100 - n : 100 + n; };
+  const { reglaTxt, reglaControles, leerRegla } = PRECIOS;   // la regla en dos controles: [20] [% menos que la base ▾]
   const ejemplo = l => { const c = PRECIOS.calcular({ id: '', producto_id: '', precio: EJ }, l.id, ctx, {}); return `Ej.: una prenda de <b>${fmt.pesos(EJ)}</b> sale <b>${fmt.pesos(c.precio)}</b>`; };
 
   async function recargar() {
@@ -90,7 +86,7 @@ APP.ready.then(async () => {
   async function guardarLista(id, d, msg) { const r = await sb.from('listas_precios').update(d).eq('id', id); if (r.error) { toast(mensajeError(r.error), 'error'); await recargar(); return; } if (msg) toast(msg); await recargar(); }
 
   function pintarListas() {
-    const cont = $('#listas'), ls = ctx.listas;
+    const cont = $('#listas'), ls = PRECIOS.delLocal(ctx), web = ctx.listas.filter(l => l.canal);
     cont.innerHTML = ls.map((l, i) => {
       const ex = (ctx.datos.excep || []).filter(x => x.lista_id === l.id);
       return `<div class="lp${l.predeterminada ? ' base' : ''}" data-l="${l.id}">
@@ -106,17 +102,17 @@ APP.ready.then(async () => {
             return `<div class="ex-fila" data-ex="${x.id}"><span class="que">${p ? esc(p.nombre) + ' <small class="mono">' + esc(p.codigo) + '</small>' : 'Familia <b>' + esc(nice(c && c.nombre)) + '</b>'}</span>${reglaControles(x.porcentaje, 'x')}<button class="btn-eliminar" data-ex-del title="Quitar la excepción">✕</button></div>`; }).join('')}
           <button class="btn chico" data-ex-mas style="margin-top:4px">+ Agregar excepción</button></div>`}
       </div>`;
-    }).join('');
+    }).join('') + web.map(l => `<div class="lp" style="background:var(--superficie)"><div class="lp-cab" style="margin:0"><b style="font:700 17px var(--f-titulo)">${esc(l.nombre)}</b><span class="chip">web</span><span class="sub" style="margin-left:6px">${reglaTxt(l.porcentaje)} · se configura en la conexión, junto con sus descuentos</span><a class="btn chico" style="margin-left:auto" href="../conexiones/conexiones.html#precios">Abrir</a></div></div>`).join('');
 
-    $$('.lp', cont).forEach(card => {
-      const l = ctx.listas.find(x => x.id === card.dataset.l), idx = ctx.listas.indexOf(l);
+    $$('.lp[data-l]', cont).forEach(card => {
+      const l = ls.find(x => x.id === card.dataset.l), idx = ls.indexOf(l);
       $('[data-nom]', card).onchange = ev => { const n = ev.target.value.trim(); if (!n) { ev.target.value = l.nombre; return; } guardarLista(l.id, { nombre: n }, 'Nombre guardado'); };
       const s = $('[data-r-s]', card), n = $('[data-r-n]', card);
       if (s) { const guardar = () => { const pct = leerRegla(card, 'r'); if (pct == null) { toast('Poné un número: cuánto % menos o más que la base', 'error'); return; } if (pct !== +l.porcentaje) guardarLista(l.id, { porcentaje: pct }, `${l.nombre}: ${reglaTxt(pct)}`); };
         s.onchange = () => { n.disabled = s.value === 'igual'; if (s.value !== 'igual' && !n.value) { n.focus(); return; } guardar(); }; n.onchange = guardar; }
       $('[data-red]', card).onchange = ev => guardarLista(l.id, { redondeo: ev.target.value }, 'Redondeo guardado');
       const rb = $('[data-reb]', card); if (rb) rb.onchange = () => guardarLista(l.id, { toma_rebajas: rb.checked }, rb.checked ? `${l.nombre} parte del precio rebajado` : `${l.nombre} parte siempre del precio sin rebaja`);
-      const mover = async d => { const otro = ctx.listas[idx + d]; if (!otro) return; const a = +l.orden || idx, b = +otro.orden || idx + d;
+      const mover = async d => { const otro = ls[idx + d]; if (!otro) return; const a = +l.orden || idx, b = +otro.orden || idx + d;
         await sb.from('listas_precios').update({ orden: a === b ? idx + d : b }).eq('id', l.id); await sb.from('listas_precios').update({ orden: a === b ? idx : a }).eq('id', otro.id); recargar(); };
       $('[data-sube]', card).onclick = () => mover(-1); $('[data-baja]', card).onclick = () => mover(1);
       const q = $('[data-quitar]', card); if (q) q.onclick = async () => { if (!(await confirmar(`¿Quitar la lista ${l.nombre}? Las ventas ya hechas no cambian.`, 'Quitar'))) return; guardarLista(l.id, { activa: false }, 'Lista quitada'); };
@@ -137,7 +133,7 @@ APP.ready.then(async () => {
     const cont = $('#formas');
     if (!formas.length) { cont.innerHTML = '<p class="sub">No hay formas de pago cargadas.</p>'; return; }
     cont.innerHTML = formas.map(f => { const ls = f.listas || [], varias = ls.length > 1;
-      return `<div class="forma" data-f="${f.id}"><span title="${esc(f.nombre)}">${esc(f.nombre)}</span><select>${varias ? `<option value="varias" selected>${esc(ls.map(id => (ctx.listas.find(l => l.id === id) || {}).nombre).filter(Boolean).join(' o '))}</option>` : ''}<option value="" ${!ls.length ? 'selected' : ''}>Cualquiera</option>${ctx.listas.map(l => `<option value="${l.id}" ${!varias && ls[0] === l.id ? 'selected' : ''}>${esc(l.nombre)}</option>`).join('')}</select></div>`; }).join('');
+      return `<div class="forma" data-f="${f.id}"><span title="${esc(f.nombre)}">${esc(f.nombre)}</span><select>${varias ? `<option value="varias" selected>${esc(ls.map(id => (ctx.listas.find(l => l.id === id) || {}).nombre).filter(Boolean).join(' o '))}</option>` : ''}<option value="" ${!ls.length ? 'selected' : ''}>Cualquiera</option>${PRECIOS.delLocal(ctx).map(l => `<option value="${l.id}" ${!varias && ls[0] === l.id ? 'selected' : ''}>${esc(l.nombre)}</option>`).join('')}</select></div>`; }).join('');
     $$('.forma', cont).forEach(d => { const sel = $('select', d); sel.onchange = async () => {
       if (sel.value === 'varias') return;
       const r = await sb.from('formas_pago').update({ listas: sel.value ? [sel.value] : null }).eq('id', d.dataset.f);
@@ -147,10 +143,10 @@ APP.ready.then(async () => {
   function pintarMuestra() {
     const q = $('#q').value.trim().toLowerCase(), pal = q.split(/\s+/).filter(Boolean);
     const lista = prods.filter(p => +p.precio > 0 && pal.every(w => (p.nombre + ' ' + p.codigo).toLowerCase().includes(w))).slice(0, 25);
-    $('#tb-muestra').innerHTML = `<tr><th>Producto</th>${ctx.listas.map(l => `<th class="num">${esc(l.nombre)}</th>`).join('')}</tr>` + (lista.length ? lista.map(p => {
+    $('#tb-muestra').innerHTML = `<tr><th>Producto</th>${ctx.listas.map(l => `<th class="num">${esc(l.nombre)}${l.canal ? ' (web)' : ''}</th>`).join('')}</tr>` + (lista.length ? lista.map(p => {
       const v = { id: '', producto_id: p.id, precio: +p.precio };
       return `<tr><td><a href="../catalogo/producto.html?id=${p.id}">${esc(p.nombre)}</a><br><small class="mono">${esc(p.codigo)}</small></td>${ctx.listas.map(l => { const c = PRECIOS.calcular(v, l.id, ctx, { categoria_id: p.categoria_id, tipo: p.tipo });
-        return `<td class="num">${c.rebaja && l.predeterminada ? `<s>${fmt.pesos(c.base)}</s>` : ''}<b>${fmt.pesos(c.precio)}</b>${c.rebaja && l.predeterminada ? `<br><small style="color:var(--acento)">▼ ${esc(c.rebaja.nombre)}</small>` : ''}${c.fijo ? ' <span class="chip aviso">fijo</span>' : ''}</td>`; }).join('')}</tr>`;
+        const tach = c.rebaja && (l.predeterminada || l.canal); return `<td class="num">${tach ? `<s>${fmt.pesos(PRECIOS.calcular(v, l.id, ctx, { sinRebajas: true, categoria_id: p.categoria_id, tipo: p.tipo }).precio)}</s>` : ''}<b>${fmt.pesos(c.precio)}</b>${tach ? `<br><small style="color:var(--acento)">▼ ${esc(c.rebaja.nombre)}</small>` : ''}${c.fijo ? ' <span class="chip aviso">fijo</span>' : ''}</td>`; }).join('')}</tr>`;
     }).join('') : `<tr><td colspan="${ctx.listas.length + 1}" class="vacio">No hay productos con ese nombre.</td></tr>`);
   }
   let tq; $('#q').oninput = () => { clearTimeout(tq); tq = setTimeout(pintarMuestra, 200); };
@@ -166,7 +162,7 @@ APP.ready.then(async () => {
     $('[data-si]', m).onclick = async () => {
       const nombre = $('#n-nom', m).value.trim(), pct = leerRegla(m, 'r');
       if (!nombre) { toast('Ponele un nombre', 'error'); return; } if (pct == null) { toast('Revisá el porcentaje', 'error'); return; }
-      const orden = Math.max(0, ...ctx.listas.map(l => +l.orden || 0)) + 1;
+      const orden = Math.max(0, ...PRECIOS.delLocal(ctx).map(l => +l.orden || 0)) + 1;
       const r = await sb.from('listas_precios').insert(APP.conEmpresa({ nombre, porcentaje: pct, orden, redondeo: '10+', toma_rebajas: true }));
       if (r.error) { toast(/duplicate|unique/i.test(r.error.message) ? 'Ya hay una lista con ese nombre (puede estar quitada)' : mensajeError(r.error), 'error'); return; }
       m.cerrar(); toast('Lista agregada'); recargar();

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Promociones · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610272021">
+<link rel="stylesheet" href="../shell/shell.css?v=202610272200">
 <style>
   .pestanas{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
   .pestanas a{font:600 13px var(--f-ui);color:var(--tinta);text-decoration:none;padding:8px 14px;border:1px solid var(--linea);background:var(--superficie-2);border-radius:10px}
@@ -23,6 +23,11 @@
   .reb-tabla table{width:100%;border-collapse:collapse}.reb-tabla td{padding:5px 8px;border-bottom:1px solid var(--linea-suave);font-size:13px}
   .reb-tabla input{width:110px;height:32px;border:1px solid var(--linea);border-radius:8px;text-align:right;font:600 13px var(--f-mono);background:var(--superficie-2);padding:0 8px}
   .reb-alta{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.reb-alta input{height:36px;border:1px solid var(--linea);border-radius:10px;padding:0 10px;background:var(--superficie-2)}
+  .picker{margin-top:8px;border:1px solid var(--linea-suave);border-radius:12px;padding:8px}
+  .pk-fil{display:flex;gap:6px;flex-wrap:wrap}.pk-fil input{flex:1;min-width:180px;height:36px;border:1px solid var(--linea);border-radius:10px;padding:0 10px;background:var(--superficie-2)}.pk-fil select{height:36px;border:1px solid var(--linea);border-radius:10px;background:var(--superficie-2);padding:0 8px}
+  .pk-acc{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:8px 0;font-size:12.5px;color:var(--tinta-3)}.pk-acc span{margin-left:auto}
+  .pk-lista{max-height:260px;overflow:auto;border-top:1px solid var(--linea-suave)}
+  .pk-it{display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid var(--linea-suave);font-size:13px;cursor:pointer}.pk-it span{flex:1;min-width:0}.pk-it b{font:600 12px var(--f-mono);color:var(--tinta-2)}.pk-it input{width:17px;height:17px}
   .esc-fila input{width:74px;height:38px;border:1px solid var(--linea);border-radius:10px;text-align:center;font:700 15px var(--f-mono);background:var(--superficie-2)}
 </style>
 </head>
@@ -33,17 +38,18 @@
     <table class="lista" id="tb"><tr><th>Nombre</th><th>Regla</th><th>Alcance</th><th>Dónde</th><th>Vigencia</th><th>Activa</th><th></th></tr></table></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610272021"></script>
-<script src="../shared/canales.js?v=202610272021"></script>
-<script src="../shell/shell.js?v=202610272021"></script>
+<script src="../shared/supabase.js?v=202610272200"></script>
+<script src="../shared/canales.js?v=202610272200"></script>
+<script src="../shell/shell.js?v=202610272200"></script>
 <script>
 APP.ready.then(async () => {
   const { esc, $, $$, toast, modal, confirmar, mensajeError, fmt } = APP, e = APP.empresa.id;
   if (!APP.esAdmin) { document.querySelector('main').innerHTML = '<div class="card"><p>Esta sección es solo para administración.</p></div>'; return; }
-  const [{ data: cats }, { data: prods }, { data: listas }] = await Promise.all([sb.from('categorias').select('id,nombre').eq('empresa_id', e).eq('activa', true).order('orden'), sb.from('productos').select('id,nombre,codigo,precio').eq('empresa_id', e).eq('activo', true).order('nombre').limit(5000), sb.from('listas_precios').select('id,nombre').eq('empresa_id', e).eq('activa', true).order('orden')]);
+  const [{ data: cats }, { data: prods }, { data: listas }] = await Promise.all([sb.from('categorias').select('id,nombre').eq('empresa_id', e).eq('activa', true).order('orden'), sb.from('productos').select('id,nombre,codigo,precio,categoria_id').eq('empresa_id', e).eq('activo', true).order('nombre').limit(5000), sb.from('listas_precios').select('id,nombre').eq('empresa_id', e).eq('activa', true).order('orden')]);
   const nice = s => s.charAt(0) + s.slice(1).toLowerCase();
   const canales = await CANALES.cargar(e);
   const dondeTxt = cs => !cs || !cs.length || cs.length >= canales.length ? 'Todos los canales' : cs.map(k => CANALES.nombre(canales, k)).join(' · ');
+  let volver = null;   // si se abrió desde otra pantalla (la conexión), al guardar vuelve allá
   const DIAS = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá', 'Do'];
   const escalonesDe = p => (p.escalones && p.escalones.length ? p.escalones : [{ n: p.n, valor: p.valor }]).slice().sort((a, b) => a.n - b.n);
   const regla = p => p.tipo === 'rebaja' ? 'Rebaja' + (+p.valor > 0 ? ` ${fmt.dec(p.valor)}% sobre Lista` : '') + (p.n_fijos ? ` · ${fmt.num(p.n_fijos)} precios de oferta` : '') : ({ porcentaje: `${p.valor}% de descuento`, monto: `${fmt.pesos(p.valor)} menos por unidad`, nxm: `Lleva ${p.n}, paga ${p.m}`, cantidad: escalonesDe(p).map(x => `${fmt.dec(x.valor)}% llevando ${x.n}+${x.canales && x.canales.length ? ' (' + dondeTxt(x.canales) + ')' : ''}`).join(' · ') })[p.tipo];
@@ -57,8 +63,9 @@ APP.ready.then(async () => {
     $$('[data-e]', tb).forEach(b => b.onclick = () => editar(data.find(p => p.id === b.dataset.e)));
     $$('[data-p]', tb).forEach(b => b.onclick = async () => { const p = data.find(x => x.id === b.dataset.p); await sb.from('promociones').update({ activa: !p.activa }).eq('id', p.id); cargar(); });
   }
-  function editar(p) {
-    p = JSON.parse(JSON.stringify(p || { nombre: '', tipo: 'cantidad', escalones: [{ n: 3, valor: 10 }], valor: 0, n: 3, m: 2, alcance: 'todo', familia_ids: [], producto_ids: [], dias_semana: [1, 2, 3, 4, 5, 6, 7], activa: true, canales: null, listas: null }));
+  function editar(p, previo) {
+    const pk = { q: '', fam: '' };   // selector de productos (como el panel de Tienda Nube)
+    p = JSON.parse(JSON.stringify(p || previo || { nombre: '', tipo: 'cantidad', escalones: [{ n: 3, valor: 10 }], valor: 0, n: 3, m: 2, alcance: 'todo', familia_ids: [], producto_ids: [], dias_semana: [1, 2, 3, 4, 5, 6, 7], activa: true, canales: null, listas: null }));
     if (p.tipo === 'cantidad') p.escalones = escalonesDe(p);
     const TIPOS = [['cantidad', 'Llevando N o más, % off'], ['nxm', 'Lleva N, paga M'], ['porcentaje', '% de descuento'], ['monto', '$ menos por prenda'], ['rebaja', 'Rebaja (precio tachado)']];
     // rebaja: precios de oferta por producto o por talle/color
@@ -81,13 +88,24 @@ APP.ready.then(async () => {
       ${fijos == null ? '<p class="sub">Cargando…</p>' : `<div class="reb-tabla"><table>${fijos.length ? fijos.map(filaFijo).join('') : '<tr><td class="vacio">Sin precios de oferta puntuales.</td></tr>'}</table></div>
       <div class="reb-alta"><input id="f-prod" list="dl-prods-reb" placeholder="Producto (nombre o código)" style="flex:1;min-width:200px"><datalist id="dl-prods-reb">${prods.map(x => `<option value="${esc(x.codigo)} · ${esc(x.nombre)}"></option>`).join('')}</datalist><input id="f-precio" type="number" step="1" min="0" placeholder="Precio de oferta" style="width:140px"><button type="button" class="btn" id="f-mas">+ Agregar</button></div>`}`;
     const m = modal('<div id="pe"></div>'); $('.modal', m).style.maxWidth = '640px';
+    const visibles = () => { const pal = pk.q.toLowerCase().split(/\s+/).filter(Boolean); return prods.filter(x => (!pk.fam || x.categoria_id === pk.fam) && pal.every(w => (x.nombre + ' ' + x.codigo).toLowerCase().includes(w))); };
+    function pintarPicker() {
+      const sel = new Set(p.producto_ids || []), vs = visibles(), cont = $('#pk-lista', m);
+      cont.innerHTML = vs.slice(0, 300).map(x => `<label class="pk-it"><input type="checkbox" value="${x.id}" ${sel.has(x.id) ? 'checked' : ''}><span>${esc(x.nombre)} <small class="mono">${esc(x.codigo)}</small></span><b>${fmt.pesos(x.precio || 0)}</b></label>`).join('')
+        + (vs.length > 300 ? `<p class="sub" style="padding:6px 10px">y ${fmt.num(vs.length - 300)} más: buscá para achicar.</p>` : '') + (!vs.length ? '<p class="sub" style="padding:6px 10px">No hay productos con ese filtro.</p>' : '');
+      $('#pk-n', m).textContent = sel.size;
+      $$('input', cont).forEach(i => i.onchange = () => { const s2 = new Set(p.producto_ids || []); i.checked ? s2.add(i.value) : s2.delete(i.value); p.producto_ids = [...s2]; $('#pk-n', m).textContent = s2.size; });
+      $('#pk-q', m).oninput = ev => { pk.q = ev.target.value; pintarPicker(); };
+      $('#pk-fam', m).onchange = ev => { pk.fam = ev.target.value; pintarPicker(); };
+      $('#pk-todos', m).onclick = () => { const s2 = new Set(p.producto_ids || []); visibles().forEach(x => s2.add(x.id)); p.producto_ids = [...s2]; pintarPicker(); };
+      $('#pk-ninguno', m).onclick = () => { const fuera = new Set(visibles().map(x => x.id)); p.producto_ids = (p.producto_ids || []).filter(id => !fuera.has(id)); pintarPicker(); };
+    }
     const leer = () => {
       p.nombre = $('#p-nombre', m).value; p.desde = $('#p-desde', m).value || null; p.hasta = $('#p-hasta', m).value || null;
       p.dias_semana = $$('.dias input:checked', m).map(i => +i.value);
       if (p.tipo === 'cantidad') p.escalones = $$('.esc-fila', m).map((f, i) => ({ n: +$('[data-k="n"]', f).value || 0, valor: +String($('[data-k="valor"]', f).value).replace(',', '.') || 0, canales: (p.escalones[i] || {}).canales || null }));
       else if (p.tipo === 'nxm') { p.n = +$('#p-n', m).value || 0; p.m = +$('#p-m', m).value || 0; }
       else p.valor = +String($('#p-valor', m).value).replace(',', '.') || 0;
-      if (p.alcance === 'productos') p.producto_ids = [...$('#p-prod', m).selectedOptions].map(o => o.value);
     };
     const pintar = () => {
       $('#pe', m).innerHTML = `<h2>${p.id ? 'Editar' : 'Nueva'} promoción</h2>
@@ -101,7 +119,8 @@ APP.ready.then(async () => {
           : `<label>${p.tipo === 'monto' ? 'Pesos menos por prenda' : 'Porcentaje de descuento'}</label><div class="esc-fila"><input id="p-valor" inputmode="decimal" value="${p.valor || ''}" style="width:110px"> ${p.tipo === 'monto' ? '$' : '% off'}</div>`}</div>
         <div class="campo"><label>A qué prendas</label><div class="chips-sel">${[['todo', 'Todas'], ['familias', 'Algunas familias'], ['productos', 'Algunos productos']].map(([k, t]) => `<button type="button" class="chip-sel${p.alcance === k ? ' on' : ''}" data-alc="${k}">${t}</button>`).join('')}</div>
           ${p.alcance === 'familias' ? `<div class="chips-sel" style="margin-top:8px">${cats.map(c => `<button type="button" class="chip-sel chico${(p.familia_ids || []).includes(c.id) ? ' on' : ''}" data-fam="${c.id}">${esc(nice(c.nombre))}</button>`).join('')}</div>`
-          : p.alcance === 'productos' ? `<select id="p-prod" multiple size="7" style="margin-top:8px;width:100%">${prods.map(x => `<option value="${x.id}" ${(p.producto_ids || []).includes(x.id) ? 'selected' : ''}>${esc(x.nombre)} · ${esc(x.codigo)}</option>`).join('')}</select><span class="ayuda">Con Ctrl (o ⌘) elegís varios.</span>` : ''}</div>
+          : p.alcance === 'productos' ? `<div class="picker"><div class="pk-fil"><input id="pk-q" placeholder="Buscar por nombre o código" value="${esc(pk.q)}"><select id="pk-fam"><option value="">Todas las familias</option>${cats.map(c => `<option value="${c.id}" ${pk.fam === c.id ? 'selected' : ''}>${esc(nice(c.nombre))}</option>`).join('')}</select></div>
+            <div class="pk-acc"><button type="button" class="btn chico" id="pk-todos">Tildar los que se ven</button><button type="button" class="btn chico" id="pk-ninguno">Destildar los que se ven</button><span><b id="pk-n">${(p.producto_ids || []).length}</b> elegidos</span></div><div class="pk-lista" id="pk-lista"></div></div>` : ''}</div>
         <div class="campo"><label>Dónde vale</label><div class="chips-sel"><button type="button" class="chip-sel${!p.canales || !p.canales.length ? ' on' : ''}" data-canal="">Todos los canales</button>${canales.map(c => `<button type="button" class="chip-sel${p.canales && p.canales.includes(c.k) ? ' on' : ''}" data-canal="${c.k}">${esc(c.n)}</button>`).join('')}</div>
           <span class="ayuda">En la caja se aplica según el canal de la venta.${p.tipo === 'rebaja' ? ' En Tienda Nube va como precio tachado al actualizar la web desde Percha.' : canales.some(c => !['local', 'whatsapp'].includes(c.k)) ? ' En la web de cada tienda online, por ahora, la promo hay que cargarla también allá: Percha todavía no la publica.' : ''}</span></div>
         <div class="campo" ${p.tipo === 'rebaja' ? 'style="display:none"' : ''}><label>Listas de precios</label><div class="chips-sel"><button type="button" class="chip-sel chico${!p.listas || !p.listas.length ? ' on' : ''}" data-lista="todas">Todas</button>${listas.map(l => `<button type="button" class="chip-sel chico${p.listas && p.listas.includes(l.id) ? ' on' : ''}" data-lista="${l.id}">${esc(l.nombre)}</button>`).join('')}</div></div>
@@ -118,6 +137,7 @@ APP.ready.then(async () => {
       };
       $$('[data-tipo]', m).forEach(b => b.onclick = () => { leer(); p.tipo = b.dataset.tipo; if (p.tipo === 'rebaja' && fijos == null) cargarFijos(); if (p.tipo === 'cantidad' && !(p.escalones || []).length) p.escalones = [{ n: 3, valor: 10 }]; pintar(); });
       $$('[data-alc]', m).forEach(b => b.onclick = () => { leer(); p.alcance = b.dataset.alc; pintar(); });
+      if ($('#pk-lista', m)) pintarPicker();
       $$('[data-fam]', m).forEach(b => b.onclick = () => { leer(); const s = new Set(p.familia_ids || []); s.has(b.dataset.fam) ? s.delete(b.dataset.fam) : s.add(b.dataset.fam); p.familia_ids = [...s]; pintar(); });
       $$('[data-canal]', m).forEach(b => b.onclick = () => { leer(); const k = b.dataset.canal; if (!k) p.canales = null; else { const s = new Set(p.canales || []); s.has(k) ? s.delete(k) : s.add(k); p.canales = s.size && s.size < canales.length ? [...s] : null; }
         (p.escalones || []).forEach(x => { if (x.canales && p.canales) { x.canales = x.canales.filter(c => p.canales.includes(c)); if (!x.canales.length) x.canales = null; } }); pintar(); });
@@ -141,6 +161,7 @@ APP.ready.then(async () => {
         p.escalones = es; p.n = es[0].n; p.valor = es[0].valor;
       }
       if (p.alcance === 'familias' && !(p.familia_ids || []).length) { toast('Elegí al menos una familia', 'error'); return; }
+      if (p.alcance === 'productos' && !(p.producto_ids || []).length && !(p.tipo === 'rebaja' && !(+p.valor > 0))) { toast('Tildá al menos un producto', 'error'); return; }
       if (p.tipo === 'rebaja') {
         if (+p.valor >= 100) { toast('La rebaja no puede ser del 100%', 'error'); return; }
         if (!(+p.valor > 0) && !(fijos || []).length) { toast('Poné un % de rebaja o al menos un precio de oferta', 'error'); return; }
@@ -158,12 +179,17 @@ APP.ready.then(async () => {
         const nuevos = fijos.filter(x => !x.id).map(x => APP.conEmpresa({ promocion_id: pid, producto_id: x.producto_id, variante_id: x.variante_id, precio: +x.precio }));
         if (nuevos.length) { const ri = await sb.from('rebaja_precios').insert(nuevos); if (ri.error) { toast(mensajeError(ri.error), 'error'); return; } }
       }
-      m.cerrar(); toast('Guardada'); cargar();
+      m.cerrar(); toast('Guardada'); if (volver) { location.href = volver; return; } cargar();
     };
     pintar(); if (p.tipo === 'rebaja') cargarFijos();
   }
   $('#btn-nueva').onclick = () => editar(null);
   await cargar();
+  // desde la conexión: ?nueva=rebaja&canal=tiendanube · ?editar=<id> · &volver=<página de Percha>
+  const qs = new URLSearchParams(location.search);
+  volver = /^\.\.\/[a-z/.#-]+$/i.test(qs.get('volver') || '') ? qs.get('volver') : null;
+  if (qs.get('editar')) { const { data: pe } = await sb.from('promociones').select('*').eq('id', qs.get('editar')).maybeSingle(); if (pe) editar(pe); }
+  else if (qs.get('nueva') === 'rebaja') editar(null, { nombre: '', tipo: 'rebaja', valor: 0, n: 0, m: 0, escalones: null, alcance: 'productos', familia_ids: [], producto_ids: [], dias_semana: [1, 2, 3, 4, 5, 6, 7], activa: true, canales: qs.get('canal') ? [qs.get('canal')] : null, listas: null });
 });
 </script>
 </body>

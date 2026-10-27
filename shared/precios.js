@@ -37,7 +37,7 @@
     ctx.rebajas = (d.rebajas || []).map(p => ({ p, precios: new Map() }));
     const porId = new Map(ctx.rebajas.map(r => [r.p.id, r]));
     (d.rp || []).forEach(x => { const r = porId.get(x.promocion_id); if (r) r.precios.set(x.producto_id + '|' + (x.variante_id || ''), +x.precio); });
-    ctx.base = ctx.listas.find(l => l.predeterminada) || ctx.listas[0] || { id: null, porcentaje: 100, redondeo: '10+', toma_rebajas: true };
+    ctx.base = ctx.listas.find(l => l.predeterminada && !l.canal) || ctx.listas.find(l => !l.canal) || { id: null, porcentaje: 100, redondeo: '10+', toma_rebajas: true };
     return ctx;
   }
   const hoy = () => new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10);
@@ -62,13 +62,15 @@
     }
     return mejor;
   }
-  // v = variante (precio = el suyo o el del producto); op = { canal, fecha, categoria_id, tipo }
+  // v = variante (precio = el suyo o el del producto); op = { canal, fecha, categoria_id, tipo, sinRebajas }
+  // la lista de un canal (Tienda Nube) toma las rebajas que valen en ese canal
   function calcular(v, listaId, ctx, op) {
-    op = op || {}; const base = +v.precio || 0;
+    const base = +v.precio || 0;
     const lista = ctx.listas.find(l => l.id === listaId) || ctx.base;
+    op = Object.assign({}, op || {}); if (!op.canal) op.canal = lista.canal || 'local';
     let fijo = ctx.fijos.get(lista.id + '|' + v.producto_id + '|' + v.id); if (fijo == null) fijo = ctx.fijos.get(lista.id + '|' + v.producto_id + '|');
     if (fijo != null) return { base, lista, rebaja: null, pct: null, fijo: true, precio: fijo };
-    const rebaja = lista.toma_rebajas !== false ? rebajaDe(v, ctx, op) : null;
+    const rebaja = lista.toma_rebajas !== false && !op.sinRebajas ? rebajaDe(v, ctx, op) : null;
     const punto = rebaja ? rebaja.precio : base;
     let pct = ctx.excep.get(lista.id + '|p' + v.producto_id);
     if (pct == null && op.categoria_id) pct = ctx.excep.get(lista.id + '|c' + op.categoria_id);
@@ -77,5 +79,26 @@
     return { base, lista, rebaja, pct, fijo: false, precio };
   }
   const REDONDEOS = [['10+', 'Para arriba a $10'], ['100+', 'Para arriba a $100'], ['500+', 'Para arriba a $500'], ['990+', 'Terminado en 990'], ['10', 'Al $10 más cercano'], ['100', 'Al $100 más cercano'], ['no', 'Sin redondear']];
-  window.PRECIOS = { cargar, armar, calcular, rebajaDe, redondear, vigente, REDONDEOS };
+  // ---- para las pantallas: la regla de una lista en dos controles, [20] [% menos que la base ▾]; se guarda como 80 ----
+  const dec = n => (+n).toLocaleString('es-AR', { maximumFractionDigits: 3 });
+  const reglaTxt = pct => +pct === 100 ? 'igual que la base' : +pct < 100 ? dec(100 - pct) + '% menos que la base' : dec(pct - 100) + '% más que la base';
+  function reglaControles(pct, k) {
+    const dif = Math.round(Math.abs(100 - +pct) * 1000) / 1000, s = +pct > 100 ? 'mas' : +pct < 100 ? 'menos' : 'igual';
+    return '<div class="regla"><input data-' + k + '-n inputmode="decimal" value="' + (s === 'igual' ? '' : dec(dif)) + '" ' + (s === 'igual' ? 'disabled' : '') + '><select data-' + k + '-s>'
+      + [['menos', '% menos que la base'], ['mas', '% más que la base'], ['igual', 'igual que la base']].map(([v, t]) => '<option value="' + v + '"' + (s === v ? ' selected' : '') + '>' + t + '</option>').join('') + '</select></div>';
+  }
+  function leerRegla(cont, k) {
+    const s = cont.querySelector('[data-' + k + '-s]').value, n = parseFloat(String(cont.querySelector('[data-' + k + '-n]').value).replace(',', '.').replace('−', '-'));
+    if (s === 'igual') return 100; if (isNaN(n) || n <= 0) return null; if (s === 'menos' && n >= 100) return null;
+    return s === 'menos' ? 100 - n : 100 + n;
+  }
+  // engancha los dos controles: al cambiar, llama a guardar(pct) (o avisa si el número no sirve)
+  function reglaEnganchar(cont, k, guardar, avisar) {
+    const s = cont.querySelector('[data-' + k + '-s]'), n = cont.querySelector('[data-' + k + '-n]'); if (!s) return;
+    const ir = () => { const pct = leerRegla(cont, k); if (pct == null) { avisar && avisar(); return; } guardar(pct); };
+    s.onchange = () => { n.disabled = s.value === 'igual'; if (s.value !== 'igual' && !n.value) { n.focus(); return; } ir(); }; n.onchange = ir;
+  }
+  // las listas que se eligen en el local (sin las de los canales online)
+  const delLocal = ctx => ctx.listas.filter(l => !l.canal);
+  window.PRECIOS = { cargar, armar, calcular, rebajaDe, redondear, vigente, delLocal, REDONDEOS, reglaTxt, reglaControles, leerRegla, reglaEnganchar };
 })();

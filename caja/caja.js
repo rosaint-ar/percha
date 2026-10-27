@@ -27,7 +27,7 @@ APP.ready.then(async () => {
     ]);
     // listas, reglas y rebajas: sin internet se usan las últimas guardadas
     if (l && l.listas.length) { pctx = l; try { localStorage.setItem(LS('precios'), JSON.stringify(l.datos)); } catch (_) {} } else { try { const g = JSON.parse(localStorage.getItem(LS('precios')) || 'null'); if (g) pctx = PRECIOS.armar(g); } catch (_) {} }
-    listas = pctx.listas; formas = f.data || []; if (window.MEDIOS) { MEDIOS.cargar(sb, e); MEDIOS.listas = Object.fromEntries(listas.map(x => [x.id, x])); } sb.rpc('formas_pago_uso', { e }).then(({ data }) => { usosFormas = Object.fromEntries((data || []).map(x => [x.forma_pago_id, +x.usos])); }); promos = p.data || []; vendedoras = v.data || []; caja = (c.data || [])[0]; clientes = cl.data || [];
+    listas = PRECIOS.delLocal(pctx); formas = f.data || []; if (window.MEDIOS) { MEDIOS.cargar(sb, e); MEDIOS.listas = Object.fromEntries(listas.map(x => [x.id, x])); } sb.rpc('formas_pago_uso', { e }).then(({ data }) => { usosFormas = Object.fromEntries((data || []).map(x => [x.forma_pago_id, +x.usos])); }); promos = p.data || []; vendedoras = v.data || []; caja = (c.data || [])[0]; clientes = cl.data || [];
     carrito.lista = carrito.lista || (listas.find(x => x.predeterminada) || listas[0] || {}).id;
     // arranque rápido: si hay catálogo guardado de hace menos de 12 h, se usa ya y se refresca en segundo plano
     cargarFallas();
@@ -333,7 +333,8 @@ APP.ready.then(async () => {
   // Lista → rebaja → regla de la lista (%, excepciones, precio fijo, redondeo): shared/precios.js
   function precioDe(v, listaId) {
     const p = productos[v.producto_id] || {};
-    return PRECIOS.calcular(v, listaId || carrito.lista, pctx, { canal: origenVenta(), categoria_id: p.categoria_id, tipo: p.tipo || v.producto_tipo });
+    const o = origenVenta(), lc = !listaId && o !== 'local' && pctx.listas.find(l => l.canal === o);   // venta cargada a mano de la tienda online: su lista
+    return PRECIOS.calcular(v, listaId || (lc ? lc.id : carrito.lista), pctx, { canal: o, categoria_id: p.categoria_id, tipo: p.tipo || v.producto_tipo });
   }
   function precioLista(v, listaId) { return precioDe(v, listaId).precio; }
   function agregar(v, cantidad) {

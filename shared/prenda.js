@@ -69,7 +69,7 @@
     const { fmt, esc, $, $$, toast, modal, mensajeError } = APP, raiz = document.querySelector('meta[name="app-root"]')?.content || '';
     const [{ data: d, error }, listas] = await Promise.all([
       sb.rpc('ventana_prenda', { p_variante: varianteId }),
-      listasCache ? Promise.resolve(listasCache) : (window.PRECIOS ? PRECIOS.cargar(sb, APP.empresa.id).then(c => { pctxCache = c; return (listasCache = c.listas); }) : sb.from('listas_precios').select('id,nombre,porcentaje,predeterminada').eq('empresa_id', APP.empresa.id).eq('activa', true).order('orden').then(r => (listasCache = r.data || [])))]);
+      listasCache ? Promise.resolve(listasCache) : (window.PRECIOS ? PRECIOS.cargar(sb, APP.empresa.id).then(c => { pctxCache = c; return (listasCache = PRECIOS.delLocal(c)); }) : sb.from('listas_precios').select('id,nombre,porcentaje,predeterminada').eq('empresa_id', APP.empresa.id).eq('activa', true).order('orden').then(r => (listasCache = r.data || [])))]);
     if (error || !d) { toast(error ? mensajeError(error) : 'No se encontró la prenda', 'error'); return; }
     const v = d.variante, pr = d.producto, admin = APP.esAdmin, puede = APP.rol !== 'visor';
     const actual = Math.round(+v.stock || 0);

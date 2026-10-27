@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Conexiones · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610272021">
+<link rel="stylesheet" href="../shell/shell.css?v=202610272200">
 <style>
   .canales{display:grid;grid-template-columns:1fr 1fr;gap:14px}
   .canal-card .logo{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font:800 16px var(--f-titulo);color:#fff}
@@ -17,6 +17,18 @@
   .dato.mal b{color:var(--error)}.dato.bien b{color:var(--ok)}
   .pasos{font-size:13.5px;color:var(--tinta-2);margin:0;padding-left:18px}
   @media (max-width:900px){.canales{grid-template-columns:1fr}}
+  /* precios en la tienda online */
+  .pw-grid{display:grid;grid-template-columns:minmax(260px,1.4fr) minmax(200px,1fr) minmax(200px,1fr);gap:14px 18px;align-items:start;margin-bottom:14px}
+  @media (max-width:860px){.pw-grid{grid-template-columns:1fr}}
+  .pw-grid .campo{margin:0}
+  .regla{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .regla input{width:84px!important;text-align:center;font:700 16px var(--f-mono)!important}.regla select{width:auto!important}
+  .ejemplo{font-size:12.5px;color:var(--tinta-3);margin-top:6px}.ejemplo b{color:var(--tinta);font-family:var(--f-mono)}
+  .fila-sw{display:flex;align-items:center;gap:10px;min-height:38px;font-size:13.5px}
+  .bloque{border-top:1px solid var(--linea-suave);padding-top:14px;margin-top:14px}
+  .bloque h3{font:700 14px var(--f-ui);margin:0 0 4px}
+  .rev-tabla{max-height:52vh;overflow:auto;border:1px solid var(--linea-suave);border-radius:12px;margin-top:10px}
+  .rev-tabla s{color:var(--tinta-3)}
 </style>
 </head>
 <body data-page="conexiones" data-etq="Sistema" data-title="Conexiones" data-subtitle="Canales de venta online conectados a Percha: catálogo, stock y pedidos">
@@ -31,10 +43,12 @@
       <div class="aviso-caja info">Próximamente. Se conecta igual que Tienda Nube: con un clic y la autorización de la cuenta.</div>
     </div>
   </div>
+  <div class="card" id="precios" style="margin-top:14px;display:none"></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610272021"></script>
-<script src="../shell/shell.js?v=202610272021"></script>
+<script src="../shared/supabase.js?v=202610272200"></script>
+<script src="../shared/precios.js?v=202610272200"></script>
+<script src="../shell/shell.js?v=202610272200"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -91,6 +105,82 @@ APP.ready.then(async () => {
     };
     $('#btn-sync').onclick = async () => { const b = $('#btn-sync'); b.disabled = true; b.textContent = 'Sincronizando…'; try { const j = await llamar('tn-sync', { conexion_id: cx.id }); toast(`${fmt.num(j.variantes)} variantes leídas · ${fmt.num(j.cruzados)} cruzadas · ${fmt.num(j.sin_cruzar)} sin cruzar`); } catch (err) { toast(err.message, 'error'); } cargarTN(); };
     $('#btn-desconectar').onclick = async () => { if (!await confirmar('¿Desconectar Tienda Nube? Se borra el cruce guardado; no se toca nada en la tienda.', 'Desconectar')) return; await sb.from('conexiones').delete().eq('id', cx.id); cargarTN(); };
+    cargarPrecios(cx);
+  }
+
+  // ================= Precios en Tienda Nube: la lista de la conexión, el envío y los descuentos =================
+  async function cargarPrecios(cx) {
+    const card = $('#precios'); card.style.display = '';
+    let ctx = await PRECIOS.cargar(sb, e);
+    let lista = ctx.listas.find(l => l.canal === 'tiendanube');
+    if (!lista) {   // conexión nueva: su lista arranca igual que la base (la web no cambia)
+      const r = await sb.from('listas_precios').insert(APP.conEmpresa({ nombre: 'Tienda Nube', porcentaje: 100, orden: 90, redondeo: '10+', toma_rebajas: true, canal: 'tiendanube', conexion_id: cx.id })).select('*').single();
+      if (r.error) { card.innerHTML = `<p class="sub">No se pudo crear la lista de Tienda Nube: ${esc(mensajeError(r.error))}</p>`; return; }
+      ctx = await PRECIOS.cargar(sb, e); lista = ctx.listas.find(l => l.canal === 'tiendanube');
+    }
+    const { data: promos } = await sb.from('promociones').select('*').eq('empresa_id', e).eq('tipo', 'rebaja').order('creada', { ascending: false });
+    const web = (promos || []).filter(p => !p.canales || !p.canales.length || p.canales.includes('tiendanube'));
+    const nFijos = {}; for (const p of web) { const { count } = await sb.from('rebaja_precios').select('id', { count: 'exact', head: true }).eq('promocion_id', p.id); nFijos[p.id] = count || 0; }
+    const base = ctx.base, EJ = 50000, ej = PRECIOS.calcular({ id: '', producto_id: '', precio: EJ }, lista.id, ctx, { sinRebajas: true }).precio;
+    const queTxt = p => (+p.valor > 0 ? `${fmt.dec(p.valor)}% menos` + (p.alcance === 'familias' ? ` en ${(p.familia_ids || []).length} familias` : p.alcance === 'productos' ? ` en ${(p.producto_ids || []).length} productos` : ' en todo') : '') + (nFijos[p.id] ? (+p.valor > 0 ? ' · ' : '') + `${fmt.num(nFijos[p.id])} precios de oferta` : '');
+    const volver = encodeURIComponent('../conexiones/conexiones.html#precios');
+    card.innerHTML = `<div class="card-cab"><div><h2>Precios en Tienda Nube</h2><p class="sub">La lista <b>${esc(lista.nombre)}</b> es la de la tienda online: sale de la base (${esc(base.nombre || 'Lista')}) con su regla. En la web va el precio de esta lista y, si hay descuento, el precio tachado y el promocional.</p></div></div>
+      <div class="pw-grid">
+        <div class="campo"><label>Precio en la web</label>${PRECIOS.reglaControles(lista.porcentaje, 'w')}<p class="ejemplo">Ej.: una prenda de <b>${fmt.pesos(EJ)}</b> en el local, en la web <b>${fmt.pesos(ej)}</b></p></div>
+        <div class="campo"><label>Redondeo</label><select data-red>${PRECIOS.REDONDEOS.map(([k, t]) => `<option value="${k}" ${(lista.redondeo || '10+') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
+        <div class="campo"><label>Rebajas del local</label><div class="fila-sw"><label class="switch"><input type="checkbox" data-reb ${lista.toma_rebajas !== false ? 'checked' : ''}><span></span></label> ${lista.toma_rebajas !== false ? 'Las que valen en la web también se aplican' : 'Solo los descuentos de la web'}</div></div>
+      </div>
+      <div class="fila-sw" style="align-items:flex-start"><label class="switch" style="margin-top:2px"><input type="checkbox" id="chk-precios" ${cx.empujar_precios ? 'checked' : ''}><span></span></label><span><b>Percha manda los precios a Tienda Nube.</b> Cada cambio de precio, de regla o de descuento (y los que empiezan o vencen) llega a la web en unos minutos.<br><small class="sub">Con esto prendido, los precios se cambian en Percha: lo que se cambie a mano en el panel de Tienda Nube se vuelve a poner como dice Percha. Lo oculto en la web no se toca.${cx.ultimo_envio_precios ? ' Último envío: ' + fmt.fechaHora(cx.ultimo_envio_precios) + '.' : ''}</small></span></div>
+      <div class="acciones" style="margin-top:10px"><button class="btn" id="btn-revisar">Revisar precios de la web</button></div>
+      <div class="bloque"><div style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:240px"><h3>Descuentos en la web</h3><p class="sub" style="margin:0">Como en el panel de Tienda Nube: un % o un precio de oferta, para todo, una familia o productos elegidos, con fechas. En la web se ven con el precio tachado.</p></div><a class="btn primario" href="../configuracion/promociones.html?nueva=rebaja&canal=tiendanube&volver=${volver}">+ Nuevo descuento</a></div>
+        <table class="lista" style="margin-top:10px"><tr><th>Descuento</th><th>Qué</th><th>Vigencia</th><th>Dónde</th><th></th></tr>
+          ${web.map(p => `<tr><td><b>${esc(p.nombre)}</b></td><td>${queTxt(p) || '—'}</td><td><small>${p.desde ? fmt.fecha(p.desde) : 'ya'}${p.hasta ? ' → ' + fmt.fecha(p.hasta) : ' · sin fin'}</small></td><td>${!p.canales || !p.canales.length ? '<span class="chip aviso" title="También vale en la caja del local">web y local</span>' : '<span class="chip">solo web</span>'}</td>
+            <td style="white-space:nowrap"><label class="switch" title="${p.activa ? 'Activo' : 'Pausado'}"><input type="checkbox" data-act="${p.id}" ${p.activa ? 'checked' : ''}><span></span></label> <a class="btn chico" href="../configuracion/promociones.html?editar=${p.id}&volver=${volver}">Editar</a></td></tr>`).join('') || '<tr><td colspan="5" class="vacio">Sin descuentos: la web muestra el precio de la lista.</td></tr>'}</table>
+        <p class="sub" style="margin-top:8px">Los descuentos por medio de pago (por ejemplo, transferencia) se configuran en el panel de Tienda Nube.</p></div>`;
+    const recargar = () => cargarPrecios(cx);
+    const guardar = async (d, msg) => { const r = await sb.from('listas_precios').update(d).eq('id', lista.id); toast(r.error ? mensajeError(r.error) : msg, r.error ? 'error' : ''); recargar(); };
+    PRECIOS.reglaEnganchar(card, 'w', pct => { if (pct !== +lista.porcentaje) guardar({ porcentaje: pct }, `Precio en la web: ${PRECIOS.reglaTxt(pct)}`); }, () => toast('Poné un número: cuánto % menos o más que la base', 'error'));
+    $('[data-red]', card).onchange = ev => guardar({ redondeo: ev.target.value }, 'Redondeo guardado');
+    $('[data-reb]', card).onchange = ev => guardar({ toma_rebajas: ev.target.checked }, ev.target.checked ? 'La web toma también las rebajas del local' : 'La web toma solo sus descuentos');
+    $$('[data-act]', card).forEach(i => i.onchange = async () => { const r = await sb.from('promociones').update({ activa: i.checked }).eq('id', i.dataset.act); toast(r.error ? mensajeError(r.error) : (i.checked ? 'Descuento activo' : 'Descuento pausado'), r.error ? 'error' : ''); recargar(); });
+    $('#chk-precios').onchange = async ev => {
+      if (ev.target.checked) { ev.target.checked = false; revisar(true); return; }   // prenderlo pasa siempre por la revisión
+      const r = await sb.from('conexiones').update({ empujar_precios: false }).eq('id', cx.id); toast(r.error ? mensajeError(r.error) : 'Percha ya no manda los precios', r.error ? 'error' : ''); cx.empujar_precios = false;
+    };
+    $('#btn-revisar').onclick = () => revisar(false);
+
+    // revisar: compara con la web en vivo; aplicar: manda de a tandas hasta terminar
+    async function revisar(prender) {
+      const m = APP.modal('<h2>Precios de la web</h2><p class="sub">Leyendo los precios de Tienda Nube…</p>'); $('.modal', m).style.maxWidth = '860px';
+      let r; try { r = ((await llamar('tn-precios', { accion: 'revisar' })).resultados || [])[0] || {}; } catch (err) { m.cerrar(); toast(err.message, 'error'); return; }
+      if (r.error) { m.cerrar(); toast(r.error, 'error'); return; }
+      const cs = r.cambios || [], pz = x => x == null ? '—' : fmt.pesos(x);
+      const linea = (n, p) => p != null ? `<s>${pz(n)}</s> <b>${pz(p)}</b>` : `<b>${pz(n)}</b>`;
+      $('.modal', m).innerHTML = `<h2>Precios de la web</h2>
+        <p class="sub">Revisé ${fmt.num(r.revisadas || 0)} prendas publicadas. ${cs.length ? `<b>${fmt.num(cs.length)}</b> publicaciones tendrían otro precio en la web.` : 'La web ya tiene los precios de Percha: no hay nada para mandar.'}${r.n_sin_tocar ? ` No se tocan ${fmt.num(r.n_sin_tocar)} (dos publicaciones a distinto precio o sin precio en Percha).` : ''}</p>
+        ${cs.length ? `<div class="rev-tabla"><table class="lista"><tr><th>Prenda</th><th class="num">Hoy en la web</th><th class="num">Con Percha</th></tr>${cs.slice(0, 400).map(c => `<tr><td>${esc(c.producto)}<br><small>${esc(c.variante || 'único')}${c.rebaja ? ' · ▼ ' + esc(c.rebaja) : ''}</small></td><td class="num">${linea(c.precio_antes, c.promo_antes)}</td><td class="num">${linea(c.precio, c.promo)}</td></tr>`).join('')}${cs.length > 400 ? `<tr><td colspan="3" class="vacio">y ${fmt.num(cs.length - 400)} más…</td></tr>` : ''}</table></div>` : ''}
+        ${r.n_sin_tocar ? `<details style="margin-top:8px"><summary class="sub">Ver las que no se tocan</summary><small>${(r.sin_tocar || []).map(x => esc(x.producto + (x.variante ? ' · ' + x.variante : '') + ' — ' + x.por)).join('<br>')}</small></details>` : ''}
+        <div class="pie"><button class="btn" data-no>Cerrar</button>${cs.length ? `<button class="btn primario" data-si>${prender ? 'Mandar y dejar prendido' : 'Mandar ' + fmt.num(cs.length) + ' cambios'}</button>` : (prender ? '<button class="btn primario" data-si>Prender</button>' : '')}</div>`;
+      $('[data-no]', m).onclick = () => m.cerrar();
+      const si = $('[data-si]', m); if (!si) return;
+      si.onclick = async () => {
+        si.disabled = true; $('[data-no]', m).disabled = true;
+        let hechos = 0, errores = 0, vueltas = 0, faltan = cs.length; const errs = [];
+        while (faltan > 0 && vueltas < 40) {
+          si.textContent = `Mandando… ${fmt.num(hechos)} de ${fmt.num(cs.length)}`;
+          let q; try { q = ((await llamar('tn-precios', { accion: 'aplicar' })).resultados || [])[0] || {}; } catch (err) { errs.push(err.message); break; }
+          if (q.error) { errs.push(q.error); break; }
+          hechos += q.hechos || 0; errores += q.errores || 0; errs.push(...(q.errs || [])); vueltas++;
+          if (!q.hechos && (q.faltan || 0) >= faltan) break;   // no avanza: frenar
+          faltan = q.faltan || 0;
+        }
+        if (prender && !errs.length) { const u = await sb.from('conexiones').update({ empujar_precios: true }).eq('id', cx.id); if (u.error) errs.push(mensajeError(u.error)); else cx.empujar_precios = true; }
+        m.cerrar(); toast(`${fmt.num(hechos)} precios mandados a Tienda Nube${errores ? ` · ${errores} con error` : ''}${faltan > 0 ? ` · faltan ${fmt.num(faltan)}: se terminan solos en unos minutos` : ''}${prender && cx.empujar_precios ? ' · Percha manda los precios' : ''}`, errores || errs.length ? 'error' : '');
+        if (errs.length) console.warn(errs);
+        recargar();
+      };
+    }
+    if (location.hash === '#precios') card.scrollIntoView({ behavior: 'smooth' });
   }
   await cargarTN();
 });
