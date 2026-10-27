@@ -24,6 +24,7 @@
   }
   const raiz = () => (window.APP && APP.root) || '../';
   const urlFactura = id => `${raiz()}caja/factura.html?id=${id}`;
+  const urlMuestra = ventaId => `${raiz()}caja/factura.html?muestra=${ventaId}`;
   const textoWsp = (emp, c) => encodeURIComponent(`${emp.nombre} · ${c.nombre_tipo} ${c.numero_mostrar}\nTotal ${pesos2.format(c.total)}\nCAE ${c.cae} (vence ${new Date(c.cae_vence + 'T12:00').toLocaleDateString('es-AR')})\n¡Gracias por tu compra!`);
 
   function chip(v) {
@@ -82,7 +83,7 @@
         <div class="campo" data-cond><label>Condición frente al IVA</label><select id="fa-cond"><option value="6">Monotributo</option><option value="1">Responsable inscripto</option><option value="4">Exento</option><option value="5">Consumidor final</option></select></div>
         <div class="campo"><label>Domicilio <small>(opcional)</small></label><input id="fa-dom" value="${esc(cli ? [cli.direccion, cli.localidad].filter(Boolean).join(', ') : '')}"></div>
       </div>
-      <div data-res><div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Emitir factura</button></div></div>
+      <div data-res><div class="pie" style="justify-content:space-between"><a class="btn" target="_blank" href="${urlMuestra(venta.id)}" title="Sin validez: no se manda a ARCA">Ver cómo sale (muestra)</a><div style="display:flex;gap:8px"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Emitir factura</button></div></div></div>
       <style>.chips-fila{display:flex;gap:6px;flex-wrap:wrap}.chip-opc{border:1px solid var(--linea);background:var(--superficie-2);padding:8px 14px;border-radius:999px;font:600 13px var(--f-ui);cursor:pointer;color:var(--tinta)}.chip-opc.on{background:var(--acento);border-color:var(--acento);color:#fff}.chip-opc:disabled{opacity:.45;cursor:not-allowed}</style>`);
     const pintar = () => {
       $$('[data-m]', m).forEach(b => b.classList.toggle('on', b.dataset.m === modo));
@@ -106,5 +107,5 @@
       catch (err) { const { data: c } = await sb.from('v_comprobantes').select('*').eq('id', data.id).maybeSingle(); pintarResultado(m, c, mensajeError(err), op.alTerminar); }
     };
   }
-  window.FACTURA = { abrir, chip, config, mandar, llamar, urlFactura };
+  window.FACTURA = { abrir, chip, config, mandar, llamar, urlFactura, urlMuestra };
 })();

@@ -49,7 +49,9 @@ Deno.serve(async (req) => {
   const { data: ck } = await admin.from("app_config").select("valor").eq("clave", "cron_key").maybeSingle();
   const esCron = !!(req.headers.get("x-cron-key") && ck?.valor && req.headers.get("x-cron-key") === ck.valor);
   let empresas: string[] = [];
-  if (esCron) {
+  if (esCron && accion === "simular" && body.empresa_id) {
+    empresas = [body.empresa_id];
+  } else if (esCron) {
     const { data } = await admin.from("comprobantes").select("empresa_id").eq("estado", "pendiente");
     empresas = [...new Set((data || []).map((x: any) => x.empresa_id))];
   } else {
@@ -106,6 +108,17 @@ Deno.serve(async (req) => {
     return { total: +(tag(g, "ImpTotal") || 0), doc: tag(g, "DocNro"), cae: tag(g, "CodAutorizacion"), vence: tag(g, "FchVto"), fecha: tag(g, "CbteFch") };
   }
 
+  // ---------- el renglón del pedido a ARCA (FECAEDetRequest) ----------
+  function armarDetalle(c: any, nro: number, asoc: any, cuit: string, fch: string) {
+    const total = r2(+c.total), esC = [11, 12, 13].includes(c.tipo);
+    const neto = esC ? total : r2(total / 1.21), iva = esC ? 0 : r2(total - neto);
+    const asocXml = asoc ? `<ar:CbtesAsoc><ar:CbteAsoc><ar:Tipo>${asoc.tipo}</ar:Tipo><ar:PtoVta>${asoc.punto_venta}</ar:PtoVta><ar:Nro>${asoc.numero}</ar:Nro><ar:Cuit>${cuit}</ar:Cuit><ar:CbteFch>${String(asoc.fecha || "").replace(/-/g, "")}</ar:CbteFch></ar:CbteAsoc></ar:CbtesAsoc>` : "";
+    const ivaXml = esC ? "" : `<ar:Iva><ar:AlicIva><ar:Id>5</ar:Id><ar:BaseImp>${imp(neto)}</ar:BaseImp><ar:Importe>${imp(iva)}</ar:Importe></ar:AlicIva></ar:Iva>`;
+    return `<ar:Concepto>1</ar:Concepto><ar:DocTipo>${c.doc_tipo}</ar:DocTipo><ar:DocNro>${c.doc_nro}</ar:DocNro><ar:CbteDesde>${nro}</ar:CbteDesde><ar:CbteHasta>${nro}</ar:CbteHasta><ar:CbteFch>${fch}</ar:CbteFch>`
+      + `<ar:ImpTotal>${imp(total)}</ar:ImpTotal><ar:ImpTotConc>0.00</ar:ImpTotConc><ar:ImpNeto>${imp(neto)}</ar:ImpNeto><ar:ImpOpEx>0.00</ar:ImpOpEx><ar:ImpTrib>0.00</ar:ImpTrib><ar:ImpIVA>${imp(iva)}</ar:ImpIVA>`
+      + `<ar:MonId>PES</ar:MonId><ar:MonCotiz>1</ar:MonCotiz><ar:CondicionIVAReceptorId>${c.receptor_condicion}</ar:CondicionIVAReceptorId>${asocXml}${ivaXml}`;
+  }
+
   // ---------- mandar un comprobante ----------
   async function mandar(c: any, cfg: any, emp: any, a: any) {
     const cuit = cuitDe(cfg, emp);
@@ -126,13 +139,7 @@ Deno.serve(async (req) => {
     const nro = ult + 1;
     await admin.from("comprobantes").update({ numero_intento: nro, intentos: (c.intentos || 0) + 1 }).eq("id", c.id);
     const fch = hoyAR();
-    const total = r2(+c.total), esC = [11, 12, 13].includes(c.tipo);
-    const neto = esC ? total : r2(total / 1.21), iva = esC ? 0 : r2(total - neto);
-    const asocXml = asoc ? `<ar:CbtesAsoc><ar:CbteAsoc><ar:Tipo>${asoc.tipo}</ar:Tipo><ar:PtoVta>${asoc.punto_venta}</ar:PtoVta><ar:Nro>${asoc.numero}</ar:Nro><ar:Cuit>${cuit}</ar:Cuit><ar:CbteFch>${String(asoc.fecha || "").replace(/-/g, "")}</ar:CbteFch></ar:CbteAsoc></ar:CbtesAsoc>` : "";
-    const ivaXml = esC ? "" : `<ar:Iva><ar:AlicIva><ar:Id>5</ar:Id><ar:BaseImp>${imp(neto)}</ar:BaseImp><ar:Importe>${imp(iva)}</ar:Importe></ar:AlicIva></ar:Iva>`;
-    const det = `<ar:Concepto>1</ar:Concepto><ar:DocTipo>${c.doc_tipo}</ar:DocTipo><ar:DocNro>${c.doc_nro}</ar:DocNro><ar:CbteDesde>${nro}</ar:CbteDesde><ar:CbteHasta>${nro}</ar:CbteHasta><ar:CbteFch>${fch}</ar:CbteFch>`
-      + `<ar:ImpTotal>${imp(total)}</ar:ImpTotal><ar:ImpTotConc>0.00</ar:ImpTotConc><ar:ImpNeto>${imp(neto)}</ar:ImpNeto><ar:ImpOpEx>0.00</ar:ImpOpEx><ar:ImpTrib>0.00</ar:ImpTrib><ar:ImpIVA>${imp(iva)}</ar:ImpIVA>`
-      + `<ar:MonId>PES</ar:MonId><ar:MonCotiz>1</ar:MonCotiz><ar:CondicionIVAReceptorId>${c.receptor_condicion}</ar:CondicionIVAReceptorId>${asocXml}${ivaXml}`;
+    const det = armarDetalle(c, nro, asoc, cuit, fch);
     let r: string;
     try {
       r = await soap(URLS[cfg.ambiente as "produccion"].wsfe, "http://ar.gov.afip.dif.FEV1/FECAESolicitar",
@@ -156,6 +163,26 @@ Deno.serve(async (req) => {
   }
 
   try {
+    if (accion === "simular") {
+      const e = empresas[0]; const emp = await empDe(e); const cfg = await cfgDe(e); const cuit = cuitDe(cfg, emp);
+      const { data: v } = await admin.from("ventas").select("id,numero,total,estado,reservada").eq("id", body.venta_id).eq("empresa_id", e).maybeSingle();
+      if (!v) return json({ error: "No existe esa venta" }, 400);
+      const pasos: any[] = []; const paso = (nombre: string, ok: boolean, detalle = "") => pasos.push({ nombre, ok, detalle });
+      const a = await acceso(e, cfg); paso("Acceso a ARCA", true, "con el certificado de Percha");
+      const tipo = emp.condicion_iva === "responsable_inscripto" ? 6 : 11;
+      const ult = await ultimo(cfg, a, cuit, tipo); paso("Próximo número", true, `${String(cfg.punto_venta).padStart(5, "0")}-${String(ult + 1).padStart(8, "0")}`);
+      const ws = URLS[cfg.ambiente as "produccion"].wsfe;
+      const ci = await soap(ws, "http://ar.gov.afip.dif.FEV1/FEParamGetCondicionIvaReceptor", `<ar:FEParamGetCondicionIvaReceptor>${authXml(a, cuit)}<ar:ClaseCmp>${tipo === 11 ? "C" : "B"}</ar:ClaseCmp></ar:FEParamGetCondicionIvaReceptor>`);
+      const conds = tags(ci, "CondicionIvaReceptor").map((x) => ({ id: +(tag(x, "Id") || 0), desc: desesc(tag(x, "Desc") || "") }));
+      const cf = conds.find((x) => x.id === 5); paso("Consumidor final aceptado en Factura " + (tipo === 11 ? "C" : "B"), !!cf, cf ? cf.desc : conds.map((x) => x.id + " " + x.desc).join(", ") || erroresDe(ci).join(" · "));
+      const tc = await soap(ws, "http://ar.gov.afip.dif.FEV1/FEParamGetTiposCbte", `<ar:FEParamGetTiposCbte>${authXml(a, cuit)}</ar:FEParamGetTiposCbte>`);
+      const tipos = tags(tc, "CbteTipo").map((x) => +(tag(x, "Id") || 0)); paso("Factura y nota de crédito habilitadas", tipos.includes(tipo) && tipos.includes(tipo + 2), `tipos ${tipo} y ${tipo + 2}`);
+      const ok = v.estado === "completada" && !v.reservada && +v.total > 0 && +v.total < +cfg.umbral_identificar;
+      paso("La venta se puede facturar como consumidor final", ok, `#${v.numero} · ${v.estado} · $${v.total}`);
+      const det = armarDetalle({ tipo, doc_tipo: 99, doc_nro: "0", total: v.total, receptor_condicion: 5 }, ult + 1, null, cuit, hoyAR());
+      return json({ ok: pasos.every((x) => x.ok), pasos, numero: ult + 1, pedido: `<FeCabReq><CantReg>1</CantReg><PtoVta>${cfg.punto_venta}</PtoVta><CbteTipo>${tipo}</CbteTipo></FeCabReq>` + det.replace(/ar:/g, "") });
+    }
+
     if (accion === "csr") {
       const e = empresas[0]; const emp = await empDe(e); const cfg = await cfgDe(e); const cuit = cuitDe(cfg, emp);
       if (cuit.length !== 11) return json({ error: "Primero cargá el CUIT de la empresa" }, 400);

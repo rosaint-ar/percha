@@ -31,6 +31,8 @@
   .pie{margin-top:auto;display:flex;gap:16px;align-items:center;border-top:1px solid var(--tinta);padding-top:10px}
   .pie .cae{margin-left:auto;text-align:right}.pie .cae b{font-size:14px}
   .arca{font-weight:800;font-size:15px;letter-spacing:.02em}
+  .hoja{position:relative}.marca-muestra{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;font:800 64px/1 Arial,sans-serif;color:rgba(200,30,30,.16);transform:rotate(-28deg);text-align:center}
+  @media screen{.hoja{zoom:var(--z,1)}}
   .estado{max-width:210mm;margin:20px auto;background:#fff;padding:20px;border-radius:10px;text-align:center}
   @media print{body{background:#fff}.barra,.estado{display:none}.hoja{margin:0;box-shadow:none;width:auto;min-height:calc(297mm - 16mm);padding:0}@page{size:A4;margin:8mm}}
 </style>
@@ -40,7 +42,7 @@
 <div id="cont"><div class="estado">Cargando…</div></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="../shared/supabase.js?v=202610271712"></script>
+<script src="../shared/supabase.js?v=202610271730"></script>
 <script>
 (async () => {
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -50,8 +52,17 @@
   const cont = document.getElementById('cont');
   const { data: { session } } = await sb.auth.getSession();
   if (!session) { location.replace('../login.html?next=' + encodeURIComponent(location.pathname + location.search)); return; }
-  const id = new URLSearchParams(location.search).get('id');
-  const { data: c } = await sb.from('v_comprobantes').select('*').eq('id', id).maybeSingle();
+  const qs = new URLSearchParams(location.search), id = qs.get('id'), muestra = qs.get('muestra');
+  let c;
+  if (muestra) {
+    // ?muestra=<venta>: cómo saldría la factura de esa venta, sin pedir nada a ARCA (sin validez)
+    const [{ data: vm }, { data: fc }] = await Promise.all([sb.from('v_ventas').select('*').eq('id', muestra).maybeSingle(), sb.from('facturacion_config').select('punto_venta,ultimo_numero,empresa_id').maybeSingle()]);
+    if (!vm) { cont.innerHTML = '<div class="estado">No se encontró la venta.</div>'; return; }
+    const hoy = new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10), vto = new Date(Date.now() + 7 * 86400e3).toISOString().slice(0, 10);
+    c = { empresa_id: vm.empresa_id, venta_id: vm.id, tipo: 11, letra: 'C', nombre_tipo: 'Factura C', punto_venta: (fc && fc.punto_venta) || 1, numero: ((fc && fc.ultimo_numero) || 0) + 1, fecha: hoy, total: vm.total,
+      doc_tipo: 99, doc_nro: '0', receptor_condicion: 5, estado: 'autorizado', cae: '00000000000000', cae_vence: vto, muestra: true };
+    c.numero_mostrar = String(c.punto_venta).padStart(5, '0') + '-' + String(c.numero).padStart(8, '0');
+  } else ({ data: c } = await sb.from('v_comprobantes').select('*').eq('id', id).maybeSingle());
   if (!c) { cont.innerHTML = '<div class="estado">No se encontró el comprobante.</div>'; return; }
   if (c.estado !== 'autorizado') { cont.innerHTML = `<div class="estado"><b>Este comprobante no está autorizado todavía</b> (${esc(c.estado)}).<br>${esc(c.errores || '')}</div>`; return; }
   const [{ data: emp }, { data: ls }, { data: v }] = await Promise.all([
@@ -65,7 +76,7 @@
   const cuitEmisor = String(emp.cuit || '').replace(/\D/g, '');
   const tituloTipo = c.nombre_tipo.replace(/ [ABC]$/, '');
   // el detalle: las prendas de la venta; descuento y recargo como renglones para que cierre con el total autorizado
-  const filas = (ls || []).map(l => `<tr><td>${esc(l.descripcion)}${l.talle || l.color ? `<br><small style="color:var(--tinta-2)">${esc([l.talle, l.color].filter(Boolean).join(' · '))}</small>` : ''}</td><td class="n">${num.format(l.cantidad)}</td><td class="n">${pesos.format(l.precio_unit * (1 - (+l.descuento_pct || 0) / 100))}</td><td class="n">${pesos.format(l.total)}</td></tr>`);
+  const filas = (ls || []).map(l => `<tr><td>${esc(l.descripcion)}${l.talle || l.color ? `<br><small style="color:var(--tinta-2)">${esc([l.talle, l.color].filter(Boolean).join(' · '))}</small>` : ''}</td><td class="n">${num.format(l.cantidad)}</td><td class="n">${pesos.format(+l.cantidad ? l.total / l.cantidad : l.total)}</td><td class="n">${pesos.format(l.total)}</td></tr>`);
   const sumaLineas = (ls || []).reduce((s, l) => s + +l.total, 0);
   if (v && +v.descuento) filas.push(`<tr><td>Descuento${+v.descuento_pct ? ' ' + v.descuento_pct + '%' : ''}</td><td></td><td></td><td class="n">−${pesos.format(v.descuento)}</td></tr>`);
   if (v && +v.recargo) filas.push(`<tr><td>Recargo</td><td></td><td></td><td class="n">${pesos.format(v.recargo)}</td></tr>`);
@@ -77,7 +88,7 @@
   const qrUrl = 'https://www.afip.gob.ar/fe/qr/?p=' + btoa(JSON.stringify(qrDatos));
   const asociado = c.asociado_id ? `<div class="dato"><b>Comprobante asociado:</b> ${c.asociado_tipo === 11 ? 'Factura C' : c.asociado_tipo === 6 ? 'Factura B' : 'Factura A'} ${String(c.asociado_pv).padStart(5, '0')}-${String(c.asociado_numero).padStart(8, '0')} del ${fecha(c.asociado_fecha)}</div>` : '';
   cont.innerHTML = `<div class="hoja">
-    <div class="copia">ORIGINAL</div>
+    ${c.muestra ? '<div class="marca-muestra">MUESTRA<br>SIN VALIDEZ</div>' : ''}<div class="copia">${c.muestra ? 'MUESTRA · SIN VALIDEZ FISCAL' : 'ORIGINAL'}</div>
     <div class="cab">
       <div class="emisor"><h1>${esc(emp.razon_social || emp.nombre)}</h1>
         <div class="dato"><b>Domicilio:</b> ${esc([emp.domicilio, emp.localidad, emp.provincia].filter(Boolean).join(', '))}</div>
@@ -95,7 +106,7 @@
       <div class="dato"><b>${DOC[c.doc_tipo] ? DOC[c.doc_tipo] + ':' : ''}</b> ${c.doc_tipo === 99 ? '' : esc(c.doc_tipo === 80 ? fmtCuit(c.doc_nro) : c.doc_nro)}</div>
       <div class="dato"><b>Apellido y nombre / Razón social:</b> ${esc(c.receptor_nombre || (c.doc_tipo === 99 ? 'Consumidor final' : ''))}</div>
       <div class="dato"><b>Condición frente al IVA:</b> ${esc(CONDR[c.receptor_condicion] || '')}</div>
-      <div class="dato"><b>Domicilio:</b> ${esc(c.receptor_domicilio || '')}</div>
+      ${c.receptor_domicilio ? `<div class="dato"><b>Domicilio:</b> ${esc(c.receptor_domicilio)}</div>` : ''}
       <div class="dato"><b>Condición de venta:</b> Contado</div>${asociado}
     </div>
     <table><thead><tr><th>Producto / servicio</th><th class="n">Cantidad</th><th class="n">Precio unit.</th><th class="n">Subtotal</th></tr></thead><tbody>${filas.join('')}</tbody></table>
@@ -106,7 +117,11 @@
   new QRCode(document.getElementById('qr'), { text: qrUrl, width: 96, height: 96, correctLevel: QRCode.CorrectLevel.M });
   document.title = `${c.nombre_tipo} ${c.numero_mostrar} · ${emp.nombre}`;
   document.getElementById('wsp').href = 'https://wa.me/?text=' + encodeURIComponent(`${emp.nombre} · ${c.nombre_tipo} ${c.numero_mostrar}\nTotal ${pesos.format(c.total)}\nCAE ${c.cae}\nVerificala en ARCA: ${qrUrl}`);
+  if (c.muestra) document.getElementById('wsp').hidden = true;
   document.getElementById('barra').hidden = false;
+  // en el celular la hoja A4 se achica para entrar en la pantalla (al imprimir sale a tamaño real)
+  const ajustar = () => document.documentElement.style.setProperty('--z', Math.min(1, (Math.min(innerWidth, screen.width || innerWidth) - 16) / 820).toFixed(3));
+  ajustar(); addEventListener('resize', ajustar);
 })();
 </script>
 </body>
