@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Facturación · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610271730">
+<link rel="stylesheet" href="../shell/shell.css?v=202610271733">
 <style>
   .pestanas{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
   .pestanas a{font:600 13px var(--f-ui);color:var(--tinta);text-decoration:none;padding:8px 14px;border:1px solid var(--linea);background:var(--superficie-2);border-radius:10px}
@@ -35,9 +35,9 @@
   <div class="card" id="pasos"></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610271730"></script>
-<script src="../shell/shell.js?v=202610271730"></script>
-<script src="../shared/facturar.js?v=202610271730"></script>
+<script src="../shared/supabase.js?v=202610271733"></script>
+<script src="../shell/shell.js?v=202610271733"></script>
+<script src="../shared/facturar.js?v=202610271733"></script>
 <script>
 APP.ready.then(async () => {
   const { esc, $, $$, toast, mensajeError, fmt } = APP, e = APP.empresa.id;
@@ -67,7 +67,8 @@ APP.ready.then(async () => {
           <li>Abrí <span class="ruta">Administración de puntos de venta y domicilios</span> → <b>A/B/M de puntos de venta</b> → <b>Agregar</b>.</li>
           <li>Número: el siguiente libre (por ejemplo <b>${(+cfg.punto_venta || 0) || 3}</b>). Nombre: <b>Percha</b>. Sistema: <b>Factura Electrónica - ${emp.condicion_iva === 'responsable_inscripto' ? '' : 'Monotributo - '}Web Services</b>. Domicilio: el del local. Aceptar.</li></ol>
         <div class="grilla">
-          <div class="campo"><label>Razón social (como figura en ARCA)</label><input data-f="razon_social" value="${esc(emp.razon_social || '')}"></div>
+          <div class="campo"><label>Nombre de fantasía <small>(grande en la factura)</small></label><input data-f="nombre" value="${esc(emp.nombre || '')}"></div>
+          <div class="campo"><label>Razón social <small>(como en ARCA; va en chico)</small></label><input data-f="razon_social" value="${esc(emp.razon_social || '')}"></div>
           <div class="campo"><label>CUIT</label><input data-f="cuit" inputmode="numeric" value="${esc(fmtCuit(cfg.cuit || emp.cuit))}"></div>
           <div class="campo"><label>Condición</label><select data-f="condicion_iva"><option value="monotributo" ${emp.condicion_iva === 'monotributo' ? 'selected' : ''}>Monotributo (Factura C)</option><option value="responsable_inscripto" ${emp.condicion_iva === 'responsable_inscripto' ? 'selected' : ''}>Responsable inscripto (A y B)</option></select></div>
           <div class="campo"><label>Punto de venta Web Services</label><input data-f="punto_venta" type="number" min="1" max="99998" value="${esc(cfg.punto_venta || '')}" placeholder="Ej. 3"></div>

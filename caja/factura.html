@@ -18,7 +18,7 @@
   .cab .emisor{border-right:1px solid var(--tinta)}
   .cab .letra{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;border-right:1px solid var(--tinta);border-bottom:1px solid var(--tinta);padding:6px 0;margin-bottom:auto}
   .cab .letra b{font-size:34px;line-height:1}.cab .letra small{font-size:9px;margin-top:2px}
-  .cab h1{font-size:18px;margin:0 0 6px}.cab h2{font-size:17px;margin:0 0 6px;text-transform:uppercase}
+  .cab h1{font-size:20px;margin:0;text-transform:uppercase;letter-spacing:.04em}.cab .rs{font-size:11px;color:var(--tinta-2);margin:2px 0 8px}.cab h2{font-size:17px;margin:0 0 6px;text-transform:uppercase}
   .dato{margin:1px 0}.dato b{font-weight:600}
   .bloque{border:1px solid var(--tinta);border-top:0;padding:8px 12px;display:grid;grid-template-columns:1fr 1fr;gap:2px 16px}
   table{width:100%;border-collapse:collapse;margin-top:10px}
@@ -42,7 +42,7 @@
 <div id="cont"><div class="estado">Cargando…</div></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="../shared/supabase.js?v=202610271730"></script>
+<script src="../shared/supabase.js?v=202610271733"></script>
 <script>
 (async () => {
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -90,7 +90,7 @@
   cont.innerHTML = `<div class="hoja">
     ${c.muestra ? '<div class="marca-muestra">MUESTRA<br>SIN VALIDEZ</div>' : ''}<div class="copia">${c.muestra ? 'MUESTRA · SIN VALIDEZ FISCAL' : 'ORIGINAL'}</div>
     <div class="cab">
-      <div class="emisor"><h1>${esc(emp.razon_social || emp.nombre)}</h1>
+      <div class="emisor"><h1>${esc(emp.nombre)}</h1>${emp.razon_social && emp.razon_social.toLowerCase() !== emp.nombre.toLowerCase() ? `<div class="rs">Razón social: ${esc(emp.razon_social)}</div>` : '<div class="rs"></div>'}
         <div class="dato"><b>Domicilio:</b> ${esc([emp.domicilio, emp.localidad, emp.provincia].filter(Boolean).join(', '))}</div>
         <div class="dato"><b>Condición frente al IVA:</b> ${esc(COND[emp.condicion_iva] || emp.condicion_iva)}</div>
         ${emp.telefono || emp.email ? `<div class="dato">${esc([emp.telefono, emp.email].filter(Boolean).join(' · '))}</div>` : ''}</div>
