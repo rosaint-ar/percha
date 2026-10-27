@@ -138,7 +138,7 @@ Deno.serve(async (req) => {
     }
     const nro = ult + 1;
     await admin.from("comprobantes").update({ numero_intento: nro, intentos: (c.intentos || 0) + 1 }).eq("id", c.id);
-    const fch = hoyAR();
+    const fch = c.fecha && !c.asociado_id ? String(c.fecha).slice(0, 10).replace(/-/g, "") : hoyAR();   // la fecha elegida al facturar (la nota de crédito, del día)
     const det = armarDetalle(c, nro, asoc, cuit, fch);
     let r: string;
     try {
