@@ -603,8 +603,10 @@ APP.ready.then(async () => {
       <div style="font:800 30px var(--f-titulo);letter-spacing:-.03em;margin:6px 0">${fmt.pesos(extra.total.aPagar)}</div>
       ${extra.vuelto ? `<div class="aviso-caja info">Vuelto: <b>${fmt.pesos(extra.vuelto)}</b></div>` : ''}
       ${(res.creditos || []).map(c => `<div class="aviso-caja ok">${c.tipo === 'gift_card' ? 'Gift card' : 'Nota de crédito'} emitida · código <b class="mono">${c.codigo}</b> · ${fmt.pesos(c.monto)}</div>`).join('')}
-      <div class="pie" style="justify-content:space-between"><div style="display:flex;gap:8px"><button class="btn" data-print>Imprimir ticket</button><a class="btn" target="_blank" href="https://wa.me/?text=${texto}">WhatsApp</a></div><button class="btn primario" data-ok>Nueva venta</button></div>`, { fijo: true });
+      <div class="pie" style="justify-content:space-between"><div style="display:flex;gap:8px;flex-wrap:wrap">${res.id && p.estado === 'completada' && !p.reservada && window.FACTURA ? '<button class="btn" data-facturar hidden>Facturar</button>' : ''}<button class="btn" data-print>Imprimir ticket</button><a class="btn" target="_blank" href="https://wa.me/?text=${texto}">WhatsApp</a></div><button class="btn primario" data-ok>Nueva venta</button></div>`, { fijo: true });
     $('[data-print]', m).onclick = () => window.print();
+    const bf = $('[data-facturar]', m);
+    if (bf) FACTURA.config(e).then(c => { if (c.estado !== 'listo') return; bf.hidden = false; bf.onclick = () => FACTURA.abrir({ id: res.id, numero: res.numero, total: extra.total.aPagar, cliente_id: p.cliente_id || null, cliente_nombre: null }, { alTerminar: c2 => { if (c2 && c2.estado === 'autorizado') { bf.textContent = '✓ ' + c2.nombre_tipo + ' ' + c2.numero_mostrar; bf.onclick = () => window.open(FACTURA.urlFactura(c2.id), '_blank'); } } }); });
     $('[data-ok]', m).onclick = () => { m.cerrar(); $('#q').focus(); };
   }
 

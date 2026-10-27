@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ventas · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610271534">
+<link rel="stylesheet" href="../shell/shell.css?v=202610271712">
 <style>
   .filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
   .filtros input[type=date],.filtros select{border:1px solid var(--linea);background:var(--superficie-2);padding:8px 10px;border-radius:var(--radio-mini)}
@@ -45,7 +45,7 @@
     <div class="filtros"><input type="date" id="f-desde"><span class="sub">a</span><input type="date" id="f-hasta"><select id="f-estado"><option value="">Todas</option><option value="completada">Completadas</option><option value="senada">Señadas</option><option value="anulada">Anuladas</option></select><select id="f-origen"><option value="">Local y online</option><option value="local">Solo local</option><option value="online">Solo online (Tienda Nube, WhatsApp…)</option><option value="tiendanube">Tienda Nube</option><option value="whatsapp">WhatsApp</option><option value="factusol">FactuSOL</option></select><span class="sub" id="resumen" style="margin-left:auto"></span></div>
     <div class="sub" id="fs-estado" style="display:none;margin:-6px 0 12px;align-items:center;gap:10px"></div>
     <section class="tiles" id="tiles"></section>
-    <div class="card" style="padding:0"><table class="lista" id="tb"><thead><tr><th>Ticket</th><th>Fecha</th><th>Canal</th><th>Clienta</th><th>Atendió</th><th>Pago</th><th class="num">Total</th><th>Estado</th><th></th></tr></thead><tbody></tbody></table></div>
+    <div class="card" style="padding:0"><table class="lista" id="tb"><thead><tr><th>Ticket</th><th>Fecha</th><th>Canal</th><th>Clienta</th><th>Atendió</th><th>Pago</th><th class="num">Total</th><th>Estado</th><th>Factura</th><th></th></tr></thead><tbody></tbody></table></div>
   </section>
   <section id="t-senas" style="display:none"><div class="card" style="padding:0"><table class="lista" id="tb-senas"><thead><tr><th>Ticket</th><th>Fecha</th><th>Clienta</th><th class="num">Total</th><th class="num">Pagado</th><th class="num">Saldo</th><th></th></tr></thead><tbody></tbody></table></div></section>
   <section id="t-cierres" style="display:none"><div class="card" style="padding:0"><table class="lista" id="tb-cierres"><thead><tr><th>Caja</th><th>Abierta</th><th>Cerrada</th><th class="num">Ventas</th><th class="num">Diferencia</th><th></th></tr></thead><tbody></tbody></table></div></section>
@@ -53,8 +53,9 @@
 </main>
 <div id="impresion"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610271534"></script>
-<script src="../shell/shell.js?v=202610271534"></script>
+<script src="../shared/supabase.js?v=202610271712"></script>
+<script src="../shell/shell.js?v=202610271712"></script>
+<script src="../shared/facturar.js?v=202610271712"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -74,7 +75,9 @@ APP.ready.then(async () => {
   }
   $$('.pestanas button').forEach(b => b.onclick = () => { $$('.pestanas button').forEach(x => x.classList.toggle('on', x === b)); ['ventas', 'senas', 'cierres', 'creditos'].forEach(t => $('#t-' + t).style.display = t === b.dataset.t ? '' : 'none'); ({ ventas: cargar, senas: cargarSenas, cierres: cargarCierres, creditos: cargarCreditos })[b.dataset.t](); });
 
+  let facturaLista = false;
   async function cargar() {
+    facturaLista = (await FACTURA.config(e)).estado === 'listo';
     let c = sb.from('v_ventas').select('*').eq('empresa_id', e).gte('fecha', $('#f-desde').value + 'T00:00:00').lte('fecha', $('#f-hasta').value + 'T23:59:59').order('fecha', { ascending: false }).limit(500);
     if ($('#f-estado').value) c = c.eq('estado', $('#f-estado').value);
     const fo = $('#f-origen').value; if (fo === 'online') c = c.in('origen', ONLINE); else if (fo) c = c.eq('origen', fo);
@@ -86,8 +89,9 @@ APP.ready.then(async () => {
       <div class="tile destacada"><div class="t">Vendido</div><div class="n">${fmt.pesos(total)}</div><div class="d">ticket promedio ${fmt.pesos(ok.length ? total / ok.length : 0)}</div></div>
       <div class="tile"><div class="t">Prendas</div><div class="n">${fmt.num(ok.reduce((s, x) => s + +x.lineas, 0))}</div><div class="d">líneas vendidas</div></div>
       <div class="tile"><div class="t">Margen bruto</div><div class="n">${total ? fmt.pct(100 * (total - costo) / total) : '—'}</div><div class="d">${fmt.pesos(total - costo)} de ganancia</div></div>`;
-    const tb = $('#tb tbody'); tb.innerHTML = v.map(x => `<tr class="clic" data-id="${x.id}"><td class="mono">#${String(x.numero).padStart(6, '0')}${TIPO[x.tipo] || ''}</td><td>${fmt.fechaHora(x.fecha)}</td><td>${canal(x.origen)}</td><td>${esc(x.cliente_nombre || '—')}</td><td>${esc(x.vendedora_nombre || '—')}</td><td><small>${esc(x.pagos || '')}</small></td><td class="num num-f">${fmt.pesos(x.total)}</td><td>${ESTADO[x.estado] || x.estado}</td><td><button class="btn chico" data-ver="${x.id}">Ver</button></td></tr>`).join('') || '<tr><td colspan="9" class="vacio">Sin ventas en ese período.</td></tr>';
+    const tb = $('#tb tbody'); tb.innerHTML = v.map(x => `<tr class="clic" data-id="${x.id}"><td class="mono">#${String(x.numero).padStart(6, '0')}${TIPO[x.tipo] || ''}</td><td>${fmt.fechaHora(x.fecha)}</td><td>${canal(x.origen)}</td><td>${esc(x.cliente_nombre || '—')}</td><td>${esc(x.vendedora_nombre || '—')}</td><td><small>${esc(x.pagos || '')}</small></td><td class="num num-f">${fmt.pesos(x.total)}</td><td>${ESTADO[x.estado] || x.estado}</td><td>${FACTURA.chip(x) || (x.estado === 'completada' && facturaLista ? `<button class="btn chico" data-fact="${x.id}">Facturar</button>` : '')}</td><td><button class="btn chico" data-ver="${x.id}">Ver</button></td></tr>`).join('') || '<tr><td colspan="10" class="vacio">Sin ventas en ese período.</td></tr>';
     $$('[data-ver]', tb).forEach(b => b.onclick = () => verVenta(b.dataset.ver));
+    $$('[data-fact]', tb).forEach(b => b.onclick = ev => { ev.stopPropagation(); FACTURA.abrir(v.find(x => x.id === b.dataset.fact), { alTerminar: cargar }); });
     $('#resumen').textContent = `${v.length} tickets`;
   }
   async function verVenta(id) {
@@ -98,18 +102,20 @@ APP.ready.then(async () => {
       <tr><td><b>Total</b></td><td class="num num-f">${fmt.pesos(v.total)}</td></tr>
       ${ps.map(p => `<tr><td><small>${esc(p.formas_pago ? p.formas_pago.nombre : (p.creditos ? (p.creditos.tipo === 'gift_card' ? 'Gift card ' : 'Nota de crédito ') + p.creditos.codigo : ''))}${p.cuotas > 1 ? ' · ' + p.cuotas + ' cuotas' : ''}</small></td><td class="num"><small>${fmt.pesos(p.monto)}</small></td></tr>`).join('')}
       ${+v.saldo ? `<tr><td><b>Saldo pendiente</b></td><td class="num" style="color:var(--aviso)"><b>${fmt.pesos(v.saldo)}</b></td></tr>` : ''}</table>
+      ${v.factura_id || (v.estado === 'completada' && facturaLista) ? `<div class="aviso-caja ${v.factura_estado === 'autorizado' ? 'ok' : v.factura_estado === 'rechazado' ? 'error' : 'info'}" style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px"><span>${v.factura_estado === 'autorizado' ? 'Factura ' + esc(v.factura_numero) + (v.nc_id ? (v.nc_estado === 'autorizado' ? ' · anulada con nota de crédito' : ' · nota de crédito en cola') : '') : v.factura_estado === 'pendiente' ? 'Factura en cola: sale sola apenas ARCA responda' : v.factura_estado === 'rechazado' ? 'ARCA rechazó la factura' : 'Sin factura'}</span><span style="display:flex;gap:6px">${v.factura_estado === 'autorizado' ? `<a class="btn chico" target="_blank" href="${FACTURA.urlFactura(v.factura_id)}">Ver factura</a>${v.nc_id && v.nc_estado === 'autorizado' ? `<a class="btn chico" target="_blank" href="${FACTURA.urlFactura(v.nc_id)}">Ver nota de crédito</a>` : ''}` : v.estado === 'completada' && v.factura_estado !== 'pendiente' ? `<button class="btn chico primario" data-facturar>${v.factura_estado === 'rechazado' ? 'Volver a facturar' : 'Facturar'}</button>` : ''}</span></div>` : ''}
       <div class="pie" style="justify-content:space-between"><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn" data-print>Reimprimir</button>${v.estado !== 'anulada' ? `<button class="btn primario" data-editar>Editar</button><a class="btn" href="caja.html?cambio=${v.numero}">Cambio / devolución</a>` : ''}</div>
       ${v.estado !== 'anulada' ? '<button class="btn peligro" data-anular>Anular</button>' : ''}</div>`);
     $('[data-print]', m).onclick = () => { imprimir(v, ls, ps); window.print(); };
+    const bf = $('[data-facturar]', m); if (bf) bf.onclick = () => { m.cerrar(); FACTURA.abrir(v, { alTerminar: cargar }); };
     const ed = $('[data-editar]', m); if (ed) ed.onclick = () => { m.cerrar(); editarVenta(v, ls, ps); };
     const a = $('[data-anular]', m); if (a) a.onclick = () => {
-      const m2 = modal(`<h2>Anular ticket #${String(v.numero).padStart(6, '0')}</h2><p class="sub">El stock vuelve y los pagos quedan sin efecto. No se puede deshacer.</p>
+      const m2 = modal(`<h2>Anular ticket #${String(v.numero).padStart(6, '0')}</h2><p class="sub">El stock vuelve y los pagos quedan sin efecto. No se puede deshacer.${v.factura_estado === 'autorizado' ? ' <b>Tiene factura: sale sola la nota de crédito.</b>' : ''}</p>
         <div class="campo" style="margin-top:12px"><label>Motivo</label><input id="an-motivo" placeholder="Ej. se cargó mal, la clienta se arrepintió"></div>
         <div class="pie"><button class="btn" data-no>Volver</button><button class="btn peligro" data-si>Anular</button></div>`);
       $('[data-no]', m2).onclick = () => m2.cerrar();
       $('[data-si]', m2).onclick = async () => {
         const { error } = await sb.rpc('caja_anular_venta', { p_venta: v.id, p_motivo: $('#an-motivo', m2).value.trim() || 'sin motivo' });
-        if (error) { toast(mensajeError(error), 'error'); return; } m2.cerrar(); m.cerrar(); toast('Venta anulada, stock devuelto'); cargar();
+        if (error) { toast(mensajeError(error), 'error'); return; } m2.cerrar(); m.cerrar(); toast(v.factura_estado === 'autorizado' ? 'Venta anulada: stock devuelto y nota de crédito en camino' : 'Venta anulada, stock devuelto'); if (v.factura_estado === 'autorizado') FACTURA.llamar({ accion: 'facturar', empresa_id: e }).catch(() => {}).then(cargar); cargar();
       };
     };
   }

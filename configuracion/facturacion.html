@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Facturación · Percha</title>
+<meta name="app-root" content="../">
+<link rel="stylesheet" href="../shell/shell.css?v=202610271712">
+<style>
+  .pestanas{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
+  .pestanas a{font:600 13px var(--f-ui);color:var(--tinta);text-decoration:none;padding:8px 14px;border:1px solid var(--linea);background:var(--superficie-2);border-radius:10px}
+  .pestanas a.on{background:var(--lila);border-color:transparent;color:var(--acento)}
+  .estado-fact{display:flex;gap:14px;align-items:center}
+  .estado-fact .punto{width:14px;height:14px;border-radius:50%;background:var(--aviso);flex:none}
+  .estado-fact.ok .punto{background:var(--ok)}.estado-fact.error .punto{background:var(--error)}
+  .estado-fact h2{margin:0}.estado-fact p{margin:2px 0 0}
+  .paso{display:grid;grid-template-columns:34px minmax(0,1fr);gap:12px;padding:16px 0;border-top:1px solid var(--linea)}
+  .paso:first-of-type{border-top:0}
+  .paso .nro{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font:700 14px var(--f-ui);background:var(--relleno);color:var(--tinta-2)}
+  .paso.hecho .nro{background:var(--ok);color:#fff}.paso.actual .nro{background:var(--acento);color:#fff}
+  .paso h3{margin:4px 0 4px;font:700 15px var(--f-ui)}
+  .paso ol{margin:6px 0 10px;padding-left:20px}.paso li{margin:3px 0}
+  .paso .acciones{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+  .grilla{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px 14px;margin-top:8px}
+  .grilla .campo{margin:0}.grilla input,.grilla select{width:100%}
+  .ruta{font:600 12.5px var(--f-ui);background:var(--lila);color:var(--acento);padding:2px 8px;border-radius:6px;white-space:nowrap}
+  .pruebas{list-style:none;padding:0;margin:8px 0 0}.pruebas li{padding:4px 0}.pruebas .ok{color:var(--ok)}.pruebas .mal{color:var(--error)}
+  .guardado{font:600 12px var(--f-ui);color:var(--ok);opacity:0;transition:opacity .3s}.guardado.ver{opacity:1}
+</style>
+</head>
+<body data-page="configuracion" data-etq="Configuración" data-title="Facturación" data-subtitle="Factura electrónica con ARCA">
+<main class="app">
+  <div class="pestanas"><a href="empresa.html">Empresa</a><a href="atributos.html">Talles, colores y familias</a><a href="curvas.html">Curvas de talle</a><a href="promociones.html">Promociones</a><a class="on" href="facturacion.html">Facturación</a><a href="usuarios.html">Usuarios</a></div>
+  <div class="card"><div class="estado-fact" id="estado"><span class="punto"></span><div><h2>Cargando…</h2><p class="sub"></p></div></div></div>
+  <div class="card" id="pasos"></div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../shared/supabase.js?v=202610271712"></script>
+<script src="../shell/shell.js?v=202610271712"></script>
+<script src="../shared/facturar.js?v=202610271712"></script>
+<script>
+APP.ready.then(async () => {
+  const { esc, $, $$, toast, mensajeError, fmt } = APP, e = APP.empresa.id;
+  if (!APP.esAdmin) { document.querySelector('main').innerHTML = '<div class="card"><p>Esta sección es solo para administración.</p></div>'; return; }
+  let cfg, emp;
+  async function cargar() {
+    const [c, m] = await Promise.all([sb.from('facturacion_config').select('*').eq('empresa_id', e).maybeSingle(), sb.from('empresas').select('*').eq('id', e).single()]);
+    cfg = c.data || { estado: 'sin_configurar' }; emp = m.data; pintar();
+  }
+  const fmtCuit = s => { const d = String(s || '').replace(/\D/g, ''); return d.length === 11 ? `${d.slice(0, 2)}-${d.slice(2, 10)}-${d.slice(10)}` : (s || ''); };
+  function pintar() {
+    const datosOk = !!(cfg.cuit && emp.razon_social && cfg.punto_venta);
+    const csrOk = !!cfg.csr_pem, certOk = !!cfg.cert_pem, listo = cfg.estado === 'listo';
+    const actual = !datosOk ? 1 : !csrOk ? 2 : !certOk ? 3 : !listo ? 4 : 5;
+    const est = $('#estado');
+    est.className = 'estado-fact' + (listo ? ' ok' : cfg.estado === 'error' ? ' error' : '');
+    est.innerHTML = `<span class="punto"></span><div><h2>${listo ? 'Lista para facturar' : cfg.estado === 'error' ? 'Hay un problema con ARCA' : 'Falta configurar'}</h2>
+      <p class="sub">${listo ? `${emp.condicion_iva === 'responsable_inscripto' ? 'Factura A/B' : 'Factura C'} · punto de venta ${cfg.punto_venta} · ${cfg.ambiente === 'homologacion' ? 'ambiente de PRUEBAS' : 'en producción'}${cfg.ultimo_numero != null ? ` · última emitida N° ${cfg.ultimo_numero}` : ''}${cfg.cert_vence ? ` · el certificado vence el ${fmt.fecha(cfg.cert_vence)}` : ''}`
+        : cfg.estado === 'error' ? esc(cfg.ultimo_error || '') : `Seguí los pasos de abajo. Vas por el paso ${actual} de 4.`}</p></div>`;
+    const cls = n => n < actual ? 'paso hecho' : n === actual ? 'paso actual' : 'paso';
+    const marca = n => n < actual ? '✓' : n;
+    $('#pasos').innerHTML = `
+      <div class="${cls(1)}"><div class="nro">${marca(1)}</div><div>
+        <h3>Datos fiscales y punto de venta</h3>
+        <p class="sub">Comprobantes en línea usa su propio punto de venta; Percha necesita uno nuevo, del tipo <b>Web Services</b>. Crealo en ARCA y anotá el número acá:</p>
+        <ol><li>Entrá a <b>arca.gob.ar</b> con la Clave Fiscal de la titular (${esc(fmtCuit(cfg.cuit || emp.cuit))}).</li>
+          <li>Abrí <span class="ruta">Administración de puntos de venta y domicilios</span> → <b>A/B/M de puntos de venta</b> → <b>Agregar</b>.</li>
+          <li>Número: el siguiente libre (por ejemplo <b>${(+cfg.punto_venta || 0) || 3}</b>). Nombre: <b>Percha</b>. Sistema: <b>Factura Electrónica - ${emp.condicion_iva === 'responsable_inscripto' ? '' : 'Monotributo - '}Web Services</b>. Domicilio: el del local. Aceptar.</li></ol>
+        <div class="grilla">
+          <div class="campo"><label>Razón social (como figura en ARCA)</label><input data-f="razon_social" value="${esc(emp.razon_social || '')}"></div>
+          <div class="campo"><label>CUIT</label><input data-f="cuit" inputmode="numeric" value="${esc(fmtCuit(cfg.cuit || emp.cuit))}"></div>
+          <div class="campo"><label>Condición</label><select data-f="condicion_iva"><option value="monotributo" ${emp.condicion_iva === 'monotributo' ? 'selected' : ''}>Monotributo (Factura C)</option><option value="responsable_inscripto" ${emp.condicion_iva === 'responsable_inscripto' ? 'selected' : ''}>Responsable inscripto (A y B)</option></select></div>
+          <div class="campo"><label>Punto de venta Web Services</label><input data-f="punto_venta" type="number" min="1" max="99998" value="${esc(cfg.punto_venta || '')}" placeholder="Ej. 3"></div>
+          <div class="campo"><label>Ingresos Brutos <small>(sale impreso)</small></label><input data-f="iibb" value="${esc(emp.iibb || '')}" placeholder="Nº o CUIT"></div>
+          <div class="campo"><label>Inicio de actividades <small>(sale impreso)</small></label><input data-f="inicio_actividades" type="date" value="${esc(emp.inicio_actividades || '')}"></div>
+        </div>
+        <div class="acciones"><span class="guardado" id="guardado">✓ Guardado</span></div>
+      </div></div>
+      <div class="${cls(2)}"><div class="nro">${marca(2)}</div><div>
+        <h3>Pedido de certificado</h3>
+        <p class="sub">El certificado es la "firma" con la que Percha factura a nombre de Augusta. Percha arma el pedido y guarda la clave secreta cifrada: nunca sale del servidor.</p>
+        <div class="acciones"><button class="btn ${csrOk ? '' : 'primario'}" id="b-csr" ${cfg.cuit ? '' : 'disabled'}>${csrOk ? 'Generar un pedido nuevo' : 'Generar pedido de certificado'}</button>${csrOk ? `<button class="btn primario" id="b-bajar">Descargar el pedido (.csr)</button><span class="sub">generado el ${fmt.fechaHora(cfg.csr_creado)}</span>` : ''}</div>
+        ${csrOk && certOk ? '<p class="sub" style="margin-top:6px">Ojo: si generás un pedido nuevo, el certificado actual deja de servir y hay que pedir otro en ARCA.</p>' : ''}
+      </div></div>
+      <div class="${cls(3)}"><div class="nro">${marca(3)}</div><div>
+        <h3>Certificado en ARCA</h3>
+        <ol><li>En ARCA abrí <span class="ruta">Administración de Certificados Digitales</span>. Si no aparece: <span class="ruta">Administrador de Relaciones de Clave Fiscal</span> → <b>Adherir servicio</b> → ARCA → Servicios interactivos → <b>Administración de Certificados Digitales</b>, y volvé a entrar.</li>
+          <li><b>Agregar alias</b>: escribí <b>percha</b>, elegí el archivo <b>.csr</b> que descargaste en el paso 2 y tocá <b>Agregar alias</b>.</li>
+          <li>Tocá <b>Ver</b> en el alias "percha" y descargá el certificado (un archivo <b>.crt</b>).</li>
+          <li>Subilo acá:</li></ol>
+        <div class="acciones"><label class="btn ${certOk ? '' : 'primario'}" style="${csrOk ? '' : 'pointer-events:none;opacity:.5'}">${certOk ? 'Subir otro certificado' : 'Subir el certificado (.crt)'}<input type="file" id="f-crt" accept=".crt,.pem,.cer,.txt" hidden></label>${certOk ? `<span class="sub">vence el ${fmt.fecha(cfg.cert_vence)}</span>` : ''}</div>
+      </div></div>
+      <div class="${cls(4)}"><div class="nro">${marca(4)}</div><div>
+        <h3>Autorizar a Percha a facturar</h3>
+        <ol><li>En ARCA abrí <span class="ruta">Administrador de Relaciones de Clave Fiscal</span> → <b>Nueva relación</b>.</li>
+          <li><b>Buscar</b> servicio → ARCA → WebServices → <b>Facturación Electrónica</b>.</li>
+          <li>En <b>Representante</b> tocá Buscar y elegí el certificado <b>percha</b> (computador fiscal). <b>Confirmar</b>.</li>
+          <li>Volvé acá y probá la conexión:</li></ol>
+        <div class="acciones"><button class="btn ${actual === 4 ? 'primario' : ''}" id="b-probar" ${certOk ? '' : 'disabled'}>Probar la conexión con ARCA</button></div>
+        <ul class="pruebas" id="pruebas"></ul>
+      </div></div>
+      <div class="paso"><div class="nro">⚙</div><div>
+        <h3>Opciones</h3>
+        <div class="grilla">
+          <div class="campo"><label>Ambiente</label><select data-f="ambiente"><option value="produccion" ${cfg.ambiente !== 'homologacion' ? 'selected' : ''}>Producción (facturas reales)</option><option value="homologacion" ${cfg.ambiente === 'homologacion' ? 'selected' : ''}>Homologación (pruebas de ARCA)</option></select></div>
+          <div class="campo"><label>Desde este total pedir DNI o CUIT</label><input data-f="umbral_identificar" type="number" min="0" step="1000" value="${esc(+cfg.umbral_identificar || 10000000)}"></div>
+        </div>
+        <p class="sub" style="margin-top:6px">Por ahora se factura con el botón <b>Facturar</b> del ticket o de Ventas. Si anulás una venta facturada, la nota de crédito sale sola.</p>
+      </div></div>`;
+    $$('[data-f]').forEach(i => i.onchange = () => guardar(i));
+    const bc = $('#b-csr'); if (bc) bc.onclick = generarCsr;
+    const bb = $('#b-bajar'); if (bb) bb.onclick = () => bajar(cfg.csr_pem, `percha-${String(cfg.cuit || '').replace(/\D/g, '')}.csr`);
+    $('#f-crt').onchange = subirCrt;
+    const bp = $('#b-probar'); if (bp) bp.onclick = probar;
+  }
+  async function guardar(i) {
+    const p = { empresa_id: e }; p[i.dataset.f] = i.value;
+    const { error } = await sb.rpc('facturacion_config_guardar', { p });
+    if (error) { toast(mensajeError(error), 'error'); return; }
+    const g = $('#guardado'); g.classList.add('ver'); setTimeout(() => g.classList.remove('ver'), 1500);
+    const foco = i.dataset.f; await cargar(); const n = $(`[data-f="${foco}"]`); if (n && foco !== 'ambiente') n.focus();
+  }
+  function bajar(texto, nombre) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([texto], { type: 'application/pkcs10' })); a.download = nombre; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }
+  async function generarCsr() {
+    if (cfg.cert_pem && !await APP.confirmar('El certificado actual va a dejar de servir y hay que pedir otro en ARCA. ¿Generar un pedido nuevo?', 'Generar')) return;
+    const b = $('#b-csr'); b.disabled = true; b.textContent = 'Generando…';
+    try { const j = await FACTURA.llamar({ accion: 'csr', empresa_id: e }); await cargar(); bajar(j.csr, `percha-${String(cfg.cuit || '').replace(/\D/g, '')}.csr`); toast('Pedido listo: se descargó el archivo .csr'); }
+    catch (err) { toast(mensajeError(err), 'error'); b.disabled = false; b.textContent = 'Generar pedido de certificado'; }
+  }
+  async function subirCrt(ev) {
+    const f = ev.target.files[0]; if (!f) return;
+    const pem = await f.text();
+    try { const j = await FACTURA.llamar({ accion: 'certificado', empresa_id: e, pem }); await cargar(); pintarPruebas(j); toast(j.ok ? 'Certificado guardado: ¡conectado con ARCA!' : 'Certificado guardado. Falta el paso 4.'); }
+    catch (err) { toast(mensajeError(err), 'error'); }
+  }
+  async function probar() {
+    const b = $('#b-probar'); b.disabled = true; b.textContent = 'Probando…';
+    try { const j = await FACTURA.llamar({ accion: 'probar', empresa_id: e }); await cargar(); pintarPruebas(j); }
+    catch (err) { toast(mensajeError(err), 'error'); b.disabled = false; b.textContent = 'Probar la conexión con ARCA'; }
+  }
+  function pintarPruebas(j) {
+    const ul = $('#pruebas'); if (!ul || !j.pasos) return;
+    ul.innerHTML = j.pasos.map(p => `<li class="${p.ok ? 'ok' : 'mal'}">${p.ok ? '✓' : '✗'} <b>${esc(p.nombre)}</b> <span class="sub">${esc(p.detalle || '')}</span></li>`).join('')
+      + (j.ok ? '' : '<li class="sub">Si dice que no hay acceso, revisá el paso 4 (la relación con "Facturación Electrónica"). ARCA puede tardar unos minutos en habilitarla.</li>');
+  }
+  cargar();
+});
+</script>
+</body>
+</html>

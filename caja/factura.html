@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Factura · Percha</title>
+<style>
+  :root{--tinta:#1d1f24;--tinta-2:#555b66;--linea:#c9ccd3;--fondo:#eef0f3}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--fondo);color:var(--tinta);font:13px/1.4 -apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+  .barra{position:sticky;top:0;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;padding:10px 16px;background:#fff;border-bottom:1px solid var(--linea);z-index:2}
+  .barra button,.barra a{border:1px solid var(--linea);background:#fff;padding:8px 14px;border-radius:8px;font:600 13px inherit;color:var(--tinta);text-decoration:none;cursor:pointer}
+  .barra .primario{background:#1d1f24;color:#fff;border-color:#1d1f24}
+  .hoja{width:210mm;min-height:297mm;margin:16px auto;background:#fff;padding:12mm;box-shadow:0 2px 12px rgba(0,0,0,.08);display:flex;flex-direction:column}
+  .copia{text-align:center;font-weight:700;letter-spacing:.2em;border:1px solid var(--tinta);padding:4px;margin-bottom:-1px}
+  .cab{display:grid;grid-template-columns:1fr 64px 1fr;border:1px solid var(--tinta)}
+  .cab>div{padding:10px 12px}
+  .cab .emisor{border-right:1px solid var(--tinta)}
+  .cab .letra{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;border-right:1px solid var(--tinta);border-bottom:1px solid var(--tinta);padding:6px 0;margin-bottom:auto}
+  .cab .letra b{font-size:34px;line-height:1}.cab .letra small{font-size:9px;margin-top:2px}
+  .cab h1{font-size:18px;margin:0 0 6px}.cab h2{font-size:17px;margin:0 0 6px;text-transform:uppercase}
+  .dato{margin:1px 0}.dato b{font-weight:600}
+  .bloque{border:1px solid var(--tinta);border-top:0;padding:8px 12px;display:grid;grid-template-columns:1fr 1fr;gap:2px 16px}
+  table{width:100%;border-collapse:collapse;margin-top:10px}
+  th{background:#e7e9ee;font-size:11px;text-transform:uppercase;letter-spacing:.03em;text-align:left;padding:6px 8px;border:1px solid var(--linea)}
+  td{padding:6px 8px;border-bottom:1px solid #eceef1;vertical-align:top}
+  .n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .totales{margin-left:auto;width:300px;margin-top:10px}
+  .totales div{display:flex;justify-content:space-between;padding:3px 8px}
+  .totales .total{font-size:16px;font-weight:700;border-top:2px solid var(--tinta);margin-top:4px;padding-top:6px}
+  .pie{margin-top:auto;display:flex;gap:16px;align-items:center;border-top:1px solid var(--tinta);padding-top:10px}
+  .pie .cae{margin-left:auto;text-align:right}.pie .cae b{font-size:14px}
+  .arca{font-weight:800;font-size:15px;letter-spacing:.02em}
+  .estado{max-width:210mm;margin:20px auto;background:#fff;padding:20px;border-radius:10px;text-align:center}
+  @media print{body{background:#fff}.barra,.estado{display:none}.hoja{margin:0;box-shadow:none;width:auto;min-height:calc(297mm - 16mm);padding:0}@page{size:A4;margin:8mm}}
+</style>
+</head>
+<body>
+<div class="barra" id="barra" hidden><button class="primario" onclick="window.print()">Imprimir</button><a id="wsp" target="_blank">Enviar por WhatsApp</a></div>
+<div id="cont"><div class="estado">Cargando…</div></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="../shared/supabase.js?v=202610271712"></script>
+<script>
+(async () => {
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const pesos = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const num = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 3 });
+  const fecha = d => d ? new Date(String(d).slice(0, 10) + 'T12:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
+  const cont = document.getElementById('cont');
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { location.replace('../login.html?next=' + encodeURIComponent(location.pathname + location.search)); return; }
+  const id = new URLSearchParams(location.search).get('id');
+  const { data: c } = await sb.from('v_comprobantes').select('*').eq('id', id).maybeSingle();
+  if (!c) { cont.innerHTML = '<div class="estado">No se encontró el comprobante.</div>'; return; }
+  if (c.estado !== 'autorizado') { cont.innerHTML = `<div class="estado"><b>Este comprobante no está autorizado todavía</b> (${esc(c.estado)}).<br>${esc(c.errores || '')}</div>`; return; }
+  const [{ data: emp }, { data: ls }, { data: v }] = await Promise.all([
+    sb.from('empresas').select('*').eq('id', c.empresa_id).single(),
+    c.venta_id ? sb.from('venta_lineas').select('*').eq('venta_id', c.venta_id).order('id') : Promise.resolve({ data: [] }),
+    c.venta_id ? sb.from('ventas').select('subtotal,descuento,descuento_pct,recargo,total').eq('id', c.venta_id).single() : Promise.resolve({ data: null })]);
+  const COND = { monotributo: 'Responsable Monotributo', responsable_inscripto: 'IVA Responsable Inscripto', exento: 'IVA Exento' };
+  const CONDR = { 5: 'Consumidor Final', 1: 'IVA Responsable Inscripto', 6: 'Responsable Monotributo', 4: 'IVA Sujeto Exento' };
+  const DOC = { 99: '', 96: 'DNI', 80: 'CUIT', 86: 'CUIL' };
+  const fmtCuit = s => { const d = String(s || '').replace(/\D/g, ''); return d.length === 11 ? `${d.slice(0, 2)}-${d.slice(2, 10)}-${d.slice(10)}` : s; };
+  const cuitEmisor = String(emp.cuit || '').replace(/\D/g, '');
+  const tituloTipo = c.nombre_tipo.replace(/ [ABC]$/, '');
+  // el detalle: las prendas de la venta; descuento y recargo como renglones para que cierre con el total autorizado
+  const filas = (ls || []).map(l => `<tr><td>${esc(l.descripcion)}${l.talle || l.color ? `<br><small style="color:var(--tinta-2)">${esc([l.talle, l.color].filter(Boolean).join(' · '))}</small>` : ''}</td><td class="n">${num.format(l.cantidad)}</td><td class="n">${pesos.format(l.precio_unit * (1 - (+l.descuento_pct || 0) / 100))}</td><td class="n">${pesos.format(l.total)}</td></tr>`);
+  const sumaLineas = (ls || []).reduce((s, l) => s + +l.total, 0);
+  if (v && +v.descuento) filas.push(`<tr><td>Descuento${+v.descuento_pct ? ' ' + v.descuento_pct + '%' : ''}</td><td></td><td></td><td class="n">−${pesos.format(v.descuento)}</td></tr>`);
+  if (v && +v.recargo) filas.push(`<tr><td>Recargo</td><td></td><td></td><td class="n">${pesos.format(v.recargo)}</td></tr>`);
+  const dif = Math.round((+c.total - (sumaLineas - (v ? +v.descuento : 0) + (v ? +v.recargo : 0))) * 100) / 100;
+  if (Math.abs(dif) >= 0.01) filas.push(`<tr><td>Ajuste</td><td></td><td></td><td class="n">${pesos.format(dif)}</td></tr>`);
+  if (!filas.length) filas.push(`<tr><td>Varios</td><td class="n">1</td><td class="n">${pesos.format(c.total)}</td><td class="n">${pesos.format(c.total)}</td></tr>`);
+  // QR de ARCA (RG 4892)
+  const qrDatos = { ver: 1, fecha: String(c.fecha).slice(0, 10), cuit: +cuitEmisor, ptoVta: c.punto_venta, tipoCmp: c.tipo, nroCmp: c.numero, importe: +c.total, moneda: 'PES', ctz: 1, tipoDocRec: c.doc_tipo, nroDocRec: +c.doc_nro, tipoCodAut: 'E', codAut: +c.cae };
+  const qrUrl = 'https://www.afip.gob.ar/fe/qr/?p=' + btoa(JSON.stringify(qrDatos));
+  const asociado = c.asociado_id ? `<div class="dato"><b>Comprobante asociado:</b> ${c.asociado_tipo === 11 ? 'Factura C' : c.asociado_tipo === 6 ? 'Factura B' : 'Factura A'} ${String(c.asociado_pv).padStart(5, '0')}-${String(c.asociado_numero).padStart(8, '0')} del ${fecha(c.asociado_fecha)}</div>` : '';
+  cont.innerHTML = `<div class="hoja">
+    <div class="copia">ORIGINAL</div>
+    <div class="cab">
+      <div class="emisor"><h1>${esc(emp.razon_social || emp.nombre)}</h1>
+        <div class="dato"><b>Domicilio:</b> ${esc([emp.domicilio, emp.localidad, emp.provincia].filter(Boolean).join(', '))}</div>
+        <div class="dato"><b>Condición frente al IVA:</b> ${esc(COND[emp.condicion_iva] || emp.condicion_iva)}</div>
+        ${emp.telefono || emp.email ? `<div class="dato">${esc([emp.telefono, emp.email].filter(Boolean).join(' · '))}</div>` : ''}</div>
+      <div class="letra"><b>${esc(c.letra)}</b><small>COD. ${String(c.tipo).padStart(3, '0')}</small></div>
+      <div><h2>${esc(tituloTipo)}</h2>
+        <div class="dato"><b>Punto de venta:</b> ${String(c.punto_venta).padStart(5, '0')} &nbsp; <b>Comp. Nro:</b> ${String(c.numero).padStart(8, '0')}</div>
+        <div class="dato"><b>Fecha de emisión:</b> ${fecha(c.fecha)}</div>
+        <div class="dato"><b>CUIT:</b> ${esc(fmtCuit(cuitEmisor))}</div>
+        <div class="dato"><b>Ingresos Brutos:</b> ${esc(emp.iibb || fmtCuit(cuitEmisor))}</div>
+        <div class="dato"><b>Inicio de actividades:</b> ${esc(fecha(emp.inicio_actividades) || '—')}</div></div>
+    </div>
+    <div class="bloque">
+      <div class="dato"><b>${DOC[c.doc_tipo] ? DOC[c.doc_tipo] + ':' : ''}</b> ${c.doc_tipo === 99 ? '' : esc(c.doc_tipo === 80 ? fmtCuit(c.doc_nro) : c.doc_nro)}</div>
+      <div class="dato"><b>Apellido y nombre / Razón social:</b> ${esc(c.receptor_nombre || (c.doc_tipo === 99 ? 'Consumidor final' : ''))}</div>
+      <div class="dato"><b>Condición frente al IVA:</b> ${esc(CONDR[c.receptor_condicion] || '')}</div>
+      <div class="dato"><b>Domicilio:</b> ${esc(c.receptor_domicilio || '')}</div>
+      <div class="dato"><b>Condición de venta:</b> Contado</div>${asociado}
+    </div>
+    <table><thead><tr><th>Producto / servicio</th><th class="n">Cantidad</th><th class="n">Precio unit.</th><th class="n">Subtotal</th></tr></thead><tbody>${filas.join('')}</tbody></table>
+    <div class="totales"><div class="total"><span>Importe total</span><span>${pesos.format(c.total)}</span></div></div>
+    <div class="pie"><div id="qr"></div><div><div class="arca">ARCA</div><div><b>Comprobante autorizado</b></div><small>Esta Administración Federal no se responsabiliza por los datos ingresados en el detalle de la operación.</small></div>
+      <div class="cae"><div>CAE N°: <b>${esc(c.cae)}</b></div><div>Fecha de vto. de CAE: <b>${fecha(c.cae_vence)}</b></div></div></div>
+  </div>`;
+  new QRCode(document.getElementById('qr'), { text: qrUrl, width: 96, height: 96, correctLevel: QRCode.CorrectLevel.M });
+  document.title = `${c.nombre_tipo} ${c.numero_mostrar} · ${emp.nombre}`;
+  document.getElementById('wsp').href = 'https://wa.me/?text=' + encodeURIComponent(`${emp.nombre} · ${c.nombre_tipo} ${c.numero_mostrar}\nTotal ${pesos.format(c.total)}\nCAE ${c.cae}\nVerificala en ARCA: ${qrUrl}`);
+  document.getElementById('barra').hidden = false;
+})();
+</script>
+</body>
+</html>
