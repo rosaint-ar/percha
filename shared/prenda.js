@@ -5,7 +5,7 @@
 (function () {
   const MOTIVOS = ['Rotura o falla', 'Faltante / robo', 'Regalo o canje', 'Uso interno', 'Error de carga', 'Devolución de clienta', 'Devolución a proveedor', 'Recuento', 'Otro'];
   const TIPOS = { venta: 'Venta', devolucion: 'Devolución', ajuste: 'Ajuste', recuento: 'Recuento', compra: 'Compra', inicial: 'Carga inicial', transferencia: 'Traspaso' };
-  let listasCache = null;
+  let listasCache = null, pctxCache = null;
 
   const css = `
   .pr-cab{display:flex;gap:14px;align-items:center}
@@ -69,7 +69,7 @@
     const { fmt, esc, $, $$, toast, modal, mensajeError } = APP, raiz = document.querySelector('meta[name="app-root"]')?.content || '';
     const [{ data: d, error }, listas] = await Promise.all([
       sb.rpc('ventana_prenda', { p_variante: varianteId }),
-      listasCache ? Promise.resolve(listasCache) : sb.from('listas_precios').select('id,nombre,porcentaje,predeterminada').eq('empresa_id', APP.empresa.id).eq('activa', true).order('orden').then(r => (listasCache = r.data || []))]);
+      listasCache ? Promise.resolve(listasCache) : (window.PRECIOS ? PRECIOS.cargar(sb, APP.empresa.id).then(c => { pctxCache = c; return (listasCache = c.listas); }) : sb.from('listas_precios').select('id,nombre,porcentaje,predeterminada').eq('empresa_id', APP.empresa.id).eq('activa', true).order('orden').then(r => (listasCache = r.data || [])))]);
     if (error || !d) { toast(error ? mensajeError(error) : 'No se encontró la prenda', 'error'); return; }
     const v = d.variante, pr = d.producto, admin = APP.esAdmin, puede = APP.rol !== 'visor';
     const actual = Math.round(+v.stock || 0);
@@ -82,7 +82,9 @@
     const m = modal('<div id="pr"></div>');
     $('.modal', m).style.maxWidth = '620px';
 
-    const precioCon = (u, l) => Math.round(precioBase * (+l.porcentaje || 100) / 100 * (1 - (+u.descuento_pct || 0) / 100));
+    // el precio de cada lista sale de las reglas (shared/precios.js); la falla descuenta sobre eso, como en la caja
+    const enLista = l => pctxCache ? PRECIOS.calcular({ id: v.id, producto_id: pr.id, precio: precioBase }, l.id, pctxCache, { categoria_id: pr.categoria_id, tipo: pr.tipo }).precio : Math.round(precioBase * (+l.porcentaje || 100) / 100);
+    const precioCon = (u, l) => Math.round(enLista(l) * (1 - (+u.descuento_pct || 0) / 100));
     const pintarUnidad = (u, i) => {
       const ls = u.listas && u.listas.length ? listas.filter(l => u.listas.includes(l.id)) : listas;
       const lBase = listas.find(l => l.predeterminada) || listas[0];
@@ -97,7 +99,7 @@
       if (!+u.descuento_pct) return '';
       const ls = u.listas && u.listas.length ? listas.filter(l => u.listas.includes(l.id)) : listas, lBase = listas.find(l => l.predeterminada) || listas[0];
       return `${admin ? `<div class="pr-u-listas">Se aplica en: <button type="button" class="pr-chip${!u.listas || !u.listas.length ? ' on' : ''}" data-todas="${i}">Todas</button>${listas.map(l => `<button type="button" class="pr-chip${u.listas && u.listas.includes(l.id) ? ' on' : ''}" data-lista="${i}:${l.id}">${esc(l.nombre)}</button>`).join('')}</div>` : ''}
-        <div class="pr-u-precio">Se vende a ${ls.map(l => `<b>${fmt.pesos(precioCon(u, l))}</b> en ${esc(l.nombre)}`).join(' · ')}${lBase ? ` <span style="color:var(--tinta-3)">(normal ${fmt.pesos(Math.round(precioBase * (+lBase.porcentaje || 100) / 100))})</span>` : ''}</div>`;
+        <div class="pr-u-precio">Se vende a ${ls.map(l => `<b>${fmt.pesos(precioCon(u, l))}</b> en ${esc(l.nombre)}`).join(' · ')}${lBase ? ` <span style="color:var(--tinta-3)">(normal ${fmt.pesos(enLista(lBase) || Math.round(precioBase * (+lBase.porcentaje || 100) / 100))})</span>` : ''}</div>`;
     }
     // cambia una falla sin redibujar la ventana (no se pierde lo que se está escribiendo)
     function refrescarUnidad(i) {

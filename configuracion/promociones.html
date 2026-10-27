@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Promociones · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610271956">
+<link rel="stylesheet" href="../shell/shell.css?v=202610272012">
 <style>
   .pestanas{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
   .pestanas a{font:600 13px var(--f-ui);color:var(--tinta);text-decoration:none;padding:8px 14px;border:1px solid var(--linea);background:var(--superficie-2);border-radius:10px}
@@ -19,33 +19,38 @@
   .esc-bloque{border:1px solid var(--linea-suave);border-radius:12px;padding:8px 10px;display:grid;gap:6px}
   .esc-canales{display:flex;flex-wrap:wrap;gap:5px;align-items:center;font-size:12px;color:var(--tinta-3)}
   .esc-fila{display:flex;align-items:center;gap:8px;font:500 13.5px var(--f-ui);flex-wrap:wrap}
+  .reb-tabla{max-height:320px;overflow:auto;border:1px solid var(--linea-suave);border-radius:12px}
+  .reb-tabla table{width:100%;border-collapse:collapse}.reb-tabla td{padding:5px 8px;border-bottom:1px solid var(--linea-suave);font-size:13px}
+  .reb-tabla input{width:110px;height:32px;border:1px solid var(--linea);border-radius:8px;text-align:right;font:600 13px var(--f-mono);background:var(--superficie-2);padding:0 8px}
+  .reb-alta{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.reb-alta input{height:36px;border:1px solid var(--linea);border-radius:10px;padding:0 10px;background:var(--superficie-2)}
   .esc-fila input{width:74px;height:38px;border:1px solid var(--linea);border-radius:10px;text-align:center;font:700 15px var(--f-mono);background:var(--superficie-2)}
 </style>
 </head>
 <body data-page="configuracion" data-etq="Configuración" data-title="Promociones" data-subtitle="Se aplican solas en la caja; cada prenda toma la mejor promo que le corresponda">
 <main class="app">
-  <div class="pestanas"><a href="empresa.html">Empresa</a><a href="atributos.html">Talles, colores y familias</a><a href="curvas.html">Curvas de talle</a><a class="on" href="promociones.html">Promociones</a><a href="facturacion.html">Facturación</a><a href="usuarios.html">Usuarios</a></div>
+  <div class="pestanas"><a href="empresa.html">Empresa</a><a href="atributos.html">Talles, colores y familias</a><a href="curvas.html">Curvas de talle</a><a href="listas.html">Listas de precios</a><a class="on" href="promociones.html">Promociones</a><a href="facturacion.html">Facturación</a><a href="usuarios.html">Usuarios</a></div>
   <div class="card"><div class="card-cab"><div><h2>Promociones</h2></div><div class="acciones"><button class="btn primario" id="btn-nueva">+ Nueva promoción</button></div></div>
     <table class="lista" id="tb"><tr><th>Nombre</th><th>Regla</th><th>Alcance</th><th>Dónde</th><th>Vigencia</th><th>Activa</th><th></th></tr></table></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610271956"></script>
-<script src="../shared/canales.js?v=202610271956"></script>
-<script src="../shell/shell.js?v=202610271956"></script>
+<script src="../shared/supabase.js?v=202610272012"></script>
+<script src="../shared/canales.js?v=202610272012"></script>
+<script src="../shell/shell.js?v=202610272012"></script>
 <script>
 APP.ready.then(async () => {
   const { esc, $, $$, toast, modal, confirmar, mensajeError, fmt } = APP, e = APP.empresa.id;
   if (!APP.esAdmin) { document.querySelector('main').innerHTML = '<div class="card"><p>Esta sección es solo para administración.</p></div>'; return; }
-  const [{ data: cats }, { data: prods }, { data: listas }] = await Promise.all([sb.from('categorias').select('id,nombre').eq('empresa_id', e).eq('activa', true).order('orden'), sb.from('productos').select('id,nombre,codigo').eq('empresa_id', e).eq('activo', true).order('nombre'), sb.from('listas_precios').select('id,nombre').eq('empresa_id', e).eq('activa', true).order('orden')]);
+  const [{ data: cats }, { data: prods }, { data: listas }] = await Promise.all([sb.from('categorias').select('id,nombre').eq('empresa_id', e).eq('activa', true).order('orden'), sb.from('productos').select('id,nombre,codigo,precio').eq('empresa_id', e).eq('activo', true).order('nombre').limit(5000), sb.from('listas_precios').select('id,nombre').eq('empresa_id', e).eq('activa', true).order('orden')]);
   const nice = s => s.charAt(0) + s.slice(1).toLowerCase();
   const canales = await CANALES.cargar(e);
   const dondeTxt = cs => !cs || !cs.length || cs.length >= canales.length ? 'Todos los canales' : cs.map(k => CANALES.nombre(canales, k)).join(' · ');
   const DIAS = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá', 'Do'];
   const escalonesDe = p => (p.escalones && p.escalones.length ? p.escalones : [{ n: p.n, valor: p.valor }]).slice().sort((a, b) => a.n - b.n);
-  const regla = p => ({ porcentaje: `${p.valor}% de descuento`, monto: `${fmt.pesos(p.valor)} menos por unidad`, nxm: `Lleva ${p.n}, paga ${p.m}`, cantidad: escalonesDe(p).map(x => `${fmt.dec(x.valor)}% llevando ${x.n}+${x.canales && x.canales.length ? ' (' + dondeTxt(x.canales) + ')' : ''}`).join(' · ') })[p.tipo];
-  const alcance = p => p.alcance === 'todo' ? 'Todas las prendas' : p.alcance === 'familias' ? (p.familia_ids || []).map(id => nice((cats.find(c => c.id === id) || {}).nombre || '')).filter(Boolean).join(', ') : `${(p.producto_ids || []).length} productos`;
+  const regla = p => p.tipo === 'rebaja' ? 'Rebaja' + (+p.valor > 0 ? ` ${fmt.dec(p.valor)}% sobre Lista` : '') + (p.n_fijos ? ` · ${fmt.num(p.n_fijos)} precios de oferta` : '') : ({ porcentaje: `${p.valor}% de descuento`, monto: `${fmt.pesos(p.valor)} menos por unidad`, nxm: `Lleva ${p.n}, paga ${p.m}`, cantidad: escalonesDe(p).map(x => `${fmt.dec(x.valor)}% llevando ${x.n}+${x.canales && x.canales.length ? ' (' + dondeTxt(x.canales) + ')' : ''}`).join(' · ') })[p.tipo];
+  const alcance = p => p.tipo === 'rebaja' && !(+p.valor > 0) ? 'Los productos con precio de oferta' : p.alcance === 'todo' ? 'Todas las prendas' : p.alcance === 'familias' ? (p.familia_ids || []).map(id => nice((cats.find(c => c.id === id) || {}).nombre || '')).filter(Boolean).join(', ') : `${(p.producto_ids || []).length} productos`;
   async function cargar() {
     const { data } = await sb.from('promociones').select('*').eq('empresa_id', e).order('creada', { ascending: false });
+    for (const p of (data || []).filter(x => x.tipo === 'rebaja')) { const { count } = await sb.from('rebaja_precios').select('id', { count: 'exact', head: true }).eq('promocion_id', p.id); p.n_fijos = count || 0; }
     const tb = $('#tb'); tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());
     (data || []).forEach(p => tb.insertAdjacentHTML('beforeend', `<tr><td><b>${esc(p.nombre)}</b></td><td>${regla(p)}</td><td>${esc(alcance(p))}</td><td><span class="chip ${p.canales && p.canales.length ? '' : 'ok'}">${esc(dondeTxt(p.canales))}</span>${p.listas && p.listas.length ? `<br><small>${esc(p.listas.map(id => (listas.find(l => l.id === id) || {}).nombre).filter(Boolean).join(', '))}</small>` : ''}</td><td><small>${p.desde ? fmt.fecha(p.desde) : 'siempre'}${p.hasta ? ' → ' + fmt.fecha(p.hasta) : ''} · ${(p.dias_semana || []).length === 7 ? 'todos los días' : (p.dias_semana || []).map(d => DIAS[d - 1]).join(' ')}</small></td><td>${p.activa ? '<span class="chip ok">activa</span>' : '<span class="chip gris">pausada</span>'}</td><td><button class="btn chico" data-e="${p.id}">Editar</button> <button class="btn chico" data-p="${p.id}">${p.activa ? 'Pausar' : 'Activar'}</button></td></tr>`));
     if (!(data || []).length) tb.insertAdjacentHTML('beforeend', '<tr><td colspan="7" class="vacio">Sin promociones. Creá la primera: por ejemplo "3 bombachas, paga 2".</td></tr>');
@@ -55,7 +60,26 @@ APP.ready.then(async () => {
   function editar(p) {
     p = JSON.parse(JSON.stringify(p || { nombre: '', tipo: 'cantidad', escalones: [{ n: 3, valor: 10 }], valor: 0, n: 3, m: 2, alcance: 'todo', familia_ids: [], producto_ids: [], dias_semana: [1, 2, 3, 4, 5, 6, 7], activa: true, canales: null, listas: null }));
     if (p.tipo === 'cantidad') p.escalones = escalonesDe(p);
-    const TIPOS = [['cantidad', 'Llevando N o más, % off'], ['nxm', 'Lleva N, paga M'], ['porcentaje', '% de descuento'], ['monto', '$ menos por prenda']];
+    const TIPOS = [['cantidad', 'Llevando N o más, % off'], ['nxm', 'Lleva N, paga M'], ['porcentaje', '% de descuento'], ['monto', '$ menos por prenda'], ['rebaja', 'Rebaja (precio tachado)']];
+    // rebaja: precios de oferta por producto o por talle/color
+    let fijos = null; const fijosOrig = new Map();
+    const cargarFijos = async () => {
+      fijos = [];
+      if (p.id) {
+        let d = 0; while (true) { const { data } = await sb.from('rebaja_precios').select('id,producto_id,variante_id,precio').eq('promocion_id', p.id).order('id').range(d, d + 999); (data || []).forEach(x => { fijos.push(Object.assign({}, x)); fijosOrig.set(x.id, +x.precio); }); if (!data || data.length < 1000) break; d += 1000; }
+        const vids = [...new Set(fijos.filter(x => x.variante_id).map(x => x.variante_id))], nomV = new Map();
+        for (let i = 0; i < vids.length; i += 300) { const { data } = await sb.from('v_variantes').select('id,talle_nombre,color_nombre').in('id', vids.slice(i, i + 300)); (data || []).forEach(v => nomV.set(v.id, [v.talle_nombre, v.color_nombre].filter(Boolean).join(' · '))); }
+        fijos.forEach(x => { x.var_nombre = x.variante_id ? nomV.get(x.variante_id) || 'talle · color' : ''; });
+        const nom = x => (prods.find(y => y.id === x.producto_id) || {}).nombre || ''; fijos.sort((a, b) => nom(a).localeCompare(nom(b)) || a.var_nombre.localeCompare(b.var_nombre));
+      }
+      pintar();
+    };
+    const filaFijo = (x, i) => { const pr = prods.find(y => y.id === x.producto_id) || {}; return `<tr><td>${esc(pr.nombre || '—')}${x.var_nombre ? ' <small>· ' + esc(x.var_nombre) + '</small>' : ''}<br><small class="mono">${esc(pr.codigo || '')} · lista ${fmt.pesos(pr.precio || 0)}</small></td><td style="text-align:right"><input data-fijo="${i}" type="number" step="1" min="0" value="${x.precio}"></td><td><button type="button" class="btn-eliminar" data-fijo-del="${i}" title="Quitar">✕</button></td></tr>`; };
+    const bloqueRebaja = () => `<label>Rebaja pareja sobre Lista <small>(opcional)</small></label><div class="esc-fila"><input id="p-valor" inputmode="decimal" value="${p.valor || ''}" style="width:110px"> % menos</div>
+      <span class="ayuda">Para las prendas de "A qué prendas". Deja el precio tachado, y las listas que toman rebajas (Contado, Débito) parten del precio rebajado.</span>
+      <label style="margin-top:12px">Precios de oferta puntuales <small>(mandan sobre el %)</small></label>
+      ${fijos == null ? '<p class="sub">Cargando…</p>' : `<div class="reb-tabla"><table>${fijos.length ? fijos.map(filaFijo).join('') : '<tr><td class="vacio">Sin precios de oferta puntuales.</td></tr>'}</table></div>
+      <div class="reb-alta"><input id="f-prod" list="dl-prods-reb" placeholder="Producto (nombre o código)" style="flex:1;min-width:200px"><datalist id="dl-prods-reb">${prods.map(x => `<option value="${esc(x.codigo)} · ${esc(x.nombre)}"></option>`).join('')}</datalist><input id="f-precio" type="number" step="1" min="0" placeholder="Precio de oferta" style="width:140px"><button type="button" class="btn" id="f-mas">+ Agregar</button></div>`}`;
     const m = modal('<div id="pe"></div>'); $('.modal', m).style.maxWidth = '640px';
     const leer = () => {
       p.nombre = $('#p-nombre', m).value; p.desde = $('#p-desde', m).value || null; p.hasta = $('#p-hasta', m).value || null;
@@ -73,17 +97,26 @@ APP.ready.then(async () => {
               <div class="esc-canales"><span>Vale en:</span><button type="button" class="chip-sel chico${!x.canales || !x.canales.length ? ' on' : ''}" data-esc-canal="${i}:">Como la promo</button>${canales.filter(c => !p.canales || !p.canales.length || p.canales.includes(c.k)).map(c => `<button type="button" class="chip-sel chico${x.canales && x.canales.includes(c.k) ? ' on' : ''}" data-esc-canal="${i}:${c.k}">${esc(c.n)}</button>`).join('')}</div></div>`).join('')}</div>
             <button type="button" class="btn chico" id="p-mas-esc" style="margin-top:6px">+ Agregar escalón</button><span class="ayuda">Se aplica el escalón más alto que se alcance en ese canal: llevando 7, vale el de 6. Un escalón puede valer solo en algunos canales (por ejemplo, el de 6 solo en la tienda).</span>`
           : p.tipo === 'nxm' ? `<label>Lleva / paga</label><div class="esc-fila">Lleva <input id="p-n" type="number" min="2" value="${p.n || 3}">, paga <input id="p-m" type="number" min="1" value="${p.m || 2}"></div><span class="ayuda">Las más baratas salen gratis.</span>`
+          : p.tipo === 'rebaja' ? bloqueRebaja()
           : `<label>${p.tipo === 'monto' ? 'Pesos menos por prenda' : 'Porcentaje de descuento'}</label><div class="esc-fila"><input id="p-valor" inputmode="decimal" value="${p.valor || ''}" style="width:110px"> ${p.tipo === 'monto' ? '$' : '% off'}</div>`}</div>
         <div class="campo"><label>A qué prendas</label><div class="chips-sel">${[['todo', 'Todas'], ['familias', 'Algunas familias'], ['productos', 'Algunos productos']].map(([k, t]) => `<button type="button" class="chip-sel${p.alcance === k ? ' on' : ''}" data-alc="${k}">${t}</button>`).join('')}</div>
           ${p.alcance === 'familias' ? `<div class="chips-sel" style="margin-top:8px">${cats.map(c => `<button type="button" class="chip-sel chico${(p.familia_ids || []).includes(c.id) ? ' on' : ''}" data-fam="${c.id}">${esc(nice(c.nombre))}</button>`).join('')}</div>`
           : p.alcance === 'productos' ? `<select id="p-prod" multiple size="7" style="margin-top:8px;width:100%">${prods.map(x => `<option value="${x.id}" ${(p.producto_ids || []).includes(x.id) ? 'selected' : ''}>${esc(x.nombre)} · ${esc(x.codigo)}</option>`).join('')}</select><span class="ayuda">Con Ctrl (o ⌘) elegís varios.</span>` : ''}</div>
         <div class="campo"><label>Dónde vale</label><div class="chips-sel"><button type="button" class="chip-sel${!p.canales || !p.canales.length ? ' on' : ''}" data-canal="">Todos los canales</button>${canales.map(c => `<button type="button" class="chip-sel${p.canales && p.canales.includes(c.k) ? ' on' : ''}" data-canal="${c.k}">${esc(c.n)}</button>`).join('')}</div>
-          <span class="ayuda">En la caja se aplica según el canal de la venta.${canales.some(c => !['local', 'whatsapp'].includes(c.k)) ? ' En la web de cada tienda online, por ahora, la promo hay que cargarla también allá: Percha todavía no la publica.' : ''}</span></div>
-        <div class="campo"><label>Listas de precios</label><div class="chips-sel"><button type="button" class="chip-sel chico${!p.listas || !p.listas.length ? ' on' : ''}" data-lista="todas">Todas</button>${listas.map(l => `<button type="button" class="chip-sel chico${p.listas && p.listas.includes(l.id) ? ' on' : ''}" data-lista="${l.id}">${esc(l.nombre)}</button>`).join('')}</div></div>
+          <span class="ayuda">En la caja se aplica según el canal de la venta.${p.tipo === 'rebaja' ? ' En Tienda Nube va como precio tachado al actualizar la web desde Percha.' : canales.some(c => !['local', 'whatsapp'].includes(c.k)) ? ' En la web de cada tienda online, por ahora, la promo hay que cargarla también allá: Percha todavía no la publica.' : ''}</span></div>
+        <div class="campo" ${p.tipo === 'rebaja' ? 'style="display:none"' : ''}><label>Listas de precios</label><div class="chips-sel"><button type="button" class="chip-sel chico${!p.listas || !p.listas.length ? ' on' : ''}" data-lista="todas">Todas</button>${listas.map(l => `<button type="button" class="chip-sel chico${p.listas && p.listas.includes(l.id) ? ' on' : ''}" data-lista="${l.id}">${esc(l.nombre)}</button>`).join('')}</div></div>
         <div class="fila c2"><div class="campo"><label>Desde</label><input id="p-desde" type="date" value="${p.desde || ''}"></div><div class="campo"><label>Hasta</label><input id="p-hasta" type="date" value="${p.hasta || ''}"></div></div>
-        <div class="campo"><label>Días</label><div class="dias">${DIAS.map((d, i) => `<label><input type="checkbox" value="${i + 1}" ${(p.dias_semana || []).includes(i + 1) ? 'checked' : ''}><span>${d}</span></label>`).join('')}</div></div>
+        <div class="campo" ${p.tipo === 'rebaja' ? 'style="display:none"' : ''}><label>Días</label><div class="dias">${DIAS.map((d, i) => `<label><input type="checkbox" value="${i + 1}" ${(p.dias_semana || []).includes(i + 1) ? 'checked' : ''}><span>${d}</span></label>`).join('')}</div></div>
         <div class="pie">${p.id ? '<button class="btn peligro" data-del style="margin-right:auto">Borrar</button>' : ''}<button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Guardar</button></div>`;
-      $$('[data-tipo]', m).forEach(b => b.onclick = () => { leer(); p.tipo = b.dataset.tipo; if (p.tipo === 'cantidad' && !(p.escalones || []).length) p.escalones = [{ n: 3, valor: 10 }]; pintar(); });
+      $$('[data-fijo]', m).forEach(i => i.onchange = () => { fijos[+i.dataset.fijo].precio = +i.value || 0; });
+      $$('[data-fijo-del]', m).forEach(b => b.onclick = () => { leer(); fijos.splice(+b.dataset.fijoDel, 1); pintar(); });
+      const fm = $('#f-mas', m); if (fm) fm.onclick = () => {
+        const cod = $('#f-prod', m).value.split(' · ')[0].trim(), pr = prods.find(y => y.codigo === cod), precio = +$('#f-precio', m).value;
+        if (!pr) { toast('Elegí un producto de la lista', 'error'); return; } if (!(precio > 0)) { toast('Poné el precio de oferta', 'error'); return; }
+        if (fijos.some(x => x.producto_id === pr.id && !x.variante_id)) { toast('Ese producto ya está', 'error'); return; }
+        leer(); fijos.unshift({ producto_id: pr.id, variante_id: null, precio, var_nombre: '' }); pintar();
+      };
+      $$('[data-tipo]', m).forEach(b => b.onclick = () => { leer(); p.tipo = b.dataset.tipo; if (p.tipo === 'rebaja' && fijos == null) cargarFijos(); if (p.tipo === 'cantidad' && !(p.escalones || []).length) p.escalones = [{ n: 3, valor: 10 }]; pintar(); });
       $$('[data-alc]', m).forEach(b => b.onclick = () => { leer(); p.alcance = b.dataset.alc; pintar(); });
       $$('[data-fam]', m).forEach(b => b.onclick = () => { leer(); const s = new Set(p.familia_ids || []); s.has(b.dataset.fam) ? s.delete(b.dataset.fam) : s.add(b.dataset.fam); p.familia_ids = [...s]; pintar(); });
       $$('[data-canal]', m).forEach(b => b.onclick = () => { leer(); const k = b.dataset.canal; if (!k) p.canales = null; else { const s = new Set(p.canales || []); s.has(k) ? s.delete(k) : s.add(k); p.canales = s.size && s.size < canales.length ? [...s] : null; }
@@ -108,13 +141,26 @@ APP.ready.then(async () => {
         p.escalones = es; p.n = es[0].n; p.valor = es[0].valor;
       }
       if (p.alcance === 'familias' && !(p.familia_ids || []).length) { toast('Elegí al menos una familia', 'error'); return; }
+      if (p.tipo === 'rebaja') {
+        if (+p.valor >= 100) { toast('La rebaja no puede ser del 100%', 'error'); return; }
+        if (!(+p.valor > 0) && !(fijos || []).length) { toast('Poné un % de rebaja o al menos un precio de oferta', 'error'); return; }
+        p.dias_semana = [1, 2, 3, 4, 5, 6, 7]; p.listas = null;
+      }
       const d = { nombre: p.nombre.trim(), tipo: p.tipo, valor: p.valor || 0, n: p.n || 0, m: p.m || 0, escalones: p.tipo === 'cantidad' ? p.escalones : null, alcance: p.alcance,
         familia_ids: p.alcance === 'familias' ? p.familia_ids : [], producto_ids: p.alcance === 'productos' ? p.producto_ids : [], canales: p.canales && p.canales.length ? p.canales : null, listas: p.listas && p.listas.length ? p.listas : null,
         desde: p.desde, hasta: p.hasta, dias_semana: p.dias_semana };
-      const r = p.id ? await sb.from('promociones').update(d).eq('id', p.id) : await sb.from('promociones').insert(APP.conEmpresa(d));
-      if (r.error) { toast(mensajeError(r.error), 'error'); return; } m.cerrar(); toast('Guardada'); cargar();
+      const r = p.id ? await sb.from('promociones').update(d).eq('id', p.id).select('id').single() : await sb.from('promociones').insert(APP.conEmpresa(d)).select('id').single();
+      if (r.error) { toast(mensajeError(r.error), 'error'); return; }
+      if (p.tipo === 'rebaja' && fijos) {   // precios de oferta: altas, cambios y bajas
+        const pid = r.data.id, quedan = new Set(fijos.filter(x => x.id).map(x => x.id)), borrar = [...fijosOrig.keys()].filter(id => !quedan.has(id));
+        for (let i = 0; i < borrar.length; i += 200) await sb.from('rebaja_precios').delete().in('id', borrar.slice(i, i + 200));
+        for (const x of fijos.filter(x => x.id && fijosOrig.get(x.id) !== +x.precio)) await sb.from('rebaja_precios').update({ precio: +x.precio }).eq('id', x.id);
+        const nuevos = fijos.filter(x => !x.id).map(x => APP.conEmpresa({ promocion_id: pid, producto_id: x.producto_id, variante_id: x.variante_id, precio: +x.precio }));
+        if (nuevos.length) { const ri = await sb.from('rebaja_precios').insert(nuevos); if (ri.error) { toast(mensajeError(ri.error), 'error'); return; } }
+      }
+      m.cerrar(); toast('Guardada'); cargar();
     };
-    pintar();
+    pintar(); if (p.tipo === 'rebaja') cargarFijos();
   }
   $('#btn-nueva').onclick = () => editar(null);
   await cargar();
