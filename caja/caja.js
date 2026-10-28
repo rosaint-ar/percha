@@ -200,7 +200,7 @@ APP.ready.then(async () => {
     if (reservado) { if (pin === reservado) salirReservado(); return; }
     let ok = false; try { const r = await sb.rpc('reservado_entrar', { e, p_pin: pin }); ok = r.data === true; if (r.error && /intentos/i.test(r.error.message)) toast(r.error.message, 'error'); } catch (_) {}
     if (!ok) return;   // clave mala: no se dice nada
-    reservado = pin; document.body.classList.add('reservado');
+    reservado = pin; document.body.classList.add('reservado'); pintarNumero();
     const emi = vendedoras.find(v => /^emi/i.test(v.nombre || '')); vendedoraAntes = carrito.vendedora;
     if (emi) { carrito.vendedora = emi.user_id; const sv = $('#sel-vendedora'); if (sv) sv.value = emi.user_id; }
     document.body.insertAdjacentHTML('beforeend', '<div id="barra-reservado"><span>🔒 Modo reservado</span><button type="button" id="btn-reservadas">Ventas reservadas</button><small>Para salir: la clave + Enter en el buscador</small></div>');
@@ -208,7 +208,7 @@ APP.ready.then(async () => {
     pintar(); $('#q').focus();
   }
   function salirReservado() {
-    reservado = null; document.body.classList.remove('reservado');
+    reservado = null; document.body.classList.remove('reservado'); pintarNumero();
     const b = $('#barra-reservado'); if (b) b.remove();
     document.querySelectorAll('.modal-reservadas').forEach(m => m.remove());
     if (vendedoraAntes) { carrito.vendedora = vendedoraAntes; const sv = $('#sel-vendedora'); if (sv) sv.value = vendedoraAntes; }
@@ -528,6 +528,7 @@ APP.ready.then(async () => {
         caja_id: reservado ? null : caja.id, turno_id: reservado ? null : turno.id, reservada: !!reservado, pin: reservado || undefined, cliente_id: cliente, vendedora_id: carrito.vendedora, lista_id: carrito.lista,
         descuento_pct: carrito.descPct || 0, descuento: t.descuento, recargo: t.recargo, nota: $('#nota').value.trim() || null,
         envio: carrito.envio || null,
+        numero: reservado ? null : numeroRes,   // el número que se ve en el ticket desde que empezó la venta
         venta_origen_id: carrito.cambio ? carrito.cambio.id : null, origen: ($('#sel-origen') || {}).value || 'local',
         lineas: t.lineas.map(l => ({ variante_id: l.variante.id, producto_id: l.variante.producto_id, descripcion: l.variante.producto_nombre, talle: l.variante.talle_nombre, color: l.variante.color_nombre, cantidad: l.cantidad, precio_lista: l.precioLista, precio_unit: l.precioFinal, descuento_pct: l.descPct || 0, promocion_id: l.promo ? l.promo.id : null, promocion_nombre: l.promo ? l.promo.nombre : null, total: l.total, costo_unit: +l.variante.costo || 0, componentes: l.componentes && l.componentes.length ? l.componentes : null, falla: !!l.falla, falla_id: l.fallaU ? l.fallaU.id : null, precio_manual: l.precioManual != null || undefined })),
         pagos: pagosFinal.filter(p => p.monto !== 0).map(p => ({ forma_pago_id: p.forma_pago_id || null, credito_id: p.credito_id || null, monto: p.monto, cuotas: p.cuotas || 1, recargo_pct: p.recargo_pct || 0 })),
@@ -547,6 +548,7 @@ APP.ready.then(async () => {
       if (carrito.avisos) { toast('Venta hecha. Quedó un aviso para corregir el stock en Inventario', 'error'); carrito.avisos = 0; setTimeout(pintarAvisosStock, 1500); }
       carrito.lineas = []; carrito.cambio = null; carrito.devolviendo = false; carrito.envio = null; pintarEntrega(); carrito.descPct = 0; $('#desc-general').value = 0; $('#nota').value = ''; $('#sel-cliente').value = ''; if ($('#sel-origen')) $('#sel-origen').value = 'local';
       carrito.lista = (listas.find(x => x.predeterminada) || listas[0] || {}).id;   // la próxima venta arranca con la lista base
+      if (!payload.reservada) reservarNumero(true);   // la próxima venta ya tiene su número
       // el stock del catálogo en memoria
       payload.lineas.forEach(l => { const v = catalogo.find(x => x.id === l.variante_id); if (v && v.producto_tipo !== 'kit') v.stock = (+v.stock || 0) - l.cantidad; });
       if (payload.lineas.some(l => (catalogo.find(x => x.id === l.variante_id) || {}).producto_tipo === 'kit')) cargarBase();   // los kits y sus componentes se recalculan en la base
@@ -661,39 +663,80 @@ APP.ready.then(async () => {
 
   // ================= Cambio / devolución =================
   $('#btn-cambio').onclick = () => {
-    const m = modal(`<h2>Cambio o devolución</h2><p class="sub">Buscá la venta original por número de ticket.</p>
-      <div class="campo" style="margin-top:12px"><label>Número de ticket</label><input id="cv-num" placeholder="Ej. 1234 o R-12" autofocus></div>
-      <div id="cv-res"></div>
+    const m = modal(`<h2>Cambio o devolución</h2><p class="sub">Buscá la venta por número (o parte), clienta, fecha (27/10, oct), prenda, talle, color o total.</p>
+      <input class="cv-busca" id="cv-q" placeholder="Ej. 123 · maría · 27/10 · conjunto negro 95" autocomplete="off">
+      <div id="cv-lista" class="cv-lista"></div><div id="cv-res"></div>
       <div class="sin-ticket"><span><b>¿No tiene ticket?</b>Se carga lo que trae tocándolo o escaneándolo, al precio de hoy.</span><button class="btn" data-sin-ticket>Devolver sin ticket</button></div>`);
+    $('.modal', m).style.maxWidth = '720px';
     $('[data-sin-ticket]', m).onclick = () => { carrito.cambio = carrito.cambio || { id: null, numero: null }; carrito.devolviendo = true; m.cerrar(); pintar(); $('#q').focus(); };
-    const buscarVenta = async () => {
-      const n = $('#cv-num', m).value.trim(); if (!n) return;
-      // por función: la vendedora encuentra el ticket aunque no vea el listado de ventas viejas (también los R- en efectivo)
+    const qIn = $('#cv-q', m), lista = $('#cv-lista', m), det = $('#cv-res', m);
+    let filas = [], marcada = 0, pedido = 0, tq;
+    const pintarLista = () => {
+      lista.innerHTML = filas.map((x, i) => `<button type="button" class="cv-fila${i === marcada ? ' on' : ''}" data-i="${i}"><span class="cv-num">${esc(x.mostrar)}</span><span class="cv-info"><b>${esc(x.cliente || 'Sin clienta')}${x.tipo === 'cambio' ? ' <span class="chip gris">cambio</span>' : ''}</b><small>${esc(x.resumen || '')}</small></span><span class="cv-der"><b>${fmt.pesos(x.total)}</b><small>${fmt.fechaHora(x.fecha)}</small></span></button>`).join('')
+        || `<div class="vacio">${qIn.value.trim() ? 'No encontré ventas con eso.' : 'Sin ventas.'}</div>`;
+      $$('.cv-fila', lista).forEach(b => b.onclick = () => abrir(filas[+b.dataset.i].mostrar));
+      const on = $('.cv-fila.on', lista); if (on) on.scrollIntoView({ block: 'nearest' });
+    };
+    const buscar = async () => {
+      const q = qIn.value.trim(), yo = ++pedido;
+      if (/^r\s*-?\s*\d+$/i.test(q)) { lista.innerHTML = '<div class="vacio">Enter para abrir la venta reservada.</div>'; filas = []; return; }   // las reservadas: solo por número exacto
+      const { data, error } = await sb.rpc('ventas_buscar_cambio', { e, q });
+      if (yo !== pedido) return;   // llegó tarde: ya se escribió otra cosa
+      if (error) { filas = []; lista.innerHTML = '<div class="vacio">Escribí el número de ticket y Enter.</div>'; return; }   // sin el buscador nuevo: como antes
+      filas = data || []; marcada = 0; pintarLista();
+    };
+    // la venta elegida: se marca lo que devuelve
+    const abrir = async n => {
       const { data: v } = await sb.rpc('venta_para_cambio', { e, p_numero: n });
-      if (!v) { $('#cv-res', m).innerHTML = '<div class="vacio">No existe ese ticket.</div>'; return; }
-      if (v.estado === 'anulada') { $('#cv-res', m).innerHTML = '<div class="vacio">Esa venta está anulada.</div>'; return; }
+      if (!v) { det.innerHTML = '<div class="vacio">No existe ese ticket.</div>'; return; }
+      if (v.estado === 'anulada') { det.innerHTML = '<div class="vacio">Esa venta está anulada.</div>'; return; }
       const ls = v.lineas || [];
-      $('#cv-res', m).innerHTML = `<p class="sub" style="margin:8px 0">Venta ${v.mostrar} · ${fmt.fechaHora(v.fecha)} · ${fmt.pesos(v.total)}. Marcá lo que devuelve:</p>
-        <table class="lista">${(ls || []).map(l => `<tr><td><input type="checkbox" data-l="${l.id}"></td><td>${esc(l.descripcion)}<br><small>${esc([l.talle, l.color].filter(Boolean).join(' · '))}</small></td><td class="num">${l.cantidad}× ${fmt.pesos(l.precio_unit)}</td></tr>`).join('')}</table>
-        <div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Cargar al ticket</button></div>`;
+      lista.hidden = true; qIn.hidden = true;
+      det.innerHTML = `<p class="sub" style="margin:8px 0">Venta <b>${esc(v.mostrar)}</b> · ${fmt.fechaHora(v.fecha)} · ${fmt.pesos(v.total)}. Marcá lo que devuelve:</p>
+        <table class="lista">${ls.map(l => `<tr><td><input type="checkbox" data-l="${l.id}"></td><td>${esc(l.descripcion)}<br><small>${esc([l.talle, l.color].filter(Boolean).join(' · '))}</small></td><td class="num">${l.cantidad}× ${fmt.pesos(l.precio_unit)}</td></tr>`).join('')}</table>
+        <div class="pie"><button class="btn" data-volver style="margin-right:auto">← Volver a buscar</button><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Cargar al ticket <kbd>Enter</kbd></button></div>`;
+      $('[data-volver]', m).onclick = () => { det.innerHTML = ''; lista.hidden = false; qIn.hidden = false; qIn.focus(); };
       $('[data-no]', m).onclick = () => m.cerrar();
       $('[data-si]', m).onclick = () => {
-        const sel = $$('input[data-l]:checked', m).map(i => (ls || []).find(l => String(l.id) === i.dataset.l));
+        const sel = $$('input[data-l]:checked', m).map(i => ls.find(l => String(l.id) === i.dataset.l));
         if (!sel.length) { toast('Marcá al menos una prenda', 'error'); return; }
         carrito.cambio = { id: v.id, numero: v.numero }; carrito.lista = v.lista_id || carrito.lista;
         sel.forEach(l => { const v2 = catalogo.find(x => x.id === l.variante_id) || { id: l.variante_id, producto_id: l.producto_id, producto_nombre: l.descripcion, talle_nombre: l.talle, color_nombre: l.color, precio: l.precio_lista, costo: l.costo_unit };
           carrito.lineas.push({ variante: v2, cantidad: -l.cantidad, descPct: 0, devuelta: true, precioFijo: l.precio_unit }); });
         m.cerrar(); pintar(); toast('Agregá ahora lo que se lleva, o cobrá para devolver el dinero / emitir nota de crédito'); $('#q').focus();
       };
+      // una sola prenda: ya queda marcada · Espacio marca o desmarca · Enter carga
+      const cks = $$('input[data-l]', m); if (cks.length === 1) cks[0].checked = true; if (cks[0]) cks[0].focus();
+      det.onkeydown = ev => { if (ev.key === 'Enter') { ev.preventDefault(); $('[data-si]', m).click(); } };
     };
-    $('#cv-num', m).addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); buscarVenta(); } });
-    $('#cv-num', m).addEventListener('change', buscarVenta);
+    qIn.addEventListener('input', () => { clearTimeout(tq); tq = setTimeout(buscar, 220); });
+    qIn.addEventListener('keydown', ev => {
+      if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') { ev.preventDefault(); if (!filas.length) return; marcada = Math.max(0, Math.min(filas.length - 1, marcada + (ev.key === 'ArrowDown' ? 1 : -1))); pintarLista(); }
+      else if (ev.key === 'Enter') { ev.preventDefault(); const q = qIn.value.trim(); if (filas[marcada]) abrir(filas[marcada].mostrar); else if (/^(r\s*-?\s*|#)?\d+$/i.test(q)) abrir(q); }
+    });
+    buscar();   // al abrir: las últimas ventas
   };
   // las líneas devueltas se valoran a lo que se pagó, no al precio de hoy
   const calcularBase = calcular;
   calcular = function () { const c = calcularBase(); c.lineas.forEach(l => { if (l.devuelta && l.precioFijo != null) { l.precioLista = l.precioFijo; l.precioUnit = l.precioFijo; l.promo = null; l.descPromo = 0; l.precioFinal = l.precioFijo; l.total = r2(l.precioFijo * l.cantidad); } });
     let subtotal = 0, costo = 0; c.lineas.forEach(l => { subtotal += l.total; costo += (+l.variante.costo || 0) * l.cantidad; });
     c.subtotal = r2(subtotal); c.descuento = r2(subtotal * (carrito.descPct || 0) / 100); c.total = r2(c.subtotal - c.descuento); c.costo = r2(costo); return c; };
+
+  // ================= Número de ticket desde que empieza la venta =================
+  // Se reserva al abrir el punto de venta y se ve arriba del ticket (para etiquetar el paquete, por ejemplo un cambio).
+  // Si se vacía el ticket, el número sigue para la próxima venta; el equipo lo recuerda aunque se recargue la página.
+  let numeroRes = null;
+  async function reservarNumero(nuevo) {
+    let actual = null;
+    try { if (nuevo) localStorage.removeItem(LS('numero')); else actual = +localStorage.getItem(LS('numero')) || null; } catch (_) { }
+    try { const { data, error } = await sb.rpc('venta_numero_reservar', { e, p_actual: actual }); if (error) throw error; numeroRes = data || null; if (numeroRes) localStorage.setItem(LS('numero'), numeroRes); }
+    catch (_) { numeroRes = null; }   // sin internet: se numera al cobrar
+    pintarNumero();
+  }
+  function pintarNumero() {
+    const t = document.getElementById('ticket-titulo'); if (!t) return;
+    t.innerHTML = reservado ? 'Ticket <span class="nro-ticket">reservado</span>' : numeroRes ? `Ticket <span class="nro-ticket" title="Número de esta venta: ya se puede anotar en la etiqueta">#${String(numeroRes).padStart(6, '0')}</span>` : 'Ticket';
+  }
 
   // ================= Arranque =================
   // lo que el POS (pos.js) necesita de la caja: catálogo en memoria, carrito y acciones
@@ -705,7 +748,7 @@ APP.ready.then(async () => {
     if (!document.getElementById('aviso-stock')) { const sub = document.getElementById('ticket-sub'); if (!sub) return; sub.insertAdjacentHTML('afterend', '<button id="aviso-stock" class="pildora-pend" data-pendientes hidden>📌 <b></b> pendientes</button>'); }
     if (APP.pendientes) APP.pendientes.refrescar();
   }
-  await cargarBase(); await cargarTurno(); pintar(); pintarRecientes(); sincronizar(); pintarAvisosStock();
+  reservarNumero(); await cargarBase(); await cargarTurno(); pintar(); pintarRecientes(); sincronizar(); pintarAvisosStock();
   if (APP.caja.alCargar) APP.caja.alCargar();
   const params = new URLSearchParams(location.search); if (params.get('cambio')) { $('#btn-cambio').click(); }
 });
