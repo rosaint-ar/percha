@@ -540,9 +540,16 @@ APP.ready.then(async () => {
         pagos: pagosFinal.filter(p => p.monto !== 0).map(p => ({ forma_pago_id: p.forma_pago_id || null, credito_id: p.credito_id || null, monto: p.monto, cuotas: p.cuotas || 1, recargo_pct: p.recargo_pct || 0 })),
         creditos_a_emitir
       };
+      // la ventana de cobro queda abierta mientras se registra: si falla, se ve el error y se puede reintentar
+      const bSi = $('[data-si]', m); bSi.textContent = 'Registrando…';
+      let res;
+      try { res = await enviarVenta(payload); }
+      catch (err) { bSi.disabled = false; bSi.textContent = 'Confirmar'; const r = $('#cb-resto', m); if (r) { r.className = 'resto falta'; r.innerHTML = `<span>No se pudo registrar: ${esc(mensajeError(err))}</span><span>Probá de nuevo</span>`; } return; }
       m.cerrar();
-      const res = await enviarVenta(payload);
-      mostrarTicket(payload, res, { vuelto: vuelto > 0 ? vuelto : 0, pagos: pagosFinal, total: t });
+      const numTxt = res.numero_mostrar || (res.numero ? '#' + String(res.numero).padStart(6, '0') : '');
+      toast(res.pendiente ? 'Venta guardada: se sube sola cuando vuelva internet' : `✓ Venta ${numTxt} registrada`);
+      try { mostrarTicket(payload, res, { vuelto: vuelto > 0 ? vuelto : 0, pagos: pagosFinal, total: t }); }
+      catch (err) { console.error(err); modal(`<h2>✓ Venta ${esc(numTxt)} registrada</h2><div style="font:800 30px var(--f-titulo);margin:6px 0">${fmt.pesos(t.aPagar)}</div>${vuelto > 0 ? `<div class="aviso-caja info">Vuelto: <b>${fmt.pesos(vuelto)}</b></div>` : ''}<div class="pie"><button class="btn primario" onclick="this.closest('.modal-fondo').remove()">Listo</button></div>`); }
       cargarFallas(); setTimeout(pintarAvisosStock, 1200);
       if (carrito.avisos) { toast('Venta hecha. Quedó un aviso para corregir el stock en Inventario', 'error'); carrito.avisos = 0; setTimeout(pintarAvisosStock, 1500); }
       carrito.lineas = []; carrito.cambio = null; carrito.envio = null; pintarEntrega(); carrito.descPct = 0; $('#desc-general').value = 0; $('#nota').value = ''; $('#sel-cliente').value = ''; if ($('#sel-origen')) $('#sel-origen').value = 'local';
@@ -640,7 +647,7 @@ APP.ready.then(async () => {
       ${p.nota ? `<hr><div>${esc(p.nota)}</div>` : ''}<hr><div class="c">Cambios con este ticket dentro de los 30 días.<br>¡Gracias por tu compra!</div>`;
     $('#impresion').innerHTML = html;
     const texto = encodeURIComponent(`${emp.nombre} · Ticket ${num}\n` + p.lineas.map(l => `${l.cantidad}× ${l.descripcion} ${[l.talle, l.color].filter(Boolean).join(' ')} ${fmt.pesos(l.total)}`).join('\n') + `\nTOTAL ${fmt.pesos(extra.total.aPagar)}` + (p.estado === 'senada' ? `\nSeña: saldo ${fmt.pesos(r2(extra.total.aPagar - extra.pagos.reduce((s, x) => s + x.monto, 0)))}` : '') + `\n¡Gracias por tu compra!`);
-    const m = modal(`<h2>${res.pendiente ? 'Venta guardada (se sube al volver internet)' : 'Venta ' + num + ' registrada'}</h2>
+    const m = modal(`<h2>${res.pendiente ? 'Venta guardada (se sube al volver internet)' : '✓ Venta ' + num + ' registrada'}</h2>
       <div style="font:800 30px var(--f-titulo);letter-spacing:-.03em;margin:6px 0">${fmt.pesos(extra.total.aPagar)}</div>
       ${extra.vuelto ? `<div class="aviso-caja info">Vuelto: <b>${fmt.pesos(extra.vuelto)}</b></div>` : ''}
       ${(res.creditos || []).map(c => `<div class="aviso-caja ok">${c.tipo === 'gift_card' ? 'Gift card' : 'Nota de crédito'} emitida · código <b class="mono">${c.codigo}</b> · ${fmt.pesos(c.monto)}</div>`).join('')}
