@@ -86,6 +86,12 @@
 
   const APP = { root: ROOT, sistema: SISTEMA, iconos: I, fmt, esc, $, $$, toast, modal, confirmar, mensajeError, iniciales, empresa: null, empresas: [], rol: null, user: null };
   window.APP = APP;
+  // cerrar sesión: borra la sesión de ESTE equipo sin depender del servidor (si el servidor fallaba, quedaba adentro)
+  APP.salir = async () => {
+    try { await sb.auth.signOut({ scope: 'local' }); } catch (_) { }
+    try { Object.keys(localStorage).filter(k => /^sb-.*-auth-token/.test(k)).forEach(k => localStorage.removeItem(k)); } catch (_) { }
+    location.replace(ROOT + 'login.html');
+  };
 
   // ---------- sesión y empresa ----------
   async function requireSession() {
@@ -165,7 +171,7 @@
     body.prepend(lateral); body.appendChild(telon); body.classList.add('con-lateral');
     $('#btn-menu').onclick = () => body.classList.toggle('lateral-abierta');
     const sel = $('#sel-empresa'); if (sel) sel.onchange = () => { localStorage.setItem('percha_empresa', sel.value); location.reload(); };
-    $('#btn-salir').onclick = async () => { await sb.auth.signOut(); location.href = ROOT + 'login.html'; };
+    $('#btn-salir').onclick = () => APP.salir();
     const reloj = () => { $('#reloj').textContent = new Date().toLocaleString('es-AR', { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).replace(/\./g, ''); };
     reloj(); setInterval(reloj, 30000);
     if (body.dataset.title && !$('.cab-pagina', main)) {
@@ -193,7 +199,7 @@
     APP.empresas = await cargarEmpresas();
     APP.empresa = elegirEmpresa(APP.empresas);
     if (!APP.empresa) {
-      body.innerHTML = `<main class="app"><div class="card"><h2>Sin empresa asignada</h2><p>Tu usuario (${esc(APP.user.email)}) todavía no pertenece a ninguna empresa. Pedile a quien administra el sistema que te agregue.</p><p><button class="btn" onclick="sb.auth.signOut().then(()=>location.href='${ROOT}login.html')">Salir</button></p></div></main>`;
+      body.innerHTML = `<main class="app"><div class="card"><h2>Sin empresa asignada</h2><p>Tu usuario (${esc(APP.user.email)}) todavía no pertenece a ninguna empresa. Pedile a quien administra el sistema que te agregue.</p><p><button class="btn" onclick="APP.salir()">Salir</button></p></div></main>`;
       return new Promise(() => {});
     }
     localStorage.setItem('percha_empresa', APP.empresa.id);

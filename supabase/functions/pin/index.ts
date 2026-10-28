@@ -6,12 +6,23 @@
 //           { accion: 'entrar', id, llave, pin }                (sin sesión)  → { token_hash } para sb.auth.verifyOtp
 //           { accion: 'quitar', id, llave }                     (sin sesión)  → apaga el PIN de ese equipo
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import { createRemoteJWKSet, jwtVerify } from "https://esm.sh/jose@5.9.6";
 
 const URL = Deno.env.get("SUPABASE_URL")!;
 const ANON = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
+
+// quién llama: se valida la firma del token con las llaves públicas del proyecto (ES256); si no, se le pregunta a Auth
+const JWKS = createRemoteJWKSet(new globalThis.URL(`${URL}/auth/v1/.well-known/jwks.json`));
+async function usuarioDe(auth: string): Promise<{ id: string } | string> {
+  const token = auth.replace(/^Bearer\s+/i, "");
+  if (!token || token === auth) return "Sin sesión";
+  try { const { payload } = await jwtVerify(token, JWKS); if (payload.sub && payload.role === "authenticated") return { id: String(payload.sub) }; } catch (_) { /* sigue */ }
+  const { data, error } = await createClient(URL, SERVICE).auth.getUser(token);
+  return data?.user ? { id: data.user.id } : (error?.message || "Sesión inválida");
+}
 const MAX_INTENTOS = 5;
 
 const hex = (b: ArrayBuffer | Uint8Array) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
@@ -34,8 +45,9 @@ Deno.serve(async (req) => {
 
   if (accion === "activar") {
     const auth = req.headers.get("Authorization") || "";
-    const { data: { user } } = await createClient(URL, ANON, { global: { headers: { Authorization: auth } } }).auth.getUser();
-    if (!user) return json({ error: "Primero entrá con tu contraseña" }, 401);
+    const quien = await usuarioDe(auth);
+    if (typeof quien === "string") return json({ error: "Primero entrá con tu contraseña (" + quien + ")" }, 401);
+    const user = quien;
     const pin = String(body.pin || "");
     if (!/^\d{4}$/.test(pin)) return json({ error: "El PIN tiene que ser de 4 números" }, 400);
     // si este equipo ya tenía un PIN de esta persona, se reemplaza
