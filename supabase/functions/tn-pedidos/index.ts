@@ -7,6 +7,16 @@ const UA = "Percha (rosaint.ar@gmail.com)";
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-key", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
 const r2 = (n: number) => Math.round((+n || 0) * 100) / 100;
+// la entrega del pedido (medio, costo, dirección, estado y seguimiento) → campos envio_* de la venta, para la lista de Envíos
+const RANGO: Record<string, number> = { pendiente: 0, preparado: 1, enviado: 2, entregado: 3 };
+function envioDe(o: any) {
+  const a = o.shipping_address || {}, retiro = o.shipping_pickup_type === "pickup";
+  const st = String(o.shipping_status || "").toLowerCase();
+  const estado = /deliver/.test(st) ? "entregado" : /ship|fulfill|dispatch/.test(st) ? "enviado" : /pack|ready/.test(st) ? "preparado" : "pendiente";
+  const dir = retiro ? null : [[a.address, a.number].filter(Boolean).join(" "), a.floor, a.locality, a.city, a.province, a.zipcode].filter(Boolean).join(", ") || null;
+  return { envio_metodo: (retiro ? "Retiro" + (o.shipping_store_branch_name ? " · " + o.shipping_store_branch_name : "") : o.shipping_option) || "Envío", envio_costo: +o.shipping_cost_customer || 0,
+    envio_direccion: dir, envio_contacto: [a.name, a.phone || o.contact_phone].filter(Boolean).join(" · ") || null, envio_seguimiento: o.shipping_tracking_number || null, envio_estado: estado };
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -78,6 +88,13 @@ Deno.serve(async (req) => {
       if (ya && ya.venta_id) {
         if (cancelado) { const { data: v } = await admin.from("ventas").select("estado").eq("id", ya.venta_id).single(); if (v && v.estado !== "anulada") { await admin.rpc("caja_anular_venta", { p_venta: ya.venta_id, p_motivo: "Pedido cancelado en Tienda Nube" }); anulados++; } }
         await admin.from("canal_pedidos").update({ estado_ext: o.status, pago_ext: o.payment_status, actualizado: ahora }).eq("id", ya.id);
+        // la entrega: se completa si falta y el estado solo avanza (si en Percha ya lo marcaron más adelante, se respeta)
+        if (!cancelado && o.shipping_option !== undefined) {
+          const { data: vv } = await admin.from("ventas").select("envio_estado,envio_metodo").eq("id", ya.venta_id).single();
+          const en = envioDe(o), upd: any = {};
+          if (!vv?.envio_metodo) Object.assign(upd, en); else { if (RANGO[en.envio_estado] > RANGO[vv.envio_estado || "pendiente"]) upd.envio_estado = en.envio_estado; if (en.envio_seguimiento) upd.envio_seguimiento = en.envio_seguimiento; }
+          if (Object.keys(upd).length) await admin.from("ventas").update({ ...upd, envio_actualizado: ahora }).eq("id", ya.venta_id);
+        }
         continue;
       }
       if (!pagado || cancelado) { await admin.from("canal_pedidos").upsert(datosPedido, { onConflict: "conexion_id,pedido_ext" }); continue; }
@@ -139,6 +156,7 @@ Deno.serve(async (req) => {
       const { data: venta, error } = await admin.rpc("caja_registrar_venta", { p: payload });
       if (error) { problemas.push("No se pudo registrar: " + error.message); conProblema++; await admin.from("canal_pedidos").upsert({ ...datosPedido, problema: problemas.join(" · ") }, { onConflict: "conexion_id,pedido_ext" }); continue; }
       nuevos++; if (problemas.length) conProblema++;
+      await admin.from("ventas").update({ ...envioDe(o), envio_actualizado: ahora }).eq("id", venta.id);
       await admin.from("canal_pedidos").upsert({ ...datosPedido, venta_id: venta.id, problema: problemas.length ? problemas.join(" · ") : null }, { onConflict: "conexion_id,pedido_ext" });
     }
     if (!body.solo_pedido && !body.desde) await admin.from("conexiones").update({ ultima_sync_pedidos: ahora }).eq("id", cx.id);

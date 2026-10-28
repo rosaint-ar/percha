@@ -24,6 +24,7 @@
     conteo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M8.5 12l2 2 4-4M8.5 17h7"/></svg>',
     pos: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="13" rx="2"/><path d="M8 21h8M12 16v5M7 8h4M7 11h6"/></svg>',
     caja: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M7 12h.01M17 12h.01"/></svg>',
+    envios: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h11v9H3z"/><path d="M14 10h4l3 3v3h-7"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/></svg>',
     compras: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.4 11.2a1 1 0 0 0 1 .8h8.8a1 1 0 0 0 1-.8L20 8H6.5"/><circle cx="9.5" cy="20" r="1.2"/><circle cx="16.5" cy="20" r="1.2"/></svg>',
     informes: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
     config: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
@@ -121,6 +122,7 @@
     { id: 'pos', label: 'Punto de venta', href: 'caja/pos.html', icono: 'pos', p: 'vender' },
     { id: 'caja', label: 'Caja', href: 'caja/caja.html', icono: 'caja', p: 'vender' },
     { id: 'ventas', label: 'Ventas', href: 'caja/ventas.html', icono: 'informes', p: ['ventas_todas', 'ventas_propias'] },
+    { id: 'envios', label: 'Envíos', href: 'caja/envios.html', icono: 'envios', p: 'vender' },
     { id: 'productos', label: 'Catálogo', href: 'catalogo/productos.html', icono: 'catalogo', p: 'catalogo_ver' },
     { id: 'etiquetas', label: 'Etiquetas', href: 'catalogo/etiquetas.html', icono: 'etiquetas', p: 'catalogo_editar' },
     { id: 'inventario', label: 'Inventario', href: 'catalogo/inventario.html', icono: 'conteo', p: 'catalogo_ver' },
@@ -132,7 +134,7 @@
     { id: 'configuracion', label: 'Configuración', href: 'configuracion/empresa.html', icono: 'config', p: 'configuracion' }
   ];
   // qué permiso pide cada pantalla (data-page del body); la primera permitida es adonde se manda a quien no puede
-  const PERMISO_PAGINA = { inicio: 'inicio', pos: 'vender', caja: 'vender', ventas: ['ventas_todas', 'ventas_propias'], productos: 'catalogo_ver', catalogo: 'catalogo_ver', etiquetas: 'catalogo_editar', inventario: 'catalogo_ver', conteo: 'catalogo_editar', compras: 'compras', conexiones: 'conexiones', configuracion: 'configuracion' };
+  const PERMISO_PAGINA = { inicio: 'inicio', pos: 'vender', caja: 'vender', ventas: ['ventas_todas', 'ventas_propias'], envios: 'vender', productos: 'catalogo_ver', catalogo: 'catalogo_ver', etiquetas: 'catalogo_editar', inventario: 'catalogo_ver', conteo: 'catalogo_editar', compras: 'compras', conexiones: 'conexiones', configuracion: 'configuracion' };
   const permite = p => !p || [].concat(p).some(k => APP.puede(k));
   function pintarLateral() {
     const pagina = body.dataset.page, esAdmin = APP.esAdmin;

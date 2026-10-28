@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Usuarios · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610281623">
+<link rel="stylesheet" href="../shell/shell.css?v=202610281628">
 <style>
   .pestanas{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
   .pestanas a{font:600 13px var(--f-ui);color:var(--tinta);text-decoration:none;padding:8px 14px;border:1px solid var(--linea);background:var(--superficie-2);border-radius:10px}
@@ -16,15 +16,15 @@
 </head>
 <body data-page="configuracion" data-etq="Configuración" data-title="Usuarios" data-subtitle="Quién entra al sistema y qué puede hacer">
 <main class="app">
-  <div class="pestanas"><a href="empresa.html">Empresa</a><a href="atributos.html">Talles, colores y familias</a><a href="curvas.html">Curvas de talle</a><a href="listas.html">Listas de precios</a><a href="promociones.html">Promociones</a><a href="facturacion.html">Facturación</a><a class="on" href="usuarios.html">Usuarios</a></div>
+  <div class="pestanas"><a href="empresa.html">Empresa</a><a href="atributos.html">Talles, colores y familias</a><a href="curvas.html">Curvas de talle</a><a href="listas.html">Listas de precios</a><a href="promociones.html">Promociones</a><a href="envios.html">Envíos</a><a href="facturacion.html">Facturación</a><a class="on" href="usuarios.html">Usuarios</a></div>
   <div class="card">
     <div class="card-cab"><div><h2>Equipo</h2><p class="sub">El rol trae permisos de base; con <b>Permisos</b> se ajusta qué ve y qué hace cada persona.</p></div><div class="acciones"><button class="btn primario" id="btn-nuevo">+ Agregar usuario</button></div></div>
     <table class="lista" id="tb"><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Puede</th><th>Activo</th><th></th></tr></table>
   </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610281623"></script>
-<script src="../shell/shell.js?v=202610281623"></script>
+<script src="../shared/supabase.js?v=202610281628"></script>
+<script src="../shell/shell.js?v=202610281628"></script>
 <script>
 APP.ready.then(async () => {
   const { esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;

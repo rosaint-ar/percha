@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Listas de precios · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610281623">
+<link rel="stylesheet" href="../shell/shell.css?v=202610281628">
 <style>
   .pestanas{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
   .pestanas a{font:600 13px var(--f-ui);color:var(--tinta);text-decoration:none;padding:8px 14px;border:1px solid var(--linea);background:var(--superficie-2);border-radius:10px}
@@ -47,7 +47,7 @@
 </head>
 <body data-page="configuracion" data-etq="Configuración" data-title="Listas de precios" data-subtitle="Una lista base y las demás se calculan solas con su regla">
 <main class="app">
-  <div class="pestanas"><a href="empresa.html">Empresa</a><a href="atributos.html">Talles, colores y familias</a><a href="curvas.html">Curvas de talle</a><a class="on" href="listas.html">Listas de precios</a><a href="promociones.html">Promociones</a><a href="facturacion.html">Facturación</a><a href="usuarios.html">Usuarios</a></div>
+  <div class="pestanas"><a href="empresa.html">Empresa</a><a href="atributos.html">Talles, colores y familias</a><a href="curvas.html">Curvas de talle</a><a class="on" href="listas.html">Listas de precios</a><a href="promociones.html">Promociones</a><a href="envios.html">Envíos</a><a href="facturacion.html">Facturación</a><a href="usuarios.html">Usuarios</a></div>
 
   <div class="card"><div class="card-cab"><div><h2>Listas</h2><p class="sub">La <b>base</b> es el precio de cada prenda (el de la ficha). Las demás se calculan solas desde ese precio. Todo se guarda al cambiarlo.</p></div><div class="acciones"><button class="btn primario" id="btn-nueva">+ Agregar lista</button></div></div>
     <div class="listas" id="listas"></div>
@@ -62,9 +62,9 @@
   </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610281623"></script>
-<script src="../shared/precios.js?v=202610281623"></script>
-<script src="../shell/shell.js?v=202610281623"></script>
+<script src="../shared/supabase.js?v=202610281628"></script>
+<script src="../shared/precios.js?v=202610281628"></script>
+<script src="../shell/shell.js?v=202610281628"></script>
 <script>
 APP.ready.then(async () => {
   const { esc, $, $$, toast, modal, confirmar, mensajeError, fmt } = APP, e = APP.empresa.id;

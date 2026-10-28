@@ -23,7 +23,7 @@ APP.ready.then(async () => {
       sb.from('promociones').select('*').eq('empresa_id', e).eq('activa', true),
       sb.from('empresa_usuarios').select('user_id,nombre,rol').eq('empresa_id', e).eq('activo', true).neq('rol', 'visor').order('nombre'),
       sb.from('cajas').select('*').eq('empresa_id', e).eq('activa', true).order('nombre').limit(1),
-      sb.from('clientes').select('id,nombre,telefono,lista_id').eq('empresa_id', e).eq('activo', true).eq('generico', false).order('nombre').limit(1000)
+      sb.from('clientes').select('id,nombre,telefono,lista_id,direccion,localidad').eq('empresa_id', e).eq('activo', true).eq('generico', false).order('nombre').limit(1000)
     ]);
     // listas, reglas y rebajas: sin internet se usan las últimas guardadas
     if (l && l.listas.length) { pctx = l; try { localStorage.setItem(LS('precios'), JSON.stringify(l.datos)); } catch (_) {} } else { try { const g = JSON.parse(localStorage.getItem(LS('precios')) || 'null'); if (g) pctx = PRECIOS.armar(g); } catch (_) {} }
@@ -192,6 +192,7 @@ APP.ready.then(async () => {
   }
   // Cambiar una prenda ya cargada: otro talle/color del mismo producto, u otra prenda. Mantiene cantidad y descuento.
   function cambiarLinea(i) {
+    if ((carrito.lineas[i] || {}).variante && carrito.lineas[i].variante.producto_tipo === 'envio') { entrega(); return; }
     const l = carrito.lineas[i]; if (!l || l.devuelta) return;
     const matriz = (vars, actual) => `<div class="matriz-pick">${vars.slice().sort((a, b) => (a.talle_orden ?? 999) - (b.talle_orden ?? 999) || String(a.color_nombre || '').localeCompare(b.color_nombre || '')).map(v => `<button data-v="${v.id}" class="${+v.stock > 0 ? '' : 'sin'}${v.id === actual ? ' actual' : ''}">${esc([v.talle_nombre, v.color_nombre].filter(Boolean).join(' · ') || 'único')}<small>${v.id === actual ? 'la cargada' : fmt.num(v.stock) + ' u.'}${+v.fallas > 0 ? ' · ◆' + fmt.num(v.fallas) : ''}</small></button>`).join('')}</div>`;
     const m = modal('<div id="cl"></div>');
@@ -292,7 +293,7 @@ APP.ready.then(async () => {
     return new Promise(resolve => {
       const problemas = () => {
         const g = new Map();
-        carrito.lineas.forEach(l => { const v = l.variante; if (!v || l.devuelta || v.producto_tipo === 'kit' || (productos[v.producto_id] || {}).es_generico || /-SD$/.test(v.sku || '')) return;
+        carrito.lineas.forEach(l => { const v = l.variante; if (!v || l.devuelta || v.producto_tipo === 'kit' || v.producto_tipo === 'envio' || (productos[v.producto_id] || {}).es_generico || /-SD$/.test(v.sku || '')) return;
           const x = g.get(v.id) || { v, normal: 0, falla: 0, lineas: [] }; if (l.falla) x.falla += l.cantidad; else x.normal += l.cantidad; x.lineas.push(l); g.set(v.id, x); });
         const out = [];
         g.forEach(x => { const st = Math.max(+x.v.stock || 0, 0), f = Math.min(+x.v.fallas || 0, st), buenas = st - f;
@@ -332,6 +333,7 @@ APP.ready.then(async () => {
   // ================= Carrito =================
   // Lista → rebaja → regla de la lista (%, excepciones, precio fijo, redondeo): shared/precios.js
   function precioDe(v, listaId) {
+    if (v.producto_tipo === 'envio') return { base: +v.precio || 0, precio: +v.precio || 0, rebaja: null };   // el envío va a su costo, sin lista ni rebajas
     const p = productos[v.producto_id] || {};
     const o = origenVenta(), lc = !listaId && o !== 'local' && pctx.listas.find(l => l.canal === o);   // venta cargada a mano de la tienda online: su lista
     return PRECIOS.calcular(v, listaId || (lc ? lc.id : carrito.lista), pctx, { canal: o, categoria_id: p.categoria_id, tipo: p.tipo || v.producto_tipo });
@@ -346,7 +348,7 @@ APP.ready.then(async () => {
     avisoAlAgregar(v, cantidad);
   }
   // Para el ticket: ¿esta línea vende más de lo que el sistema dice que hay?
-  const controlaStock = v => v && v.producto_tipo !== 'kit' && !(productos[v.producto_id] || {}).es_generico && !/-SD$/.test(v.sku || '');
+  const controlaStock = v => v && v.producto_tipo !== 'kit' && v.producto_tipo !== 'envio' && !(productos[v.producto_id] || {}).es_generico && !/-SD$/.test(v.sku || '');
   const llevando = v => carrito.lineas.filter(l => l.variante.id === v.id && !l.devuelta).reduce((t, l) => t + l.cantidad, 0);
   // Primer aviso, apenas se agrega (el segundo es al cobrar): no hay stock, o solo quedan las que tienen falla
   function avisoAlAgregar(v, cantidad) {
@@ -449,7 +451,7 @@ APP.ready.then(async () => {
     $('#btn-cobrar').disabled = !c.lineas.length;
     $('#btn-sena').disabled = !c.lineas.length || !!carrito.cambio;
   }
-  $('#btn-vaciar').onclick = async () => { if (!carrito.lineas.length || await confirmar('¿Vaciar el ticket?', 'Vaciar')) { carrito.lineas = []; carrito.cambio = null; carrito.descPct = 0; $('#desc-general').value = 0; $('#nota').value = ''; pintar(); } };
+  $('#btn-vaciar').onclick = async () => { if (!carrito.lineas.length || await confirmar('¿Vaciar el ticket?', 'Vaciar')) { carrito.lineas = []; carrito.cambio = null; carrito.envio = null; pintarEntrega(); carrito.descPct = 0; $('#desc-general').value = 0; $('#nota').value = ''; pintar(); } };
   $('#desc-general').onchange = ev => { if (!APP.puede('descuentos') && +ev.target.value > 0) { toast('Los descuentos los habilita administración', 'error'); ev.target.value = 0; } carrito.descPct = Math.min(100, Math.max(0, +ev.target.value || 0)); pintar(); };
   $('#sel-vendedora').onchange = ev => carrito.vendedora = ev.target.value;
 
@@ -532,6 +534,7 @@ APP.ready.then(async () => {
         empresa_id: e, offline_id: crypto.randomUUID(), tipo: carrito.cambio ? 'cambio' : 'venta', estado: modoSena ? 'senada' : 'completada',
         caja_id: reservado ? null : caja.id, turno_id: reservado ? null : turno.id, reservada: !!reservado, pin: reservado || undefined, cliente_id: cliente, vendedora_id: carrito.vendedora, lista_id: carrito.lista,
         descuento_pct: carrito.descPct || 0, descuento: t.descuento, recargo: t.recargo, nota: $('#nota').value.trim() || null,
+        envio: carrito.envio || null,
         venta_origen_id: carrito.cambio ? carrito.cambio.id : null, origen: ($('#sel-origen') || {}).value || 'local',
         lineas: t.lineas.map(l => ({ variante_id: l.variante.id, producto_id: l.variante.producto_id, descripcion: l.variante.producto_nombre, talle: l.variante.talle_nombre, color: l.variante.color_nombre, cantidad: l.cantidad, precio_lista: l.precioLista, precio_unit: l.precioFinal, descuento_pct: l.descPct || 0, promocion_id: l.promo ? l.promo.id : null, promocion_nombre: l.promo ? l.promo.nombre : null, total: l.total, costo_unit: +l.variante.costo || 0, componentes: l.componentes && l.componentes.length ? l.componentes : null, falla: !!l.falla, falla_id: l.fallaU ? l.fallaU.id : null })),
         pagos: pagosFinal.filter(p => p.monto !== 0).map(p => ({ forma_pago_id: p.forma_pago_id || null, credito_id: p.credito_id || null, monto: p.monto, cuotas: p.cuotas || 1, recargo_pct: p.recargo_pct || 0 })),
@@ -542,7 +545,7 @@ APP.ready.then(async () => {
       mostrarTicket(payload, res, { vuelto: vuelto > 0 ? vuelto : 0, pagos: pagosFinal, total: t });
       cargarFallas(); setTimeout(pintarAvisosStock, 1200);
       if (carrito.avisos) { toast('Venta hecha. Quedó un aviso para corregir el stock en Inventario', 'error'); carrito.avisos = 0; setTimeout(pintarAvisosStock, 1500); }
-      carrito.lineas = []; carrito.cambio = null; carrito.descPct = 0; $('#desc-general').value = 0; $('#nota').value = ''; $('#sel-cliente').value = ''; if ($('#sel-origen')) $('#sel-origen').value = 'local';
+      carrito.lineas = []; carrito.cambio = null; carrito.envio = null; pintarEntrega(); carrito.descPct = 0; $('#desc-general').value = 0; $('#nota').value = ''; $('#sel-cliente').value = ''; if ($('#sel-origen')) $('#sel-origen').value = 'local';
       carrito.lista = (listas.find(x => x.predeterminada) || listas[0] || {}).id;   // la próxima venta arranca con la lista base
       // el stock del catálogo en memoria
       payload.lineas.forEach(l => { const v = catalogo.find(x => x.id === l.variante_id); if (v && v.producto_tipo !== 'kit') v.stock = (+v.stock || 0) - l.cantidad; });
@@ -556,6 +559,39 @@ APP.ready.then(async () => {
     const r = await sb.from('clientes').insert(APP.conEmpresa({ nombre })).select().single();
     if (r.error) return null; clientes.push(r.data); return r.data.id;
   }
+  // ================= Entrega (envío) =================
+  // la venta puede llevar una entrega: medio (retiro, cadete, correo…), costo, dirección y contacto. Queda en Envíos para despachar.
+  let metodosEnvio = null;
+  const lineaEnvio = () => carrito.lineas.find(l => l.variante && l.variante.producto_tipo === 'envio');
+  function pintarEntrega() { const b = document.getElementById('btn-entrega'); if (b) b.innerHTML = carrito.envio ? '🚚 ' + esc(carrito.envio.metodo) + (carrito.envio.costo ? ' · ' + fmt.pesos(carrito.envio.costo) : '') : '🚚 Entrega'; }
+  async function entrega() {
+    if (!metodosEnvio) { const { data } = await sb.from('envio_metodos').select('*').eq('empresa_id', e).eq('activo', true).order('orden'); metodosEnvio = data || []; }
+    if (!metodosEnvio.length) { toast('No hay medios de envío: se cargan en Configuración › Envíos', 'error'); return; }
+    const act = carrito.envio || {}; let sel = metodosEnvio.find(x => x.id === act.metodo_id) || null;
+    const cli = clientes.find(c => norm(c.nombre) === norm($('#sel-cliente').value.trim()));
+    const m = modal(`<h2>Entrega</h2><p class="sub">Cómo le llega a la clienta. Queda en <b>Envíos</b> para despachar.</p>
+      <div class="campo"><label>Medio</label><div style="display:flex;gap:6px;flex-wrap:wrap">${metodosEnvio.map(x => `<button type="button" class="btn chico${sel && sel.id === x.id ? ' primario' : ''}" data-me="${x.id}">${esc(x.nombre)}</button>`).join('')}</div></div>
+      <div class="campo"><label>Costo del envío (lo paga la clienta)</label><input id="en-costo" type="number" min="0" step="10" value="${act.costo ?? (sel ? sel.costo : 0)}"></div>
+      <div class="campo" id="en-dir-c"><label>Dirección</label><input id="en-dir" value="${esc(act.direccion || (cli && [cli.direccion, cli.localidad].filter(Boolean).join(', ')) || '')}" placeholder="Calle, número, piso, localidad"></div>
+      <div class="campo"><label>Contacto</label><input id="en-con" value="${esc(act.contacto || (cli && cli.telefono) || '')}" placeholder="Teléfono o quién recibe"></div>
+      <div class="pie">${carrito.envio ? '<button class="btn" data-quitar style="margin-right:auto">Sin entrega</button>' : ''}<button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Listo</button></div>`);
+    const marcar = () => { $$('[data-me]', m).forEach(b => b.classList.toggle('primario', !!sel && b.dataset.me === sel.id)); $('#en-dir-c', m).style.display = sel && !sel.pide_direccion ? 'none' : ''; };
+    $$('[data-me]', m).forEach(b => b.onclick = () => { sel = metodosEnvio.find(x => x.id === b.dataset.me); $('#en-costo', m).value = sel.costo || 0; marcar(); });
+    marcar();
+    $('[data-no]', m).onclick = () => m.cerrar();
+    const q = $('[data-quitar]', m); if (q) q.onclick = () => { carrito.envio = null; const l = lineaEnvio(); if (l) carrito.lineas.splice(carrito.lineas.indexOf(l), 1); m.cerrar(); pintarEntrega(); pintar(); };
+    $('[data-si]', m).onclick = () => {
+      if (!sel) { toast('Elegí el medio', 'error'); return; }
+      const costo = Math.max(0, +$('#en-costo', m).value || 0);
+      carrito.envio = { metodo_id: sel.id, metodo: sel.nombre, costo, direccion: sel.pide_direccion ? $('#en-dir', m).value.trim() : '', contacto: $('#en-con', m).value.trim() };
+      // el costo va como un renglón "Envío" del ticket (sin stock, sin lista ni rebajas)
+      const l = lineaEnvio();
+      if (costo > 0) { const v = { id: null, producto_id: null, producto_nombre: 'Envío · ' + sel.nombre, producto_tipo: 'envio', precio: costo, costo: 0, stock: 0 }; if (l) l.variante = v; else carrito.lineas.push({ variante: v, cantidad: 1, descPct: 0 }); }
+      else if (l) carrito.lineas.splice(carrito.lineas.indexOf(l), 1);
+      m.cerrar(); pintarEntrega(); pintar();
+    };
+  }
+  { const n = document.getElementById('nota'); if (n && !document.getElementById('btn-entrega')) { n.insertAdjacentHTML('afterend', '<button class="btn chico" id="btn-entrega" type="button" title="Envío o retiro: medio, costo y dirección">🚚 Entrega</button>'); document.getElementById('btn-entrega').onclick = entrega; } }
   $('#btn-cobrar').onclick = () => cobrar(false);
   $('#btn-sena').onclick = () => cobrar(true);
 

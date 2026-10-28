@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Envíos · Percha</title>
+<meta name="app-root" content="../">
+<link rel="stylesheet" href="../shell/shell.css?v=202610281628">
+<style>
+  .pestanas{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
+  .pestanas a{font:600 13px var(--f-ui);color:var(--tinta);text-decoration:none;padding:8px 14px;border:1px solid var(--linea);background:var(--superficie-2);border-radius:10px}
+  .pestanas a.on{background:var(--lila);border-color:transparent;color:var(--acento)}
+</style>
+</head>
+<body data-page="configuracion" data-etq="Configuración" data-title="Envíos" data-subtitle="Los medios de entrega que se eligen al vender">
+<main class="app">
+  <div class="pestanas"><a href="empresa.html">Empresa</a><a href="atributos.html">Talles, colores y familias</a><a href="curvas.html">Curvas de talle</a><a href="listas.html">Listas de precios</a><a href="promociones.html">Promociones</a><a class="on" href="envios.html">Envíos</a><a href="facturacion.html">Facturación</a><a href="usuarios.html">Usuarios</a></div>
+  <div class="card"><div class="card-cab"><div><h2>Medios de envío</h2><p class="sub">En la caja, <b>🚚 Entrega</b> ofrece estos medios con su costo sugerido (se puede cambiar en cada venta). Los cambios se guardan solos.</p></div><div class="acciones"><button class="btn primario" id="btn-nuevo">+ Agregar medio</button></div></div>
+    <table class="lista" id="tb"><tr><th>Nombre</th><th>Tipo</th><th class="num">Costo sugerido</th><th>Pide dirección</th><th>Activo</th><th></th></tr></table>
+  </div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../shared/supabase.js?v=202610281628"></script>
+<script src="../shell/shell.js?v=202610281628"></script>
+<script>
+APP.ready.then(async () => {
+  const { esc, $, $$, toast, mensajeError, confirmar } = APP, e = APP.empresa.id;
+  if (!APP.esAdmin) { document.querySelector('main').innerHTML = '<div class="card"><p>Esta sección es solo para administración.</p></div>'; return; }
+  const TIPOS = [['retiro', 'Retiro'], ['cadete', 'Cadete / moto'], ['correo', 'Correo'], ['otro', 'Otro']];
+  async function cargar() {
+    const { data } = await sb.from('envio_metodos').select('*').eq('empresa_id', e).order('orden');
+    const tb = $('#tb'); tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());
+    (data || []).forEach(m => tb.insertAdjacentHTML('beforeend', `<tr data-id="${m.id}"><td><input data-k="nombre" value="${esc(m.nombre)}"></td>
+      <td><select data-k="tipo">${TIPOS.map(([k, t]) => `<option value="${k}" ${m.tipo === k ? 'selected' : ''}>${t}</option>`).join('')}</select></td>
+      <td class="num"><input data-k="costo" type="number" min="0" step="10" value="${+m.costo}"></td>
+      <td><label class="switch"><input type="checkbox" data-k="pide_direccion" ${m.pide_direccion ? 'checked' : ''}><span></span></label></td>
+      <td><label class="switch"><input type="checkbox" data-k="activo" ${m.activo ? 'checked' : ''}><span></span></label></td>
+      <td><button class="btn-eliminar" data-del title="Quitar">✕</button></td></tr>`));
+    if (!(data || []).length) tb.insertAdjacentHTML('beforeend', '<tr><td colspan="6" class="vacio">Sin medios de envío.</td></tr>');
+    $$('#tb [data-k]').forEach(i => i.onchange = async () => {
+      const tr = i.closest('tr'), k = i.dataset.k, v = i.type === 'checkbox' ? i.checked : k === 'costo' ? Math.max(0, +i.value || 0) : i.value.trim();
+      if (k === 'nombre' && !v) { toast('Ponele un nombre', 'error'); cargar(); return; }
+      const r = await sb.from('envio_metodos').update({ [k]: v }).eq('id', tr.dataset.id); toast(r.error ? mensajeError(r.error) : 'Guardado', r.error ? 'error' : '');
+    });
+    $$('#tb [data-del]').forEach(b => b.onclick = async () => {
+      if (!await confirmar('¿Quitar este medio? Las ventas que ya lo usaron no cambian.', 'Quitar')) return;
+      const r = await sb.from('envio_metodos').update({ activo: false }).eq('id', b.closest('tr').dataset.id); toast(r.error ? mensajeError(r.error) : 'Quitado (inactivo)', r.error ? 'error' : ''); cargar();
+    });
+  }
+  $('#btn-nuevo').onclick = async () => {
+    const d = await APP.formulario({ titulo: 'Nuevo medio de envío', campos: [{ k: 'nombre', label: 'Nombre', requerido: true, placeholder: 'Ej. Andreani a domicilio' }, { k: 'tipo', label: 'Tipo', tipo: 'select', opciones: TIPOS, valor: 'correo' }, { k: 'costo', label: 'Costo sugerido', tipo: 'number', valor: 0 }], boton: 'Agregar' });
+    if (!d) return;
+    const r = await sb.from('envio_metodos').insert(APP.conEmpresa({ nombre: d.nombre.trim(), tipo: d.tipo, costo: +d.costo || 0, pide_direccion: d.tipo !== 'retiro', orden: 99 }));
+    toast(r.error ? (/duplicate|unique/i.test(r.error.message) ? 'Ya hay un medio con ese nombre' : mensajeError(r.error)) : 'Agregado', r.error ? 'error' : ''); cargar();
+  };
+  await cargar();
+});
+</script>
+</body>
+</html>

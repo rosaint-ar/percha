@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Envíos · Percha</title>
+<meta name="app-root" content="../">
+<link rel="stylesheet" href="../shell/shell.css?v=202610281628">
+<style>
+  .filtros-env{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+  .filtros-env button{border:1px solid var(--linea);background:var(--superficie-2);border-radius:999px;padding:7px 14px;font:600 13px var(--f-ui);cursor:pointer;color:var(--tinta-2)}
+  .filtros-env button.on{background:var(--acento);border-color:var(--acento);color:#fff}
+  .envios{display:grid;gap:10px}
+  .env{border:1px solid var(--linea);border-radius:14px;padding:12px 14px;background:var(--superficie-2);display:grid;grid-template-columns:1fr auto;gap:6px 14px}
+  .env .cab{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+  .env .cab b{font:700 15px var(--f-ui)}.env .cab .mono{font-size:12px;color:var(--tinta-3)}
+  .env .det{font-size:13px;color:var(--tinta-2);grid-column:1}
+  .env .pr{font-size:12.5px;color:var(--tinta-3);grid-column:1}
+  .env .acc{grid-column:2;grid-row:1 / span 3;display:flex;flex-direction:column;gap:6px;align-items:stretch;min-width:190px}
+  .env select,.env input{height:34px;border:1px solid var(--linea);border-radius:9px;background:var(--superficie);padding:0 8px;font:500 13px var(--f-ui)}
+  .est-pendiente{border-left:4px solid var(--aviso,#d99a00)}.est-preparado{border-left:4px solid var(--acento)}.est-enviado{border-left:4px solid #3b82f6}.est-entregado{border-left:4px solid var(--ok);opacity:.75}
+  @media (max-width:640px){.env{grid-template-columns:1fr}.env .acc{grid-column:1;grid-row:auto}}
+</style>
+</head>
+<body data-page="envios" data-etq="Operación" data-title="Envíos" data-subtitle="Lo que hay que preparar, despachar y entregar">
+<main class="app">
+  <div class="card">
+    <div class="filtros-env" id="filtros"><button class="on" data-f="abiertos">Por despachar</button><button data-f="pendiente">Pendientes</button><button data-f="preparado">Preparados</button><button data-f="enviado">Enviados</button><button data-f="todos">Últimos 60 días</button></div>
+    <div class="envios" id="lista"><p class="sub">Cargando…</p></div>
+  </div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../shared/supabase.js?v=202610281628"></script>
+<script src="../shell/shell.js?v=202610281628"></script>
+<script>
+APP.ready.then(async () => {
+  const { fmt, esc, $, $$, toast, mensajeError } = APP, e = APP.empresa.id;
+  const ESTADOS = [['pendiente', 'Pendiente'], ['preparado', 'Preparado'], ['enviado', 'Enviado'], ['entregado', 'Entregado']];
+  const CANAL = { local: 'Local', whatsapp: 'WhatsApp', tiendanube: 'Tienda Nube', online: 'Online' };
+  let filtro = 'abiertos', datos = [];
+  async function cargar() {
+    const { data, error } = await sb.rpc('envios_listar', { e, p_todos: filtro === 'todos' });
+    if (error) { $('#lista').innerHTML = `<p class="sub">${esc(mensajeError(error))}</p>`; return; }
+    datos = data || []; pintar();
+  }
+  function pintar() {
+    const vs = datos.filter(x => filtro === 'todos' || filtro === 'abiertos' ? true : x.envio_estado === filtro);
+    $('#lista').innerHTML = vs.length ? vs.map(x => `<div class="env est-${x.envio_estado}" data-id="${x.id}">
+        <div class="cab"><b>${esc(x.cliente || 'Sin nombre')}</b><span class="mono">${esc(x.mostrar)} · ${fmt.fechaHora(x.fecha)} · ${esc(CANAL[x.origen] || x.origen)}</span>${x.metodo ? `<span class="chip">${esc(x.metodo)}</span>` : ''}</div>
+        <div class="det">${x.direccion ? '📍 ' + esc(x.direccion) : '<span class="sub">Sin dirección (retiro)</span>'}${x.contacto || x.telefono ? ' · 📞 ' + esc(x.contacto || x.telefono) : ''}${x.costo ? ' · envío ' + fmt.pesos(x.costo) : ''}</div>
+        <div class="pr">${esc(x.prendas || '')}${x.nota ? ' · ' + esc(x.nota) : ''}</div>
+        <div class="acc"><select data-est>${ESTADOS.map(([k, t]) => `<option value="${k}" ${x.envio_estado === k ? 'selected' : ''}>${t}</option>`).join('')}</select>
+          <input data-seg placeholder="N° de seguimiento" value="${esc(x.seguimiento || '')}"></div>
+      </div>`).join('') : '<div class="vacio">Nada por acá. Las ventas con entrega aparecen solas (en la caja: 🚚 Entrega; los pedidos de la web entran con su envío).</div>';
+    $$('.env').forEach(c => {
+      const guardar = async d => { const r = await sb.rpc('venta_envio_guardar', { p: Object.assign({ venta_id: c.dataset.id }, d) }); if (r.error) toast(mensajeError(r.error), 'error'); else { toast('Guardado'); const x = datos.find(y => y.id === c.dataset.id); Object.assign(x, d.estado ? { envio_estado: d.estado } : {}, 'seguimiento' in d ? { seguimiento: d.seguimiento } : {}); pintar(); } };
+      $('[data-est]', c).onchange = ev => guardar({ estado: ev.target.value });
+      $('[data-seg]', c).onchange = ev => guardar({ seguimiento: ev.target.value.trim() });
+    });
+  }
+  $$('#filtros button').forEach(b => b.onclick = () => { const antes = filtro; filtro = b.dataset.f; $$('#filtros button').forEach(x => x.classList.toggle('on', x === b)); if ((antes === 'todos') !== (filtro === 'todos')) cargar(); else pintar(); });
+  await cargar();
+});
+</script>
+</body>
+</html>
