@@ -305,6 +305,12 @@ APP.ready.then(async () => {
   function agregar(v, cantidad) {
     if (!v) return;
     if (cantidad == null) cantidad = (APP.caja && APP.caja.tomarCantidad && APP.caja.tomarCantidad()) || 1;   // el teclado del POS puede dejar una cantidad lista
+    // devolución sin ticket: lo que se toca o escanea entra como devuelto, al precio de hoy (se puede corregir en el renglón)
+    if (carrito.devolviendo) {
+      const dv = carrito.lineas.find(l => l.variante.id === v.id && l.devuelta && l.sinTicket);
+      if (dv) dv.cantidad -= cantidad; else carrito.lineas.push({ variante: v, cantidad: -cantidad, descPct: 0, devuelta: true, sinTicket: true, precioFijo: precioLista(v) });
+      recientes(v); pintar(); $('#q').focus(); return;
+    }
     const ya = carrito.lineas.find(l => l.variante.id === v.id && !l.devuelta);
     if (ya) ya.cantidad += cantidad; else carrito.lineas.push({ variante: v, cantidad, descPct: 0 });
     recientes(v); pintar(); $('#q').focus();
@@ -396,10 +402,12 @@ APP.ready.then(async () => {
   }
   function pintar() {
     const c = calcular(), cont = $('#lineas');
-    if (!c.lineas.length) cont.innerHTML = '<div class="vacio-ticket"><b>Listo para vender</b><span>Tocá una prenda o escaneá el código.</span><small><kbd>/</kbd> buscar · <kbd>F9</kbd> cobrar</small></div>';
-    else cont.innerHTML = c.lineas.map((l, i) => `<div class="linea">
+    const avisoDev = carrito.devolviendo ? '<div class="modo-dev"><span><b>↩ Devolución sin ticket</b>Tocá o escaneá lo que trae. Después, “Listo” y cargá lo que se lleva.</span><button class="btn chico primario" data-dev-listo>Listo</button></div>' : '';
+    if (!c.lineas.length && carrito.devolviendo) cont.innerHTML = avisoDev;
+    else if (!c.lineas.length) cont.innerHTML = '<div class="vacio-ticket"><b>Listo para vender</b><span>Tocá una prenda o escaneá el código.</span><small><kbd>/</kbd> buscar · <kbd>F9</kbd> cobrar</small></div>';
+    else cont.innerHTML = avisoDev + c.lineas.map((l, i) => `<div class="linea">
       <div><div class="n">${l.devuelta ? esc(l.variante.producto_nombre) : `<span class="cambiable" data-cambiar="${i}" title="Tocá para cambiar el talle, el color o la prenda">${esc(l.variante.producto_nombre)}</span>`}${l.devuelta ? ' <span class="chip error">devuelve</span>' : ''}</div><div class="v">${l.devuelta ? esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || l.variante.sku || '') : `<span class="cambiable" data-cambiar="${i}">${esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || 'único')}</span>`} · ${fmt.pesos(l.precioLista)}${l.descPct && l.precioManual == null ? ' −' + l.descPct + '%' : ''}${!l.devuelta && controlaStock(l.variante) && llevando(l.variante) > Math.max(+l.variante.stock || 0, 0) ? '<span class="sinstock-chip" title="El sistema dice que no hay suficiente">⚠ sin stock</span>' : ''}</div>${l.precioManual != null && !l.devuelta ? `<div class="promo manual">Precio cambiado a mano</div>` : ''}${l.rebaja && !l.devuelta && l.precioManual == null ? `<div class="promo">▼ ${esc(l.rebaja.nombre)} · antes ${fmt.pesos(l.precioBase)}</div>` : ''}${l.promo ? `<div class="promo">★ ${esc(l.promo.nombre)} · −${fmt.pesos(l.descPromo)}/u</div>` : ''}${(+l.variante.fallas > 0 || l.falla) && !l.devuelta ? `<button class="falla ${l.falla ? 'on' : ''}" data-falla="${i}" title="${l.falla ? 'Tocá para desmarcar' : esc(l.variante.falla_nota || '')}">${l.falla ? '◆ Con falla' + (l.fallaU && l.fallaU.nota ? ': ' + esc(l.fallaU.nota) : '') + (l.descFalla ? ' · ' + fmt.dec(l.descFalla) + '% off' : '') : '◆ Hay ' + fmt.num(l.variante.fallas) + ' con falla · ¿es esta?'}</button>` : ''}</div>
-      <div class="t">${l.devuelta ? fmt.pesos(l.total) : `<input class="pu${l.precioManual != null ? ' manual' : ''}" data-pu="${i}" type="number" min="0" step="1" value="${l.precioFinal}" data-orig="${l.precioFinal}" title="Precio por unidad: escribí otro para cambiarlo (F2)"${APP.puede('descuentos') ? '' : ' readonly'}>${Math.abs(l.cantidad) > 1 ? `<small>${l.cantidad} u. = ${fmt.pesos(l.total)}</small>` : ''}`}</div>
+      <div class="t">${l.devuelta && !l.sinTicket ? fmt.pesos(l.total) : `<input class="pu${l.precioManual != null ? ' manual' : ''}" data-pu="${i}" type="number" min="0" step="1" value="${l.precioFinal}" data-orig="${l.precioFinal}" title="Precio por unidad: escribí otro para cambiarlo (F2)"${APP.puede('descuentos') ? '' : ' readonly'}>${Math.abs(l.cantidad) > 1 ? `<small>${l.cantidad} u. = ${fmt.pesos(l.total)}</small>` : ''}`}</div>
       <div class="ctrl"><button data-i="${i}" data-d="-1">−</button><input data-i="${i}" data-q value="${l.cantidad}"><button data-i="${i}" data-d="1">+</button><span class="desc">desc % <input data-i="${i}" data-desc type="number" min="0" max="100" value="${l.precioManual != null ? 0 : l.descPct || 0}"${l.precioManual != null ? ' disabled title="Tiene precio a mano"' : ''}></span><button class="quitar" data-i="${i}" data-x title="Quitar">×</button></div></div>`).join('');
     $$('[data-d]', cont).forEach(b => b.onclick = () => { const l = carrito.lineas[+b.dataset.i]; l.cantidad += +b.dataset.d * (l.devuelta ? -1 : 1); if ((l.devuelta ? -l.cantidad : l.cantidad) <= 0) carrito.lineas.splice(+b.dataset.i, 1); pintar(); });
     $$('[data-q]', cont).forEach(i => i.onchange = () => { const n = parseInt(i.value) || 0; const l = carrito.lineas[+i.dataset.i]; if (n === 0) carrito.lineas.splice(+i.dataset.i, 1); else l.cantidad = l.devuelta ? -Math.abs(n) : Math.abs(n); pintar(); });
@@ -412,11 +420,12 @@ APP.ready.then(async () => {
     $('#listas').innerHTML = listas.map(l => `<button class="${l.id === carrito.lista ? 'on' : ''}" data-l="${l.id}" title="${+l.porcentaje === 100 ? 'Precio de lista' : (+l.porcentaje < 100 ? '−' + fmt.dec(100 - l.porcentaje) : '+' + fmt.dec(l.porcentaje - 100)) + '% sobre Lista'}">${esc(l.nombre)}</button>`).join('');
     $$('#listas button').forEach(b => b.onclick = () => { carrito.lista = b.dataset.l; pintar(); });
     $('#totales').innerHTML = `<div><span>Subtotal</span><span class="mono">${fmt.pesos(c.subtotal)}</span></div>${c.descuento ? `<div><span>Descuento ${carrito.descPct}%</span><span class="mono">−${fmt.pesos(c.descuento)}</span></div>` : ''}<div class="gran"><span>Total</span><span>${fmt.pesos(c.total)}</span></div>`;
-    $('#ticket-sub').textContent = carrito.cambio ? `Cambio sobre la venta #${carrito.cambio.numero}` : (c.lineas.length ? `${c.lineas.reduce((s, l) => s + Math.abs(l.cantidad), 0)} prendas` : 'Nueva venta');
+    { const dl = $('[data-dev-listo]', cont); if (dl) dl.onclick = () => { carrito.devolviendo = false; pintar(); $('#q').focus(); }; }
+    $('#ticket-sub').textContent = carrito.cambio ? (carrito.cambio.numero ? `Cambio sobre la venta #${carrito.cambio.numero}` : 'Cambio sin ticket') : (c.lineas.length ? `${c.lineas.reduce((s, l) => s + Math.abs(l.cantidad), 0)} prendas` : 'Nueva venta');
     $('#btn-cobrar').disabled = !c.lineas.length;
     $('#btn-sena').disabled = !c.lineas.length || !!carrito.cambio;
   }
-  $('#btn-vaciar').onclick = async () => { if (!carrito.lineas.length || await confirmar('¿Vaciar el ticket?', 'Vaciar')) { carrito.lineas = []; carrito.cambio = null; carrito.envio = null; pintarEntrega(); carrito.descPct = 0; $('#desc-general').value = 0; $('#nota').value = ''; pintar(); } };
+  $('#btn-vaciar').onclick = async () => { if (!carrito.lineas.length || await confirmar('¿Vaciar el ticket?', 'Vaciar')) { carrito.lineas = []; carrito.cambio = null; carrito.devolviendo = false; carrito.envio = null; pintarEntrega(); carrito.descPct = 0; $('#desc-general').value = 0; $('#nota').value = ''; pintar(); } };
   $('#desc-general').onchange = ev => { if (!APP.puede('descuentos') && +ev.target.value > 0) { toast('Los descuentos los habilita administración', 'error'); ev.target.value = 0; } carrito.descPct = Math.min(100, Math.max(0, +ev.target.value || 0)); pintar(); };
   $('#sel-vendedora').onchange = ev => carrito.vendedora = ev.target.value;
 
@@ -424,9 +433,10 @@ APP.ready.then(async () => {
   // El precio por unidad es un campo en el renglón: se escribe otro y manda sobre la lista, el desc % y las promos. Pide el permiso de descuentos.
   // Escribir el de lista (o dejarlo vacío) lo vuelve a la normalidad.
   function ponerPrecio(i, valor) {
-    const l = carrito.lineas[i]; if (!l || l.devuelta) return;
+    const l = carrito.lineas[i]; if (!l || (l.devuelta && !l.sinTicket)) return;
     if (!APP.puede('descuentos')) { toast('Cambiar el precio lo habilita administración (permiso de descuentos)', 'error'); pintar(); return; }
     const v = valor === '' ? null : r2(+valor);
+    if (l.devuelta) { l.precioFijo = v == null || !(v >= 0) ? precioLista(l.variante) : v; pintar(); return; }
     if (v == null || !(v >= 0) || v === r2(l.precioLista)) delete l.precioManual;
     else if (v !== r2(l.precioFinal) || l.precioManual != null) { l.precioManual = v; l.descPct = 0; }
     pintar();
@@ -535,7 +545,7 @@ APP.ready.then(async () => {
       catch (err) { console.error(err); modal(`<h2>✓ Venta ${esc(numTxt)} registrada</h2><div style="font:800 30px var(--f-titulo);margin:6px 0">${fmt.pesos(t.aPagar)}</div>${vuelto > 0 ? `<div class="aviso-caja info">Vuelto: <b>${fmt.pesos(vuelto)}</b></div>` : ''}<div class="pie"><button class="btn primario" onclick="this.closest('.modal-fondo').remove()">Listo</button></div>`); }
       cargarFallas(); setTimeout(pintarAvisosStock, 1200);
       if (carrito.avisos) { toast('Venta hecha. Quedó un aviso para corregir el stock en Inventario', 'error'); carrito.avisos = 0; setTimeout(pintarAvisosStock, 1500); }
-      carrito.lineas = []; carrito.cambio = null; carrito.envio = null; pintarEntrega(); carrito.descPct = 0; $('#desc-general').value = 0; $('#nota').value = ''; $('#sel-cliente').value = ''; if ($('#sel-origen')) $('#sel-origen').value = 'local';
+      carrito.lineas = []; carrito.cambio = null; carrito.devolviendo = false; carrito.envio = null; pintarEntrega(); carrito.descPct = 0; $('#desc-general').value = 0; $('#nota').value = ''; $('#sel-cliente').value = ''; if ($('#sel-origen')) $('#sel-origen').value = 'local';
       carrito.lista = (listas.find(x => x.predeterminada) || listas[0] || {}).id;   // la próxima venta arranca con la lista base
       // el stock del catálogo en memoria
       payload.lineas.forEach(l => { const v = catalogo.find(x => x.id === l.variante_id); if (v && v.producto_tipo !== 'kit') v.stock = (+v.stock || 0) - l.cantidad; });
@@ -653,7 +663,9 @@ APP.ready.then(async () => {
   $('#btn-cambio').onclick = () => {
     const m = modal(`<h2>Cambio o devolución</h2><p class="sub">Buscá la venta original por número de ticket.</p>
       <div class="campo" style="margin-top:12px"><label>Número de ticket</label><input id="cv-num" placeholder="Ej. 1234 o R-12" autofocus></div>
-      <div id="cv-res"></div>`);
+      <div id="cv-res"></div>
+      <div class="sin-ticket"><span><b>¿No tiene ticket?</b>Se carga lo que trae tocándolo o escaneándolo, al precio de hoy.</span><button class="btn" data-sin-ticket>Devolver sin ticket</button></div>`);
+    $('[data-sin-ticket]', m).onclick = () => { carrito.cambio = carrito.cambio || { id: null, numero: null }; carrito.devolviendo = true; m.cerrar(); pintar(); $('#q').focus(); };
     const buscarVenta = async () => {
       const n = $('#cv-num', m).value.trim(); if (!n) return;
       // por función: la vendedora encuentra el ticket aunque no vea el listado de ventas viejas (también los R- en efectivo)

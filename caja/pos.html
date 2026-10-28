@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Punto de venta · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610282059">
+<link rel="stylesheet" href="../shell/shell.css?v=202610282108">
 <style>
   /* ===== Punto de venta: pantalla completa, pensada para tocar y vender rápido ===== */
   body.con-lateral{grid-template-columns:1fr}
@@ -290,6 +290,12 @@
   .modal kbd.num{position:absolute;top:5px;right:6px;padding:0 5px;font-size:10px;color:var(--acento);border-color:rgba(var(--acento-rgb),.35);background:#fff}
   .modal .mp-chip kbd.num{top:-7px;right:-5px}
   .modal:focus{outline:none}
+  .ticket .lineas{overflow-x:hidden}   /* el renglón entra deslizando: que no aparezca una barra de desplazamiento */
+  /* devolución sin ticket */
+  .modo-dev{display:flex;align-items:center;gap:10px;margin:4px 0 8px;padding:10px 12px;border-radius:12px;background:var(--aviso-fondo);border:1px solid rgba(168,101,26,.25);font-size:12.5px;color:var(--tinta-2);animation:linea-entra .35s ease-out both}
+  .modo-dev span{flex:1;display:flex;flex-direction:column;gap:2px}.modo-dev b{color:var(--aviso);font-size:13px}
+  .sin-ticket{display:flex;align-items:center;gap:12px;margin-top:16px;padding-top:14px;border-top:1px solid var(--linea);font-size:12.5px;color:var(--tinta-3)}
+  .sin-ticket span{flex:1;display:flex;flex-direction:column;gap:2px}.sin-ticket b{color:var(--tinta);font-size:13.5px}
   .atajos{flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;padding:6px 4px 0;font:500 11.5px var(--f-ui);color:var(--tinta-3);border-top:1px solid rgba(21,23,28,.06)}
   .atajos span{display:inline-flex;align-items:center;gap:3px;white-space:nowrap}
   @media (max-width:1100px),(pointer:coarse){.atajos{display:none}}
@@ -375,15 +381,15 @@
 </main>
 <div id="impresion"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610282059"></script>
-<script src="../shared/canales.js?v=202610282059"></script>
-<script src="../shared/precios.js?v=202610282059"></script>
-<script src="../shell/shell.js?v=202610282059"></script>
-<script src="../shared/facturar.js?v=202610282059"></script>
-<script src="../shared/medios-pago.js?v=202610282059"></script>
-<script src="../shared/caja-fx.js?v=202610282059"></script>
-<script src="turno.js?v=202610282059"></script>
-<script src="caja.js?v=202610282059"></script>
-<script src="pos.js?v=202610282059"></script>
+<script src="../shared/supabase.js?v=202610282108"></script>
+<script src="../shared/canales.js?v=202610282108"></script>
+<script src="../shared/precios.js?v=202610282108"></script>
+<script src="../shell/shell.js?v=202610282108"></script>
+<script src="../shared/facturar.js?v=202610282108"></script>
+<script src="../shared/medios-pago.js?v=202610282108"></script>
+<script src="../shared/caja-fx.js?v=202610282108"></script>
+<script src="turno.js?v=202610282108"></script>
+<script src="caja.js?v=202610282108"></script>
+<script src="pos.js?v=202610282108"></script>
 </body>
 </html>
