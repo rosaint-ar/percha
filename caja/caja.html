@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Caja · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610281851">
+<link rel="stylesheet" href="../shell/shell.css?v=202610281853">
 <style>
   /* Caja: la plata del cajón. No se vende acá (eso es el Punto de venta). */
   .estado{display:grid;grid-template-columns:1fr auto;gap:18px;align-items:center;padding:22px 24px;margin-bottom:14px}
@@ -59,15 +59,15 @@
   </section>
   <div class="card">
     <div class="card-cab"><div><h2>Historial de cierres</h2><p class="sub">Cada turno: lo vendido, lo que se contó y lo que quedó. Tocá uno para ver el detalle.</p></div></div>
-    <table class="lista" id="tb-hist"><thead><tr><th>Día</th><th>Horario</th><th>Quién</th><th class="num">Ventas</th><th class="num">Vendido</th><th>Cómo se cobró</th><th>Arqueo</th><th class="num">Quedó</th><th class="num">Retirado</th></tr></thead><tbody></tbody></table>
+    <table class="lista" id="tb-hist"><thead><tr><th>Día</th><th>Horario</th><th>Quién</th><th class="num">Ventas</th><th class="num">Vendido</th><th>Cómo se cobró</th><th>Arqueo</th><th class="num">Retirado</th><th class="num">Cambio día sig.</th></tr></thead><tbody></tbody></table>
   </div>
 </main>
 <div id="impresion"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610281851"></script>
-<script src="../shell/shell.js?v=202610281851"></script>
-<script src="../shared/caja-fx.js?v=202610281851"></script>
-<script src="turno.js?v=202610281851"></script>
+<script src="../shared/supabase.js?v=202610281853"></script>
+<script src="../shell/shell.js?v=202610281853"></script>
+<script src="../shared/caja-fx.js?v=202610281853"></script>
+<script src="turno.js?v=202610281853"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal } = APP, e = APP.empresa.id;
@@ -117,7 +117,7 @@ APP.ready.then(async () => {
       el.innerHTML = `<div><span class="etq-est"><span class="punto"></span>Caja cerrada</span>
           <h1>${esc(caja.nombre)}</h1><p class="sub">${ult ? `Último cierre: ${dia(ult.cerrado)} a las ${hora(ult.cerrado)}${ult.cerro ? ' (' + esc(ult.cerro) + ')' : ''}.` : 'Todavía no hay cierres.'}</p>
           <div class="acciones"><button class="btn primario" id="btn-abrir">🔓 Abrir caja</button>${sonidoBtn}</div></div>
-        ${ult && ult.efectivo_queda != null ? `<div class="cajon"><small>Quedó en el cajón</small><b>${fmt.pesos(ult.efectivo_queda)}</b></div>` : ''}`;
+        ${ult && ult.efectivo_queda != null ? `<div class="cajon"><small>Cambio para arrancar</small><b>${fmt.pesos(ult.efectivo_queda)}</b></div>` : ''}`;
       $('#tiles').hidden = true; $('#detalle').hidden = true;
       $('#btn-abrir').onclick = async () => { if (await TURNO.abrir(caja)) cargar(); };
     }
@@ -137,7 +137,7 @@ APP.ready.then(async () => {
     tb.innerHTML = l.length ? l.map(t => { const r = resumenArqueo(t);
       return `<tr class="clic" data-id="${t.id}"><td>${dia(t.abierto)}</td><td>${hora(t.abierto)} – ${hora(t.cerrado)}</td><td>${esc(t.cerro || t.abrio || '—')}</td><td class="num">${t.ventas}</td><td class="num num-f">${fmt.pesos(t.total)}</td><td class="cobro">${cobro(t)}</td>
         <td>${!(t.arqueo || []).length ? '<span class="chip gris">sin arqueo</span>' : Math.abs(r.dif) < 1 ? '<span class="chip ok">✓ cuadró</span>' : `<span class="chip ${r.dif < 0 ? 'error' : 'aviso'}">${r.dif < 0 ? 'faltó ' : 'sobró '}${fmt.pesos(Math.abs(r.dif))}</span>`}</td>
-        <td class="num">${t.efectivo_queda != null ? fmt.pesos(t.efectivo_queda) : '—'}</td><td class="num">${r.retirado != null ? fmt.pesos(r.retirado) : '—'}</td></tr>`; }).join('')
+        <td class="num">${r.retirado != null ? fmt.pesos(r.retirado) : '—'}</td><td class="num"><b>${t.efectivo_queda != null ? fmt.pesos(t.efectivo_queda) : '—'}</b></td></tr>`; }).join('')
       : '<tr><td colspan="9" class="vacio">Todavía no se cerró ninguna caja.</td></tr>';
     $$('tr[data-id]', tb).forEach(tr => tr.onclick = () => verCierre(hist.find(x => x.id === tr.dataset.id)));
   }
@@ -150,7 +150,7 @@ APP.ready.then(async () => {
       <h3 style="margin:14px 0 6px">Arqueo</h3>
       <table class="lista"><tr><th>Medio</th><th class="num">Debería haber</th><th class="num">Se contó</th><th class="num">Diferencia</th></tr>
       ${(t.arqueo || []).map(a => `<tr><td>${esc(a.nombre)}</td><td class="num">${fmt.pesos(a.esperado)}</td><td class="num">${fmt.pesos(a.declarado)}</td><td class="num" style="color:${Math.abs(a.diferencia) < 1 ? 'var(--ok)' : 'var(--error)'}">${Math.abs(a.diferencia) < 1 ? '✓' : (a.diferencia > 0 ? '+' : '') + fmt.pesos(a.diferencia)}</td></tr>`).join('') || '<tr><td colspan="4" class="vacio">Sin arqueo.</td></tr>'}</table>
-      <p class="sub" style="margin-top:10px">${+t.movimientos ? 'Ingresos/retiros del turno: ' + fmt.pesos(t.movimientos) + ' · ' : ''}${t.efectivo_queda != null ? 'Quedó en caja ' + fmt.pesos(t.efectivo_queda) : ''}${r.retirado != null ? ' · se retiró ' + fmt.pesos(r.retirado) : ''}</p>
+      <p class="sub" style="margin-top:10px">${+t.movimientos ? 'Ingresos/retiros del turno: ' + fmt.pesos(t.movimientos) + ' · ' : ''}${r.retirado != null ? 'Se retiró ' + fmt.pesos(r.retirado) + ' · ' : ''}${t.efectivo_queda != null ? 'cambio para el día siguiente: <b>' + fmt.pesos(t.efectivo_queda) + '</b>' : ''}</p>
       ${t.notas ? `<div class="aviso-caja info" style="margin-top:10px">📝 ${esc(t.notas)}</div>` : ''}
       <div class="pie"><button class="btn" data-print>🖨️ Imprimir resumen</button><button class="btn" data-wsp>💬 Mandar por WhatsApp</button><button class="btn primario" data-ok>Listo</button></div>`);
     $('[data-ok]', m).onclick = () => m.cerrar();

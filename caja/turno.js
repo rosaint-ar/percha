@@ -18,7 +18,7 @@
       const queda = ult && ult[0] && ult[0].efectivo_queda != null ? +ult[0].efectivo_queda : 0;
       const h = new Date().getHours(), hola = h < 13 ? 'Buen día' : h < 20 ? 'Buenas tardes' : 'Buenas noches';
       const m = modal(`<h2>${h < 13 ? '☀️' : '🌤️'} ${hola}${nombrePila() ? ', ' + esc(nombrePila()) : ''}. Abramos la caja</h2>
-        <p class="sub">${queda ? `Al cerrar quedaron <b>${fmt.pesos(queda)}</b> en la caja. Si está igual, tocá Abrir.` : 'Contá el efectivo con el que arrancás.'}</p>
+        <p class="sub">${queda ? `En el último cierre quedaron <b>${fmt.pesos(queda)}</b> de cambio. Si está igual, tocá Abrir.` : 'Contá el efectivo con el que arrancás.'}</p>
         <div class="campo" style="margin-top:12px"><label>Efectivo para arrancar</label><input id="t-ini" type="number" min="0" step="100" value="${queda}" style="font:700 22px var(--f-mono);max-width:220px"></div>
         <button class="btn chico" type="button" id="t-contar">🧮 Contar billetes</button><div id="t-bil" hidden></div>
         <div class="pie"><button class="btn" data-no>Después</button><button class="btn primario" data-si>🔓 Abrir caja</button></div>`, { fijo: true });
@@ -78,14 +78,15 @@
           <div class="aviso-caja" id="c-veredicto" style="margin-top:12px"></div>
           <div class="pie"><button class="btn" data-ir="1">← Volver</button><button class="btn primario" data-ir="3">${efv ? 'Seguir →' : 'Cerrar caja'}</button></div></div>
         <div data-paso="3" hidden>
-          <h2>💵 ¿Cuánto queda en la caja?</h2><p class="sub">Lo que dejás para arrancar mañana. El resto es lo que retirás.</p>
-          <div class="fila c2" style="margin-top:12px"><div class="campo"><label>Queda en la caja</label><input id="c-queda" type="number" min="0" step="100" style="font:700 20px var(--f-mono)"></div>
-            <div class="campo"><label>Retirás</label><div id="c-retira" style="font:800 24px var(--f-titulo);padding-top:6px">—</div></div></div>
+          <h2>💸 ¿Cuánto retirás de la caja?</h2><p class="sub">Contaste <b id="c-contado"></b> en efectivo. Lo que no retirás queda de cambio para mañana.</p>
+          <div class="fila c2" style="margin-top:12px"><div class="campo"><label>Retirás</label><input id="c-retiro" type="number" min="0" step="100" style="font:700 20px var(--f-mono)"></div>
+            <div class="campo"><label>🌅 Cambio para mañana</label><div id="c-queda" style="font:800 24px var(--f-titulo);padding-top:6px">—</div></div></div>
           <div class="campo"><label>Notas (opcional)</label><input id="c-notas" placeholder="Algo para recordar de hoy"></div>
           <div class="pie"><button class="btn" data-ir="2">← Volver</button><button class="btn primario" data-si>🌙 Cerrar caja</button></div></div>`, { fijo: true });
       const contadoEfectivo = () => { const tr = $('tr[data-tipo="efectivo"]', m); return tr ? +$('input', tr).value || 0 : 0; };
-      const retira = () => { const q = +$('#c-queda', m).value || 0, c = contadoEfectivo(); $('#c-retira', m).textContent = fmt.pesos(Math.max(0, c - q)); $('#c-retira', m).style.color = q > c ? 'var(--error)' : ''; };
-      const ir = n => { $$('[data-paso]', m).forEach(p => p.hidden = p.dataset.paso !== String(n)); if (n === 3) { const q = $('#c-queda', m); if (q.value === '') q.value = Math.min(contadoEfectivo(), Math.round(+esp.efectivo_inicial || 0)); q.focus(); retira(); } };
+      const quedaDe = () => contadoEfectivo() - (+$('#c-retiro', m).value || 0);
+      const retira = () => { const q = quedaDe(); $('#c-queda', m).textContent = q < 0 ? 'Retirás más de lo que hay' : fmt.pesos(q); $('#c-queda', m).style.color = q < 0 ? 'var(--error)' : ''; };
+      const ir = n => { $$('[data-paso]', m).forEach(p => p.hidden = p.dataset.paso !== String(n)); if (n === 3) { $('#c-contado', m).textContent = fmt.pesos(contadoEfectivo()); const r = $('#c-retiro', m); if (r.value === '') r.value = Math.max(0, contadoEfectivo() - Math.round(+esp.efectivo_inicial || 0)); r.focus(); r.select(); retira(); } };
       const calc = () => {
         let falta = 0, sobra = 0;
         $$('tr[data-id]', m).forEach(tr => { const d = (+$('input', tr).value || 0) - +tr.dataset.esp; const td = $('.dif', tr); td.textContent = Math.abs(d) < 1 ? '✓' : (d > 0 ? '+' : '') + fmt.pesos(d); td.style.color = Math.abs(d) < 1 ? 'var(--ok)' : 'var(--error)'; if (d <= -1) falta -= d; if (d >= 1) sobra += d; });
@@ -95,20 +96,21 @@
       };
       $$('tr[data-id] input', m).forEach(i => i.addEventListener('input', calc)); calc();
       const cb = $('#c-contar', m); if (cb) cb.onclick = () => { const c = $('#c-bil', m); c.hidden = !c.hidden; if (!c.hidden && !c.innerHTML) fx().billetes(c, t => { $('input', $('tr[data-tipo="efectivo"]', m)).value = t; calc(); }); };
-      $('#c-queda', m).oninput = retira;
+      $('#c-retiro', m).oninput = retira;
       $('[data-no]', m).onclick = () => { m.cerrar(); resolve(false); };
       $$('[data-ir]', m).forEach(b => b.onclick = () => { const n = +b.dataset.ir; if (n === 3 && !efv) $('[data-si]', m).click(); else ir(n); });
       $('[data-si]', m).onclick = async () => {
         const b = $('[data-si]', m); b.disabled = true;
         const arqueo = $$('tr[data-id]', m).map(tr => ({ forma_pago_id: tr.dataset.id, nombre: $('td', tr).textContent.trim().split(' (')[0], esperado: +tr.dataset.esp, declarado: +$('input', tr).value || 0, diferencia: r2((+$('input', tr).value || 0) - +tr.dataset.esp) }));
-        const queda = efv ? Math.max(0, +$('#c-queda', m).value || 0) : null;
+        if (efv && quedaDe() < 0) { toast('Estás retirando más efectivo del que contaste', 'error'); return; }
+        const queda = efv ? Math.max(0, quedaDe()) : null;
         const r = await sb.from('caja_turnos').update({ estado: 'cerrado', cerrado: new Date().toISOString(), cerrado_por: APP.user.id, arqueo, efectivo_queda: queda, notas: $('#c-notas', m).value.trim() || null }).eq('id', turno.id);
         if (r.error) { b.disabled = false; fx().sonido('error'); toast(mensajeError(r.error), 'error'); return; }
         m.cerrar(); resolve(true);
         const dif = arqueo.reduce((s, a) => s + a.diferencia, 0);
         const datos = [caja, Object.assign({}, turno, { cerrado: new Date().toISOString(), notas: $('#c-notas', m).value.trim() || null }), Object.assign({}, esp, { medios: filas.filter(f => f.ventas).map(f => ({ nombre: f.nombre, monto: f.tipo === 'efectivo' ? f.esperado - esp.efectivo_inicial - esp.movimientos : f.esperado })) }), arqueo, queda, nombrePila()];
         fx().telon({ tipo: 'cerrar', emoji: '🌙', titulo: `¡Buen trabajo${nombrePila() ? ', ' + nombrePila() : ''}!`, monto: +esp.total,
-          texto: `${esp.ventas} venta${esp.ventas === 1 ? '' : 's'} en este turno${Math.abs(dif) < 1 ? ' · la caja cuadró perfecto ✓' : ''}${queda != null ? ' · quedan ' + fmt.pesos(queda) + ' para mañana' : ''}.`,
+          texto: `${esp.ventas} venta${esp.ventas === 1 ? '' : 's'} en este turno${Math.abs(dif) < 1 ? ' · la caja cuadró perfecto ✓' : ''}${queda != null ? ' · mañana arranca con ' + fmt.pesos(queda) + ' de cambio' : ''}.`,
           botones: [['Imprimir resumen', () => imprimirCierre(...datos)], ['Mandar por WhatsApp', () => whatsappCierre(...datos)], ['Listo', null, true]] });
       };
     });
@@ -123,7 +125,7 @@
       <table><tr><td>Ventas</td><td class="r">${esp.ventas}</td></tr><tr><td><b>Vendido</b></td><td class="r"><b>${fmt.pesos(esp.total)}</b></td></tr><tr><td>Efectivo inicial</td><td class="r">${fmt.pesos(esp.efectivo_inicial)}</td></tr><tr><td>Ingresos/retiros</td><td class="r">${fmt.pesos(esp.movimientos)}</td></tr></table><hr>
       ${(esp.medios || []).length ? `<div><b>Cobrado por medio</b></div><table>${esp.medios.map(x => `<tr><td>${esc(x.nombre)}</td><td class="r">${fmt.pesos(x.monto)}</td></tr>`).join('')}</table><hr>` : ''}
       <table><tr><td><b>Medio</b></td><td class="r"><b>Esperado</b></td><td class="r"><b>Contado</b></td></tr>${(arqueo || []).map(a => `<tr><td>${esc(a.nombre)}</td><td class="r">${fmt.pesos(a.esperado)}</td><td class="r">${fmt.pesos(a.declarado)}${Math.abs(a.diferencia) >= 1 ? ' (' + (a.diferencia > 0 ? '+' : '') + fmt.pesos(a.diferencia) + ')' : ''}</td></tr>`).join('')}</table>
-      ${queda != null ? `<hr><table><tr><td>Queda en caja</td><td class="r">${fmt.pesos(queda)}</td></tr></table>` : ''}`;
+      ${queda != null ? (() => { const e = (arqueo || []).find(a => /efectivo/i.test(a.nombre || '')); return `<hr><table>${e ? `<tr><td>Retiro</td><td class="r">${fmt.pesos(Math.max(0, e.declarado - queda))}</td></tr>` : ''}<tr><td><b>Cambio para mañana</b></td><td class="r"><b>${fmt.pesos(queda)}</b></td></tr></table>`; })() : ''}`;
     setTimeout(() => window.print(), 50);
   }
 
@@ -139,7 +141,7 @@
     l.push('', `💵 Efectivo: arrancó con ${fmt.pesos(esp.efectivo_inicial)}${+esp.movimientos ? ', ingresos/retiros ' + fmt.pesos(esp.movimientos) : ''}${efv ? ', se contó ' + fmt.pesos(efv.declarado) : ''}`);
     const dif = (arqueo || []).reduce((s, a) => s + (+a.diferencia || 0), 0);
     if ((arqueo || []).length) l.push(Math.abs(dif) < 1 ? '✅ La caja cuadró' : `⚠️ ${dif < 0 ? 'Faltaron' : 'Sobraron'} ${fmt.pesos(Math.abs(dif))}`);
-    if (queda != null) l.push(`Quedó en caja: ${fmt.pesos(queda)}${efv ? ' · se retiró ' + fmt.pesos(Math.max(0, efv.declarado - queda)) : ''}`);
+    if (queda != null) { if (efv) l.push(`💸 Se retiró: ${fmt.pesos(Math.max(0, efv.declarado - queda))}`); l.push('', `🌅 *Mañana arranca con ${fmt.pesos(queda)} de cambio*`); }
     if (t.notas && !/^Traído de TPVsol/.test(t.notas)) l.push('', '📝 ' + t.notas);
     return l.join('\n');
   }
