@@ -438,7 +438,7 @@ APP.ready.then(async () => {
       <div class="ctrl"><button data-i="${i}" data-d="-1">−</button><input data-i="${i}" data-q value="${l.cantidad}"><button data-i="${i}" data-d="1">+</button><span class="desc">desc % <input data-i="${i}" data-desc type="number" min="0" max="100" value="${l.descPct || 0}"></span><button class="quitar" data-i="${i}" data-x title="Quitar">×</button></div></div>`).join('');
     $$('[data-d]', cont).forEach(b => b.onclick = () => { const l = carrito.lineas[+b.dataset.i]; l.cantidad += +b.dataset.d * (l.devuelta ? -1 : 1); if ((l.devuelta ? -l.cantidad : l.cantidad) <= 0) carrito.lineas.splice(+b.dataset.i, 1); pintar(); });
     $$('[data-q]', cont).forEach(i => i.onchange = () => { const n = parseInt(i.value) || 0; const l = carrito.lineas[+i.dataset.i]; if (n === 0) carrito.lineas.splice(+i.dataset.i, 1); else l.cantidad = l.devuelta ? -Math.abs(n) : Math.abs(n); pintar(); });
-    $$('[data-desc]', cont).forEach(i => i.onchange = () => { if (!APP.esAdmin && +i.value > 0) { toast('Los descuentos los habilita administración', 'error'); i.value = 0; return; } carrito.lineas[+i.dataset.i].descPct = Math.min(100, Math.max(0, +i.value || 0)); pintar(); });
+    $$('[data-desc]', cont).forEach(i => i.onchange = () => { if (!APP.puede('descuentos') && +i.value > 0) { toast('Los descuentos los habilita administración', 'error'); i.value = 0; return; } carrito.lineas[+i.dataset.i].descPct = Math.min(100, Math.max(0, +i.value || 0)); pintar(); });
     $$('[data-x]', cont).forEach(b => b.onclick = () => { carrito.lineas.splice(+b.dataset.i, 1); pintar(); });
     $$('[data-cambiar]', cont).forEach(el => el.onclick = ev => { ev.stopPropagation(); cambiarLinea(+el.dataset.cambiar); });
     $$('[data-falla]', cont).forEach(b => b.onclick = ev => { ev.stopPropagation(); const l = carrito.lineas[+b.dataset.falla]; if (l.falla) { l.falla = false; delete l.fallaU; pintar(); } else marcarFalla(l); });
@@ -450,7 +450,7 @@ APP.ready.then(async () => {
     $('#btn-sena').disabled = !c.lineas.length || !!carrito.cambio;
   }
   $('#btn-vaciar').onclick = async () => { if (!carrito.lineas.length || await confirmar('¿Vaciar el ticket?', 'Vaciar')) { carrito.lineas = []; carrito.cambio = null; carrito.descPct = 0; $('#desc-general').value = 0; $('#nota').value = ''; pintar(); } };
-  $('#desc-general').onchange = ev => { if (!APP.esAdmin && +ev.target.value > 0) { toast('Los descuentos los habilita administración', 'error'); ev.target.value = 0; } carrito.descPct = Math.min(100, Math.max(0, +ev.target.value || 0)); pintar(); };
+  $('#desc-general').onchange = ev => { if (!APP.puede('descuentos') && +ev.target.value > 0) { toast('Los descuentos los habilita administración', 'error'); ev.target.value = 0; } carrito.descPct = Math.min(100, Math.max(0, +ev.target.value || 0)); pintar(); };
   $('#sel-vendedora').onchange = ev => carrito.vendedora = ev.target.value;
 
   // ================= Cobro =================
@@ -608,7 +608,7 @@ APP.ready.then(async () => {
       <div style="font:800 30px var(--f-titulo);letter-spacing:-.03em;margin:6px 0">${fmt.pesos(extra.total.aPagar)}</div>
       ${extra.vuelto ? `<div class="aviso-caja info">Vuelto: <b>${fmt.pesos(extra.vuelto)}</b></div>` : ''}
       ${(res.creditos || []).map(c => `<div class="aviso-caja ok">${c.tipo === 'gift_card' ? 'Gift card' : 'Nota de crédito'} emitida · código <b class="mono">${c.codigo}</b> · ${fmt.pesos(c.monto)}</div>`).join('')}
-      <div class="pie" style="justify-content:space-between"><div style="display:flex;gap:8px;flex-wrap:wrap">${res.id && p.estado === 'completada' && !p.reservada && window.FACTURA ? '<button class="btn" data-facturar hidden>Facturar</button>' : ''}<button class="btn" data-print>Imprimir ticket</button><a class="btn" target="_blank" href="https://wa.me/?text=${texto}">WhatsApp</a></div><button class="btn primario" data-ok>Nueva venta</button></div>`, { fijo: true });
+      <div class="pie" style="justify-content:space-between"><div style="display:flex;gap:8px;flex-wrap:wrap">${res.id && p.estado === 'completada' && !p.reservada && !res.reservada && window.FACTURA ? '<button class="btn" data-facturar hidden>Facturar</button>' : ''}<button class="btn" data-print>Imprimir ticket</button><a class="btn" target="_blank" href="https://wa.me/?text=${texto}">WhatsApp</a></div><button class="btn primario" data-ok>Nueva venta</button></div>`, { fijo: true });
     $('[data-print]', m).onclick = () => window.print();
     const bf = $('[data-facturar]', m);
     if (bf) FACTURA.config(e).then(c => { if (c.estado !== 'listo') return; bf.hidden = false; bf.onclick = () => FACTURA.abrir({ id: res.id, numero: res.numero, total: extra.total.aPagar, cliente_id: p.cliente_id || null, cliente_nombre: null }, { alTerminar: c2 => { if (c2 && c2.estado === 'autorizado') { bf.textContent = '✓ ' + c2.nombre_tipo + ' ' + c2.numero_mostrar; bf.onclick = () => window.open(FACTURA.urlFactura(c2.id), '_blank'); } } }); });
@@ -618,15 +618,16 @@ APP.ready.then(async () => {
   // ================= Cambio / devolución =================
   $('#btn-cambio').onclick = () => {
     const m = modal(`<h2>Cambio o devolución</h2><p class="sub">Buscá la venta original por número de ticket.</p>
-      <div class="campo" style="margin-top:12px"><label>Número de ticket</label><input id="cv-num" type="number" placeholder="Ej. 1234" autofocus></div>
+      <div class="campo" style="margin-top:12px"><label>Número de ticket</label><input id="cv-num" placeholder="Ej. 1234 o R-12" autofocus></div>
       <div id="cv-res"></div>`);
     const buscarVenta = async () => {
-      const n = +$('#cv-num', m).value; if (!n) return;
-      const { data: v } = await sb.from('ventas').select('*').eq('empresa_id', e).eq('numero', n).maybeSingle();
+      const n = $('#cv-num', m).value.trim(); if (!n) return;
+      // por función: la vendedora encuentra el ticket aunque no vea el listado de ventas viejas (también los R- en efectivo)
+      const { data: v } = await sb.rpc('venta_para_cambio', { e, p_numero: n });
       if (!v) { $('#cv-res', m).innerHTML = '<div class="vacio">No existe ese ticket.</div>'; return; }
       if (v.estado === 'anulada') { $('#cv-res', m).innerHTML = '<div class="vacio">Esa venta está anulada.</div>'; return; }
-      const { data: ls } = await sb.from('venta_lineas').select('*').eq('venta_id', v.id).gt('cantidad', 0);
-      $('#cv-res', m).innerHTML = `<p class="sub" style="margin:8px 0">Venta #${v.numero} · ${fmt.fechaHora(v.fecha)} · ${fmt.pesos(v.total)}. Marcá lo que devuelve:</p>
+      const ls = v.lineas || [];
+      $('#cv-res', m).innerHTML = `<p class="sub" style="margin:8px 0">Venta ${v.mostrar} · ${fmt.fechaHora(v.fecha)} · ${fmt.pesos(v.total)}. Marcá lo que devuelve:</p>
         <table class="lista">${(ls || []).map(l => `<tr><td><input type="checkbox" data-l="${l.id}"></td><td>${esc(l.descripcion)}<br><small>${esc([l.talle, l.color].filter(Boolean).join(' · '))}</small></td><td class="num">${l.cantidad}× ${fmt.pesos(l.precio_unit)}</td></tr>`).join('')}</table>
         <div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Cargar al ticket</button></div>`;
       $('[data-no]', m).onclick = () => m.cerrar();

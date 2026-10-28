@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ventas · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610281517">
+<link rel="stylesheet" href="../shell/shell.css?v=202610281620">
 <style>
   .filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
   .filtros input[type=date],.filtros select{border:1px solid var(--linea);background:var(--superficie-2);padding:8px 10px;border-radius:var(--radio-mini)}
@@ -53,9 +53,9 @@
 </main>
 <div id="impresion"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610281517"></script>
-<script src="../shell/shell.js?v=202610281517"></script>
-<script src="../shared/facturar.js?v=202610281517"></script>
+<script src="../shared/supabase.js?v=202610281620"></script>
+<script src="../shell/shell.js?v=202610281620"></script>
+<script src="../shared/facturar.js?v=202610281620"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -88,7 +88,7 @@ APP.ready.then(async () => {
     $('#tiles').innerHTML = `<div class="tile"><div class="t">Ventas</div><div class="n">${ok.length}</div><div class="d">${nLocal} local · ${nOnline} online${v.some(x => x.estado === 'anulada') ? ' · ' + v.filter(x => x.estado === 'anulada').length + ' anuladas' : ''}${v.some(x => x.estado === 'senada') ? ' · ' + v.filter(x => x.estado === 'senada').length + ' señadas' : ''}</div></div>
       <div class="tile destacada"><div class="t">Vendido</div><div class="n">${fmt.pesos(total)}</div><div class="d">ticket promedio ${fmt.pesos(ok.length ? total / ok.length : 0)}</div></div>
       <div class="tile"><div class="t">Prendas</div><div class="n">${fmt.num(ok.reduce((s, x) => s + +x.lineas, 0))}</div><div class="d">líneas vendidas</div></div>
-      <div class="tile"><div class="t">Margen bruto</div><div class="n">${total ? fmt.pct(100 * (total - costo) / total) : '—'}</div><div class="d">${fmt.pesos(total - costo)} de ganancia</div></div>`;
+      ${APP.puede('costos') ? `<div class="tile"><div class="t">Margen bruto</div><div class="n">${total ? fmt.pct(100 * (total - costo) / total) : '—'}</div><div class="d">${fmt.pesos(total - costo)} de ganancia</div></div>` : ''}`;
     const tb = $('#tb tbody'); tb.innerHTML = v.map(x => `<tr class="clic" data-id="${x.id}"><td class="mono">#${String(x.numero).padStart(6, '0')}${TIPO[x.tipo] || ''}</td><td>${fmt.fechaHora(x.fecha)}</td><td>${canal(x.origen)}</td><td>${esc(x.cliente_nombre || '—')}</td><td>${esc(x.vendedora_nombre || '—')}</td><td><small>${esc(x.pagos || '')}</small></td><td class="num num-f">${fmt.pesos(x.total)}</td><td>${ESTADO[x.estado] || x.estado}</td><td>${FACTURA.chip(x) || (x.estado === 'completada' && facturaLista ? `<button class="btn chico" data-fact="${x.id}">Facturar</button>` : '')}</td><td><button class="btn chico" data-ver="${x.id}">Ver</button></td></tr>`).join('') || '<tr><td colspan="10" class="vacio">Sin ventas en ese período.</td></tr>';
     $$('[data-ver]', tb).forEach(b => b.onclick = () => verVenta(b.dataset.ver));
     $$('[data-fact]', tb).forEach(b => b.onclick = ev => { ev.stopPropagation(); FACTURA.abrir(v.find(x => x.id === b.dataset.fact), { alTerminar: cargar }); });

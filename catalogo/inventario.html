@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Inventario · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610281517">
+<link rel="stylesheet" href="../shell/shell.css?v=202610281620">
 <style>
   .tiles-inv{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:16px}
   .tiles-inv .t span,.tiles-inv .t small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -123,10 +123,10 @@
   <div id="vista"></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610281517"></script>
-<script src="../shared/precios.js?v=202610281517"></script>
-<script src="../shared/prenda.js?v=202610281517"></script>
-<script src="../shell/shell.js?v=202610281517"></script>
+<script src="../shared/supabase.js?v=202610281620"></script>
+<script src="../shared/precios.js?v=202610281620"></script>
+<script src="../shared/prenda.js?v=202610281620"></script>
+<script src="../shell/shell.js?v=202610281620"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -139,7 +139,7 @@ APP.ready.then(async () => {
   async function pintarTiles() {
     const { data: r } = await sb.rpc('inventario_resumen', { e }); if (!r) return;
     $('#tiles').innerHTML = `<div class="t"><span>Prendas en stock</span><b>${fmt.num(r.unidades)}</b><small>${fmt.num(r.variantes - r.sin_stock)} variantes con stock</small></div>
-      <div class="t"><span>Valor a costo</span><b>${fmt.pesos(r.costo)}</b><small>lo invertido en mercadería</small></div>
+      ${APP.puede('costos') ? `<div class="t"><span>Valor a costo</span><b>${fmt.pesos(r.costo)}</b><small>lo invertido en mercadería</small></div>` : ''}
       <div class="t"><span>Valor de venta</span><b>${fmt.pesos(r.venta)}</b><small>a precio de lista</small></div>
       <div class="t${r.negativos ? ' alerta' : ''}"><span>Stock negativo</span><b>${fmt.num(r.negativos)}</b><small>${r.negativos ? 'conviene recontarlas' : 'todo en orden'}</small></div>
       <div class="t"><span>Recuentos abiertos</span><b>${fmt.num(r.recuentos_abiertos)}</b><small>${fmt.num(r.movimientos_7d)} movimientos en 7 días</small></div>`;

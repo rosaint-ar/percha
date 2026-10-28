@@ -117,23 +117,26 @@
   // ---------- barra lateral ----------
   const MENU = [
     { grupo: 'Operación' },
-    { id: 'inicio', label: 'Inicio', href: 'index.html', icono: 'inicio' },
-    { id: 'pos', label: 'Punto de venta', href: 'caja/pos.html', icono: 'pos' },
-    { id: 'caja', label: 'Caja', href: 'caja/caja.html', icono: 'caja' },
-    { id: 'ventas', label: 'Ventas', href: 'caja/ventas.html', icono: 'informes' },
-    { id: 'productos', label: 'Catálogo', href: 'catalogo/productos.html', icono: 'catalogo' },
-    { id: 'etiquetas', label: 'Etiquetas', href: 'catalogo/etiquetas.html', icono: 'etiquetas' },
-    { id: 'inventario', label: 'Inventario', href: 'catalogo/inventario.html', icono: 'conteo' },
-    { id: 'compras', label: 'Compras', href: 'compras/compras.html', icono: 'compras', admin: true },
-    { grupo: 'Análisis' },
-    { id: 'informes', label: 'Informes', href: '#', icono: 'informes', prox: true },
-    { grupo: 'Sistema', admin: true },
-    { id: 'conexiones', label: 'Conexiones', href: 'conexiones/conexiones.html', icono: 'conexiones', admin: true },
-    { id: 'configuracion', label: 'Configuración', href: 'configuracion/empresa.html', icono: 'config', admin: true }
+    { id: 'inicio', label: 'Inicio', href: 'index.html', icono: 'inicio', p: 'inicio' },
+    { id: 'pos', label: 'Punto de venta', href: 'caja/pos.html', icono: 'pos', p: 'vender' },
+    { id: 'caja', label: 'Caja', href: 'caja/caja.html', icono: 'caja', p: 'vender' },
+    { id: 'ventas', label: 'Ventas', href: 'caja/ventas.html', icono: 'informes', p: ['ventas_todas', 'ventas_propias'] },
+    { id: 'productos', label: 'Catálogo', href: 'catalogo/productos.html', icono: 'catalogo', p: 'catalogo_ver' },
+    { id: 'etiquetas', label: 'Etiquetas', href: 'catalogo/etiquetas.html', icono: 'etiquetas', p: 'catalogo_editar' },
+    { id: 'inventario', label: 'Inventario', href: 'catalogo/inventario.html', icono: 'conteo', p: 'catalogo_ver' },
+    { id: 'compras', label: 'Compras', href: 'compras/compras.html', icono: 'compras', p: 'compras' },
+    { grupo: 'Análisis', p: 'inicio' },
+    { id: 'informes', label: 'Informes', href: '#', icono: 'informes', prox: true, p: 'inicio' },
+    { grupo: 'Sistema', p: ['conexiones', 'configuracion'] },
+    { id: 'conexiones', label: 'Conexiones', href: 'conexiones/conexiones.html', icono: 'conexiones', p: 'conexiones' },
+    { id: 'configuracion', label: 'Configuración', href: 'configuracion/empresa.html', icono: 'config', p: 'configuracion' }
   ];
+  // qué permiso pide cada pantalla (data-page del body); la primera permitida es adonde se manda a quien no puede
+  const PERMISO_PAGINA = { inicio: 'inicio', pos: 'vender', caja: 'vender', ventas: ['ventas_todas', 'ventas_propias'], productos: 'catalogo_ver', catalogo: 'catalogo_ver', etiquetas: 'catalogo_editar', inventario: 'catalogo_ver', conteo: 'catalogo_editar', compras: 'compras', conexiones: 'conexiones', configuracion: 'configuracion' };
+  const permite = p => !p || [].concat(p).some(k => APP.puede(k));
   function pintarLateral() {
     const pagina = body.dataset.page, esAdmin = APP.esAdmin;
-    const items = MENU.filter(m => !m.admin || esAdmin).map(m => {
+    const items = MENU.filter(m => permite(m.p)).map(m => {
       if (m.grupo) return `<div class="grupo">${m.grupo}</div>`;
       const cls = [m.id === pagina ? 'on' : '', m.prox ? 'prox' : ''].join(' ').trim();
       return `<a class="${cls}" href="${m.prox ? '#' : ROOT + m.href}" ${m.prox ? 'title="Próximamente" onclick="return false"' : ''}>${I[m.icono]}<span>${m.label}</span>${m.prox ? '<span class="pronto">PRONTO</span>' : ''}</a>`;
@@ -195,6 +198,11 @@
     APP.miembro = await cargarRol(APP.empresa.id);
     APP.rol = APP.miembro.rol;
     APP.esAdmin = ['duenio', 'admin'].includes(APP.rol);
+    // permisos de este usuario (los de su rol + los que se le cambiaron en Configuración › Usuarios)
+    { const { data: pm } = await sb.rpc('mis_permisos', { e: APP.empresa.id }); APP.permisos = pm || {}; }
+    APP.puede = k => !!(APP.permisos || {})[k];
+    // pantalla sin permiso: se va a la primera que sí pueda usar
+    if (!permite(PERMISO_PAGINA[body.dataset.page])) { const ir = MENU.find(m => m.href && m.href !== '#' && !m.prox && permite(m.p)); if (ir) { location.replace(ROOT + ir.href); return new Promise(() => {}); } }
     aplicarTema();
     pintarLateral();
     document.title = ((body.dataset.title || '').replace(/<[^>]+>/g, '') || 'Inicio') + ' · ' + APP.empresa.nombre + ' · ' + SISTEMA;

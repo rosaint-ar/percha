@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Usuarios · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610281517">
+<link rel="stylesheet" href="../shell/shell.css?v=202610281620">
 <style>
   .pestanas{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
   .pestanas a{font:600 13px var(--f-ui);color:var(--tinta);text-decoration:none;padding:8px 14px;border:1px solid var(--linea);background:var(--superficie-2);border-radius:10px}
@@ -18,18 +18,41 @@
 <main class="app">
   <div class="pestanas"><a href="empresa.html">Empresa</a><a href="atributos.html">Talles, colores y familias</a><a href="curvas.html">Curvas de talle</a><a href="listas.html">Listas de precios</a><a href="promociones.html">Promociones</a><a href="facturacion.html">Facturación</a><a class="on" href="usuarios.html">Usuarios</a></div>
   <div class="card">
-    <div class="card-cab"><div><h2>Equipo</h2><p class="sub">Dueña y administración ven todo; vendedora vende y ajusta stock; visor solo mira.</p></div><div class="acciones"><button class="btn primario" id="btn-nuevo">+ Agregar usuario</button></div></div>
-    <table class="lista" id="tb"><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Activo</th><th></th></tr></table>
+    <div class="card-cab"><div><h2>Equipo</h2><p class="sub">El rol trae permisos de base; con <b>Permisos</b> se ajusta qué ve y qué hace cada persona.</p></div><div class="acciones"><button class="btn primario" id="btn-nuevo">+ Agregar usuario</button></div></div>
+    <table class="lista" id="tb"><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Puede</th><th>Activo</th><th></th></tr></table>
   </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610281517"></script>
-<script src="../shell/shell.js?v=202610281517"></script>
+<script src="../shared/supabase.js?v=202610281620"></script>
+<script src="../shell/shell.js?v=202610281620"></script>
 <script>
 APP.ready.then(async () => {
   const { esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
   if (!APP.esAdmin) { document.querySelector('main').innerHTML = '<div class="card"><p>Esta sección es solo para administración.</p></div>'; return; }
   const ROLES = { duenio: 'Dueña', admin: 'Administración', vendedora: 'Vendedora', visor: 'Solo ver' };
+  // permisos (los mismos que usa la base: permisos_rol / puede)
+  const PERMISOS = [
+    ['Vender', [['vender', 'Vender en la caja', 'Cobrar, señas, cambios y devoluciones'], ['descuentos', 'Hacer descuentos a mano', 'Poner % de descuento en una prenda o en el ticket'], ['clientes', 'Cargar clientas', 'Dar de alta y buscar clientas']]],
+    ['Ventas', [['ventas_propias', 'Ver sus ventas del día', 'Solo las que hizo, de hoy'], ['ventas_todas', 'Ver todas las ventas', 'De todos los días y de todo el equipo, con totales']]],
+    ['Mercadería', [['catalogo_ver', 'Ver stock y precios', 'Buscar prendas, cuántas hay y a cuánto se venden'], ['catalogo_editar', 'Editar catálogo y stock', 'Productos, precios, etiquetas, ajustes y recuentos'], ['costos', 'Ver costos y márgenes', 'Costo de cada prenda, margen y valor del stock'], ['compras', 'Compras', 'Pedidos a proveedores y recepciones']]],
+    ['Negocio', [['inicio', 'Inicio y totales', 'El tablero con lo vendido y el stock valorizado'], ['conexiones', 'Conexiones', 'Tienda Nube: stock, precios y pedidos'], ['configuracion', 'Configuración', 'Empresa, listas de precios, promociones, facturación y usuarios']]]];
+  const TODOS = PERMISOS.flatMap(g => g[1]);
+  const BASE = {}; await Promise.all(Object.keys(ROLES).map(async r => { const { data } = await sb.rpc('permisos_rol', { p_rol: r }); BASE[r] = data || {}; }));
+  const efectivos = u => Object.assign({}, BASE[u.rol] || {}, u.permisos || {});
+  const resumen = u => { const p = efectivos(u), si = TODOS.filter(([k]) => p[k]).map(x => x[1]); return si.length === TODOS.length ? 'Todo' : si.join(' · ') || 'Nada'; };
+  // permisos de una persona: tildes; lo que difiere del rol queda guardado "a medida"
+  function permisos(u) {
+    const base = BASE[u.rol] || {}, p = efectivos(u);
+    const grupo = ([g, ps]) => `<h3 style="font:700 12px var(--f-ui);color:var(--tinta-3);margin:14px 0 6px;text-transform:uppercase;letter-spacing:.06em">${g}</h3>`
+      + ps.map(([k, t, d]) => `<label style="display:flex;gap:10px;align-items:flex-start;padding:6px 0;cursor:pointer"><input type="checkbox" data-k="${k}" ${p[k] ? 'checked' : ''} style="width:18px;height:18px;margin-top:2px"><span><b>${t}</b> <span data-dif="${k}" style="color:var(--acento)">${!!p[k] !== !!base[k] ? '•' : ''}</span><br><small class="sub">${d}</small></span></label>`).join('');
+    const m = modal(`<h2>Permisos de ${esc(u.nombre)}</h2><p class="sub">Rol: <b>${esc(ROLES[u.rol] || u.rol)}</b>. Lo marcado con • es distinto de lo que trae el rol.</p>${PERMISOS.map(grupo).join('')}
+      <div class="pie"><button class="btn" data-rol style="margin-right:auto">Volver a lo del rol</button><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Guardar</button></div>`);
+    $$('[data-k]', m).forEach(i => i.onchange = () => { $(`[data-dif="${i.dataset.k}"]`, m).textContent = i.checked !== !!base[i.dataset.k] ? '•' : ''; });
+    $('[data-no]', m).onclick = () => m.cerrar();
+    const guardar = async perms => { const r = await sb.from('empresa_usuarios').update({ permisos: perms }).eq('empresa_id', e).eq('user_id', u.user_id); if (r.error) { toast(mensajeError(r.error), 'error'); return; } m.cerrar(); toast('Permisos guardados: se aplican cuando esa persona recarga la pantalla'); cargar(); };
+    $('[data-rol]', m).onclick = () => guardar(null);
+    $('[data-si]', m).onclick = () => { const d = {}; $$('[data-k]', m).forEach(i => { if (i.checked !== !!base[i.dataset.k]) d[i.dataset.k] = i.checked; }); guardar(Object.keys(d).length ? d : null); };
+  }
   async function llamar(body) {
     const { data: { session } } = await sb.auth.getSession();
     const r = await fetch(`${SUPABASE_URL}/functions/v1/usuarios-admin`, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SUPABASE_KEY, Authorization: `Bearer ${session.access_token}` }, body: JSON.stringify(Object.assign({ empresa_id: e }, body)) });
@@ -42,11 +65,13 @@ APP.ready.then(async () => {
     const tb = $('#tb'); tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());
     (data || []).forEach(u => tb.insertAdjacentHTML('beforeend', `<tr data-id="${u.user_id}"><td>${esc(u.nombre)}${u.user_id === APP.user.id ? ' <span class="chip">vos</span>' : ''}</td><td>${u.user_id === APP.user.id ? esc(APP.user.email) : '<small style="color:var(--suave)">—</small>'}</td>
       <td><select data-rol ${u.user_id === APP.user.id ? 'disabled' : ''}>${Object.entries(ROLES).map(([k, v]) => `<option value="${k}" ${u.rol === k ? 'selected' : ''}>${v}</option>`).join('')}</select></td>
+      <td><small>${esc(resumen(u))}</small>${u.permisos && Object.keys(u.permisos).length ? ' <span class="chip aviso">a medida</span>' : ''}</td>
       <td><select data-activo ${u.user_id === APP.user.id ? 'disabled' : ''}><option value="true" ${u.activo ? 'selected' : ''}>Sí</option><option value="false" ${!u.activo ? 'selected' : ''}>No</option></select></td>
-      <td><button class="btn chico" data-clave>Nueva contraseña</button></td></tr>`));
+      <td style="white-space:nowrap">${u.user_id === APP.user.id || u.rol === 'duenio' ? '' : '<button class="btn chico" data-perm>Permisos</button> '}<button class="btn chico" data-clave>Nueva contraseña</button></td></tr>`));
+    $$('[data-perm]', tb).forEach(b => b.onclick = () => permisos((data || []).find(u => u.user_id === b.closest('tr').dataset.id)));
     $$('[data-rol],[data-activo]', tb).forEach(sel => sel.onchange = async () => {
       const tr = sel.closest('tr'); const r = await sb.from('empresa_usuarios').update({ rol: $('[data-rol]', tr).value, activo: $('[data-activo]', tr).value === 'true' }).eq('empresa_id', e).eq('user_id', tr.dataset.id);
-      toast(r.error ? mensajeError(r.error) : 'Guardado', r.error ? 'error' : '');
+      toast(r.error ? mensajeError(r.error) : 'Guardado', r.error ? 'error' : ''); cargar();
     });
     $$('[data-clave]', tb).forEach(b => b.onclick = async () => {
       const tr = b.closest('tr'); if (!await confirmar('Se genera una contraseña nueva y la anterior deja de servir. ¿Seguimos?', 'Generar')) return;
