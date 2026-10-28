@@ -189,6 +189,14 @@
     document.head.appendChild(s);
     APP.pendientes = { refrescar: () => window.PENDIENTES && PENDIENTES.refrescar(), abrir: () => window.PENDIENTES && PENDIENTES.abrir() };
   }
+  // Avisos de pedidos online + sonidos: se cargan en todas las pantallas (los sonidos son de caja-fx.js)
+  function iniciarAvisos() {
+    if (!(APP.puede('ventas_todas') || APP.puede('vender'))) return;
+    const v = ((document.querySelector('script[src*="shell.js"]') || {}).src || '').split('v=')[1] || '';
+    const cargar = (src, listo) => { const s = document.createElement('script'); s.src = ROOT + src + '?v=' + v; s.onload = listo; document.head.appendChild(s); };
+    const avisos = () => cargar('shared/avisos.js', () => AVISOS.iniciar());
+    if (window.CAJAFX) avisos(); else cargar('shared/caja-fx.js', avisos);
+  }
   function rolNombre(r) { return { duenio: 'Dueña', admin: 'Administración', vendedora: 'Vendedora', visor: 'Solo ver' }[r] || r; }
 
   // ---------- arranque ----------
@@ -215,6 +223,7 @@
     pintarLateral();
     document.title = ((body.dataset.title || '').replace(/<[^>]+>/g, '') || 'Inicio') + ' · ' + APP.empresa.nombre + ' · ' + SISTEMA;
     iniciarPendientes();
+    iniciarAvisos();
     return APP;
   })();
 
