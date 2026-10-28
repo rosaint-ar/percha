@@ -5,74 +5,36 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Caja · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610281829">
+<link rel="stylesheet" href="../shell/shell.css?v=202610281834">
 <style>
-  main.app{max-width:none;padding-top:0}
-  .cab-pagina{display:none}
-  .pos{display:grid;grid-template-columns:1fr 420px;gap:14px;align-items:start;min-height:calc(100vh - 70px)}
-  /* ---- izquierda: búsqueda y resultados ---- */
-  .panel-busqueda .buscador{min-width:0;width:100%;padding:11px 14px;border-radius:14px}
-  .panel-busqueda .buscador input{font-size:16px}
-  .estado-caja{display:flex;align-items:center;gap:10px;margin:0 0 12px;flex-wrap:wrap}
-  .estado-caja .chip{font-size:11px}
-  .punto{width:8px;height:8px;border-radius:50%;background:var(--ok);display:inline-block;box-shadow:0 0 0 3px var(--ok-fondo)}
-  .punto.off{background:var(--error);box-shadow:0 0 0 3px var(--error-fondo)}
-  .resultados{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin-top:12px}
-  .res{background:var(--superficie-2);border:1px solid var(--linea);border-radius:var(--radio-chico);padding:12px 12px 10px;cursor:pointer;transition:transform .08s,box-shadow .12s;position:relative}
-  .res:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(21,23,28,.08);border-color:rgba(var(--acento-rgb),.5)}
-  .res .nom{font-weight:600;font-size:13.5px;line-height:1.25;margin-bottom:4px}
-  .res .cod{font:500 10.5px var(--f-mono);color:var(--tinta-3)}
-  .res .pre{font:700 15px var(--f-mono);letter-spacing:-.02em;margin-top:6px;color:var(--acento)}
-  .res .st{position:absolute;top:10px;right:10px}
-  .matriz-pick{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:6px;margin-top:10px}
-  .matriz-pick button{border:1px solid var(--linea);background:var(--superficie-2);border-radius:9px;padding:8px 6px;cursor:pointer;text-align:center;font:600 12px var(--f-ui)}
-  .matriz-pick button small{display:block;font:500 10px var(--f-mono);color:var(--tinta-3)}
-  .matriz-pick button.sin{opacity:.45}
-  .matriz-pick button:hover{border-color:var(--acento);background:var(--lila)}
-  .recientes{margin-top:18px}
-  .recientes h3{margin-bottom:8px;color:var(--tinta-3);font-size:11px;font-family:var(--f-mono);letter-spacing:.1em;text-transform:uppercase}
-  /* ---- derecha: ticket ---- */
-  .estado-caja{padding-top:16px}
-  .ticket{position:sticky;top:16px;display:flex;flex-direction:column;max-height:calc(100vh - 80px)}
-  .ticket .lineas{flex:1;overflow:auto;margin:0 -8px;padding:0 8px}
-  .linea{display:grid;grid-template-columns:1fr auto;gap:6px 10px;padding:9px 0;border-bottom:1px solid var(--linea-suave)}
-  .linea .n{font-weight:600;font-size:13px;line-height:1.25}
-  .linea .v{font:500 11px var(--f-mono);color:var(--tinta-3)}
-  .linea .promo{font:600 10.5px var(--f-mono);color:var(--ok)}
-  .linea .falla{margin-top:4px;border:1px dashed #c9a24a;background:#fff8e6;color:#8a6400;border-radius:8px;padding:3px 8px;font:600 11px var(--f-ui);cursor:pointer}
-  .linea .falla.on{border-style:solid;background:#f6d98a;color:#5a4100}
-  .linea .t{font:700 14px var(--f-mono);text-align:right;letter-spacing:-.02em}
-  .linea .ctrl{display:flex;align-items:center;gap:6px;grid-column:1/3}
-  .linea .ctrl button{width:26px;height:26px;border-radius:7px;border:1px solid var(--linea);background:var(--superficie-2);cursor:pointer;font-weight:700}
-  .linea .ctrl input{width:44px;text-align:center;border:1px solid var(--linea);border-radius:7px;padding:3px;font:600 13px var(--f-mono)}
-  .linea .ctrl .desc{margin-left:auto;display:flex;align-items:center;gap:4px;font-size:11px;color:var(--tinta-3)}
-  .linea .ctrl .desc input{width:48px}
-  .linea .ctrl .quitar{margin-left:4px;color:var(--error);border-color:transparent;background:transparent}
-  .ticket .sel{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
-  .ticket .sel select,.ticket .sel input{border:1px solid var(--linea);background:var(--superficie-2);border-radius:9px;padding:7px 9px;width:100%;font-size:12.5px}
-  .listas{display:flex;gap:4px;background:var(--relleno);padding:3px;border-radius:9px;margin:10px 0 6px}
-  .listas button{flex:1;border:0;background:transparent;padding:6px 4px;border-radius:7px;font:600 12px var(--f-ui);color:var(--tinta-2);cursor:pointer}
-  .listas button.on{background:var(--superficie-2);color:var(--tinta);box-shadow:0 1px 2px rgba(21,23,28,.08)}
-  .totales{border-top:1px solid var(--linea);padding-top:10px;margin-top:6px}
-  .totales div{display:flex;justify-content:space-between;font-size:13px;padding:2px 0;color:var(--tinta-2)}
-  .totales .gran{font:800 26px var(--f-titulo);letter-spacing:-.03em;color:var(--tinta);padding-top:4px}
-  .totales .gran span:last-child{font-family:var(--f-mono);font-weight:700}
-  .botonera{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
-  .botonera .btn{justify-content:center;padding:11px}
-  .botonera .cobrar{grid-column:1/3;font-size:15px;padding:14px}
-  .vacio-ticket{padding:40px 12px;text-align:center;color:var(--tinta-3);font-size:13px}
-  /* ---- cobro ---- */
-  .formas{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .formas button{border:1px solid var(--linea);background:var(--superficie-2);border-radius:10px;padding:10px;cursor:pointer;text-align:left;font:600 13px var(--f-ui)}
-  .formas button small{display:block;font:500 11px var(--f-mono);color:var(--tinta-3)}
-  .formas button:hover{border-color:var(--acento)}
-  .pagos-lista{margin:12px 0}
-  .pago{display:grid;grid-template-columns:1fr 120px 30px;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--linea-suave)}
-  .pago input{text-align:right;font-family:var(--f-mono);border:1px solid var(--linea);border-radius:8px;padding:6px 8px;width:100%}
-  .pago .x{border:0;background:transparent;color:var(--error);cursor:pointer;font-weight:700}
-  .resto{display:flex;justify-content:space-between;font:700 15px var(--f-mono);padding:8px 0}
-  .resto.ok{color:var(--ok)} .resto.falta{color:var(--aviso)} .resto.vuelto{color:var(--acento)}
-  /* ---- ticket impreso ---- */
+  /* Caja: la plata del cajón. No se vende acá (eso es el Punto de venta). */
+  .estado{display:grid;grid-template-columns:1fr auto;gap:18px;align-items:center;padding:22px 24px;margin-bottom:14px}
+  .estado.abierta{background:linear-gradient(120deg,rgba(31,122,92,.13),rgba(31,122,92,.03) 60%)}
+  .estado.cerrada{background:linear-gradient(120deg,rgba(var(--acento-rgb),.14),rgba(var(--acento-rgb),.03) 60%)}
+  .estado .etq-est{display:inline-flex;align-items:center;gap:8px;font:700 12px var(--f-mono);letter-spacing:.1em;text-transform:uppercase}
+  .estado .etq-est .punto{width:10px;height:10px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 4px var(--ok-fondo);animation:late 2.4s ease-in-out infinite}
+  .estado.cerrada .etq-est .punto{background:var(--tinta-4);box-shadow:0 0 0 4px var(--relleno);animation:none}
+  @keyframes late{50%{box-shadow:0 0 0 7px rgba(31,122,92,.06)}}
+  .estado h1{font-size:26px;margin:8px 0 4px}
+  .estado .sub{font-size:14px}
+  .estado .cajon{text-align:right}
+  .estado .cajon small{display:block;font:600 11px var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--tinta-3)}
+  .estado .cajon b{font:800 36px/1.1 var(--f-titulo);letter-spacing:-.04em;font-variant-numeric:tabular-nums}
+  .estado .acciones{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .dos{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+  .dos>.card{margin:0}
+  .medio{display:grid;grid-template-columns:1fr auto auto;gap:12px;padding:9px 0;border-top:1px solid var(--linea-suave);align-items:center}
+  .medio:first-child{border-top:0}
+  .medio small{color:var(--tinta-3)} .medio b{font-variant-numeric:tabular-nums}
+  .efv-det{font-size:12px;color:var(--tinta-3);background:var(--relleno);border-radius:10px;padding:8px 12px;margin-top:8px}
+  .mov{display:grid;grid-template-columns:auto 1fr auto;gap:12px;padding:9px 0;border-top:1px solid var(--linea-suave);align-items:center}
+  .mov:first-child{border-top:0}
+  .mov .ic{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;background:var(--relleno)}
+  .mov small{display:block;color:var(--tinta-3)}
+  .mov .monto{font-weight:700;font-variant-numeric:tabular-nums}
+  .mov .monto.menos{color:var(--error)} .mov .monto.mas{color:var(--ok)}
+  #tb-hist tr.clic{cursor:pointer}
+  .vacio-c{color:var(--tinta-3);font-size:13px;padding:10px 0}
   #impresion{display:none}
   @media print{
     body.con-lateral>*{display:none!important}
@@ -83,84 +45,115 @@
     #impresion hr{border:0;border-top:1px dashed #000;margin:6px 0}
     @page{size:80mm auto;margin:0}
   }
-  @media (max-width:1000px){.pos{grid-template-columns:1fr}.ticket{position:static;max-height:none}}
-  .pick-busca{width:100%;border:1.5px solid var(--acento,#70547b);background:#fff;border-radius:10px;padding:10px 12px;font-size:15px;margin-top:10px}
-  .rs-lista{display:grid;gap:8px;margin:12px 0}
-  .rs-item{display:flex;justify-content:space-between;align-items:center;gap:12px;border-radius:12px;padding:12px 14px;flex-wrap:wrap}
-  .rs-item b{display:block;font-size:14px}.rs-item span{font-size:13.5px}
-  .rs-item.falla{background:#fff8e6;border:1px solid #f0d58f}.rs-item.sin{background:#fdecee;border:1px solid #f3c2c7}
-  .rs-nota{font-size:13px;color:var(--tinta-2,#555);margin:0 0 6px}
-  .aviso-stock{background:#fdecee;color:#a8323a;border-radius:999px;padding:3px 10px;font:700 11.5px var(--f-ui);text-decoration:none;white-space:nowrap}
-  .cambiable{cursor:pointer}.cambiable:hover{color:var(--acento,#70547b)}.lapiz{font-size:11px;opacity:.55}
-  .matriz-pick button.actual{outline:2px solid var(--acento,#70547b);background:var(--lila,#efe8f3)}
-  .cl-res{display:grid;gap:4px;margin-top:8px;max-height:50vh;overflow:auto}
-  .cl-res button{display:flex;justify-content:space-between;gap:10px;border:1px solid var(--linea);background:var(--superficie-2,#fff);border-radius:10px;padding:10px 12px;cursor:pointer;text-align:left;font:600 13.5px var(--f-ui)}
-  .cl-res button:hover{border-color:var(--acento,#70547b)}.cl-res small{color:var(--tinta-3);font-family:var(--f-mono)}
-  .sinstock-chip{display:inline-block;background:#fdecee;color:#a8323a;border-radius:6px;padding:0 6px;margin-left:4px;font:700 10.5px var(--f-ui)}
-  /* ===== Modo reservado: tema oscuro ===== */
-  body.reservado{--lienzo:#121016;--lienzo-2:#17141c;--tinta:#ECE8F2;--tinta-2:#CFC8D9;--tinta-3:#9C95A8;--tinta-4:#6F6979;--superficie:rgba(30,27,36,.92);--superficie-2:#221e29;--superficie-borde:rgba(255,255,255,.06);--linea:rgba(255,255,255,.11);--linea-suave:rgba(255,255,255,.06);--relleno:rgba(255,255,255,.06);--relleno-2:rgba(255,255,255,.1);--acento:#C3A6EC;--acento-rgb:195,166,236;--lila:rgba(195,166,236,.16);--ok:#6FD39B;--error:#F08A91;background:#121016!important;color:var(--tinta)}
-  body.reservado main,body.reservado .pos,body.reservado .ticket,body.reservado .catalogo{background:transparent;color:var(--tinta)}
-  body.reservado .modal{background:rgba(30,27,36,.98);color:var(--tinta);border-color:rgba(255,255,255,.08)}
-  body.reservado input,body.reservado select,body.reservado textarea,body.reservado .linea .ctrl button,body.reservado .linea .ctrl input{background:#1b1820!important;color:var(--tinta)!important;border-color:var(--linea)!important}
-  body.reservado .btn:not(.primario):not(.peligro){background:#2a2531;color:var(--tinta);border-color:var(--linea)}
-  body.reservado .tile-p,body.reservado .matriz-pick button,body.reservado .familias button:not(.on),body.reservado .cl-res button{background:#221e29;color:var(--tinta);border-color:var(--linea)}
-  body.reservado .listas button{background:transparent;color:var(--tinta-2)}body.reservado .listas button.on{background:#2f2938;color:var(--tinta)}body.reservado .listas{background:rgba(255,255,255,.05)}
-  #barra-reservado{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:50;display:flex;align-items:center;gap:12px;background:#000;color:#ECE8F2;border:1px solid rgba(195,166,236,.45);border-radius:999px;padding:8px 10px 8px 16px;box-shadow:0 10px 30px rgba(0,0,0,.5);font:600 13px var(--f-ui)}
-  #barra-reservado button{background:#C3A6EC;color:#1b1424;border:0;border-radius:999px;padding:7px 14px;font:700 12.5px var(--f-ui);cursor:pointer}
-  #barra-reservado small{color:#9C95A8;font-weight:500}
-  .filtros-res{display:flex;gap:8px;align-items:center;margin:10px 0}.filtros-res b{margin-left:auto;font-family:var(--f-mono)}
-  .rv-lista{display:grid;gap:6px;max-height:60vh;overflow:auto}
-  .rv-venta{border:1px solid var(--linea);border-radius:10px;padding:8px 12px}.rv-venta.anulada{opacity:.55}
-  .rv-venta summary{display:flex;gap:12px;align-items:center;cursor:pointer;font-size:13.5px}.rv-venta summary b{margin-left:auto}
-  .rv-det{padding:8px 0 4px;display:grid;gap:4px;font-size:13px}.rv-det>div{display:flex;gap:8px}.rv-det>div .mono{margin-left:auto}
-  .rv-pagos{color:var(--tinta-3);font-size:12.5px;margin:4px 0}
-  .matriz-pick.por-color{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
-  .pc-col{border:1px solid var(--linea);border-radius:14px;padding:8px;display:grid;gap:7px;align-content:start;background:var(--superficie-2)}
-  .pc-col.sin{opacity:.55}
-  .pc-foto{aspect-ratio:1/1;border-radius:10px;overflow:hidden;background:var(--relleno);display:grid;place-items:center}
-  .pc-foto img{width:100%;height:100%;object-fit:cover;display:block}.pc-foto i{width:46px;height:46px;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
-  .pc-col>b{font:650 13px var(--f-ui);padding:0 2px}
-  .pc-talles{display:flex;flex-wrap:wrap;gap:6px}
-  .matriz-pick.por-color .pc-talles button{flex:1 0 50px;min-height:44px;padding:6px 8px}
-  body.reservado .pc-col{background:#221e29;border-color:var(--linea)}
+  @media (max-width:900px){.dos{grid-template-columns:1fr}.estado{grid-template-columns:1fr}.estado .cajon{text-align:left}}
 </style>
 </head>
-<body data-page="caja" data-title="Caja">
+<body data-page="caja" data-etq="Caja" data-title="Caja" data-subtitle="La plata del cajón: apertura, ingresos y retiros, cierre e historial">
 <main class="app">
-  <div class="estado-caja" id="estado-caja"></div>
-  <div class="pos">
-    <section class="panel-busqueda">
-      <div class="buscador"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" placeholder="Escaneá el código o escribí el nombre…" autocomplete="off" autofocus><kbd>/</kbd></div>
-      <div id="resultados" class="resultados"></div>
-      <div class="recientes" id="recientes"></div>
-    </section>
-    <aside class="card ticket">
-      <div class="card-cab" style="margin-bottom:6px"><div><h2 id="ticket-titulo">Ticket</h2><p class="sub" id="ticket-sub">Nueva venta</p></div><div class="acciones"><button class="btn chico" id="btn-vaciar">Vaciar</button></div></div>
-      <div class="lineas" id="lineas"><div class="vacio-ticket">Escaneá o buscá una prenda para empezar.</div></div>
-      <div class="listas" id="listas"></div>
-      <div class="sel">
-        <select id="sel-vendedora" title="Quién atendió"></select>
-        <input id="sel-cliente" placeholder="Clienta (opcional)" list="dl-clientes"><datalist id="dl-clientes"></datalist>
-      </div>
-      <div class="sel"><input id="nota" placeholder="Nota (regalo, cambio antes del…)"><div style="display:flex;gap:6px;align-items:center"><label style="font-size:12px;color:var(--tinta-3);white-space:nowrap">Desc. general %</label><input id="desc-general" type="number" min="0" max="100" step="1" value="0" style="width:70px;text-align:right;font-family:var(--f-mono)"></div></div>
-      <div class="totales" id="totales"></div>
-      <div class="botonera">
-        <button class="btn cobrar primario" id="btn-cobrar">Cobrar <kbd style="background:rgba(255,255,255,.2);border-color:transparent;color:#fff">Ctrl+Enter</kbd></button>
-        <button class="btn" id="btn-sena">Dejar seña</button>
-        <button class="btn" id="btn-cambio">Cambio / devolución</button>
-      </div>
-    </aside>
+  <section class="card estado" id="estado"><div class="sub">Cargando…</div></section>
+  <section class="tiles" id="tiles" hidden></section>
+  <section class="dos" id="detalle" hidden>
+    <div class="card"><div class="card-cab"><div><h2>Cobrado en este turno</h2><p class="sub">Por medio de pago</p></div></div><div id="medios"></div></div>
+    <div class="card"><div class="card-cab"><div><h2>Ingresos y retiros</h2><p class="sub">Plata que entró o salió del cajón sin ser venta</p></div><div class="acciones"><button class="btn chico" id="btn-mov2">+ Registrar</button></div></div><div id="movs"></div></div>
+  </section>
+  <div class="card">
+    <div class="card-cab"><div><h2>Historial de cierres</h2><p class="sub">Cada turno: lo vendido, lo que se contó y lo que quedó. Tocá uno para ver el detalle.</p></div></div>
+    <table class="lista" id="tb-hist"><thead><tr><th>Día</th><th>Horario</th><th>Quién</th><th class="num">Ventas</th><th class="num">Vendido</th><th>Arqueo</th><th class="num">Quedó</th><th class="num">Retirado</th></tr></thead><tbody></tbody></table>
   </div>
 </main>
 <div id="impresion"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610281829"></script>
-<script src="../shared/canales.js?v=202610281829"></script>
-<script src="../shared/precios.js?v=202610281829"></script>
-<script src="../shell/shell.js?v=202610281829"></script>
-<script src="../shared/facturar.js?v=202610281829"></script>
-<script src="../shared/medios-pago.js?v=202610281829"></script>
-<script src="../shared/caja-fx.js?v=202610281829"></script>
-<script src="caja.js?v=202610281829"></script>
+<script src="../shared/supabase.js?v=202610281834"></script>
+<script src="../shell/shell.js?v=202610281834"></script>
+<script src="../shared/caja-fx.js?v=202610281834"></script>
+<script src="turno.js?v=202610281834"></script>
+<script>
+APP.ready.then(async () => {
+  const { fmt, esc, $, $$, toast, modal } = APP, e = APP.empresa.id;
+  const fx = window.CAJAFX;
+  const caja = await TURNO.cajaDe(e);
+  if (!caja) { $('#estado').innerHTML = '<div><h2>No hay ninguna caja configurada</h2><p class="sub">Pedile a administración que cree una.</p></div>'; return; }
+  const cola = () => { try { return JSON.parse(localStorage.getItem(`percha_cola_ventas_${e}`) || '[]').length; } catch (_) { return 0; } };
+  const hora = d => new Date(d).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+  const dia = d => new Date(d).toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' }).replace('.', '');
+  let turno = null, hist = [];
+
+  async function cargar() {
+    turno = await TURNO.abierto(caja.id);
+    const [h, esp, mv] = await Promise.all([
+      sb.rpc('caja_historial', { p_caja: caja.id, p_limite: 60 }),
+      turno ? sb.rpc('caja_esperado', { p_turno: turno.id }) : Promise.resolve({ data: null }),
+      turno ? sb.from('caja_movimientos').select('*').eq('turno_id', turno.id).order('fecha', { ascending: false }) : Promise.resolve({ data: [] })
+    ]);
+    hist = h.data || [];
+    pintarEstado(esp.data, mv.data || []);
+    pintarHistorial();
+  }
+
+  function pintarEstado(esp, movs) {
+    const el = $('#estado'), sonidoBtn = `<button class="btn" id="btn-sonido" title="Prender o apagar los sonidos">${fx && fx.sonidoActivo() ? '🔊' : '🔇'}</button>`;
+    if (turno && esp) {
+      const efv = (esp.formas || []).find(f => f.tipo === 'efectivo'), yo = (hist.find(x => x.id === turno.id) || {}).abrio;
+      el.className = 'card estado abierta';
+      el.innerHTML = `<div><span class="etq-est"><span class="punto"></span>Caja abierta</span>
+          <h1>${esc(caja.nombre)}</h1><p class="sub">Abrió ${yo ? esc(yo) + ' ' : ''}${dia(turno.abierto)} a las ${hora(turno.abierto)} con ${fmt.pesos(turno.efectivo_inicial)}.</p>
+          <div class="acciones"><button class="btn" id="btn-mov">💵 Ingreso / retiro</button><button class="btn primario" id="btn-cerrar">🌙 Cerrar caja</button><a class="btn" href="pos.html">🛍️ Ir a vender</a>${sonidoBtn}</div></div>
+        <div class="cajon"><small>Debería haber en el cajón</small><b>${fmt.pesos(efv ? efv.esperado : 0)}</b><small style="text-transform:none;letter-spacing:0;font-family:var(--f-ui)">en efectivo, ahora</small></div>`;
+      $('#tiles').hidden = false; $('#detalle').hidden = false;
+      $('#tiles').innerHTML = `<div class="tile"><div class="t">Vendido en el turno</div><div class="n">${fmt.pesos(esp.total)}</div><div class="d">${esp.ventas} venta${esp.ventas === 1 ? '' : 's'}</div></div>
+        <div class="tile"><div class="t">Ticket promedio</div><div class="n">${esp.ventas ? fmt.pesos(esp.total / esp.ventas) : '—'}</div><div class="d">por venta</div></div>
+        <div class="tile"><div class="t">Efectivo inicial</div><div class="n">${fmt.pesos(esp.efectivo_inicial)}</div><div class="d">con lo que arrancó</div></div>
+        <div class="tile"><div class="t">Ingresos y retiros</div><div class="n">${(esp.movimientos > 0 ? '+' : '') + fmt.pesos(esp.movimientos)}</div><div class="d">${movs.length} movimiento${movs.length === 1 ? '' : 's'}</div></div>`;
+      const medios = (esp.formas || []).filter(f => f.ventas);
+      $('#medios').innerHTML = (medios.length ? medios.map(f => `<div class="medio"><span>${esc(f.nombre)}</span><small>${f.ventas} venta${f.ventas > 1 ? 's' : ''}</small><b>${fmt.pesos(f.tipo === 'efectivo' ? f.esperado - esp.efectivo_inicial - esp.movimientos : f.esperado)}</b></div>`).join('') : '<div class="vacio-c">Todavía no se cobró nada en este turno.</div>')
+        + (efv ? `<div class="efv-det">Efectivo: arrancó con ${fmt.pesos(esp.efectivo_inicial)} + ventas ${fmt.pesos(efv.esperado - esp.efectivo_inicial - esp.movimientos)} ${esp.movimientos >= 0 ? '+' : '−'} ingresos/retiros ${fmt.pesos(Math.abs(esp.movimientos))} = <b>${fmt.pesos(efv.esperado)}</b></div>` : '');
+      $('#movs').innerHTML = movs.length ? movs.map(m => `<div class="mov"><span class="ic">${m.tipo === 'retiro' ? '↗️' : '↙️'}</span><span>${esc(m.concepto || (m.tipo === 'retiro' ? 'Retiro' : 'Ingreso'))}<small>${m.tipo === 'retiro' ? 'Retiro' : 'Ingreso'} · ${hora(m.fecha)}</small></span><span class="monto ${m.tipo === 'retiro' ? 'menos' : 'mas'}">${m.tipo === 'retiro' ? '−' : '+'}${fmt.pesos(m.monto)}</span></div>`).join('') : '<div class="vacio-c">No hubo ingresos ni retiros en este turno.</div>';
+      $('#btn-mov').onclick = $('#btn-mov2').onclick = async () => { if (await TURNO.movimiento(turno)) cargar(); };
+      $('#btn-cerrar').onclick = async () => { if (await TURNO.cerrar(caja, turno, { pendientes: cola() })) cargar(); };
+    } else {
+      const ult = hist.find(x => x.estado === 'cerrado');
+      el.className = 'card estado cerrada';
+      el.innerHTML = `<div><span class="etq-est"><span class="punto"></span>Caja cerrada</span>
+          <h1>${esc(caja.nombre)}</h1><p class="sub">${ult ? `Último cierre: ${dia(ult.cerrado)} a las ${hora(ult.cerrado)}${ult.cerro ? ' (' + esc(ult.cerro) + ')' : ''}.` : 'Todavía no hay cierres.'}</p>
+          <div class="acciones"><button class="btn primario" id="btn-abrir">🔓 Abrir caja</button>${sonidoBtn}</div></div>
+        ${ult && ult.efectivo_queda != null ? `<div class="cajon"><small>Quedó en el cajón</small><b>${fmt.pesos(ult.efectivo_queda)}</b></div>` : ''}`;
+      $('#tiles').hidden = true; $('#detalle').hidden = true;
+      $('#btn-abrir').onclick = async () => { if (await TURNO.abrir(caja)) cargar(); };
+    }
+    const so = $('#btn-sonido'); if (so && fx) so.onclick = () => { const on = fx.alternarSonido(); so.textContent = on ? '🔊' : '🔇'; toast(on ? 'Sonidos prendidos' : 'Sonidos apagados'); };
+  }
+
+  // arqueo de un turno: cuánto faltó o sobró, y cuánto se retiró
+  const resumenArqueo = t => {
+    const a = t.arqueo || [], dif = a.reduce((s, x) => s + (+x.diferencia || 0), 0);
+    const efv = a.find(x => /efectivo/i.test(x.nombre || '')), contado = efv ? +efv.declarado : null;
+    return { dif, retirado: contado != null && t.efectivo_queda != null ? Math.max(0, contado - t.efectivo_queda) : null };
+  };
+  function pintarHistorial() {
+    const tb = $('#tb-hist tbody'), l = hist.filter(t => t.estado === 'cerrado');
+    tb.innerHTML = l.length ? l.map(t => { const r = resumenArqueo(t);
+      return `<tr class="clic" data-id="${t.id}"><td>${dia(t.abierto)}</td><td>${hora(t.abierto)} – ${hora(t.cerrado)}</td><td>${esc(t.cerro || t.abrio || '—')}</td><td class="num">${t.ventas}</td><td class="num num-f">${fmt.pesos(t.total)}</td>
+        <td>${!(t.arqueo || []).length ? '<span class="chip gris">sin arqueo</span>' : Math.abs(r.dif) < 1 ? '<span class="chip ok">✓ cuadró</span>' : `<span class="chip ${r.dif < 0 ? 'error' : 'aviso'}">${r.dif < 0 ? 'faltó ' : 'sobró '}${fmt.pesos(Math.abs(r.dif))}</span>`}</td>
+        <td class="num">${t.efectivo_queda != null ? fmt.pesos(t.efectivo_queda) : '—'}</td><td class="num">${r.retirado != null ? fmt.pesos(r.retirado) : '—'}</td></tr>`; }).join('')
+      : '<tr><td colspan="8" class="vacio">Todavía no se cerró ninguna caja.</td></tr>';
+    $$('tr[data-id]', tb).forEach(tr => tr.onclick = () => verCierre(hist.find(x => x.id === tr.dataset.id)));
+  }
+  function verCierre(t) {
+    const r = resumenArqueo(t);
+    const m = modal(`<h2>Cierre del ${dia(t.cerrado)}</h2><p class="sub">${hora(t.abierto)} a ${hora(t.cerrado)}${t.abrio ? ' · abrió ' + esc(t.abrio) : ''}${t.cerro ? ' · cerró ' + esc(t.cerro) : ''}</p>
+      <div class="tiles" style="grid-template-columns:repeat(3,1fr);margin:12px 0"><div class="tile"><div class="t">Ventas</div><div class="n">${t.ventas}</div></div><div class="tile"><div class="t">Vendido</div><div class="n" style="font-size:22px">${fmt.pesos(t.total)}</div></div><div class="tile"><div class="t">Arrancó con</div><div class="n" style="font-size:22px">${fmt.pesos(t.efectivo_inicial)}</div></div></div>
+      <table class="lista"><tr><th>Medio</th><th class="num">Debería haber</th><th class="num">Se contó</th><th class="num">Diferencia</th></tr>
+      ${(t.arqueo || []).map(a => `<tr><td>${esc(a.nombre)}</td><td class="num">${fmt.pesos(a.esperado)}</td><td class="num">${fmt.pesos(a.declarado)}</td><td class="num" style="color:${Math.abs(a.diferencia) < 1 ? 'var(--ok)' : 'var(--error)'}">${Math.abs(a.diferencia) < 1 ? '✓' : (a.diferencia > 0 ? '+' : '') + fmt.pesos(a.diferencia)}</td></tr>`).join('') || '<tr><td colspan="4" class="vacio">Sin arqueo.</td></tr>'}</table>
+      <p class="sub" style="margin-top:10px">${+t.movimientos ? 'Ingresos/retiros del turno: ' + fmt.pesos(t.movimientos) + ' · ' : ''}${t.efectivo_queda != null ? 'Quedó en caja ' + fmt.pesos(t.efectivo_queda) : ''}${r.retirado != null ? ' · se retiró ' + fmt.pesos(r.retirado) : ''}</p>
+      ${t.notas ? `<div class="aviso-caja info" style="margin-top:10px">📝 ${esc(t.notas)}</div>` : ''}
+      <div class="pie"><button class="btn" data-print>Imprimir resumen</button><button class="btn primario" data-ok>Listo</button></div>`);
+    $('[data-ok]', m).onclick = () => m.cerrar();
+    $('[data-print]', m).onclick = () => TURNO.imprimirCierre(caja, t, { ventas: t.ventas, total: t.total, efectivo_inicial: t.efectivo_inicial, movimientos: t.movimientos }, t.arqueo, t.efectivo_queda, t.cerro);
+  }
+
+  await cargar();
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) cargar(); });
+});
+</script>
 </body>
 </html>
