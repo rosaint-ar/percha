@@ -42,7 +42,7 @@
 <div id="cont"><div class="estado">Cargando…</div></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="../shared/supabase.js?v=202610281853"></script>
+<script src="../shared/supabase.js?v=202610281854"></script>
 <script>
 (async () => {
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -118,7 +118,7 @@
   </div>`;
   new QRCode(document.getElementById('qr'), { text: qrUrl, width: 96, height: 96, correctLevel: QRCode.CorrectLevel.M });
   document.title = `${c.nombre_tipo} ${c.numero_mostrar} · ${emp.nombre}`;
-  document.getElementById('wsp').href = 'https://wa.me/?text=' + encodeURIComponent(`${emp.nombre} · ${c.nombre_tipo} ${c.numero_mostrar}\nTotal ${pesos.format(c.total)}\nCAE ${c.cae}\nVerificala en ARCA: ${qrUrl}`);
+  document.getElementById('wsp').href = 'https://api.whatsapp.com/send?text=' + encodeURIComponent(`${emp.nombre} · ${c.nombre_tipo} ${c.numero_mostrar}\nTotal ${pesos.format(c.total)}\nCAE ${c.cae}\nVerificala en ARCA: ${qrUrl}`);
   if (c.muestra) document.getElementById('wsp').hidden = true;
   document.getElementById('barra').hidden = false;
   // en el celular la hoja A4 se achica para entrar en la pantalla (al imprimir sale a tamaño real)

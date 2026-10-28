@@ -145,7 +145,7 @@
     if (t.notas && !/^Traído de TPVsol/.test(t.notas)) l.push('', '📝 ' + t.notas);
     return l.join('\n');
   }
-  function whatsappCierre(...a) { window.open('https://wa.me/?text=' + encodeURIComponent(textoCierre(...a)), '_blank'); }
+  function whatsappCierre(...a) { window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(textoCierre(...a)), '_blank'); }
 
   window.TURNO = { cajaDe, abierto, abrir, movimiento, cerrar, imprimirCierre, textoCierre, whatsappCierre };
 })();
