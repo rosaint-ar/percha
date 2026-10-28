@@ -106,9 +106,10 @@
         if (r.error) { b.disabled = false; fx().sonido('error'); toast(mensajeError(r.error), 'error'); return; }
         m.cerrar(); resolve(true);
         const dif = arqueo.reduce((s, a) => s + a.diferencia, 0);
+        const datos = [caja, Object.assign({}, turno, { cerrado: new Date().toISOString(), notas: $('#c-notas', m).value.trim() || null }), Object.assign({}, esp, { medios: filas.filter(f => f.ventas).map(f => ({ nombre: f.nombre, monto: f.tipo === 'efectivo' ? f.esperado - esp.efectivo_inicial - esp.movimientos : f.esperado })) }), arqueo, queda, nombrePila()];
         fx().telon({ tipo: 'cerrar', emoji: '🌙', titulo: `¡Buen trabajo${nombrePila() ? ', ' + nombrePila() : ''}!`, monto: +esp.total,
           texto: `${esp.ventas} venta${esp.ventas === 1 ? '' : 's'} en este turno${Math.abs(dif) < 1 ? ' · la caja cuadró perfecto ✓' : ''}${queda != null ? ' · quedan ' + fmt.pesos(queda) + ' para mañana' : ''}.`,
-          botones: [['Imprimir resumen', () => imprimirCierre(caja, Object.assign({}, turno, { cerrado: new Date().toISOString() }), Object.assign({}, esp, { medios: filas.filter(f => f.ventas).map(f => ({ nombre: f.nombre, monto: f.tipo === 'efectivo' ? f.esperado - esp.efectivo_inicial - esp.movimientos : f.esperado })) }), arqueo, queda, nombrePila())], ['Listo', null, true]] });
+          botones: [['Imprimir resumen', () => imprimirCierre(...datos)], ['Mandar por WhatsApp', () => whatsappCierre(...datos)], ['Listo', null, true]] });
       };
     });
   }
@@ -126,5 +127,23 @@
     setTimeout(() => window.print(), 50);
   }
 
-  window.TURNO = { cajaDe, abierto, abrir, movimiento, cerrar, imprimirCierre };
+  // resumen del cierre en texto, para mandar por WhatsApp (se elige a quién en WhatsApp)
+  function textoCierre(caja, t, esp, arqueo, queda, quien) {
+    const { fmt } = APP, emp = APP.empresa || {};
+    const dia = new Date(t.cerrado || Date.now()).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
+    const hora = d => new Date(d).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+    const l = [`*Cierre de caja · ${emp.nombre || ''}*`, `${dia.charAt(0).toUpperCase() + dia.slice(1)} · ${hora(t.abierto)} a ${hora(t.cerrado || Date.now())}${quien ? ' · ' + quien : ''}`, '',
+      `🛍️ Ventas: ${esp.ventas} · Vendido: *${fmt.pesos(esp.total)}*`];
+    if ((esp.medios || []).length) { l.push('', '*Cobrado por medio:*'); esp.medios.forEach(x => l.push(`• ${x.nombre}: ${fmt.pesos(x.monto)}`)); }
+    const efv = (arqueo || []).find(a => /efectivo/i.test(a.nombre || ''));
+    l.push('', `💵 Efectivo: arrancó con ${fmt.pesos(esp.efectivo_inicial)}${+esp.movimientos ? ', ingresos/retiros ' + fmt.pesos(esp.movimientos) : ''}${efv ? ', se contó ' + fmt.pesos(efv.declarado) : ''}`);
+    const dif = (arqueo || []).reduce((s, a) => s + (+a.diferencia || 0), 0);
+    if ((arqueo || []).length) l.push(Math.abs(dif) < 1 ? '✅ La caja cuadró' : `⚠️ ${dif < 0 ? 'Faltaron' : 'Sobraron'} ${fmt.pesos(Math.abs(dif))}`);
+    if (queda != null) l.push(`Quedó en caja: ${fmt.pesos(queda)}${efv ? ' · se retiró ' + fmt.pesos(Math.max(0, efv.declarado - queda)) : ''}`);
+    if (t.notas && !/^Traído de TPVsol/.test(t.notas)) l.push('', '📝 ' + t.notas);
+    return l.join('\n');
+  }
+  function whatsappCierre(...a) { window.open('https://wa.me/?text=' + encodeURIComponent(textoCierre(...a)), '_blank'); }
+
+  window.TURNO = { cajaDe, abierto, abrir, movimiento, cerrar, imprimirCierre, textoCierre, whatsappCierre };
 })();

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Caja · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610281847">
+<link rel="stylesheet" href="../shell/shell.css?v=202610281851">
 <style>
   /* Caja: la plata del cajón. No se vende acá (eso es el Punto de venta). */
   .estado{display:grid;grid-template-columns:1fr auto;gap:18px;align-items:center;padding:22px 24px;margin-bottom:14px}
@@ -64,10 +64,10 @@
 </main>
 <div id="impresion"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610281847"></script>
-<script src="../shell/shell.js?v=202610281847"></script>
-<script src="../shared/caja-fx.js?v=202610281847"></script>
-<script src="turno.js?v=202610281847"></script>
+<script src="../shared/supabase.js?v=202610281851"></script>
+<script src="../shell/shell.js?v=202610281851"></script>
+<script src="../shared/caja-fx.js?v=202610281851"></script>
+<script src="turno.js?v=202610281851"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal } = APP, e = APP.empresa.id;
@@ -152,9 +152,11 @@ APP.ready.then(async () => {
       ${(t.arqueo || []).map(a => `<tr><td>${esc(a.nombre)}</td><td class="num">${fmt.pesos(a.esperado)}</td><td class="num">${fmt.pesos(a.declarado)}</td><td class="num" style="color:${Math.abs(a.diferencia) < 1 ? 'var(--ok)' : 'var(--error)'}">${Math.abs(a.diferencia) < 1 ? '✓' : (a.diferencia > 0 ? '+' : '') + fmt.pesos(a.diferencia)}</td></tr>`).join('') || '<tr><td colspan="4" class="vacio">Sin arqueo.</td></tr>'}</table>
       <p class="sub" style="margin-top:10px">${+t.movimientos ? 'Ingresos/retiros del turno: ' + fmt.pesos(t.movimientos) + ' · ' : ''}${t.efectivo_queda != null ? 'Quedó en caja ' + fmt.pesos(t.efectivo_queda) : ''}${r.retirado != null ? ' · se retiró ' + fmt.pesos(r.retirado) : ''}</p>
       ${t.notas ? `<div class="aviso-caja info" style="margin-top:10px">📝 ${esc(t.notas)}</div>` : ''}
-      <div class="pie"><button class="btn" data-print>Imprimir resumen</button><button class="btn primario" data-ok>Listo</button></div>`);
+      <div class="pie"><button class="btn" data-print>🖨️ Imprimir resumen</button><button class="btn" data-wsp>💬 Mandar por WhatsApp</button><button class="btn primario" data-ok>Listo</button></div>`);
     $('[data-ok]', m).onclick = () => m.cerrar();
-    $('[data-print]', m).onclick = () => TURNO.imprimirCierre(caja, t, { ventas: t.ventas, total: t.total, efectivo_inicial: t.efectivo_inicial, movimientos: t.movimientos, medios: t.medios }, t.arqueo, t.efectivo_queda, t.cerro || t.abrio);
+    const datos = [caja, t, { ventas: t.ventas, total: t.total, efectivo_inicial: t.efectivo_inicial, movimientos: t.movimientos, medios: t.medios }, t.arqueo, t.efectivo_queda, t.cerro || t.abrio];
+    $('[data-print]', m).onclick = () => TURNO.imprimirCierre(...datos);
+    $('[data-wsp]', m).onclick = () => TURNO.whatsappCierre(...datos);
   }
 
   await cargar();
