@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Conexiones · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610281620">
+<link rel="stylesheet" href="../shell/shell.css?v=202610281623">
 <style>
   .canales{display:grid;grid-template-columns:1fr 1fr;gap:14px}
   .canal-card .logo{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font:800 16px var(--f-titulo);color:#fff}
@@ -15,6 +15,9 @@
   .dato{background:var(--relleno);border-radius:10px;padding:10px 12px}
   .dato b{display:block;font:700 20px var(--f-titulo);letter-spacing:-.03em}.dato span{font-size:11.5px;color:var(--tinta-3)}
   .dato.mal b{color:var(--error)}.dato.bien b{color:var(--ok)}
+  details.avanzado{margin-top:16px;border-top:1px solid var(--linea-suave);padding-top:10px}
+  details.avanzado summary{cursor:pointer;font:600 13px var(--f-ui);color:var(--tinta-2)}
+  .av-fila{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:8px 0}.av-fila .btn{min-width:230px}
   .pasos{font-size:13.5px;color:var(--tinta-2);margin:0;padding-left:18px}
   @media (max-width:900px){.canales{grid-template-columns:1fr}}
   /* precios en la tienda online */
@@ -46,9 +49,9 @@
   <div class="card" id="precios" style="margin-top:14px;display:none"></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610281620"></script>
-<script src="../shared/precios.js?v=202610281620"></script>
-<script src="../shell/shell.js?v=202610281620"></script>
+<script src="../shared/supabase.js?v=202610281623"></script>
+<script src="../shared/precios.js?v=202610281623"></script>
+<script src="../shell/shell.js?v=202610281623"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -70,12 +73,19 @@ APP.ready.then(async () => {
       return;
     }
     const { data: r } = await sb.rpc('resumen_conexion', { c: cx.id }); const res = r || {};
-    cuerpo.innerHTML = `<p style="margin:0 0 4px"><span class="chip ${cx.estado === 'activa' ? 'ok' : 'error'}">${cx.estado === 'activa' ? 'conectada' : cx.estado}</span> <b>${esc(cx.nombre || '')}</b> <small class="mono">#${esc(cx.externo_id)}</small>${cx.url ? ` · <a href="${esc(cx.url)}" target="_blank">ver tienda</a>` : ''}</p>
-      <p class="sub">${cx.ultima_sync ? 'Última sincronización ' + fmt.fechaHora(cx.ultima_sync) : 'Todavía no se sincronizó'}${cx.ultimo_error ? ' · <span style="color:var(--error)">' + esc(cx.ultimo_error) + '</span>' : ''}</p>
-      <div class="datos"><div class="dato"><b>${fmt.num(res.items || 0)}</b><span>variantes publicadas</span></div><div class="dato ${res.sin_cruzar ? 'mal' : 'bien'}"><b>${fmt.num(res.sin_cruzar || 0)}</b><span>sin cruzar con el local</span></div><div class="dato ${res.stock_distinto ? 'mal' : 'bien'}"><b>${fmt.num(res.stock_distinto || 0)}</b><span>con stock distinto</span></div></div>
-      <label style="display:flex;gap:10px;align-items:center;margin:4px 0 12px;font-size:13.5px"><input type="checkbox" id="chk-empujar" ${cx.empujar_stock ? 'checked' : ''} style="width:18px;height:18px"> <span><b>El local manda el stock a Tienda Nube.</b> Cada venta, compra o ajuste en el local actualiza la tienda online al instante. <small class="sub">Solo para lo que está cruzado.</small></span></label>
-      <label style="display:flex;gap:10px;align-items:center;margin:-4px 0 12px;font-size:13.5px"><input type="checkbox" id="chk-ocultos" ${cx.incluir_ocultos ? 'checked' : ''} ${APP.esAdmin ? '' : 'disabled'} style="width:18px;height:18px"> <span><b>Tener en cuenta los productos ocultos de la tienda.</b> Apagado, lo que está oculto en Tienda Nube no cuenta para nada: ni stock, ni cruce, ni precios. <small class="sub">Hoy hay ${fmt.num(res.ocultos || 0)} ocultos.</small></span></label>
-      <div class="acciones"><button class="btn primario" id="btn-sync">Sincronizar catálogo</button><a class="btn" href="cruce.html?c=${cx.id}">Ver cruce de productos</a><button class="btn" id="btn-tomar" title="Hasta el corte: el local toma de Tienda Nube el stock, el nombre y las variantes de todo lo cruzado, y crea lo que falte">Tomar todo de Tienda Nube</button><button class="btn" id="btn-todo" title="Manda a Tienda Nube el stock del local de todo lo cruzado">Enviar todo el stock a Tienda Nube</button><button class="btn" id="btn-pedidos">Pedidos recientes</button><button class="btn peligro" id="btn-desconectar">Desconectar</button></div>`;
+    cuerpo.innerHTML = `<p style="margin:0 0 6px"><span class="chip ${cx.estado === 'activa' ? 'ok' : 'error'}">${cx.estado === 'activa' ? 'conectada' : cx.estado}</span> <b>${esc(cx.nombre || '')}</b>${cx.url ? ` · <a href="${esc(cx.url)}" target="_blank">ver tienda</a>` : ''}</p>
+      ${cx.ultimo_error ? `<p class="sub" style="color:var(--error)">${esc(cx.ultimo_error)}</p>` : ''}
+      <div class="datos"><div class="dato"><b>${fmt.num(res.items || 0)}</b><span>prendas publicadas</span></div><div class="dato ${res.sin_cruzar ? 'mal' : 'bien'}"><b>${fmt.num(res.sin_cruzar || 0)}</b><span>sin cruzar con el local</span></div><div class="dato ${res.stock_distinto ? 'mal' : 'bien'}"><b>${fmt.num(res.stock_distinto || 0)}</b><span>con stock distinto</span></div></div>
+      <div class="fila-sw" style="align-items:flex-start"><label class="switch" style="margin-top:2px"><input type="checkbox" id="chk-empujar" ${cx.empujar_stock ? 'checked' : ''}><span></span></label><span><b>Stock compartido con la web</b><br><small class="sub">Cada venta, compra o ajuste del local actualiza Tienda Nube al momento. Los pedidos de la web entran solos como ventas.</small></span></div>
+      <div class="acciones" style="margin-top:12px"><a class="btn primario" href="cruce.html?c=${cx.id}">Ver cruce de productos</a><button class="btn" id="btn-pedidos">Pedidos recientes</button></div>
+      <details class="avanzado"><summary>Opciones avanzadas</summary>
+        <p class="sub" style="margin:6px 0 10px">Se usan pocas veces. Las que tienen ⚠ cambian muchos datos de una sola vez: usalas solo si sabés para qué.</p>
+        <div class="fila-sw" style="align-items:flex-start"><label class="switch" style="margin-top:2px"><input type="checkbox" id="chk-ocultos" ${cx.incluir_ocultos ? 'checked' : ''}><span></span></label><span><b>Tener en cuenta los productos ocultos de la tienda</b><br><small class="sub">Apagado, lo oculto en Tienda Nube no cuenta para nada. Hoy hay ${fmt.num(res.ocultos || 0)} ocultos.</small></span></div>
+        <div class="av-fila"><button class="btn" id="btn-sync">Sincronizar catálogo</button><small class="sub">Vuelve a leer los productos de la web (los nuevos y los cambios). ${cx.ultima_sync ? 'Última: ' + fmt.fechaHora(cx.ultima_sync) : 'Nunca se hizo.'}</small></div>
+        <div class="av-fila"><button class="btn" id="btn-todo">⚠ Enviar todo el stock a la web</button><small class="sub">Pisa el stock de Tienda Nube con el del local en todo lo cruzado.</small></div>
+        <div class="av-fila"><button class="btn" id="btn-tomar">⚠ Tomar todo de la web</button><small class="sub">Al revés: el local toma el stock, los nombres y las variantes de Tienda Nube.</small></div>
+        <div class="av-fila"><button class="btn peligro" id="btn-desconectar">Desconectar Tienda Nube</button><small class="sub">Borra el cruce guardado. No toca nada en la tienda.</small></div>
+      </details>`;
     $('#chk-empujar').onchange = async ev => { const r = await sb.from('conexiones').update({ empujar_stock: ev.target.checked }).eq('id', cx.id); toast(r.error ? mensajeError(r.error) : (ev.target.checked ? 'El local manda el stock a Tienda Nube' : 'Empuje desactivado'), r.error ? 'error' : ''); cx.empujar_stock = ev.target.checked; };
     $('#chk-ocultos').onchange = async ev => { const r = await sb.from('conexiones').update({ incluir_ocultos: ev.target.checked }).eq('id', cx.id); toast(r.error ? mensajeError(r.error) : (ev.target.checked ? 'Los ocultos de la tienda ahora cuentan' : 'Los ocultos de la tienda no cuentan para nada'), r.error ? 'error' : ''); if (r.error) ev.target.checked = !ev.target.checked; else { cx.incluir_ocultos = ev.target.checked; cargarTN(); } };
     $('#btn-todo').onclick = async () => {
@@ -124,19 +134,19 @@ APP.ready.then(async () => {
     const base = ctx.base, EJ = 50000, ej = PRECIOS.calcular({ id: '', producto_id: '', precio: EJ }, lista.id, ctx, { sinRebajas: true }).precio;
     const queTxt = p => (+p.valor > 0 ? `${fmt.dec(p.valor)}% menos` + (p.alcance === 'familias' ? ` en ${(p.familia_ids || []).length} familias` : p.alcance === 'productos' ? ` en ${(p.producto_ids || []).length} productos` : ' en todo') : '') + (nFijos[p.id] ? (+p.valor > 0 ? ' · ' : '') + `${fmt.num(nFijos[p.id])} precios de oferta` : '');
     const volver = encodeURIComponent('../conexiones/conexiones.html#precios');
-    card.innerHTML = `<div class="card-cab"><div><h2>Precios en Tienda Nube</h2><p class="sub">La lista <b>${esc(lista.nombre)}</b> es la de la tienda online: sale de la base (${esc(base.nombre || 'Lista')}) con su regla. En la web va el precio de esta lista y, si hay descuento, el precio tachado y el promocional.</p></div></div>
-      <div class="pw-grid">
-        <div class="campo"><label>Precio en la web</label>${PRECIOS.reglaControles(lista.porcentaje, 'w')}<p class="ejemplo">Ej.: una prenda de <b>${fmt.pesos(EJ)}</b> en el local, en la web <b>${fmt.pesos(ej)}</b></p></div>
-        <div class="campo"><label>Redondeo</label><select data-red>${PRECIOS.REDONDEOS.map(([k, t]) => `<option value="${k}" ${(lista.redondeo || '10+') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
-        <div class="campo"><label>Rebajas del local</label><div class="fila-sw"><label class="switch"><input type="checkbox" data-reb ${lista.toma_rebajas !== false ? 'checked' : ''}><span></span></label> ${lista.toma_rebajas !== false ? 'Las que valen en la web también se aplican' : 'Solo los descuentos de la web'}</div></div>
-      </div>
-      <div class="fila-sw" style="align-items:flex-start"><label class="switch" style="margin-top:2px"><input type="checkbox" id="chk-precios" ${cx.empujar_precios ? 'checked' : ''}><span></span></label><span><b>Percha manda los precios a Tienda Nube.</b> Cada cambio de precio, de regla o de descuento (y los que empiezan o vencen) llega a la web en unos minutos.<br><small class="sub">Con esto prendido, los precios se cambian en Percha: lo que se cambie a mano en el panel de Tienda Nube se vuelve a poner como dice Percha. Lo oculto en la web no se toca.${cx.ultimo_envio_precios ? ' Último envío: ' + fmt.fechaHora(cx.ultimo_envio_precios) + '.' : ''}</small></span></div>
-      <div class="acciones" style="margin-top:10px"><button class="btn" id="btn-revisar">Revisar precios de la web</button></div>
+    card.innerHTML = `<div class="card-cab"><div><h2>Precios en Tienda Nube</h2><p class="sub">Hoy: <b>${cx.empujar_precios ? 'los precios se cambian en Percha y pasan solos a la web' : 'los precios se cambian en el panel de Tienda Nube'}</b>.</p></div></div>
+      <div class="campo" style="max-width:560px;margin-bottom:12px"><label>Precio en la web</label>${PRECIOS.reglaControles(lista.porcentaje, 'w')}<p class="ejemplo">Ej.: una prenda de <b>${fmt.pesos(EJ)}</b> en el local, en la web <b>${fmt.pesos(ej)}</b></p></div>
+      <div class="fila-sw" style="align-items:flex-start"><label class="switch" style="margin-top:2px"><input type="checkbox" id="chk-precios" ${cx.empujar_precios ? 'checked' : ''}><span></span></label><span><b>Los precios se manejan desde Percha</b><br><small class="sub">Prendido: precios y descuentos se cambian acá y llegan solos a la web. Lo que se cambie a mano en el panel de Tienda Nube vuelve a quedar como en Percha.${cx.ultimo_envio_precios ? ' Último control: ' + fmt.fechaHora(cx.ultimo_envio_precios) + '.' : ''}</small></span></div>
+      <div class="acciones" style="margin-top:10px"><button class="btn" id="btn-revisar">Comparar con la web</button></div>
       <div class="bloque"><div style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:240px"><h3>Descuentos en la web</h3><p class="sub" style="margin:0">Como en el panel de Tienda Nube: un % o un precio de oferta, para todo, una familia o productos elegidos, con fechas. En la web se ven con el precio tachado.</p></div><a class="btn primario" href="../configuracion/promociones.html?nueva=rebaja&canal=tiendanube&volver=${volver}">+ Nuevo descuento</a></div>
         <table class="lista" style="margin-top:10px"><tr><th>Descuento</th><th>Qué</th><th>Vigencia</th><th>Dónde</th><th></th></tr>
           ${web.map(p => `<tr><td><b>${esc(p.nombre)}</b></td><td>${queTxt(p) || '—'}</td><td><small>${p.desde ? fmt.fecha(p.desde) : 'ya'}${p.hasta ? ' → ' + fmt.fecha(p.hasta) : ' · sin fin'}</small></td><td>${!p.canales || !p.canales.length ? '<span class="chip aviso" title="También vale en la caja del local">web y local</span>' : '<span class="chip">solo web</span>'}</td>
             <td style="white-space:nowrap"><label class="switch" title="${p.activa ? 'Activo' : 'Pausado'}"><input type="checkbox" data-act="${p.id}" ${p.activa ? 'checked' : ''}><span></span></label> <a class="btn chico" href="../configuracion/promociones.html?editar=${p.id}&volver=${volver}">Editar</a></td></tr>`).join('') || '<tr><td colspan="5" class="vacio">Sin descuentos: la web muestra el precio de la lista.</td></tr>'}</table>
-        <p class="sub" style="margin-top:8px">Los descuentos por medio de pago (por ejemplo, transferencia) se configuran en el panel de Tienda Nube.</p></div>`;
+        <p class="sub" style="margin-top:8px">Los descuentos por medio de pago (por ejemplo, transferencia) se configuran en el panel de Tienda Nube.</p></div>
+      <details class="avanzado"><summary>Opciones avanzadas</summary>
+        <div class="av-fila"><span style="min-width:230px"><b>Redondeo</b></span><select data-red>${PRECIOS.REDONDEOS.map(([k, t]) => `<option value="${k}" ${(lista.redondeo || '10+') === k ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
+        <div class="fila-sw" style="align-items:flex-start"><label class="switch" style="margin-top:2px"><input type="checkbox" data-reb ${lista.toma_rebajas !== false ? 'checked' : ''}><span></span></label><span><b>Las rebajas del local también valen en la web</b><br><small class="sub">Apagado, la web solo toma los descuentos de acá abajo.</small></span></div>
+      </details>`;
     const recargar = () => cargarPrecios(cx);
     const guardar = async (d, msg) => { const r = await sb.from('listas_precios').update(d).eq('id', lista.id); toast(r.error ? mensajeError(r.error) : msg, r.error ? 'error' : ''); recargar(); };
     PRECIOS.reglaEnganchar(card, 'w', pct => { if (pct !== +lista.porcentaje) guardar({ porcentaje: pct }, `Precio en la web: ${PRECIOS.reglaTxt(pct)}`); }, () => toast('Poné un número: cuánto % menos o más que la base', 'error'));
