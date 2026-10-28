@@ -123,7 +123,7 @@ APP.ready.then(async () => {
       // las que solo se venden en el local (BOMBIS «LOCAL»): completan sin elegir modelo
       const loc = gen.generico_local_id ? C.catalogo.find(v => v.producto_id === gen.generico_local_id) : null;
       const elegidos = [];
-      const m = modal(`<h2>¿Qué modelos se lleva?</h2><p class="sub">Buscá cada uno (ej. <b>fru cel</b> = Fru Fru celeste) y tocalo. Si no sabés cuál es, dejalo como ${esc(nombreGen)}.</p>
+      const m = modal(`<h2>¿Qué modelos se lleva?</h2><p class="sub">Buscá cada uno (ej. <b>fru cel</b> = Fru Fru celeste) y tocalo. Si no sabés cuál es, dejalo como ${esc(nombreGen)}.${genericas().some(l => l.canje) ? ' <b>La del cambio de un conjunto va sin cargo.</b>' : ''}</p>
         <div class="pend"><b id="df-n"></b><span class="sub">por definir</span><span class="mult" data-mult><button class="on" data-m="1">×1</button><button data-m="2">×2</button><button data-m="3">×3</button><button data-m="5">×5</button></span><div class="elegidos" id="df-elegidos"></div></div>
         <div class="buscador" style="min-width:0;width:100%"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="df-q" placeholder="Modelo, color, talle…" autocomplete="off"><label class="filtro-stock"><input type="checkbox" id="df-sinstock"> sin stock</label></div>
         <div class="grilla" id="df-grilla"></div>
@@ -149,8 +149,12 @@ APP.ready.then(async () => {
       };
       // una unidad del genérico pasa a ser el modelo real (a su precio)
       const asignar = v => {
-        const n = Math.min(multDe(m), pendientes()); for (let i = 0; i < n; i++) { const g = genericas()[0]; if (!g) break; g.cantidad -= 1; if (g.cantidad <= 0) C.carrito.lineas.splice(C.carrito.lineas.indexOf(g), 1); elegidos.push(v); }
-        C.agregar(v, n); ponerMult(m, 1); $('#df-q', m).value = ''; pintarPend(); pintarLista(); $('#df-q', m).focus();
+        const n = Math.min(multDe(m), pendientes()); let cobra = 0;
+        for (let i = 0; i < n; i++) { const g = genericas()[0]; if (!g) break; elegidos.push(v);
+          // la suelta del cambio de un conjunto: toma el modelo y sigue a $0, atada a su conjunto
+          if (g.canje) { if (g.cantidad > 1) { g.cantidad -= 1; C.carrito.lineas.splice(C.carrito.lineas.indexOf(g) + 1, 0, Object.assign({}, g, { variante: v, cantidad: 1 })); } else g.variante = v; continue; }
+          g.cantidad -= 1; if (g.cantidad <= 0) C.carrito.lineas.splice(C.carrito.lineas.indexOf(g), 1); cobra++; }
+        if (cobra) C.agregar(v, cobra); else C.pintar(); ponerMult(m, 1); $('#df-q', m).value = ''; pintarPend(); pintarLista(); $('#df-q', m).focus();
         if (!pendientes()) { m.cerrar(); res(true); }
       };
       $('#df-q', m).addEventListener('input', () => pintarLista());
