@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Catálogo · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610281703">
+<link rel="stylesheet" href="../shell/shell.css?v=202610281716">
 <style>
   .filtros{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
   .filtros .buscador{flex:1 1 260px;min-width:0}
@@ -86,8 +86,8 @@
   <div class="barra-sel" id="barra-sel" hidden></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610281703"></script>
-<script src="../shell/shell.js?v=202610281703"></script>
+<script src="../shared/supabase.js?v=202610281716"></script>
+<script src="../shell/shell.js?v=202610281716"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id, PAG = 100, admin = APP.esAdmin;
@@ -222,7 +222,7 @@ APP.ready.then(async () => {
       const valor = st.op === 'baja' || st.op === 'resta' ? -v : v;
       const red = st.red === 'no' ? 'no' : st.red + (st.arriba ? '+' : '');
       const desc = st.desc || `${OPS[st.op][0].replace(/ [%$]$/, '')} ${st.op === 'markup' ? fmt.dec(v) + ' veces el costo' : OPS[st.op][1] === '%' ? fmt.dec(v) + '%' : fmt.pesos(v)} · ${st.campo === 'precio' ? 'precio de venta' : 'costo'}${red !== 'no' ? ' · redondeo ' + $('#cp-red option:checked', m).textContent.toLowerCase() : ''} · ${fmt.num(elegidos.size)} productos`;
-      return { empresa_id: e, productos: [...elegidos], campo: st.campo, operacion: op, valor, redondeo: red, simular, descripcion: desc };
+      return { empresa_id: e, productos: [...elegidos], campo: st.campo, operacion: op, valor, redondeo: red, simular, descripcion: desc, ofertas: st.ofertas || null };
     };
     const pintar = () => {
       $('#cp', m).innerHTML = `<h2>Cambiar precios · ${fmt.num(elegidos.size)} productos</h2><p class="sub">Primero ves cómo queda; recién al aplicar se cambia. Después se puede deshacer.</p>
@@ -260,7 +260,15 @@ APP.ready.then(async () => {
         ${d.fijos_sin_tocar ? `<p class="sub">Hay ${fmt.num(d.fijos_sin_tocar)} precios fijados a mano por lista que quedan como están.</p>` : ''}
         <div class="cp-tabla"><table>${(d.filas || []).map(f => { const p = f.antes ? 100 * (f.despues - f.antes) / f.antes : null; return `<tr><td>${esc(f.nombre)} <small style="color:var(--tinta-3);font-family:var(--f-mono)">${esc(f.codigo)}</small></td><td class="n">${fmt.pesos(f.antes)}</td><td class="n">→ <b>${fmt.pesos(f.despues)}</b></td><td class="n ${p >= 0 ? 'sube' : 'baja'}">${p == null ? '' : (p > 0 ? '+' : '') + fmt.dec(p) + '%'}</td></tr>`; }).join('') || '<tr><td class="vacio">Ningún precio cambia con estos valores.</td></tr>'}</table></div>
         ${(d.filas || []).length >= 400 ? '<p class="sub">Se muestran los primeros 400.</p>' : ''}`;
-      $('[data-si]', m).disabled = !d.productos; $('[data-si]', m).textContent = d.productos ? `Aplicar a ${fmt.num(d.productos)}` : 'Aplicar';
+      // productos con precio de oferta: se elige antes de aplicar si la oferta queda igual o sigue el mismo % de descuento
+      if (d.con_oferta) {
+        $('#cp-prev', m).insertAdjacentHTML('beforeend', `<div class="aviso-caja info" style="margin-top:10px"><b>${fmt.num(d.con_oferta)} de estos productos tienen precio de oferta.</b> ¿Qué pasa con la oferta?
+          <div class="seg" id="cp-of" style="margin-top:8px"><button data-v="precio" class="${st.ofertas === 'precio' ? 'on' : ''}">Queda el mismo precio de oferta</button><button data-v="porcentaje" class="${st.ofertas === 'porcentaje' ? 'on' : ''}">Mantiene el mismo % de descuento</button></div>
+          <small class="sub">Ej.: normal $25.000 con oferta $12.500 (50%) que pasa a $30.000 → la oferta queda en $12.500, o pasa a $15.000 (sigue 50%).</small></div>`);
+        $$('#cp-of button', m).forEach(b => b.onclick = () => { st.ofertas = b.dataset.v; mostrar(d); });
+      }
+      const falta = d.con_oferta && !st.ofertas;
+      $('[data-si]', m).disabled = !d.productos || falta; $('[data-si]', m).textContent = falta ? 'Elegí qué pasa con las ofertas' : d.productos ? `Aplicar a ${fmt.num(d.productos)}` : 'Aplicar';
     };
     const aplicar = async () => {
       const b = $('[data-si]', m); b.disabled = true; b.textContent = 'Aplicando…';

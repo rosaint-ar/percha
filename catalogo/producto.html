@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Producto · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610281703">
+<link rel="stylesheet" href="../shell/shell.css?v=202610281716">
 <style>
   .dos{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
   .dos>.card{min-width:0;overflow-x:auto}
@@ -159,10 +159,10 @@
   </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610281703"></script>
-<script src="../shared/precios.js?v=202610281703"></script>
-<script src="../shared/prenda.js?v=202610281703"></script>
-<script src="../shell/shell.js?v=202610281703"></script>
+<script src="../shared/supabase.js?v=202610281716"></script>
+<script src="../shared/precios.js?v=202610281716"></script>
+<script src="../shared/prenda.js?v=202610281716"></script>
+<script src="../shell/shell.js?v=202610281716"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$ , toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -267,17 +267,35 @@ APP.ready.then(async () => {
     if (!d.codigo || !d.nombre) { estado('Falta código o nombre', 'mal'); return; }
     const cambios = {}; Object.keys(d).forEach(k => { if ((producto[k] ?? null) !== (d[k] ?? null) && String(producto[k] ?? '') !== String(d[k] ?? '')) cambios[k] = d[k]; });
     if (!Object.keys(cambios).length) { estado('Guardado ✓', 'ok'); return; }
+    // cambió el precio y el producto tiene precio de oferta: se elige si la oferta queda igual o sigue el mismo % de descuento
+    let seguirOferta = false;
+    if ('precio' in cambios && +producto.precio > 0) {
+      const { count } = await sb.from('rebaja_precios').select('id', { count: 'exact', head: true }).eq('producto_id', id);
+      if (count) {
+        const antesP = +producto.precio, nuevoP = +cambios.precio;
+        const elec = await new Promise(res => {
+          const m = modal(`<h2>Este producto tiene precio de oferta</h2><p class="sub">El precio normal pasa de ${fmt.pesos(antesP)} a ${fmt.pesos(nuevoP)}. ¿Qué pasa con la oferta?</p>
+            <div style="display:grid;gap:8px;margin-top:12px"><button class="btn" data-o="precio">Queda el mismo precio de oferta</button><button class="btn" data-o="porcentaje">Mantiene el mismo % de descuento (sube o baja en proporción)</button></div>
+            <div class="pie"><button class="btn" data-o="">Cancelar el cambio de precio</button></div>`, { fijo: true });
+          $$('[data-o]', m).forEach(b => b.onclick = () => { m.cerrar(); res(b.dataset.o); });
+        });
+        if (!elec) { form.precio.value = producto.precio; delete cambios.precio; pintarPrecios(); if (!Object.keys(cambios).length) { estado('Guardado ✓', 'ok'); return; } }
+        else seguirOferta = elec === 'porcentaje';
+      }
+    }
     estado('Guardando…');
     const r = await sb.from('productos').update(cambios).eq('id', id).select().single();
     if (r.error) { estado('No se guardó', 'mal'); toast(mensajeError(r.error), 'error'); return; }
     const antes = producto; producto = r.data; estado('Guardado ✓', 'ok');
+    if (seguirOferta) { const { data: n } = await sb.rpc('ofertas_seguir_precio', { p_producto: id, p_antes: +antes.precio, p_despues: +producto.precio }); if (n) toast(`La oferta se ajustó al mismo % de descuento`); cargarPctx(); }
     // si es único, el código de barras y el código del producto son los de su variante
     if (!d.tiene_variantes && variantes.length === 1 && ('ean' in cambios || 'codigo' in cambios)) await sb.from('variantes').update({ ean: d.ean, sku: d.codigo }).eq('id', variantes[0].id);
     if ('nombre' in cambios) { $('h1').textContent = producto.nombre; document.title = producto.nombre + ' · ' + APP.empresa.nombre; }
     if ('precio' in cambios || 'costo' in cambios) pintarHistorial();
     if (['tipo', 'tiene_variantes', 'es_generico'].some(k => k in cambios) || (antes.tipo !== producto.tipo)) await cargar();
   }
-  form.addEventListener('input', ev => { if (!id || !APP.esAdmin || ev.target.matches('select')) return; clearTimeout(tAuto); estado('Escribiendo…'); tAuto = setTimeout(() => { guardando = guardando.then(autoguardar); }, 700); });
+  // el precio se guarda al salir del campo (no mientras se escribe): puede preguntar qué pasa con la oferta
+  form.addEventListener('input', ev => { if (!id || !APP.esAdmin || ev.target.matches('select') || ev.target.name === 'precio') return; clearTimeout(tAuto); estado('Escribiendo…'); tAuto = setTimeout(() => { guardando = guardando.then(autoguardar); }, 700); });
   form.addEventListener('change', ev => { if (!id || !APP.esAdmin || ev.target.value === '__nuevo__') return; clearTimeout(tAuto); guardando = guardando.then(autoguardar); });
   form.addEventListener('submit', ev => ev.preventDefault());
 
