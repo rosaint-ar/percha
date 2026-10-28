@@ -2,6 +2,8 @@
 // Solo puede llamarla un usuario con sesión que sea dueño/admin de esa empresa.
 // Acciones: { accion: 'crear', empresa_id, email, nombre, rol, password? }  → crea (o encuentra) el usuario y lo vincula
 //           { accion: 'resetear', empresa_id, user_id, password }           → cambia la contraseña de un miembro
+//           { accion: 'email', empresa_id, user_id, email }                 → cambia el correo con el que entra
+//           { accion: 'listar', empresa_id }                                → { correos: { user_id: email } }
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
 const URL = Deno.env.get("SUPABASE_URL")!;
@@ -51,13 +53,36 @@ Deno.serve(async (req) => {
     return json({ ok: true, user_id: userId, existia: !!existente, password });
   }
 
+  const esMiembro = async (uid: string) => {
+    const { data: m } = await admin.from("empresa_usuarios").select("user_id").eq("empresa_id", empresa_id).eq("user_id", uid).maybeSingle();
+    return !!m;
+  };
+
   if (accion === "resetear") {
     const { user_id } = body; const password = body.password || genPass();
-    const { data: m } = await admin.from("empresa_usuarios").select("user_id").eq("empresa_id", empresa_id).eq("user_id", user_id).maybeSingle();
-    if (!m) return json({ error: "Ese usuario no pertenece a la empresa" }, 404);
+    if (password.length < 8) return json({ error: "La contraseña tiene que tener al menos 8 caracteres" }, 400);
+    if (!(await esMiembro(user_id))) return json({ error: "Ese usuario no pertenece a la empresa" }, 404);
     const { error } = await admin.auth.admin.updateUserById(user_id, { password });
     if (error) return json({ error: error.message }, 400);
     return json({ ok: true, password });
+  }
+
+  // cambiar el correo con el que entra (queda confirmado; la contraseña no cambia)
+  if (accion === "email") {
+    const { user_id } = body; const email = (body.email || "").trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: "Ese correo no parece válido" }, 400);
+    if (!(await esMiembro(user_id))) return json({ error: "Ese usuario no pertenece a la empresa" }, 404);
+    const { error } = await admin.auth.admin.updateUserById(user_id, { email, email_confirm: true });
+    if (error) return json({ error: /already|registered|exists/i.test(error.message) ? "Ese correo ya lo usa otro usuario" : error.message }, 400);
+    return json({ ok: true });
+  }
+
+  // los correos de los miembros de la empresa (para mostrarlos en el panel)
+  if (accion === "listar") {
+    const { data: ms } = await admin.from("empresa_usuarios").select("user_id").eq("empresa_id", empresa_id);
+    const correos: Record<string, string> = {};
+    for (const m of ms || []) { const { data } = await admin.auth.admin.getUserById(m.user_id); if (data?.user?.email) correos[m.user_id] = data.user.email; }
+    return json({ ok: true, correos });
   }
   return json({ error: "Acción desconocida" }, 400);
 });

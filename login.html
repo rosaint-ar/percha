@@ -8,7 +8,7 @@
 <link rel="icon" type="image/svg+xml" href="shell/percha.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="shell/shell.css?v=202610281740">
+<link rel="stylesheet" href="shell/shell.css?v=202610281757">
 <style>
   body{display:grid;place-items:center;min-height:100vh;padding:16px}
   .ingreso{width:100%;max-width:400px;background:var(--superficie);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid var(--superficie-borde);border-radius:22px;padding:30px 30px 26px;position:relative;z-index:1;box-shadow:var(--sombra-flotante)}
@@ -20,35 +20,147 @@
   .ingreso h1{font-size:24px;margin-bottom:4px}
   .ingreso .btn{width:100%;justify-content:center;padding:11px;margin-top:6px}
   .pie-legal{margin-top:18px;text-align:center;font:500 11px var(--f-mono);letter-spacing:.06em;color:var(--tinta-4)}
+  .vista{display:none} .vista.on{display:block}
+  .personas{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+  .personas button{font:600 14px var(--f-ui);padding:9px 16px;border-radius:999px;border:1px solid var(--linea);background:var(--superficie-2);color:var(--tinta);cursor:pointer}
+  .personas button.on{background:var(--acento);border-color:transparent;color:#fff}
+  input.pin{font:700 30px var(--f-mono);letter-spacing:.6em;text-align:center;padding:12px 0 12px .6em}
+  .enlace{background:none;border:0;padding:0;margin-top:14px;font:600 13px var(--f-ui);color:var(--acento);cursor:pointer;display:block;width:100%;text-align:center}
+  .enlace.suave{color:var(--tinta-3);font-weight:500;font-size:12px;margin-top:8px}
 </style>
 </head>
 <body>
-<form class="ingreso" id="form">
+<div class="ingreso">
   <div class="marca"><span class="icono"><svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><path d="M32 24c-5 0-8-3-8-7s3.5-7 8-7 8 3 8 7c0 3-2 5-5 6.5"/><path d="M32 24v5"/><path d="M32 29 8 44c-2 1.3-1.2 4.5 1.3 4.5h45.4c2.5 0 3.3-3.2 1.3-4.5L32 29z"/></svg></span><span><b>Percha</b><small>sistema de gestión</small></span></div>
-  <h1>Hola, <em>bienvenida</em>.</h1>
-  <p class="sub" style="margin-bottom:18px">Ingresá con tu correo y contraseña.</p>
-  <div class="campo"><label for="email">Correo</label><input id="email" type="email" autocomplete="username" required autofocus></div>
-  <div class="campo"><label for="pass">Contraseña</label><input id="pass" type="password" autocomplete="current-password" required></div>
-  <div id="msg" class="aviso-caja error" style="display:none"></div>
-  <button class="btn primario" id="btn" type="submit">Ingresar</button>
+
+  <!-- entrar con PIN (solo en equipos donde ya se activó) -->
+  <form class="vista" id="v-pin" autocomplete="off">
+    <h1>Hola, <em id="pin-hola">bienvenida</em>.</h1>
+    <p class="sub" style="margin-bottom:16px" id="pin-sub">Poné tu PIN.</p>
+    <div class="personas" id="personas"></div>
+    <div class="campo"><input id="pin" class="pin" type="password" inputmode="numeric" pattern="\d*" maxlength="4" aria-label="PIN"></div>
+    <div id="pin-msg" class="aviso-caja error" style="display:none"></div>
+    <button class="btn primario" id="pin-btn" type="submit">Entrar</button>
+    <button class="enlace" type="button" id="ir-clave">Entrar con correo y contraseña</button>
+    <button class="enlace suave" type="button" id="olvidar">Quitar mi PIN de este equipo</button>
+  </form>
+
+  <!-- entrar con correo y contraseña -->
+  <form class="vista" id="v-clave">
+    <h1>Hola, <em>bienvenida</em>.</h1>
+    <p class="sub" style="margin-bottom:18px">Ingresá con tu correo y contraseña.</p>
+    <div class="campo"><label for="email">Correo</label><input id="email" type="email" autocomplete="username" required></div>
+    <div class="campo"><label for="pass">Contraseña</label><input id="pass" type="password" autocomplete="current-password" required></div>
+    <div id="msg" class="aviso-caja error" style="display:none"></div>
+    <button class="btn primario" id="btn" type="submit">Ingresar</button>
+    <button class="enlace" type="button" id="ir-pin" style="display:none">Entrar con PIN</button>
+  </form>
+
+  <!-- después de la contraseña: activar el PIN en este equipo -->
+  <form class="vista" id="v-activar" autocomplete="off">
+    <h1>Entrá más <em>rápido</em>.</h1>
+    <p class="sub" style="margin-bottom:16px">Elegí un PIN de 4 números. Sirve solo en este equipo: en otro te va a pedir la contraseña.</p>
+    <div class="campo"><label for="pin1">PIN</label><input id="pin1" class="pin" type="password" inputmode="numeric" pattern="\d*" maxlength="4"></div>
+    <div class="campo"><label for="pin2">Repetilo</label><input id="pin2" class="pin" type="password" inputmode="numeric" pattern="\d*" maxlength="4"></div>
+    <div id="act-msg" class="aviso-caja error" style="display:none"></div>
+    <button class="btn primario" id="act-btn" type="submit">Activar PIN</button>
+    <button class="enlace" type="button" id="ahora-no">Ahora no</button>
+  </form>
+
   <p class="pie-legal">PERCHA · TIENDAS DE INDUMENTARIA</p>
-</form>
+</div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="shared/supabase.js?v=202610281740"></script>
+<script src="shared/supabase.js?v=202610281757"></script>
 <script>
   const params = new URLSearchParams(location.search);
-  const next = params.get('next') && params.get('next').startsWith('/') ? params.get('next') : 'index.html';
-  sb.auth.getSession().then(({ data: { session } }) => { if (session) location.replace(next); });
-  const form = document.getElementById('form'), msg = document.getElementById('msg'), btn = document.getElementById('btn');
-  form.onsubmit = async e => {
-    e.preventDefault(); btn.disabled = true; msg.style.display = 'none';
-    const { error } = await sb.auth.signInWithPassword({ email: form.email.value.trim(), password: form.pass.value });
-    if (error) {
-      msg.textContent = /Invalid login/i.test(error.message) ? 'El correo o la contraseña no son correctos.' : (/fetch/i.test(error.message) ? 'Sin conexión. Revisá internet.' : error.message);
-      msg.style.display = 'block'; btn.disabled = false; return;
+  const n0 = params.get('next') || '';
+  const next = n0.startsWith('/') && !n0.startsWith('//') ? n0 : 'index.html';
+  const $ = s => document.getElementById(s);
+  const ver = (id, txt) => { const m = $(id); m.textContent = txt || ''; m.style.display = txt ? 'block' : 'none'; };
+  const vista = v => { document.querySelectorAll('.vista').forEach(x => x.classList.toggle('on', x.id === v)); const f = { 'v-pin': 'pin', 'v-clave': 'email', 'v-activar': 'pin1' }[v]; setTimeout(() => $(f).focus(), 20); };
+
+  // las personas con PIN en este equipo: [{ id, llave, user_id, nombre }]
+  const CLAVE_LS = 'percha_pin';
+  const equipos = () => { try { return JSON.parse(localStorage.getItem(CLAVE_LS) || '[]'); } catch (_) { return []; } };
+  const guardarEquipos = l => { try { localStorage.setItem(CLAVE_LS, JSON.stringify(l)); } catch (_) { } };
+  const quitarLocal = uid => guardarEquipos(equipos().filter(x => x.user_id !== uid));
+  const equipoTxt = () => { const u = navigator.userAgent; const nav = /Edg\//.test(u) ? 'Edge' : /Chrome\//.test(u) ? 'Chrome' : /Firefox\//.test(u) ? 'Firefox' : /Safari\//.test(u) ? 'Safari' : 'Navegador'; const so = /Android/.test(u) ? 'Android' : /iPhone|iPad/.test(u) ? 'iPhone/iPad' : /Windows/.test(u) ? 'Windows' : /Mac OS/.test(u) ? 'Mac' : ''; return nav + (so ? ' en ' + so : ''); };
+  async function llamarPin(body, token) {
+    const h = { 'Content-Type': 'application/json', apikey: SUPABASE_KEY }; if (token) h.Authorization = 'Bearer ' + token;
+    const r = await fetch(`${SUPABASE_URL}/functions/v1/pin`, { method: 'POST', headers: h, body: JSON.stringify(body) });
+    const j = await r.json().catch(() => ({ error: 'Sin conexión. Revisá internet.' }));
+    return j;
+  }
+
+  let elegida = null;
+  function armarPin() {
+    const l = equipos();
+    if (!l.length) { $('ir-pin').style.display = 'none'; vista('v-clave'); return; }
+    $('ir-pin').style.display = '';
+    if (!elegida || !l.some(x => x.user_id === elegida)) elegida = (l.find(x => x.user_id === localStorage.getItem('percha_pin_ultima')) || l[0]).user_id;
+    const p = l.find(x => x.user_id === elegida);
+    $('pin-hola').textContent = (p.nombre || '').split(' ')[0] || 'bienvenida';
+    $('pin-sub').textContent = l.length > 1 ? 'Elegí quién sos y poné tu PIN.' : 'Poné tu PIN de 4 números.';
+    $('personas').style.display = l.length > 1 ? '' : 'none';
+    $('personas').innerHTML = l.map(x => `<button type="button" data-u="${x.user_id}" class="${x.user_id === elegida ? 'on' : ''}"></button>`).join('');
+    $('personas').querySelectorAll('button').forEach((b, i) => { b.textContent = l[i].nombre; b.onclick = () => { elegida = b.dataset.u; ver('pin-msg'); $('pin').value = ''; armarPin(); $('pin').focus(); }; });
+    vista('v-pin');
+  }
+
+  // entrar con PIN: se manda apenas se completan los 4 números
+  $('pin').oninput = () => { $('pin').value = $('pin').value.replace(/\D/g, '').slice(0, 4); if ($('pin').value.length === 4) $('v-pin').requestSubmit(); };
+  $('v-pin').onsubmit = async ev => {
+    ev.preventDefault(); const pin = $('pin').value; if (pin.length !== 4) { ver('pin-msg', 'El PIN es de 4 números.'); return; }
+    const p = equipos().find(x => x.user_id === elegida); if (!p) return armarPin();
+    $('pin-btn').disabled = true; ver('pin-msg');
+    const j = await llamarPin({ accion: 'entrar', id: p.id, llave: p.llave, pin });
+    if (j.token_hash) {
+      const { error } = await sb.auth.verifyOtp({ token_hash: j.token_hash, type: 'magiclink' });
+      if (!error) { try { localStorage.setItem('percha_pin_ultima', p.user_id); } catch (_) { } location.replace(next); return; }
+      j.error = error.message;
     }
+    $('pin-btn').disabled = false; $('pin').value = '';
+    if (j.sin_pin) { quitarLocal(p.user_id); $('email').value = p.email || ''; ver('msg', j.error); armarPin(); if (equipos().length) ver('pin-msg', j.error); return; }
+    ver('pin-msg', j.error || 'No se pudo entrar.'); $('pin').focus();
+  };
+  $('ir-clave').onclick = () => { const p = equipos().find(x => x.user_id === elegida); if (p && p.email) $('email').value = p.email; ver('msg'); vista('v-clave'); };
+  $('ir-pin').onclick = () => armarPin();
+  $('olvidar').onclick = async () => {
+    const p = equipos().find(x => x.user_id === elegida); if (!p) return;
+    if (!confirm(`¿Quitar el PIN de ${p.nombre} en este equipo? Para volver a entrar va a necesitar la contraseña.`)) return;
+    await llamarPin({ accion: 'quitar', id: p.id, llave: p.llave }); quitarLocal(p.user_id); elegida = null; armarPin();
+  };
+
+  // entrar con contraseña; después ofrece el PIN si este equipo no lo tiene
+  $('v-clave').onsubmit = async ev => {
+    ev.preventDefault(); $('btn').disabled = true; ver('msg');
+    const { data, error } = await sb.auth.signInWithPassword({ email: $('email').value.trim(), password: $('pass').value });
+    if (error) {
+      ver('msg', /Invalid login/i.test(error.message) ? 'El correo o la contraseña no son correctos.' : (/fetch/i.test(error.message) ? 'Sin conexión. Revisá internet.' : error.message));
+      $('btn').disabled = false; return;
+    }
+    if (equipos().some(x => x.user_id === data.user.id)) { location.replace(next); return; }
+    vista('v-activar');
+  };
+  const soloNum = i => i.oninput = () => { i.value = i.value.replace(/\D/g, '').slice(0, 4); if (i === $('pin1') && i.value.length === 4) $('pin2').focus(); };
+  soloNum($('pin1')); soloNum($('pin2'));
+  $('ahora-no').onclick = () => location.replace(next);
+  $('v-activar').onsubmit = async ev => {
+    ev.preventDefault(); const a = $('pin1').value, b = $('pin2').value;
+    if (!/^\d{4}$/.test(a)) { ver('act-msg', 'El PIN tiene que ser de 4 números.'); return; }
+    if (a !== b) { ver('act-msg', 'Los dos PIN no son iguales.'); $('pin2').value = ''; $('pin2').focus(); return; }
+    $('act-btn').disabled = true; ver('act-msg');
+    const { data: { session } } = await sb.auth.getSession();
+    const j = await llamarPin({ accion: 'activar', pin: a, equipo: equipoTxt() }, session && session.access_token);
+    if (!j.id) { ver('act-msg', j.error || 'No se pudo activar.'); $('act-btn').disabled = false; return; }
+    let nombre = session.user.email;
+    try { const r = await sb.from('empresa_usuarios').select('nombre').eq('user_id', session.user.id).limit(1); if (r.data && r.data[0]) nombre = r.data[0].nombre; } catch (_) { }
+    guardarEquipos(equipos().filter(x => x.user_id !== session.user.id).concat([{ id: j.id, llave: j.llave, user_id: session.user.id, nombre, email: session.user.email }]));
+    try { localStorage.setItem('percha_pin_ultima', session.user.id); } catch (_) { }
     location.replace(next);
   };
+
+  sb.auth.getSession().then(({ data: { session } }) => { if (session) location.replace(next); else armarPin(); });
 </script>
 </body>
 </html>

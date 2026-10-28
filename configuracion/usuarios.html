@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Usuarios · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610281740">
+<link rel="stylesheet" href="../shell/shell.css?v=202610281757">
 <style>
   .pestanas{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
   .pestanas a{font:600 13px var(--f-ui);color:var(--tinta);text-decoration:none;padding:8px 14px;border:1px solid var(--linea);background:var(--superficie-2);border-radius:10px}
@@ -23,8 +23,8 @@
   </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610281740"></script>
-<script src="../shell/shell.js?v=202610281740"></script>
+<script src="../shared/supabase.js?v=202610281757"></script>
+<script src="../shell/shell.js?v=202610281757"></script>
 <script>
 APP.ready.then(async () => {
   const { esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -62,13 +62,20 @@ APP.ready.then(async () => {
   }
   async function cargar() {
     const { data } = await sb.from('empresa_usuarios').select('*').eq('empresa_id', e).order('nombre');
+    let pines = {}; try { const r = await sb.rpc('pin_equipos_contar', { e }); (r.data || []).forEach(x => pines[x.user_id] = x.equipos); } catch (_) { }
     let correos = {}; try { correos = (await llamar({ accion: 'listar' })).correos || {}; } catch (_) { correos = { [APP.user.id]: APP.user.email }; }
     const tb = $('#tb'); tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());
     (data || []).forEach(u => tb.insertAdjacentHTML('beforeend', `<tr data-id="${u.user_id}"><td>${esc(u.nombre)}${u.user_id === APP.user.id ? ' <span class="chip">vos</span>' : ''}</td><td style="white-space:nowrap">${correos[u.user_id] ? esc(correos[u.user_id]) : '<small style="color:var(--suave)">—</small>'} <button class="btn chico" data-mail title="Cambiar el correo con el que entra">✎</button></td>
       <td><select data-rol ${u.user_id === APP.user.id ? 'disabled' : ''}>${Object.entries(ROLES).map(([k, v]) => `<option value="${k}" ${u.rol === k ? 'selected' : ''}>${v}</option>`).join('')}</select></td>
       <td><small>${esc(resumen(u))}</small>${u.permisos && Object.keys(u.permisos).length ? ' <span class="chip aviso">a medida</span>' : ''}</td>
       <td><select data-activo ${u.user_id === APP.user.id ? 'disabled' : ''}><option value="true" ${u.activo ? 'selected' : ''}>Sí</option><option value="false" ${!u.activo ? 'selected' : ''}>No</option></select></td>
-      <td style="white-space:nowrap">${u.user_id === APP.user.id || u.rol === 'duenio' ? '' : '<button class="btn chico" data-perm>Permisos</button> '}<button class="btn chico" data-clave>Nueva contraseña</button></td></tr>`));
+      <td style="white-space:nowrap">${u.user_id === APP.user.id || u.rol === 'duenio' ? '' : '<button class="btn chico" data-perm>Permisos</button> '}<button class="btn chico" data-clave>Nueva contraseña</button>${pines[u.user_id] ? ` <button class="btn chico" data-sinpin title="Entra con PIN en ${pines[u.user_id]} equipo${pines[u.user_id] > 1 ? 's' : ''}">Quitar PIN (${pines[u.user_id]})</button>` : ''}</td></tr>`));
+    // el PIN sirve solo en los equipos donde se activó; si se pierde un celular, se apaga acá
+    $$('[data-sinpin]', tb).forEach(b => b.onclick = async () => {
+      const tr = b.closest('tr'), nombre = (data.find(u => u.user_id === tr.dataset.id) || {}).nombre || '';
+      if (!await confirmar(`¿Quitar el PIN de ${nombre} en todos sus equipos? Va a tener que entrar con la contraseña (y ahí puede elegir un PIN nuevo).`, 'Quitar PIN')) return;
+      const r = await sb.rpc('pin_equipos_quitar', { e, p_user: tr.dataset.id }); toast(r.error ? mensajeError(r.error) : 'PIN quitado', r.error ? 'error' : ''); cargar();
+    });
     $$('[data-perm]', tb).forEach(b => b.onclick = () => permisos((data || []).find(u => u.user_id === b.closest('tr').dataset.id)));
     $$('[data-rol],[data-activo]', tb).forEach(sel => sel.onchange = async () => {
       const tr = sel.closest('tr'); const r = await sb.from('empresa_usuarios').update({ rol: $('[data-rol]', tr).value, activo: $('[data-activo]', tr).value === 'true' }).eq('empresa_id', e).eq('user_id', tr.dataset.id);
