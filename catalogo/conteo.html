@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pasar de bolsa a modelo · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610282254">
+<link rel="stylesheet" href="../shell/shell.css?v=202610282302">
 <style>
   .origen{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center}
   .origen select{border:1px solid var(--linea);background:var(--superficie-2);border-radius:10px;padding:10px 12px;font-size:14px;width:100%}
@@ -37,7 +37,7 @@
   .pestanas-inv a.on{background:var(--superficie-2);color:var(--tinta);box-shadow:0 1px 2px rgba(21,23,28,.08)}
 </style>
 </head>
-<body data-page="inventario" data-etq="Catálogo" data-title="Inventario" data-subtitle="De bolsa a modelo: las prendas cargadas en una bolsa genérica (ej. MERCADERÍA) se reparten a su modelo, talle y color reales. Cada pase queda registrado.">
+<body data-page="inventario" data-etq="Catálogo" data-title="Inventario" data-subtitle="De bolsa a modelo: lo cargado en un código común (BOMBIS «VARIAS», PANTUFLÓN «ANIMADOS»…) se reparte a su modelo, talle y color reales. Cada pase queda registrado.">
 <main class="app">
   <nav class="pestanas-inv"><a href="inventario.html#stock">Stock</a><a href="inventario.html#fallas">Con falla</a><a href="inventario.html#recuentos">Recuentos</a><a class="on" href="conteo.html">De bolsa a modelo</a><a href="inventario.html#movimientos">Movimientos</a></nav>
   <div class="card">
@@ -52,8 +52,8 @@
   <div class="card" id="card-hoy" style="display:none"><div class="card-cab"><h2>Contado en esta sesión</h2><span class="sub" id="hoy-total"></span></div><table class="lista hoy" id="tb-hoy"></table></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610282254"></script>
-<script src="../shell/shell.js?v=202610282254"></script>
+<script src="../shared/supabase.js?v=202610282302"></script>
+<script src="../shell/shell.js?v=202610282302"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, mensajeError } = APP, e = APP.empresa.id;
@@ -64,7 +64,7 @@ APP.ready.then(async () => {
   async function cargar() {
     const [vars, prods, cats] = await Promise.all([
       paginar(() => sb.from('v_variantes').select('id,producto_id,producto_codigo,producto_nombre,producto_tipo,talle,talle_nombre,talle_orden,color,color_nombre,stock,activa').eq('empresa_id', e).eq('activa', true).order('producto_nombre').order('talle_orden')),
-      paginar(() => sb.from('productos').select('id,categoria_id,tipo,imagen_url').eq('empresa_id', e).eq('activo', true)),
+      paginar(() => sb.from('productos').select('id,categoria_id,tipo,imagen_url,es_generico,generico_filtro').eq('empresa_id', e).eq('activo', true)),
       sb.from('categorias').select('id,nombre,orden').eq('empresa_id', e).eq('activa', true).order('orden').order('nombre')
     ]);
     productos = Object.fromEntries(prods.map(x => [x.id, x])); categorias = cats.data || [];
@@ -72,17 +72,17 @@ APP.ready.then(async () => {
     porProducto = new Map(); catalogo.forEach(v => { if (!porProducto.has(v.producto_id)) porProducto.set(v.producto_id, []); porProducto.get(v.producto_id).push(v); });
     pintarBolsas(); pintarFamilias(); pintarGrilla();
   }
-  // bolsas: artículos únicos (sin talle ni color) con stock — el típico "BOMBIS VARIAS"
+  // bolsas: los genéricos (códigos comunes como BOMBIS «VARIAS» o PANTUFLÓN «ANIMADOS»), con lo que tengan
+  const esBolsa = v => !!(productos[v.producto_id] || {}).es_generico;
   function pintarBolsas() {
-    // solo prendas: envíos, señas, gift cards y "artículos varios" no son bolsas de las que contar
-    const unicas = catalogo.filter(v => !v.talle && !v.color && +v.stock > 0 && porProducto.get(v.producto_id).length === 1 && (productos[v.producto_id] || {}).tipo === 'prenda' && !/varios|art[ií]culos/i.test(v.producto_nombre.replace(/«|»/g, '')) || /BOMBIS|MEDIAS/i.test(v.producto_nombre) && !v.talle && !v.color && +v.stock > 0).sort((a, b) => +b.stock - +a.stock);
+    const unicas = catalogo.filter(esBolsa).sort((a, b) => (+b.stock > 0) - (+a.stock > 0) || a.producto_nombre.localeCompare(b.producto_nombre));
     const sel = $('#sel-bolsa'); const actual = bolsa && bolsa.id;
     sel.innerHTML = `<option value="">Sin bolsa: solo sumar lo contado</option>` + unicas.map(v => `<option value="${v.id}" ${v.id === actual ? 'selected' : ''}>${esc(v.producto_codigo)} · ${esc(v.producto_nombre)} (${fmt.num(v.stock)} u.)</option>`).join('');
-    if (!actual && unicas.length) { sel.value = unicas[0].id; }
+    if (!actual && unicas.length && +unicas[0].stock > 0) { sel.value = unicas[0].id; }
     bolsa = catalogo.find(v => v.id === sel.value) || null; pintarQueda();
-    sel.onchange = () => { bolsa = catalogo.find(v => v.id === sel.value) || null; pintarQueda(); pintarGrilla(); };
+    sel.onchange = () => { bolsa = catalogo.find(v => v.id === sel.value) || null; familia = 'todo'; pintarQueda(); pintarFamilias(); pintarGrilla(); };
   }
-  function pintarQueda() { $('#queda').textContent = bolsa ? fmt.num(bolsa.stock) : '—'; $('#queda-txt').textContent = bolsa ? 'quedan en la bolsa' : 'sin bolsa'; }
+  function pintarQueda() { $('#queda').textContent = bolsa ? fmt.num(bolsa.stock) : '—'; $('#queda-txt').textContent = bolsa ? (+bolsa.stock > 0 ? 'quedan en la bolsa' : 'en la bolsa: no hay nada para repartir') : 'sin bolsa'; }
   function pintarFamilias() {
     const cuenta = {}; porProducto.forEach((vars, pid) => { const c = (productos[pid] || {}).categoria_id || 'sin'; cuenta[c] = (cuenta[c] || 0) + 1; });
     const items = [{ id: 'todo', nombre: 'Todo', n: porProducto.size }, ...categorias.filter(c => cuenta[c.id]).map(c => ({ id: c.id, nombre: c.nombre, n: cuenta[c.id] }))];
@@ -91,10 +91,14 @@ APP.ready.then(async () => {
     // si hay bolsa, arranca en su familia
     if (bolsa && familia === 'todo') { const c = (productos[bolsa.producto_id] || {}).categoria_id; if (c && cuenta[c]) { familia = c; pintarFamilias(); } }
   }
+  // ¿el modelo es de esta bolsa? (misma familia, con las palabras que incluye y sin las que excluye)
+  const encaja = (f, pid, nombre) => { const n = String(nombre || '').toUpperCase(); return (!f.categoria_id || (productos[pid] || {}).categoria_id === f.categoria_id) && (f.incluye || []).every(w => !w.trim() || n.includes(w.trim().toUpperCase())) && !(f.excluye || []).some(w => w.trim() && n.includes(w.trim().toUpperCase())); };
   const sumaStock = vars => vars.reduce((s, v) => s + (+v.stock || 0), 0);
   function pintarGrilla() {
     const palabras = norm($('#q').value.trim()).split(/\s+/).filter(Boolean);
-    let lista = [...porProducto.entries()].filter(([pid]) => !bolsa || pid !== bolsa.producto_id);
+    let lista = [...porProducto.entries()].filter(([pid]) => !(productos[pid] || {}).es_generico);
+    const fb = bolsa && (productos[bolsa.producto_id] || {}).generico_filtro;
+    if (fb && !palabras.length) lista = lista.filter(([pid, vars]) => encaja(fb, pid, vars[0].producto_nombre));
     if (palabras.length) lista = lista.filter(([pid, vars]) => { const t = norm(`${vars[0].producto_nombre} ${vars[0].producto_codigo} ${vars.map(v => v.color_nombre || '').join(' ')}`); return palabras.every(w => t.includes(w)); });
     else if (familia !== 'todo') lista = lista.filter(([pid]) => (productos[pid] || {}).categoria_id === familia);
     lista.sort((a, b) => a[1][0].producto_nombre.localeCompare(b[1][0].producto_nombre));
