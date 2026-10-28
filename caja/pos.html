@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Punto de venta · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610281857">
+<link rel="stylesheet" href="../shell/shell.css?v=202610282046">
 <style>
   /* ===== Punto de venta: pantalla completa, pensada para tocar y vender rápido ===== */
   body.con-lateral{grid-template-columns:1fr}
@@ -205,6 +205,71 @@
   .botonera .cobrar.primario:not(:disabled){box-shadow:0 8px 20px rgba(var(--acento-rgb),.30)}
   .btn-mas{background:#fff;border:1px solid rgba(21,23,28,.08)}
   .modal{background:rgba(255,255,255,.92)}
+  /* ===== Más amigable: saludo, movimiento suave al vender (28/10) ===== */
+  .arriba .marca .quien{display:flex;flex-direction:column;line-height:1.2;min-width:0}
+  .arriba .marca small{font:500 11.5px var(--f-ui);color:var(--tinta-3);white-space:nowrap}
+  .arriba .marca .avatar{width:36px;height:36px;border-radius:11px;background:linear-gradient(145deg,rgba(var(--acento-rgb),.22),rgba(var(--acento-rgb),.08));box-shadow:inset 0 0 0 1px rgba(var(--acento-rgb),.15)}
+  .arriba .reloj{background:rgba(255,255,255,.7);border:1px solid rgba(21,23,28,.06);border-radius:999px;padding:6px 11px}
+  .arriba .buscador input{min-width:0;width:100%}
+  @media (max-width:1180px){.arriba .reloj{display:none}}
+  /* el punto verde de "caja abierta" late despacito */
+  .punto{position:relative;flex:none}
+  .punto:not(.off)::after{content:"";position:absolute;inset:0;border-radius:50%;background:var(--ok);animation:punto-late 2.6s ease-out infinite}
+  @keyframes punto-late{0%{transform:scale(1);opacity:.5}70%,100%{transform:scale(3.4);opacity:0}}
+  .estado-caja .chip{border-radius:999px;padding:4px 10px}
+  /* familias */
+  .familias button{transition:background .2s,color .2s,box-shadow .2s,border-color .2s,transform .12s}
+  .familias button:active{transform:scale(.95)}
+  .familias button.on{background:linear-gradient(135deg,var(--acento),rgba(var(--acento-rgb),.82))}
+  /* tarjetas: entran en cascada al cambiar de familia o de búsqueda; se hunden un poco al tocarlas */
+  .tile-p{transition:transform .14s,box-shadow .2s,border-color .2s}
+  .tile-p.entra{animation:tile-entra .4s cubic-bezier(.2,.8,.3,1) both}
+  @keyframes tile-entra{from{opacity:0;transform:translateY(12px) scale(.98)}to{opacity:1;transform:none}}
+  .tile-p:active{transform:scale(.97)!important;transition-duration:.06s}
+  .tile-p.compacta::before{content:"";position:absolute;left:0;top:14px;bottom:14px;width:3px;border-radius:0 3px 3px 0;background:rgba(var(--acento-rgb),.0);transition:background .2s}
+  .tile-p.compacta:hover::before{background:rgba(var(--acento-rgb),.55)}
+  .tile-p .mas-tile{transition:transform .25s cubic-bezier(.3,1.5,.5,1),box-shadow .2s}
+  .tile-p:hover .mas-tile{transform:scale(1.1) rotate(90deg);box-shadow:0 5px 14px rgba(var(--acento-rgb),.4)}
+  .tile-p.con-foto .foto{overflow:hidden}
+  .tile-p.con-foto .foto img{transition:transform .4s ease}
+  .tile-p.con-foto:hover .foto img{transform:scale(1.06)}
+  /* la prenda vuela al ticket */
+  .vuela{position:fixed;left:0;top:0;z-index:8000;pointer-events:none;background:var(--acento);color:#fff;font:700 12px var(--f-ui);padding:7px 13px;border-radius:999px;box-shadow:0 10px 26px rgba(var(--acento-rgb),.42);white-space:nowrap;max-width:230px;overflow:hidden;text-overflow:ellipsis;will-change:transform}
+  /* renglones del ticket: entra deslizando, se ilumina al sumar, se va hacia el costado al quitar */
+  .linea.entra{animation:linea-entra .45s cubic-bezier(.2,.9,.3,1.15) both}
+  @keyframes linea-entra{from{opacity:0;transform:translateX(26px)}to{opacity:1;transform:none}}
+  .linea.suma{animation:linea-suma .9s ease-out both}
+  @keyframes linea-suma{0%,30%{background:rgba(var(--acento-rgb),.16)}100%{background:transparent}}
+  .linea.entra .t,.linea.suma .t{animation:num-pop .45s cubic-bezier(.3,1.6,.5,1) both;animation-delay:inherit}
+  .linea .t{transform-origin:right center}
+  .linea.sale{animation:linea-sale .2s ease-in forwards;pointer-events:none}
+  @keyframes linea-sale{to{opacity:0;transform:translateX(34px)}}
+  @keyframes num-pop{0%{transform:scale(1)}40%{transform:scale(1.12)}100%{transform:scale(1)}}
+  /* ticket vacío: una percha que se mece */
+  .vacio-ticket{display:flex;flex-direction:column;align-items:center;gap:6px;padding:52px 16px 24px;font-size:13px;color:var(--tinta-3)}
+  .vacio-ticket::before{content:"";width:84px;height:60px;margin-bottom:10px;background:rgba(var(--acento-rgb),.38);transform-origin:50% 6%;animation:percha-mece 4s ease-in-out infinite;
+    -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 46' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M27.5 8.5a4.5 4.5 0 1 1 6.6 4c-1.4.8-2.1 1.8-2.1 3.4V18'/%3E%3Cpath d='M32 18 5.2 35.6c-2.4 1.6-1.3 5 1.6 5h50.4c2.9 0 4-3.4 1.6-5L32 18Z'/%3E%3C/svg%3E") center/contain no-repeat;
+    mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 46' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M27.5 8.5a4.5 4.5 0 1 1 6.6 4c-1.4.8-2.1 1.8-2.1 3.4V18'/%3E%3Cpath d='M32 18 5.2 35.6c-2.4 1.6-1.3 5 1.6 5h50.4c2.9 0 4-3.4 1.6-5L32 18Z'/%3E%3C/svg%3E") center/contain no-repeat}
+  .vacio-ticket b{font:700 15px var(--f-ui);color:var(--tinta-2)}
+  .vacio-ticket small{margin-top:8px;font:500 11.5px var(--f-ui);color:var(--tinta-4)}
+  .vacio-ticket kbd{font:600 10.5px var(--f-mono);border:1px solid var(--linea);border-bottom-width:2px;border-radius:5px;padding:1px 5px;background:#fff;color:var(--tinta-3)}
+  @keyframes percha-mece{0%,100%{transform:rotate(-6deg)}50%{transform:rotate(6deg)}}
+  /* total y cantidad de prendas: saltan suave cuando cambian */
+  .totales .gran span:last-child{display:inline-block;transform-origin:right bottom;font-variant-numeric:tabular-nums}
+  .totales .gran.bump span:last-child{animation:num-pop .45s cubic-bezier(.3,1.6,.5,1)}
+  #ticket-sub{display:inline-block}
+  #ticket-sub.pop{animation:num-pop .4s cubic-bezier(.3,1.6,.5,1)}
+  /* Cobrar: con relieve y un brillo que pasa cuando hay algo para cobrar */
+  .botonera .cobrar{position:relative;overflow:hidden;letter-spacing:.01em;transition:transform .12s,box-shadow .2s,filter .2s}
+  .botonera .cobrar.primario:not(:disabled){background:linear-gradient(135deg,var(--acento),rgba(var(--acento-rgb),.8))}
+  .botonera .cobrar:not(:disabled):hover{transform:translateY(-1px);box-shadow:0 14px 28px rgba(var(--acento-rgb),.38)}
+  .botonera .cobrar:not(:disabled):active{transform:translateY(1px) scale(.99)}
+  .botonera .cobrar::after{content:"";position:absolute;top:-10%;bottom:-10%;left:-60%;width:38%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.4),transparent);transform:skewX(-18deg);opacity:0;pointer-events:none}
+  .botonera .cobrar.brilla::after{animation:brillo-pasa 1.1s ease-out .15s}
+  @keyframes brillo-pasa{0%{left:-60%;opacity:1}100%{left:135%;opacity:1}}
+  .botonera .btn:not(.cobrar){transition:transform .12s,background .2s}
+  .botonera .btn:not(.cobrar):active{transform:scale(.97)}
+  @media (prefers-reduced-motion:reduce){.pos *,.pos *::before,.pos *::after,.vuela{animation:none!important;transition:none!important}}
   /* modo reservado (oscuro), con la misma estructura */
   body.reservado{background:linear-gradient(165deg,#141118 0%,#100e14 60%,#15121b 100%)!important;background-attachment:fixed!important}
   body.reservado .arriba .buscador,body.reservado .arriba .menu,body.reservado .estado-caja .btn.chico,body.reservado .familias button:not(.on),body.reservado .btn-mas,body.reservado .botonera .btn:not(.primario){background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.09);color:var(--tinta)}
@@ -218,6 +283,7 @@
   body.reservado .ticket .cab,body.reservado .linea{border-bottom-color:rgba(255,255,255,.07)}
   body.reservado .linea:hover{background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.06)}
   body.reservado .btn,body.reservado .tile-p .mas-tile{box-shadow:none}
+  body.reservado .vacio-ticket kbd,body.reservado .arriba .reloj{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.1)}
   /* ===== Modo reservado: tema oscuro ===== */
   body.reservado{--lienzo:#121016;--lienzo-2:#17141c;--tinta:#ECE8F2;--tinta-2:#CFC8D9;--tinta-3:#9C95A8;--tinta-4:#6F6979;--superficie:rgba(30,27,36,.92);--superficie-2:#221e29;--superficie-borde:rgba(255,255,255,.06);--linea:rgba(255,255,255,.11);--linea-suave:rgba(255,255,255,.06);--relleno:rgba(255,255,255,.06);--relleno-2:rgba(255,255,255,.1);--acento:#C3A6EC;--acento-rgb:195,166,236;--lila:rgba(195,166,236,.16);--ok:#6FD39B;--error:#F08A91;color:var(--tinta)}
   body.reservado main,body.reservado .pos,body.reservado .ticket,body.reservado .catalogo{background:transparent;color:var(--tinta)}
@@ -252,7 +318,7 @@
     <section class="lado">
       <div class="arriba">
         <button class="menu" id="btn-menu-pos" title="Menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
-        <div class="marca"><span class="avatar" id="pos-avatar"></span><b id="pos-empresa"></b></div>
+        <div class="marca"><span class="avatar" id="pos-avatar"></span><span class="quien"><b id="pos-empresa"></b><small id="pos-saludo"></small></span></div>
         <div class="buscador"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" placeholder="Escaneá el código o escribí el nombre…" autocomplete="off" autofocus><kbd>/</kbd></div>
         <div class="reloj" id="pos-reloj"></div>
       </div>
@@ -263,7 +329,7 @@
     </section>
     <aside class="ticket">
       <div class="cab"><h2 id="ticket-titulo">Ticket</h2><span class="sub" id="ticket-sub">Nueva venta</span><select id="sel-vendedora" title="Quién atendió"></select><button class="btn chico" id="btn-vaciar">Vaciar</button></div>
-      <div class="lineas" id="lineas"><div class="vacio-ticket">Tocá una prenda o escaneá para empezar.</div></div>
+      <div class="lineas" id="lineas"><div class="vacio-ticket"><b>Listo para vender</b><span>Tocá una prenda o escaneá el código.</span><small><kbd>/</kbd> buscar · <kbd>Ctrl</kbd>+<kbd>Enter</kbd> cobrar</small></div></div>
       <div class="listas" id="listas"></div>
       <div class="mas" id="mas">
         <input id="sel-cliente" placeholder="Clienta (opcional)" list="dl-clientes"><datalist id="dl-clientes"></datalist>
@@ -284,15 +350,15 @@
 </main>
 <div id="impresion"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610281857"></script>
-<script src="../shared/canales.js?v=202610281857"></script>
-<script src="../shared/precios.js?v=202610281857"></script>
-<script src="../shell/shell.js?v=202610281857"></script>
-<script src="../shared/facturar.js?v=202610281857"></script>
-<script src="../shared/medios-pago.js?v=202610281857"></script>
-<script src="../shared/caja-fx.js?v=202610281857"></script>
-<script src="turno.js?v=202610281857"></script>
-<script src="caja.js?v=202610281857"></script>
-<script src="pos.js?v=202610281857"></script>
+<script src="../shared/supabase.js?v=202610282046"></script>
+<script src="../shared/canales.js?v=202610282046"></script>
+<script src="../shared/precios.js?v=202610282046"></script>
+<script src="../shell/shell.js?v=202610282046"></script>
+<script src="../shared/facturar.js?v=202610282046"></script>
+<script src="../shared/medios-pago.js?v=202610282046"></script>
+<script src="../shared/caja-fx.js?v=202610282046"></script>
+<script src="turno.js?v=202610282046"></script>
+<script src="caja.js?v=202610282046"></script>
+<script src="pos.js?v=202610282046"></script>
 </body>
 </html>

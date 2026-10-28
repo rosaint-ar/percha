@@ -9,6 +9,9 @@ APP.ready.then(async () => {
   $('#btn-menu-pos').onclick = () => document.body.classList.toggle('lateral-abierta');
   const reloj = () => { $('#pos-reloj').textContent = new Date().toLocaleString('es-AR', { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).replace(/\./g, ''); };
   reloj(); setInterval(reloj, 30000);
+  const saludo = () => { const h = new Date().getHours(), nom = String((APP.miembro || {}).nombre || '').split(' ')[0];
+    $('#pos-saludo').textContent = (h < 6 || h >= 20 ? 'Buenas noches' : h < 13 ? 'Buen día' : 'Buenas tardes') + (nom ? ', ' + nom : '') + ' 👋'; };
+  saludo(); setInterval(saludo, 600000);
 
   // ================= Búsqueda inteligente =================
   // cada palabra escrita tiene que ser el comienzo de alguna palabra del nombre, código, color o talle: "fru cel" → FRU FRU · Celeste
@@ -68,7 +71,8 @@ APP.ready.then(async () => {
   function activarTiles(cont, alElegir) {
     $$('.tile-p', cont).forEach(t => t.onclick = ev => { const b = ev.target.closest('[data-v]'); if (b) { alElegir(C.catalogo.find(v => v.id === b.dataset.v)); return; } alElegir(null, t.dataset.pid); });
   }
-  let grillaMax = 60;
+  let grillaMax = 60, ultimaGrilla = '';
+  const sinMovimiento = matchMedia('(prefers-reduced-motion: reduce)').matches;
   function pintarGrilla() {
     const q = $('#q').value.trim();
     const recientes = JSON.parse(localStorage.getItem(`percha_recientes_${e}`) || '[]');
@@ -81,6 +85,10 @@ APP.ready.then(async () => {
     $('#grilla').classList.toggle('con-fotos', !!q); $('#grilla').innerHTML = lista.slice(0, max).map(x => tile(x.pid, x.vars, x.coinciden, !!q)).join('') || '<div class="vacio">Nada con ese nombre.</div>';
     if (lista.length > max) $('#grilla').insertAdjacentHTML('beforeend', `<div class="vacio"><button class="btn" id="btn-grilla-mas">Ver ${fmt.num(Math.min(120, lista.length - max))} más</button></div>`);
     const bm = $('#btn-grilla-mas'); if (bm) bm.onclick = () => { grillaMax += 120; pintarGrilla(); };
+    // al cambiar de familia (o al empezar / dejar de buscar) las tarjetas entran en cascada; mientras se escribe, no
+    const clave = familia + '|' + (q ? 'q' : '');
+    if (clave !== ultimaGrilla && !sinMovimiento) $$('#grilla .tile-p').slice(0, 40).forEach((t, i) => { t.classList.add('entra'); t.style.animationDelay = i * 16 + 'ms'; });
+    ultimaGrilla = clave;
     activarTiles($('#grilla'), (v, pid) => { if (v) C.agregar(v); else C.elegirProducto(pid); $('#q').value = ''; setTimeout(pintarGrilla, 50); });
   }
   let tq; $('#q').addEventListener('input', () => { clearTimeout(tq); tq = setTimeout(pintarGrilla, 150); });
@@ -207,6 +215,69 @@ APP.ready.then(async () => {
   // cobrar y seña pasan primero por la definición de genéricos y de kits
   $('#btn-cobrar').onclick = async () => { if (!C.carrito.lineas.length) return; if (await definirModelos() && await definirKits()) C.cobrar(false); };
   $('#btn-sena').onclick = async () => { if (!C.carrito.lineas.length) return; if (await definirModelos() && await definirKits()) C.cobrar(true); };
+
+  // ================= Movimiento: la prenda vuela al ticket, el renglón entra, el total sube =================
+  // Todo es visual: se mira el ticket después de que caja.js lo dibuja (no cambia nada de la venta).
+  let toque = null;   // de dónde sale la prenda que vuela: la tarjeta o el botón de talle que se tocó
+  document.addEventListener('pointerdown', ev => { const el = ev.target.closest('.tile-p, .matriz-pick button[data-v], .vchips button'); toque = el ? { r: el.getBoundingClientRect(), t: Date.now() } : null; }, true);
+  // terminada la animación se saca la clase, así no tapa el efecto de pasar el mouse
+  document.addEventListener('animationend', ev => { const c = ev.target.classList; if (/^(tile-entra|linea-entra|linea-suma)$/.test(ev.animationName)) { c.remove('entra', 'suma'); ev.target.style.animationDelay = ''; } });
+  function volar(r, destino, texto) {
+    const d = destino.getBoundingClientRect(), el = document.createElement('div'); el.className = 'vuela'; el.textContent = texto; document.body.appendChild(el);
+    const w = el.offsetWidth, h = el.offsetHeight, x0 = r.left + r.width / 2 - w / 2, y0 = r.top + r.height / 2 - h / 2, x1 = d.left + 12, y1 = d.top + d.height / 2 - h / 2;
+    const mx = x0 + (x1 - x0) * .55, my = Math.min(y0, y1) - 60;   // un arco hacia arriba
+    el.animate([
+      { transform: `translate(${x0}px,${y0}px) scale(.6)`, opacity: 0 },
+      { transform: `translate(${x0}px,${y0 - 14}px) scale(1)`, opacity: 1, offset: .18 },
+      { transform: `translate(${mx}px,${my}px) scale(.92)`, opacity: 1, offset: .6 },
+      { transform: `translate(${x1}px,${y1}px) scale(.45)`, opacity: 0 }
+    ], { duration: 620, easing: 'cubic-bezier(.45,0,.35,1)' }).onfinish = () => el.remove();
+    setTimeout(() => el.remove(), 1500);
+  }
+  const claveLinea = l => (l.variante.id || l.variante.producto_nombre) + (l.falla ? '·f' : '') + (l.devuelta ? '·d' : '');
+  let antesLineas = null, antesSub = '', totalAntes = 0, habiaLineas = false, vuelo = 0;
+  new MutationObserver(() => {
+    const ls = C.carrito.lineas, filas = $$('#lineas .linea'), ahora = new Map(), cuenta = {};
+    let destino = null, nueva = null;
+    ls.forEach((l, i) => {
+      let k = claveLinea(l); cuenta[k] = (cuenta[k] || 0) + 1; k += '#' + cuenta[k]; ahora.set(k, Math.abs(l.cantidad));
+      if (!antesLineas || !filas[i]) return;
+      const a = antesLineas.get(k);
+      if (a == null) { filas[i].classList.add('entra'); destino = filas[i]; nueva = l; }
+      else if (Math.abs(l.cantidad) > a) { filas[i].classList.add('suma'); destino = filas[i]; nueva = l; }
+    });
+    antesLineas = ahora;
+    if (!destino || sinMovimiento) return;
+    // si se tocó una prenda recién (y no hay una ventana abierta tapando el ticket), vuela hasta su renglón
+    if (toque && Date.now() - toque.t < 1500 && !document.querySelector('.modal-fondo')) { destino.style.animationDelay = '.4s'; vuelo = Date.now(); volar(toque.r, destino, nueva.variante.producto_nombre); }
+    toque = null;
+    destino.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }).observe($('#lineas'), { childList: true });
+  const bCobrar = $('#btn-cobrar');
+  new MutationObserver(() => {
+    const t = C.calcular().total, gran = $('#totales .gran'), sp = gran && gran.lastElementChild, hay = C.carrito.lineas.length > 0;
+    const sub = $('#ticket-sub'); if (sub && sub.textContent !== antesSub) { if (hay && !sinMovimiento) { sub.classList.remove('pop'); void sub.offsetWidth; sub.classList.add('pop'); } antesSub = sub.textContent; }
+    if (hay && !habiaLineas && !sinMovimiento) { bCobrar.classList.remove('brilla'); void bCobrar.offsetWidth; bCobrar.classList.add('brilla'); }
+    habiaLineas = hay;
+    const desde = totalAntes; totalAntes = t;
+    if (!sp || t === desde || sinMovimiento || document.hidden) return;
+    // el total cuenta hasta el nuevo valor (si vuela una prenda, espera a que llegue)
+    const t0 = performance.now() + (Date.now() - vuelo < 200 ? 380 : 0), dur = 420;
+    sp.textContent = fmt.pesos(desde);
+    const paso = now => { if (!sp.isConnected) return; const k = Math.min(1, Math.max(0, (now - t0) / dur)), e2 = 1 - Math.pow(1 - k, 3);
+      sp.textContent = fmt.pesos(k < 1 ? Math.round(desde + (t - desde) * e2) : t);
+      if (k > 0 && !gran.classList.contains('bump')) gran.classList.add('bump');
+      if (k < 1) requestAnimationFrame(paso); };
+    requestAnimationFrame(paso);
+    setTimeout(() => { if (sp.isConnected) sp.textContent = fmt.pesos(t); }, t0 - performance.now() + dur + 60);   // el número final queda sí o sí, aunque el navegador no anime
+  }).observe($('#totales'), { childList: true });
+  // quitar un renglón: se va hacia el costado y recién ahí se borra
+  $('#lineas').addEventListener('click', ev => {
+    const b = ev.target.closest('.quitar, [data-d="-1"]'); if (!b || sinMovimiento || b.dataset.ya) return;
+    const l = C.carrito.lineas[+b.dataset.i]; if (!l || (!b.classList.contains('quitar') && Math.abs(l.cantidad) > 1)) return;
+    ev.stopPropagation(); ev.preventDefault();
+    b.closest('.linea').classList.add('sale'); setTimeout(() => { b.dataset.ya = '1'; b.click(); }, 190);
+  }, true);
 
   // ================= Más opciones (clienta, nota, descuento, canal) =================
   $('#btn-mas').onclick = () => { const m = $('#mas'); m.classList.toggle('ver'); $('#btn-mas').classList.toggle('on', m.classList.contains('ver')); if (m.classList.contains('ver')) $('#sel-cliente').focus(); };
