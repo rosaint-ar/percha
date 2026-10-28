@@ -709,12 +709,19 @@ APP.ready.then(async () => {
       <div style="font:800 30px var(--f-titulo);letter-spacing:-.03em;margin:6px 0"><span data-monto-venta>${fmt.pesos(extra.total.aPagar)}</span> ${res.pendiente ? '' : '🎉'}</div>
       ${extra.vuelto ? `<div class="aviso-caja info">Vuelto: <b>${fmt.pesos(extra.vuelto)}</b></div>` : ''}
       ${(res.creditos || []).map(c => `<div class="aviso-caja ok">${c.tipo === 'gift_card' ? 'Gift card' : 'Nota de crédito'} emitida · código <b class="mono">${c.codigo}</b> · ${fmt.pesos(c.monto)}</div>`).join('')}
-      <div class="pie" style="justify-content:space-between"><div style="display:flex;gap:8px;flex-wrap:wrap">${res.id && p.estado === 'completada' && !p.reservada && !res.reservada && window.FACTURA ? '<button class="btn" data-facturar hidden>Facturar</button>' : ''}<button class="btn" data-print>Imprimir ticket</button><a class="btn" target="_blank" href="https://wa.me/?text=${texto}">WhatsApp</a></div><button class="btn primario" data-ok>Nueva venta</button></div>`, { fijo: true });
+      <div class="pie" style="justify-content:space-between"><div style="display:flex;gap:8px;flex-wrap:wrap">${res.id && p.estado === 'completada' && !p.reservada && !res.reservada && window.FACTURA ? '<button class="btn" data-facturar hidden>Facturar</button>' : ''}<button class="btn" data-print>Imprimir ticket</button><a class="btn" target="_blank" href="https://wa.me/?text=${texto}">WhatsApp</a>${res.id && !res.pendiente ? '<button class="btn" data-prueba title="Borra esta venta como si no hubiera existido">🧪 Era de prueba</button>' : ''}</div><button class="btn primario" data-ok>Nueva venta</button></div>`, { fijo: true });
     if (!res.pendiente) { fx.sonido('venta'); fx.pop($('[data-monto-venta]', m)); if (fx.brillo) fx.brillo($('.modal', m) || m); }
     $('[data-print]', m).onclick = () => window.print();
     const bf = $('[data-facturar]', m);
     if (bf) FACTURA.config(e).then(c => { if (c.estado !== 'listo') return; bf.hidden = false; bf.onclick = () => FACTURA.abrir({ id: res.id, numero: res.numero, total: extra.total.aPagar, cliente_id: p.cliente_id || null, cliente_nombre: null }, { alTerminar: c2 => { if (c2 && c2.estado === 'autorizado') { bf.textContent = '✓ ' + c2.nombre_tipo + ' ' + c2.numero_mostrar; bf.onclick = () => window.open(FACTURA.urlFactura(c2.id), '_blank'); } } }); });
     $('[data-ok]', m).onclick = () => { m.cerrar(); $('#q').focus(); };
+    // venta de prueba: se borra entera (vuelve el stock, sale de la caja), sin dejar registro
+    const pr = $('[data-prueba]', m); if (pr) pr.onclick = async () => {
+      if (!await confirmar('Se borra esta venta como si nunca hubiera existido: el stock vuelve (también en la web) y sale de la caja. ¿Seguimos?', 'Borrar venta de prueba')) return;
+      const { error } = await sb.rpc('venta_borrar_prueba', { p_venta: res.id });
+      if (error) { toast(mensajeError(error), 'error'); return; }
+      m.cerrar(); toast('Venta de prueba borrada ✓ · stock devuelto'); if (window.empujarStock) empujarStock(e); $('#q').focus();
+    };
   }
 
   // ================= Cambio / devolución =================

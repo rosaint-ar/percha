@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ventas · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610281825">
+<link rel="stylesheet" href="../shell/shell.css?v=202610281829">
 <style>
   .filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
   .filtros input[type=date],.filtros select{border:1px solid var(--linea);background:var(--superficie-2);padding:8px 10px;border-radius:var(--radio-mini)}
@@ -55,10 +55,10 @@
 </main>
 <div id="impresion"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610281825"></script>
-<script src="../shared/canales.js?v=202610281825"></script>
-<script src="../shell/shell.js?v=202610281825"></script>
-<script src="../shared/facturar.js?v=202610281825"></script>
+<script src="../shared/supabase.js?v=202610281829"></script>
+<script src="../shared/canales.js?v=202610281829"></script>
+<script src="../shell/shell.js?v=202610281829"></script>
+<script src="../shared/facturar.js?v=202610281829"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -120,11 +120,17 @@ APP.ready.then(async () => {
       ${+v.saldo ? `<tr><td><b>Saldo pendiente</b></td><td class="num" style="color:var(--aviso)"><b>${fmt.pesos(v.saldo)}</b></td></tr>` : ''}</table>
       ${v.factura_id || (v.estado === 'completada' && facturaLista) ? `<div class="aviso-caja ${v.factura_estado === 'autorizado' ? 'ok' : v.factura_estado === 'rechazado' ? 'error' : 'info'}" style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px"><span>${v.factura_estado === 'autorizado' ? 'Factura ' + esc(v.factura_numero) + (v.nc_id ? (v.nc_estado === 'autorizado' ? ' · anulada con nota de crédito' : ' · nota de crédito en cola') : '') : v.factura_estado === 'pendiente' ? 'Factura en cola: sale sola apenas ARCA responda' : v.factura_estado === 'rechazado' ? 'ARCA rechazó la factura' : 'Sin factura'}</span><span style="display:flex;gap:6px">${v.factura_estado === 'autorizado' ? `<a class="btn chico" target="_blank" href="${FACTURA.urlFactura(v.factura_id)}">Ver factura</a>${v.nc_id && v.nc_estado === 'autorizado' ? `<a class="btn chico" target="_blank" href="${FACTURA.urlFactura(v.nc_id)}">Ver nota de crédito</a>` : ''}` : v.estado === 'completada' && v.factura_estado !== 'pendiente' ? `<button class="btn chico primario" data-facturar>${v.factura_estado === 'rechazado' ? 'Volver a facturar' : 'Facturar'}</button>` : ''}</span></div>` : ''}
       <div class="pie" style="justify-content:space-between"><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn" data-print>Reimprimir</button>${v.estado !== 'anulada' ? `<button class="btn primario" data-editar>Editar</button><a class="btn" href="caja.html?cambio=${v.numero}">Cambio / devolución</a>` : ''}</div>
-      ${v.estado !== 'anulada' ? '<button class="btn peligro" data-anular>Anular</button>' : ''}</div>`);
+      <div style="display:flex;gap:6px">${v.origen !== 'tiendanube' && v.factura_estado !== 'autorizado' ? '<button class="btn" data-prueba title="Borra la venta como si no hubiera existido: vuelve el stock y sale de la caja">🧪 Era de prueba</button>' : ''}${v.estado !== 'anulada' ? '<button class="btn peligro" data-anular>Anular</button>' : ''}</div></div>`);
     { const ce = $('[data-canal]', m); if (ce) ce.onclick = () => cambiarCanal(v.id, v.origen, () => { m.cerrar(); cargar(); }); }
     $('[data-print]', m).onclick = () => { imprimir(v, ls, ps); window.print(); };
     const bf = $('[data-facturar]', m); if (bf) bf.onclick = () => { m.cerrar(); FACTURA.abrir(v, { alTerminar: cargar }); };
     const ed = $('[data-editar]', m); if (ed) ed.onclick = () => { m.cerrar(); editarVenta(v, ls, ps); };
+    const pr = $('[data-prueba]', m); if (pr) pr.onclick = async () => {
+      if (!await confirmar(`Se borra el ticket #${String(v.numero).padStart(6, '0')} como si nunca hubiera existido: el stock vuelve (también en la web), sale de la caja y de los totales. No queda registro. ¿Seguimos?`, 'Borrar venta de prueba')) return;
+      const { error } = await sb.rpc('venta_borrar_prueba', { p_venta: v.id });
+      if (error) { toast(mensajeError(error), 'error'); return; }
+      m.cerrar(); toast('Venta de prueba borrada ✓ · stock devuelto'); if (window.empujarStock) empujarStock(e); cargar();
+    };
     const a = $('[data-anular]', m); if (a) a.onclick = () => {
       const m2 = modal(`<h2>Anular ticket #${String(v.numero).padStart(6, '0')}</h2><p class="sub">El stock vuelve y los pagos quedan sin efecto. No se puede deshacer.${v.factura_estado === 'autorizado' ? ' <b>Tiene factura: sale sola la nota de crédito.</b>' : ''}</p>
         <div class="campo" style="margin-top:12px"><label>Motivo</label><input id="an-motivo" placeholder="Ej. se cargó mal, la clienta se arrepintió"></div>
