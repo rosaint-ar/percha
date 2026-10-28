@@ -110,12 +110,14 @@ APP.ready.then(async () => {
       if (!genericas().length) { res(true); return; }
       const l0 = genericas()[0], gen = C.productos[l0.variante.producto_id], catId = gen.categoria_id;
       const nombreGen = l0.variante.producto_nombre;
+      // las que solo se venden en el local (BOMBIS «LOCAL»): completan sin elegir modelo
+      const loc = gen.generico_local_id ? C.catalogo.find(v => v.producto_id === gen.generico_local_id) : null;
       const elegidos = [];
       const m = modal(`<h2>¿Qué modelos se lleva?</h2><p class="sub">Buscá cada uno (ej. <b>fru cel</b> = Fru Fru celeste) y tocalo. Si no sabés cuál es, dejalo como ${esc(nombreGen)}.</p>
         <div class="pend"><b id="df-n"></b><span class="sub">por definir</span><span class="mult" data-mult><button class="on" data-m="1">×1</button><button data-m="2">×2</button><button data-m="3">×3</button><button data-m="5">×5</button></span><div class="elegidos" id="df-elegidos"></div></div>
         <div class="buscador" style="min-width:0;width:100%"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="df-q" placeholder="Modelo, color, talle…" autocomplete="off"><label class="filtro-stock"><input type="checkbox" id="df-sinstock"> sin stock</label></div>
         <div class="grilla" id="df-grilla"></div>
-        <div class="pie"><div style="display:flex;gap:8px"><button class="btn" data-mas>+ Una más</button><button class="btn" data-dejar>Dejar como ${esc(nombreGen)}</button></div><button class="btn primario" data-ok style="padding:12px 22px;font-size:15px">Seguir al cobro</button></div>`, { fijo: true });
+        <div class="pie"><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-mas>+ Una más</button>${loc ? `<button class="btn" data-local title="Las que no están en la web: van a ${esc(loc.producto_nombre)}, sin modelo">+ ${esc(loc.producto_nombre)} <small>(no está en la web)</small></button>` : ''}<button class="btn" data-dejar>Dejar como ${esc(nombreGen)}</button></div><button class="btn primario" data-ok style="padding:12px 22px;font-size:15px">Seguir al cobro</button></div>`, { fijo: true });
       m.querySelector('.modal').classList.add('definir');
       const pendientes = () => genericas().reduce((s, l) => s + l.cantidad, 0);
       const pintarPend = () => { $('#df-n', m).textContent = pendientes(); $('#df-elegidos', m).innerHTML = elegidos.map(v => `<span>${esc(v.producto_nombre)} ${esc([v.talle_nombre, v.color_nombre].filter(Boolean).join(' '))}</span>`).join(''); };
@@ -146,6 +148,7 @@ APP.ready.then(async () => {
       $('#df-sinstock', m).onchange = pintarLista;
       $('[data-mas]', m).onclick = () => { const g = genericas()[0]; if (g) g.cantidad += 1; else C.agregar(l0.variante, 1); C.pintar(); pintarPend(); };
       const avisarPend = () => { if (pendientes()) toast(`Quedan ${pendientes()} por definir: después las definís desde 📌 Pendientes`); };
+      const bl = $('[data-local]', m); if (bl) bl.onclick = () => asignar(loc);
       $('[data-dejar]', m).onclick = () => { avisarPend(); m.cerrar(); res(true); };
       $('[data-ok]', m).onclick = () => { avisarPend(); m.cerrar(); res(true); };
       m.addEventListener('click', ev => { if (ev.target === m) { /* fijo: no se cierra tocando afuera */ } });

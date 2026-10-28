@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Producto · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610272200">
+<link rel="stylesheet" href="../shell/shell.css?v=202610281517">
 <style>
   .dos{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
   .dos>.card{min-width:0;overflow-x:auto}
@@ -85,6 +85,8 @@
       <div class="campo" style="margin:0;min-width:170px"><label>Que NO contenga (coma)</label><input id="gf-exc" placeholder="PACK, RED"></div>
       <button class="btn primario" id="gf-guardar" type="button">Guardar filtro</button><span class="sub" id="gf-cuenta"></span>
     </div>
+    <div class="campo" style="margin:12px 0 0;max-width:420px"><label>Lo que no está en la web se completa con</label><select id="gf-local"><option value="">— nada —</option></select>
+      <span class="ayuda">Un artículo del local sin modelos (ej. BOMBIS «LOCAL»): al cobrar aparece un botón para sumarlo sin elegir talle ni color.</span></div>
   </div>
   <div class="card" id="card-kit" style="display:none">
     <div class="card-cab"><div><h2>Qué lleva este kit</h2><p class="sub">No tiene stock propio: se puede vender mientras haya de cada componente, y al venderlo se descuentan todos.</p></div></div>
@@ -157,10 +159,10 @@
   </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610272200"></script>
-<script src="../shared/precios.js?v=202610272200"></script>
-<script src="../shared/prenda.js?v=202610272200"></script>
-<script src="../shell/shell.js?v=202610272200"></script>
+<script src="../shared/supabase.js?v=202610281517"></script>
+<script src="../shared/precios.js?v=202610281517"></script>
+<script src="../shared/prenda.js?v=202610281517"></script>
+<script src="../shell/shell.js?v=202610281517"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$ , toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -552,7 +554,13 @@ APP.ready.then(async () => {
     const es = form.es_generico.value === 'true'; $('#card-generico').style.display = es ? '' : 'none'; if (!es) return;
     const f = (producto && producto.generico_filtro) || {}; $('#gf-cat').value = f.categoria_id || (producto && producto.categoria_id) || ''; $('#gf-inc').value = (f.incluye || []).join(', '); $('#gf-exc').value = (f.excluye || []).join(', ');
     contar(filtroGen(), '#gf-cuenta');
+    // con qué artículo del local se completa (misma familia, que no sea genérico)
+    sb.from('productos').select('id,nombre,codigo').eq('empresa_id', e).eq('activo', true).eq('es_generico', false).eq('categoria_id', (producto && producto.categoria_id) || $('#gf-cat').value || '00000000-0000-0000-0000-000000000000').order('nombre').then(({ data }) => {
+      $('#gf-local').innerHTML = '<option value="">— nada —</option>' + (data || []).map(p => `<option value="${p.id}">${esc(p.nombre)} · ${esc(p.codigo)}</option>`).join('');
+      $('#gf-local').value = (producto && producto.generico_local_id) || '';
+    });
   }
+  $('#gf-local').onchange = async () => { if (!id) { toast('Guardá el producto primero', 'error'); return; } const v = $('#gf-local').value || null; const r = await sb.from('productos').update({ generico_local_id: v }).eq('id', id); if (!r.error && producto) producto.generico_local_id = v; toast(r.error ? mensajeError(r.error) : 'Guardado', r.error ? 'error' : ''); };
   form.es_generico.addEventListener('change', pintarGenerico);
   $('#gf-guardar').onclick = async () => { if (!id) { toast('Guardá el producto primero', 'error'); return; } const r = await sb.from('productos').update({ generico_filtro: filtroGen() }).eq('id', id); toast(r.error ? mensajeError(r.error) : 'Filtro del genérico guardado', r.error ? 'error' : ''); };
   // kit nuevo: se avisa que primero hay que guardar

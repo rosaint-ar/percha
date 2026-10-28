@@ -37,7 +37,7 @@ APP.ready.then(async () => {
     const traer = async () => {
       const [vars, prods] = await Promise.all([
         paginar(() => sb.from('v_variantes').select('id,producto_id,producto_codigo,producto_nombre,producto_tipo,sku,ean,talle,talle_nombre,talle_orden,color,color_nombre,color_hex,precio,costo,stock,fallas,falla_nota,activa,foto').eq('empresa_id', e).eq('activa', true).order('producto_nombre').order('talle_orden')),
-        paginar(() => sb.from('productos').select('id,categoria_id,tipo,activo,imagen_url,es_generico,generico_filtro').eq('empresa_id', e).eq('activo', true))
+        paginar(() => sb.from('productos').select('id,categoria_id,tipo,activo,imagen_url,es_generico,generico_filtro,generico_local_id').eq('empresa_id', e).eq('activo', true))
       ]);
       productos = Object.fromEntries(prods.map(x => [x.id, x]));
       catalogo = vars.filter(x => productos[x.id === undefined ? '' : x.producto_id]);

@@ -2,7 +2,8 @@
 // Precio normal = la lista del canal SIN rebajas; promocional = con las rebajas que valen en el canal (o vacío si no hay).
 // La cuenta es la misma que shared/precios.js (la caja): fijo de la lista > rebaja (si la lista la toma) × % (excepción
 // de producto > de familia > de la lista) → redondeo. Si se cambia una, cambiar la otra.
-// No toca: lo oculto en la web (salvo conexiones.incluir_ocultos), genéricos, y prendas con dos publicaciones a distinto precio.
+// No toca: lo oculto en la web (salvo conexiones.incluir_ocultos), genéricos, prendas con varias publicaciones que no
+//   coinciden en precio u oferta, y las que en la web tienen la oferta igual o mayor al precio (así las dejó la tienda).
 // body: { empresa_id, accion: 'revisar' | 'aplicar', limite? }  ·  cron (x-cron-key): aplica en las conexiones con empujar_precios.
 // 'revisar' lee los precios de la web en vivo y devuelve las diferencias sin escribir nada.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
@@ -144,7 +145,9 @@ Deno.serve(async (req) => {
       if (!v || !p || !p.activo) continue;
       if (p.es_generico) continue;
       if (!(+v.precio > 0)) { sinTocar.push({ producto: v.producto_nombre, por: "sin precio en Percha" }); continue; }
-      if (new Set(its.map((i: any) => i.w.precio)).size > 1) { sinTocar.push({ producto: v.producto_nombre, variante: [v.talle_nombre, v.color_nombre].filter(Boolean).join(" · "), por: "dos publicaciones a distinto precio" }); continue; }
+      const nomV = [v.talle_nombre, v.color_nombre].filter(Boolean).join(" · ");
+      if (new Set(its.map((i: any) => i.w.precio)).size > 1 || new Set(its.map((i: any) => i.w.promo ?? 0)).size > 1) { sinTocar.push({ producto: v.producto_nombre, variante: nomV, por: "varias publicaciones con distinto precio u oferta" }); continue; }
+      if (its.some((i: any) => i.w.promo != null && i.w.promo >= i.w.precio)) { sinTocar.push({ producto: v.producto_nombre, variante: nomV, por: "en la web la oferta es igual o mayor al precio: se deja como está" }); continue; }
       const op = { canal: "tiendanube", categoria_id: p.categoria_id, tipo: p.tipo };
       const normal = calcular(v, lista, ctx, { ...op, sinRebajas: true }).precio;
       const conReb = calcular(v, lista, ctx, op);

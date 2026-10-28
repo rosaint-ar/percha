@@ -47,14 +47,15 @@
   const cargarScript = src => new Promise((ok, mal) => { if ([...document.scripts].some(s => s.src.includes(src.split('?')[0]))) return ok(); const s = document.createElement('script'); s.src = raiz() + src; s.onload = ok; s.onerror = mal; document.head.appendChild(s); });
 
   let catalogo = null;
+  let productosP = new Map();   // producto → {generico_local_id, …}: con qué artículo del local se completa un genérico
   async function cargarCatalogo() {
     if (catalogo) return catalogo; let todo = [], d = 0;
     while (true) {
       const { data } = await sb.from('v_variantes').select('id,producto_id,producto_codigo,producto_nombre,producto_tipo,talle_nombre,talle_orden,color_nombre,sku,stock,foto').eq('empresa_id', APP.empresa.id).eq('activa', true).neq('producto_tipo', 'kit').not('sku', 'like', '%-SD').order('producto_nombre').range(d, d + 999);
       todo = todo.concat(data || []); if (!data || data.length < 1000) break; d += 1000;
     }
-    const { data: ps } = await sb.from('productos').select('id,categoria_id,es_generico').eq('empresa_id', APP.empresa.id);
-    const P = new Map((ps || []).map(p => [p.id, p]));
+    const { data: ps } = await sb.from('productos').select('id,categoria_id,es_generico,generico_local_id').eq('empresa_id', APP.empresa.id);
+    const P = new Map((ps || []).map(p => [p.id, p])); productosP = P;
     todo.forEach(v => { const p = P.get(v.producto_id) || {}; v.categoria_id = p.categoria_id; v.es_generico = p.es_generico; });
     return catalogo = todo.filter(v => !v.es_generico);
   }
@@ -124,6 +125,9 @@
     const f = x.generico_filtro || {}, famId = f.categoria_id || x.categoria_id;
     const encaja = v => (!famId || v.categoria_id === famId) && (f.incluye || []).every(w => !w.trim() || v.producto_nombre.toUpperCase().includes(w.trim().toUpperCase())) && !(f.excluye || []).some(w => w.trim() && v.producto_nombre.toUpperCase().includes(w.trim().toUpperCase()));
     const q = $('#df-q', m); q.disabled = false; q.placeholder = 'Modelo, color o talle (ej. fru cel)'; q.focus();
+    // las que solo se venden en el local (BOMBIS «LOCAL»): completan sin elegir modelo
+    const gl = (productosP.get(x.desde_producto_id) || {}).generico_local_id, vloc = gl && cat.find(v => v.producto_id === gl);
+    if (vloc) { $('#df-mult', m).insertAdjacentHTML('afterend', `<button type="button" class="btn chico" id="df-local" style="margin-left:8px" title="Las que no están en la web">+ ${esc(vloc.producto_nombre)}</button>`); $('#df-local', m).onclick = () => sumar(vloc); }
     const pintarLista = () => {
       const t = nrm(q.value.trim()), ws = t.split(/\s+/).filter(Boolean);
       let vs = cat.filter(v => ws.every(w => nrm(`${v.producto_nombre} ${v.producto_codigo} ${v.talle_nombre || ''} ${v.color_nombre || ''}`).includes(w)));
