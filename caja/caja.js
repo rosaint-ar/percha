@@ -398,14 +398,15 @@ APP.ready.then(async () => {
     const c = calcular(), cont = $('#lineas');
     if (!c.lineas.length) cont.innerHTML = '<div class="vacio-ticket"><b>Listo para vender</b><span>Tocá una prenda o escaneá el código.</span><small><kbd>/</kbd> buscar · <kbd>F9</kbd> cobrar</small></div>';
     else cont.innerHTML = c.lineas.map((l, i) => `<div class="linea">
-      <div><div class="n">${l.devuelta ? esc(l.variante.producto_nombre) : `<span class="cambiable" data-cambiar="${i}" title="Tocá para cambiar el talle, el color o la prenda">${esc(l.variante.producto_nombre)} <span class="lapiz">✎</span></span>`}${l.devuelta ? ' <span class="chip error">devuelve</span>' : ''}</div><div class="v">${l.devuelta ? esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || l.variante.sku || '') : `<span class="cambiable" data-cambiar="${i}">${esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || 'único')}</span>`} · ${l.devuelta ? fmt.pesos(l.precioLista) : `<span class="precio-linea" data-precio="${i}" title="Cambiar el precio (F2)">${fmt.pesos(l.precioManual != null ? l.precioManual : l.precioLista)}</span>`}${l.descPct && l.precioManual == null ? ' −' + l.descPct + '%' : ''}${!l.devuelta && controlaStock(l.variante) && llevando(l.variante) > Math.max(+l.variante.stock || 0, 0) ? '<span class="sinstock-chip" title="El sistema dice que no hay suficiente">⚠ sin stock</span>' : ''}</div>${l.precioManual != null && !l.devuelta ? `<div class="promo manual">✎ Precio a mano · el de lista es ${fmt.pesos(l.precioLista)}</div>` : ''}${l.rebaja && !l.devuelta && l.precioManual == null ? `<div class="promo">▼ ${esc(l.rebaja.nombre)} · antes ${fmt.pesos(l.precioBase)}</div>` : ''}${l.promo ? `<div class="promo">★ ${esc(l.promo.nombre)} · −${fmt.pesos(l.descPromo)}/u</div>` : ''}${(+l.variante.fallas > 0 || l.falla) && !l.devuelta ? `<button class="falla ${l.falla ? 'on' : ''}" data-falla="${i}" title="${l.falla ? 'Tocá para desmarcar' : esc(l.variante.falla_nota || '')}">${l.falla ? '◆ Con falla' + (l.fallaU && l.fallaU.nota ? ': ' + esc(l.fallaU.nota) : '') + (l.descFalla ? ' · ' + fmt.dec(l.descFalla) + '% off' : '') : '◆ Hay ' + fmt.num(l.variante.fallas) + ' con falla · ¿es esta?'}</button>` : ''}</div>
-      <div class="t">${fmt.pesos(l.total)}</div>
+      <div><div class="n">${l.devuelta ? esc(l.variante.producto_nombre) : `<span class="cambiable" data-cambiar="${i}" title="Tocá para cambiar el talle, el color o la prenda">${esc(l.variante.producto_nombre)}</span>`}${l.devuelta ? ' <span class="chip error">devuelve</span>' : ''}</div><div class="v">${l.devuelta ? esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || l.variante.sku || '') : `<span class="cambiable" data-cambiar="${i}">${esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || 'único')}</span>`} · ${fmt.pesos(l.precioLista)}${l.descPct && l.precioManual == null ? ' −' + l.descPct + '%' : ''}${!l.devuelta && controlaStock(l.variante) && llevando(l.variante) > Math.max(+l.variante.stock || 0, 0) ? '<span class="sinstock-chip" title="El sistema dice que no hay suficiente">⚠ sin stock</span>' : ''}</div>${l.precioManual != null && !l.devuelta ? `<div class="promo manual">Precio cambiado a mano</div>` : ''}${l.rebaja && !l.devuelta && l.precioManual == null ? `<div class="promo">▼ ${esc(l.rebaja.nombre)} · antes ${fmt.pesos(l.precioBase)}</div>` : ''}${l.promo ? `<div class="promo">★ ${esc(l.promo.nombre)} · −${fmt.pesos(l.descPromo)}/u</div>` : ''}${(+l.variante.fallas > 0 || l.falla) && !l.devuelta ? `<button class="falla ${l.falla ? 'on' : ''}" data-falla="${i}" title="${l.falla ? 'Tocá para desmarcar' : esc(l.variante.falla_nota || '')}">${l.falla ? '◆ Con falla' + (l.fallaU && l.fallaU.nota ? ': ' + esc(l.fallaU.nota) : '') + (l.descFalla ? ' · ' + fmt.dec(l.descFalla) + '% off' : '') : '◆ Hay ' + fmt.num(l.variante.fallas) + ' con falla · ¿es esta?'}</button>` : ''}</div>
+      <div class="t">${l.devuelta ? fmt.pesos(l.total) : `<input class="pu${l.precioManual != null ? ' manual' : ''}" data-pu="${i}" type="number" min="0" step="1" value="${l.precioFinal}" data-orig="${l.precioFinal}" title="Precio por unidad: escribí otro para cambiarlo (F2)"${APP.puede('descuentos') ? '' : ' readonly'}>${Math.abs(l.cantidad) > 1 ? `<small>${l.cantidad} u. = ${fmt.pesos(l.total)}</small>` : ''}`}</div>
       <div class="ctrl"><button data-i="${i}" data-d="-1">−</button><input data-i="${i}" data-q value="${l.cantidad}"><button data-i="${i}" data-d="1">+</button><span class="desc">desc % <input data-i="${i}" data-desc type="number" min="0" max="100" value="${l.precioManual != null ? 0 : l.descPct || 0}"${l.precioManual != null ? ' disabled title="Tiene precio a mano"' : ''}></span><button class="quitar" data-i="${i}" data-x title="Quitar">×</button></div></div>`).join('');
     $$('[data-d]', cont).forEach(b => b.onclick = () => { const l = carrito.lineas[+b.dataset.i]; l.cantidad += +b.dataset.d * (l.devuelta ? -1 : 1); if ((l.devuelta ? -l.cantidad : l.cantidad) <= 0) carrito.lineas.splice(+b.dataset.i, 1); pintar(); });
     $$('[data-q]', cont).forEach(i => i.onchange = () => { const n = parseInt(i.value) || 0; const l = carrito.lineas[+i.dataset.i]; if (n === 0) carrito.lineas.splice(+i.dataset.i, 1); else l.cantidad = l.devuelta ? -Math.abs(n) : Math.abs(n); pintar(); });
     $$('[data-desc]', cont).forEach(i => i.onchange = () => { if (!APP.puede('descuentos') && +i.value > 0) { toast('Los descuentos los habilita administración', 'error'); i.value = 0; return; } carrito.lineas[+i.dataset.i].descPct = Math.min(100, Math.max(0, +i.value || 0)); pintar(); });
     $$('[data-x]', cont).forEach(b => b.onclick = () => { carrito.lineas.splice(+b.dataset.i, 1); pintar(); });
-    $$('[data-precio]', cont).forEach(el => el.onclick = ev => { ev.stopPropagation(); cambiarPrecio(+el.dataset.precio); });
+    $$('[data-pu]', cont).forEach(inp => { inp.onfocus = () => inp.select(); inp.onchange = () => ponerPrecio(+inp.dataset.pu, inp.value);
+      inp.onkeydown = ev => { if (ev.key === 'Enter') { ev.preventDefault(); $('#q').focus(); } else if (ev.key === 'Escape') { inp.value = inp.dataset.orig; $('#q').focus(); } }; });
     $$('[data-cambiar]', cont).forEach(el => el.onclick = ev => { ev.stopPropagation(); cambiarLinea(+el.dataset.cambiar); });
     $$('[data-falla]', cont).forEach(b => b.onclick = ev => { ev.stopPropagation(); const l = carrito.lineas[+b.dataset.falla]; if (l.falla) { l.falla = false; delete l.fallaU; pintar(); } else marcarFalla(l); });
     $('#listas').innerHTML = listas.map(l => `<button class="${l.id === carrito.lista ? 'on' : ''}" data-l="${l.id}" title="${+l.porcentaje === 100 ? 'Precio de lista' : (+l.porcentaje < 100 ? '−' + fmt.dec(100 - l.porcentaje) : '+' + fmt.dec(l.porcentaje - 100)) + '% sobre Lista'}">${esc(l.nombre)}</button>`).join('');
@@ -420,28 +421,21 @@ APP.ready.then(async () => {
   $('#sel-vendedora').onchange = ev => carrito.vendedora = ev.target.value;
 
   // ================= Precio a mano =================
-  // Por si el precio está mal o se acuerda otro: manda sobre la lista, el descuento de la línea y las promos. Pide el permiso de descuentos.
-  function cambiarPrecio(i) {
+  // El precio por unidad es un campo en el renglón: se escribe otro y manda sobre la lista, el desc % y las promos. Pide el permiso de descuentos.
+  // Escribir el de lista (o dejarlo vacío) lo vuelve a la normalidad.
+  function ponerPrecio(i, valor) {
     const l = carrito.lineas[i]; if (!l || l.devuelta) return;
-    if (!APP.puede('descuentos')) { toast('Cambiar el precio lo habilita administración (permiso de descuentos)', 'error'); return; }
-    calcular();
-    const lista = l.precioLista, actual = l.precioManual != null ? l.precioManual : l.precioFinal;
-    const m = modal(`<h2>Cambiar el precio</h2><p class="sub">${esc([l.variante.producto_nombre, l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · '))} · de lista ${fmt.pesos(lista)}</p>
-      <div class="campo" style="margin-top:12px"><label>Precio por unidad</label><input id="cp-precio" type="number" min="0" step="1" value="${actual}" style="font:700 24px var(--f-mono);text-align:right;padding:10px 12px"></div>
-      <p class="sub" id="cp-dif" style="min-height:20px;margin:6px 0 0"></p>
-      <div class="pie">${l.precioManual != null ? '<button class="btn" data-lista style="margin-right:auto">Volver al de lista</button>' : ''}<button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Aplicar <kbd>Enter</kbd></button></div>`);
-    const inp = $('#cp-precio', m);
-    const dif = () => { const v = +inp.value; $('#cp-dif', m).textContent = inp.value === '' || !(v >= 0) ? '' : v === lista ? 'Igual al de lista' : `${v < lista ? 'Rebaja' : 'Aumento'} de ${fmt.pesos(Math.abs(lista - v))} por unidad${lista ? ' (' + (v < lista ? '−' : '+') + fmt.dec(Math.abs(1 - v / lista) * 100) + '%)' : ''}${l.cantidad > 1 ? ' · ' + l.cantidad + ' u. = ' + fmt.pesos(r2(v * l.cantidad)) : ''}`; };
-    const aplicar = () => {
-      const v = r2(+inp.value); if (inp.value === '' || !(v >= 0)) { toast('Escribí el precio', 'error'); inp.focus(); return; }
-      if (v === lista) delete l.precioManual; else { l.precioManual = v; l.descPct = 0; }
-      m.cerrar(); pintar(); toast(v === lista ? 'Vuelve al precio de lista' : 'Precio cambiado a ' + fmt.pesos(v)); $('#q').focus();
-    };
-    inp.oninput = dif; dif();
-    inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); aplicar(); } });
-    $('[data-si]', m).onclick = aplicar; $('[data-no]', m).onclick = () => { m.cerrar(); $('#q').focus(); };
-    const bl = $('[data-lista]', m); if (bl) bl.onclick = () => { delete l.precioManual; m.cerrar(); pintar(); toast('Vuelve al precio de lista'); $('#q').focus(); };
-    setTimeout(() => { inp.focus(); inp.select(); }, 30);
+    if (!APP.puede('descuentos')) { toast('Cambiar el precio lo habilita administración (permiso de descuentos)', 'error'); pintar(); return; }
+    const v = valor === '' ? null : r2(+valor);
+    if (v == null || !(v >= 0) || v === r2(l.precioLista)) delete l.precioManual;
+    else if (v !== r2(l.precioFinal) || l.precioManual != null) { l.precioManual = v; l.descPct = 0; }
+    pintar();
+  }
+  // F2: va al campo del precio del renglón
+  function cambiarPrecio(i) {
+    const inp = document.querySelector('#lineas [data-pu="' + i + '"]'); if (!inp) return;
+    if (inp.readOnly) { toast('Cambiar el precio lo habilita administración (permiso de descuentos)', 'error'); return; }
+    inp.focus(); inp.select();
   }
 
   // ================= Cobro =================

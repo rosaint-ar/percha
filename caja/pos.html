@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Punto de venta · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610282057">
+<link rel="stylesheet" href="../shell/shell.css?v=202610282059">
 <style>
   /* ===== Punto de venta: pantalla completa, pensada para tocar y vender rápido ===== */
   body.con-lateral{grid-template-columns:1fr}
@@ -144,7 +144,7 @@
   .rs-item.falla{background:#fff8e6;border:1px solid #f0d58f}.rs-item.sin{background:#fdecee;border:1px solid #f3c2c7}
   .rs-nota{font-size:13px;color:var(--tinta-2,#555);margin:0 0 6px}
   .aviso-stock{background:#fdecee;color:#a8323a;border-radius:999px;padding:3px 10px;font:700 11.5px var(--f-ui);text-decoration:none;white-space:nowrap}
-  .cambiable{cursor:pointer}.cambiable:hover{color:var(--acento,#70547b)}.lapiz{font-size:11px;opacity:.55}
+  .cambiable{cursor:pointer}.cambiable:hover{color:var(--acento,#70547b)}
   .matriz-pick button.actual{outline:2px solid var(--acento,#70547b);background:var(--lila,#efe8f3)}
   .cl-res{display:grid;gap:4px;margin-top:8px;max-height:50vh;overflow:auto}
   .cl-res button{display:flex;justify-content:space-between;gap:10px;border:1px solid var(--linea);background:var(--superficie-2,#fff);border-radius:10px;padding:10px 12px;cursor:pointer;text-align:left;font:600 13.5px var(--f-ui)}
@@ -276,8 +276,13 @@
   .tile-p.activa{border-color:var(--acento)!important;box-shadow:0 0 0 3px rgba(var(--acento-rgb),.22),0 10px 24px rgba(60,40,90,.12)!important;transform:translateY(-2px)}
   #cant-pend{flex:none;background:var(--acento);color:#fff;font:800 13px var(--f-mono);border-radius:8px;padding:3px 8px;animation:num-pop .35s cubic-bezier(.3,1.6,.5,1)}
   .linea.sel{background:rgba(var(--acento-rgb),.07);border-color:rgba(var(--acento-rgb),.28)!important;outline:0;box-shadow:inset 3px 0 0 var(--acento)}
-  .precio-linea{cursor:pointer;border-bottom:1px dashed rgba(var(--acento-rgb),.5);padding-bottom:1px}
-  .precio-linea:hover{color:var(--acento)}
+  .linea .t{display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+  .linea .t .pu{width:116px;height:34px;text-align:right;border:1px solid rgba(21,23,28,.12);background:#fff;border-radius:9px;padding:0 9px;font:700 15px var(--f-mono);letter-spacing:-.02em;color:var(--tinta);-moz-appearance:textfield}
+  .linea .t .pu::-webkit-outer-spin-button,.linea .t .pu::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  .linea .t .pu:focus{outline:none;border-color:var(--acento);box-shadow:0 0 0 3px rgba(var(--acento-rgb),.15)}
+  .linea .t .pu.manual{border-color:rgba(var(--acento-rgb),.55);background:var(--lila);color:var(--acento)}
+  .linea .t .pu[readonly]{border-color:transparent;background:transparent;padding:0}
+  .linea .t small{font:500 11px var(--f-mono);color:var(--tinta-3)}
   .linea .promo.manual{color:var(--acento)}
   .linea .ctrl .desc input:disabled{opacity:.45}
   .matriz-pick button:focus{outline:2px solid var(--acento);outline-offset:1px;background:var(--lila)}
@@ -370,15 +375,15 @@
 </main>
 <div id="impresion"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610282057"></script>
-<script src="../shared/canales.js?v=202610282057"></script>
-<script src="../shared/precios.js?v=202610282057"></script>
-<script src="../shell/shell.js?v=202610282057"></script>
-<script src="../shared/facturar.js?v=202610282057"></script>
-<script src="../shared/medios-pago.js?v=202610282057"></script>
-<script src="../shared/caja-fx.js?v=202610282057"></script>
-<script src="turno.js?v=202610282057"></script>
-<script src="caja.js?v=202610282057"></script>
-<script src="pos.js?v=202610282057"></script>
+<script src="../shared/supabase.js?v=202610282059"></script>
+<script src="../shared/canales.js?v=202610282059"></script>
+<script src="../shared/precios.js?v=202610282059"></script>
+<script src="../shell/shell.js?v=202610282059"></script>
+<script src="../shared/facturar.js?v=202610282059"></script>
+<script src="../shared/medios-pago.js?v=202610282059"></script>
+<script src="../shared/caja-fx.js?v=202610282059"></script>
+<script src="turno.js?v=202610282059"></script>
+<script src="caja.js?v=202610282059"></script>
+<script src="pos.js?v=202610282059"></script>
 </body>
 </html>
