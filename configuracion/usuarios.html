@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Usuarios · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610281757">
+<link rel="stylesheet" href="../shell/shell.css?v=202610281800">
 <style>
   .pestanas{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
   .pestanas a{font:600 13px var(--f-ui);color:var(--tinta);text-decoration:none;padding:8px 14px;border:1px solid var(--linea);background:var(--superficie-2);border-radius:10px}
@@ -23,8 +23,8 @@
   </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610281757"></script>
-<script src="../shell/shell.js?v=202610281757"></script>
+<script src="../shared/supabase.js?v=202610281800"></script>
+<script src="../shell/shell.js?v=202610281800"></script>
 <script>
 APP.ready.then(async () => {
   const { esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -63,7 +63,7 @@ APP.ready.then(async () => {
   async function cargar() {
     const { data } = await sb.from('empresa_usuarios').select('*').eq('empresa_id', e).order('nombre');
     let pines = {}; try { const r = await sb.rpc('pin_equipos_contar', { e }); (r.data || []).forEach(x => pines[x.user_id] = x.equipos); } catch (_) { }
-    let correos = {}; try { correos = (await llamar({ accion: 'listar' })).correos || {}; } catch (_) { correos = { [APP.user.id]: APP.user.email }; }
+    let correos = {}; try { correos = (await llamar({ accion: 'listar' })).correos || {}; } catch (err) { correos = { [APP.user.id]: APP.user.email }; toast('No pude traer los correos: ' + err.message, 'error'); }
     const tb = $('#tb'); tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());
     (data || []).forEach(u => tb.insertAdjacentHTML('beforeend', `<tr data-id="${u.user_id}"><td>${esc(u.nombre)}${u.user_id === APP.user.id ? ' <span class="chip">vos</span>' : ''}</td><td style="white-space:nowrap">${correos[u.user_id] ? esc(correos[u.user_id]) : '<small style="color:var(--suave)">—</small>'} <button class="btn chico" data-mail title="Cambiar el correo con el que entra">✎</button></td>
       <td><select data-rol ${u.user_id === APP.user.id ? 'disabled' : ''}>${Object.entries(ROLES).map(([k, v]) => `<option value="${k}" ${u.rol === k ? 'selected' : ''}>${v}</option>`).join('')}</select></td>
