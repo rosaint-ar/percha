@@ -385,8 +385,8 @@ APP.ready.then(async () => {
   // el selector de canal de la venta: Local, WhatsApp y cada conexión de la empresa (genérico)
   async function armarCanales() {
     const sel = document.getElementById('sel-origen'); if (!sel || !window.CANALES) return;
-    const lista = await CANALES.cargar(e), actual = sel.value;
-    sel.innerHTML = lista.map(x => `<option value="${x.k}">${esc(x.n)}</option>`).join('') + '<option value="online">Otra venta online</option>';
+    const lista = CANALES.activos(await CANALES.cargar(e)), actual = sel.value;
+    sel.innerHTML = lista.map(x => `<option value="${x.k}">${esc(x.n)}</option>`).join('') + (lista.some(x => x.k === 'online') ? '' : '<option value="online">Otra venta online</option>');
     sel.value = lista.some(x => x.k === actual) ? actual : 'local';
     sel.onchange = () => pintar();
   }
@@ -583,7 +583,7 @@ APP.ready.then(async () => {
       <div class="campo"><label>Contacto</label><input id="en-con" value="${esc(act.contacto || (cli && cli.telefono) || '')}" placeholder="Teléfono o quién recibe"></div>
       <div class="pie">${carrito.envio ? '<button class="btn" data-quitar style="margin-right:auto">Sin entrega</button>' : ''}<button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Listo</button></div>`);
     const marcar = () => { $$('[data-me]', m).forEach(b => b.classList.toggle('primario', !!sel && b.dataset.me === sel.id)); $('#en-dir-c', m).style.display = sel && !sel.pide_direccion ? 'none' : ''; };
-    $$('[data-me]', m).forEach(b => b.onclick = () => { sel = metodosEnvio.find(x => x.id === b.dataset.me); $('#en-costo', m).value = sel.costo || 0; marcar(); });
+    $$('[data-me]', m).forEach(b => b.onclick = () => { sel = metodosEnvio.find(x => x.id === b.dataset.me); const ci = $('#en-costo', m); ci.value = sel.tipo === 'cadete' ? '' : (sel.costo || 0); marcar(); if (sel.tipo === 'cadete') { ci.placeholder = 'Lo que cobra el cadete'; ci.focus(); } });   // el cadete se carga en el momento
     marcar();
     $('[data-no]', m).onclick = () => m.cerrar();
     const q = $('[data-quitar]', m); if (q) q.onclick = () => { carrito.envio = null; const l = lineaEnvio(); if (l) carrito.lineas.splice(carrito.lineas.indexOf(l), 1); m.cerrar(); pintarEntrega(); pintar(); };

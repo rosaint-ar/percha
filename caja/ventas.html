@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ventas · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610281716">
+<link rel="stylesheet" href="../shell/shell.css?v=202610281723">
 <style>
   .filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
   .filtros input[type=date],.filtros select{border:1px solid var(--linea);background:var(--superficie-2);padding:8px 10px;border-radius:var(--radio-mini)}
@@ -36,6 +36,7 @@
   #impresion{display:none}
   @media print{body.con-lateral>*{display:none!important}#impresion{display:block!important;font:12px/1.35 var(--f-mono);color:#000;width:72mm;padding:2mm}#impresion h2{font:700 15px var(--f-ui);margin:0 0 2px}#impresion .c{text-align:center}#impresion .r{text-align:right}#impresion table{width:100%;border-collapse:collapse}#impresion td{padding:2px 0;vertical-align:top}#impresion hr{border:0;border-top:1px dashed #000;margin:6px 0}@page{size:80mm auto;margin:0}}
   .aviso-revisar{margin-left:auto;align-self:center;font:600 12.5px var(--f-ui);color:var(--error);background:var(--error-fondo);border-radius:999px;padding:6px 12px;text-decoration:none;white-space:nowrap}
+  .canal-edit{cursor:pointer;white-space:nowrap}.canal-edit small{opacity:.45}.canal-edit:hover small{opacity:1}
 </style>
 </head>
 <body data-page="ventas" data-etq="Caja" data-title="Ventas" data-subtitle="Tickets, señas, cambios y cierres de caja">
@@ -53,9 +54,10 @@
 </main>
 <div id="impresion"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610281716"></script>
-<script src="../shell/shell.js?v=202610281716"></script>
-<script src="../shared/facturar.js?v=202610281716"></script>
+<script src="../shared/supabase.js?v=202610281723"></script>
+<script src="../shared/canales.js?v=202610281723"></script>
+<script src="../shell/shell.js?v=202610281723"></script>
+<script src="../shared/facturar.js?v=202610281723"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -64,8 +66,16 @@ APP.ready.then(async () => {
   const ESTADO = { completada: '<span class="chip ok">completada</span>', senada: '<span class="chip aviso">señada</span>', anulada: '<span class="chip error">anulada</span>' };
   const TIPO = { venta: '', cambio: ' <span class="chip">cambio</span>', devolucion: ' <span class="chip">devolución</span>' };
   const ORIGEN = { local: 'Local', whatsapp: 'WhatsApp', tiendanube: 'Tienda Nube', mercadolibre: 'Mercado Libre', online: 'Online', factusol: 'FactuSOL' };
-  const ONLINE = ['whatsapp', 'tiendanube', 'mercadolibre', 'online'];
-  const canal = o => `<span class="canal ${esc(o || 'local')}">${esc(ORIGEN[o] || o || 'Local')}</span>`;
+  // canales (etiquetas): Configuración › Canales de venta; se cambian tocando la etiqueta
+  const CANL = await CANALES.cargar(e);
+  const ONLINE = CANL.filter(x => x.online).map(x => x.k).concat(['mercadolibre', 'online']);
+  const canal = o => CANALES.chip(CANL, o);
+  const canalEditable = (id, o) => `<span class="canal-edit" data-canal="${id}" title="Cambiar el canal">${canal(o)} <small>✎</small></span>`;
+  async function cambiarCanal(id, actual, alTerminar) {
+    const m = modal(`<h2>Canal de la venta</h2><p class="sub">Se pone solo (caja = Local, pedidos de la web = Tienda Nube); acá se corrige. Los canales se crean en Configuración › Canales de venta.</p><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px">${CANALES.activos(CANL).map(c => `<button class="btn${c.k === actual ? ' primario' : ''}" data-k="${esc(c.k)}">${esc(c.n)}</button>`).join('')}</div><div class="pie"><button class="btn" data-no>Cancelar</button></div>`);
+    $('[data-no]', m).onclick = () => m.cerrar();
+    $$('[data-k]', m).forEach(b => b.onclick = async () => { if (b.dataset.k === actual) { m.cerrar(); return; } const r = await sb.rpc('venta_cambiar_canal', { p_venta: id, p_clave: b.dataset.k }); if (r.error) { toast(mensajeError(r.error), 'error'); return; } m.cerrar(); toast('Canal cambiado'); alTerminar && alTerminar(); });
+  }
   const r2 = n => Math.round((+n || 0) * 100) / 100;
   let vendedoras = null, clientes = null, formas = null;
   async function cargarApoyo() {
@@ -89,14 +99,15 @@ APP.ready.then(async () => {
       <div class="tile destacada"><div class="t">Vendido</div><div class="n">${fmt.pesos(total)}</div><div class="d">ticket promedio ${fmt.pesos(ok.length ? total / ok.length : 0)}</div></div>
       <div class="tile"><div class="t">Prendas</div><div class="n">${fmt.num(ok.reduce((s, x) => s + +x.lineas, 0))}</div><div class="d">líneas vendidas</div></div>
       ${APP.puede('costos') ? `<div class="tile"><div class="t">Margen bruto</div><div class="n">${total ? fmt.pct(100 * (total - costo) / total) : '—'}</div><div class="d">${fmt.pesos(total - costo)} de ganancia</div></div>` : ''}`;
-    const tb = $('#tb tbody'); tb.innerHTML = v.map(x => `<tr class="clic" data-id="${x.id}"><td class="mono">#${String(x.numero).padStart(6, '0')}${TIPO[x.tipo] || ''}</td><td>${fmt.fechaHora(x.fecha)}</td><td>${canal(x.origen)}</td><td>${esc(x.cliente_nombre || '—')}</td><td>${esc(x.vendedora_nombre || '—')}</td><td><small>${esc(x.pagos || '')}</small></td><td class="num num-f">${fmt.pesos(x.total)}</td><td>${ESTADO[x.estado] || x.estado}</td><td>${FACTURA.chip(x) || (x.estado === 'completada' && facturaLista ? `<button class="btn chico" data-fact="${x.id}">Facturar</button>` : '')}</td><td><button class="btn chico" data-ver="${x.id}">Ver</button></td></tr>`).join('') || '<tr><td colspan="10" class="vacio">Sin ventas en ese período.</td></tr>';
+    const tb = $('#tb tbody'); tb.innerHTML = v.map(x => `<tr class="clic" data-id="${x.id}"><td class="mono">#${String(x.numero).padStart(6, '0')}${TIPO[x.tipo] || ''}</td><td>${fmt.fechaHora(x.fecha)}</td><td>${canalEditable(x.id, x.origen)}</td><td>${esc(x.cliente_nombre || '—')}</td><td>${esc(x.vendedora_nombre || '—')}</td><td><small>${esc(x.pagos || '')}</small></td><td class="num num-f">${fmt.pesos(x.total)}</td><td>${ESTADO[x.estado] || x.estado}</td><td>${FACTURA.chip(x) || (x.estado === 'completada' && facturaLista ? `<button class="btn chico" data-fact="${x.id}">Facturar</button>` : '')}</td><td><button class="btn chico" data-ver="${x.id}">Ver</button></td></tr>`).join('') || '<tr><td colspan="10" class="vacio">Sin ventas en ese período.</td></tr>';
     $$('[data-ver]', tb).forEach(b => b.onclick = () => verVenta(b.dataset.ver));
+    $$('[data-canal]', tb).forEach(b => b.onclick = ev => { ev.stopPropagation(); const x = v.find(y => y.id === b.dataset.canal); cambiarCanal(x.id, x.origen, cargar); });
     $$('[data-fact]', tb).forEach(b => b.onclick = ev => { ev.stopPropagation(); FACTURA.abrir(v.find(x => x.id === b.dataset.fact), { alTerminar: cargar }); });
     $('#resumen').textContent = `${v.length} tickets`;
   }
   async function verVenta(id) {
     const [{ data: v }, { data: ls }, { data: ps }] = await Promise.all([sb.from('v_ventas').select('*').eq('id', id).single(), sb.from('venta_lineas').select('*').eq('venta_id', id).order('id'), sb.from('venta_pagos').select('*, formas_pago(nombre), creditos(codigo,tipo)').eq('venta_id', id)]);
-    const m = modal(`<h2>Ticket #${String(v.numero).padStart(6, '0')} ${ESTADO[v.estado]} ${canal(v.origen)}</h2><p class="sub">${fmt.fechaHora(v.fecha)} · ${v.vendedora_nombre ? 'atendió ' + esc(v.vendedora_nombre) : 'sin vendedora'}${v.cliente_nombre ? ' · ' + esc(v.cliente_nombre) : ''}${v.referencia ? ' · ref. ' + esc(v.referencia) : ''}${v.nota ? ' · ' + esc(v.nota) : ''}${v.anulada_motivo ? ' · anulada: ' + esc(v.anulada_motivo) : ''}</p>
+    const m = modal(`<h2>Ticket #${String(v.numero).padStart(6, '0')} ${ESTADO[v.estado]} ${canalEditable(v.id, v.origen)}</h2><p class="sub">${fmt.fechaHora(v.fecha)} · ${v.vendedora_nombre ? 'atendió ' + esc(v.vendedora_nombre) : 'sin vendedora'}${v.cliente_nombre ? ' · ' + esc(v.cliente_nombre) : ''}${v.referencia ? ' · ref. ' + esc(v.referencia) : ''}${v.nota ? ' · ' + esc(v.nota) : ''}${v.anulada_motivo ? ' · anulada: ' + esc(v.anulada_motivo) : ''}</p>
       <table class="lista detalle" style="margin-top:10px">${ls.map(l => `<tr><td>${l.cantidad}× ${esc(l.descripcion)}${l.falla ? ' <span title="Prenda con falla" style="color:#8a6400">◆</span>' : ''}<br><small>${esc([l.talle, l.color].filter(Boolean).join(' · '))}${l.promocion_nombre ? ' · ★ ' + esc(l.promocion_nombre) : ''}${l.descuento_pct ? ' · −' + l.descuento_pct + '%' : ''}</small></td><td class="num">${fmt.pesos(l.total)}</td></tr>`).join('')}
       ${+v.descuento ? `<tr><td>Descuento ${v.descuento_pct}%</td><td class="num">−${fmt.pesos(v.descuento)}</td></tr>` : ''}${+v.recargo ? `<tr><td>Recargo</td><td class="num">${fmt.pesos(v.recargo)}</td></tr>` : ''}
       <tr><td><b>Total</b></td><td class="num num-f">${fmt.pesos(v.total)}</td></tr>
@@ -105,6 +116,7 @@ APP.ready.then(async () => {
       ${v.factura_id || (v.estado === 'completada' && facturaLista) ? `<div class="aviso-caja ${v.factura_estado === 'autorizado' ? 'ok' : v.factura_estado === 'rechazado' ? 'error' : 'info'}" style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px"><span>${v.factura_estado === 'autorizado' ? 'Factura ' + esc(v.factura_numero) + (v.nc_id ? (v.nc_estado === 'autorizado' ? ' · anulada con nota de crédito' : ' · nota de crédito en cola') : '') : v.factura_estado === 'pendiente' ? 'Factura en cola: sale sola apenas ARCA responda' : v.factura_estado === 'rechazado' ? 'ARCA rechazó la factura' : 'Sin factura'}</span><span style="display:flex;gap:6px">${v.factura_estado === 'autorizado' ? `<a class="btn chico" target="_blank" href="${FACTURA.urlFactura(v.factura_id)}">Ver factura</a>${v.nc_id && v.nc_estado === 'autorizado' ? `<a class="btn chico" target="_blank" href="${FACTURA.urlFactura(v.nc_id)}">Ver nota de crédito</a>` : ''}` : v.estado === 'completada' && v.factura_estado !== 'pendiente' ? `<button class="btn chico primario" data-facturar>${v.factura_estado === 'rechazado' ? 'Volver a facturar' : 'Facturar'}</button>` : ''}</span></div>` : ''}
       <div class="pie" style="justify-content:space-between"><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn" data-print>Reimprimir</button>${v.estado !== 'anulada' ? `<button class="btn primario" data-editar>Editar</button><a class="btn" href="caja.html?cambio=${v.numero}">Cambio / devolución</a>` : ''}</div>
       ${v.estado !== 'anulada' ? '<button class="btn peligro" data-anular>Anular</button>' : ''}</div>`);
+    { const ce = $('[data-canal]', m); if (ce) ce.onclick = () => cambiarCanal(v.id, v.origen, () => { m.cerrar(); cargar(); }); }
     $('[data-print]', m).onclick = () => { imprimir(v, ls, ps); window.print(); };
     const bf = $('[data-facturar]', m); if (bf) bf.onclick = () => { m.cerrar(); FACTURA.abrir(v, { alTerminar: cargar }); };
     const ed = $('[data-editar]', m); if (ed) ed.onclick = () => { m.cerrar(); editarVenta(v, ls, ps); };
