@@ -108,7 +108,7 @@
         const dif = arqueo.reduce((s, a) => s + a.diferencia, 0);
         fx().telon({ tipo: 'cerrar', emoji: '🌙', titulo: `¡Buen trabajo${nombrePila() ? ', ' + nombrePila() : ''}!`, monto: +esp.total,
           texto: `${esp.ventas} venta${esp.ventas === 1 ? '' : 's'} en este turno${Math.abs(dif) < 1 ? ' · la caja cuadró perfecto ✓' : ''}${queda != null ? ' · quedan ' + fmt.pesos(queda) + ' para mañana' : ''}.`,
-          botones: [['Imprimir resumen', () => imprimirCierre(caja, Object.assign({}, turno, { cerrado: new Date().toISOString() }), esp, arqueo, queda, nombrePila())], ['Listo', null, true]] });
+          botones: [['Imprimir resumen', () => imprimirCierre(caja, Object.assign({}, turno, { cerrado: new Date().toISOString() }), Object.assign({}, esp, { medios: filas.filter(f => f.ventas).map(f => ({ nombre: f.nombre, monto: f.tipo === 'efectivo' ? f.esperado - esp.efectivo_inicial - esp.movimientos : f.esperado })) }), arqueo, queda, nombrePila())], ['Listo', null, true]] });
       };
     });
   }
@@ -120,6 +120,7 @@
     el.innerHTML = `<h2 class="c">${esc(emp.nombre || '')}</h2><div class="c">CIERRE DE CAJA · ${esc(caja.nombre)}</div><hr>
       <div>Abrió: ${f(t.abierto)}<br>Cerró: ${f(t.cerrado || new Date())}${quien ? '<br>Responsable: ' + esc(quien) : ''}</div><hr>
       <table><tr><td>Ventas</td><td class="r">${esp.ventas}</td></tr><tr><td><b>Vendido</b></td><td class="r"><b>${fmt.pesos(esp.total)}</b></td></tr><tr><td>Efectivo inicial</td><td class="r">${fmt.pesos(esp.efectivo_inicial)}</td></tr><tr><td>Ingresos/retiros</td><td class="r">${fmt.pesos(esp.movimientos)}</td></tr></table><hr>
+      ${(esp.medios || []).length ? `<div><b>Cobrado por medio</b></div><table>${esp.medios.map(x => `<tr><td>${esc(x.nombre)}</td><td class="r">${fmt.pesos(x.monto)}</td></tr>`).join('')}</table><hr>` : ''}
       <table><tr><td><b>Medio</b></td><td class="r"><b>Esperado</b></td><td class="r"><b>Contado</b></td></tr>${(arqueo || []).map(a => `<tr><td>${esc(a.nombre)}</td><td class="r">${fmt.pesos(a.esperado)}</td><td class="r">${fmt.pesos(a.declarado)}${Math.abs(a.diferencia) >= 1 ? ' (' + (a.diferencia > 0 ? '+' : '') + fmt.pesos(a.diferencia) + ')' : ''}</td></tr>`).join('')}</table>
       ${queda != null ? `<hr><table><tr><td>Queda en caja</td><td class="r">${fmt.pesos(queda)}</td></tr></table>` : ''}`;
     setTimeout(() => window.print(), 50);
