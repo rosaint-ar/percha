@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Usuarios · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610281730">
+<link rel="stylesheet" href="../shell/shell.css?v=202610281740">
 <style>
   .pestanas{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
   .pestanas a{font:600 13px var(--f-ui);color:var(--tinta);text-decoration:none;padding:8px 14px;border:1px solid var(--linea);background:var(--superficie-2);border-radius:10px}
@@ -23,8 +23,8 @@
   </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610281730"></script>
-<script src="../shell/shell.js?v=202610281730"></script>
+<script src="../shared/supabase.js?v=202610281740"></script>
+<script src="../shell/shell.js?v=202610281740"></script>
 <script>
 APP.ready.then(async () => {
   const { esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -62,8 +62,9 @@ APP.ready.then(async () => {
   }
   async function cargar() {
     const { data } = await sb.from('empresa_usuarios').select('*').eq('empresa_id', e).order('nombre');
+    let correos = {}; try { correos = (await llamar({ accion: 'listar' })).correos || {}; } catch (_) { correos = { [APP.user.id]: APP.user.email }; }
     const tb = $('#tb'); tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());
-    (data || []).forEach(u => tb.insertAdjacentHTML('beforeend', `<tr data-id="${u.user_id}"><td>${esc(u.nombre)}${u.user_id === APP.user.id ? ' <span class="chip">vos</span>' : ''}</td><td>${u.user_id === APP.user.id ? esc(APP.user.email) : '<small style="color:var(--suave)">—</small>'}</td>
+    (data || []).forEach(u => tb.insertAdjacentHTML('beforeend', `<tr data-id="${u.user_id}"><td>${esc(u.nombre)}${u.user_id === APP.user.id ? ' <span class="chip">vos</span>' : ''}</td><td style="white-space:nowrap">${correos[u.user_id] ? esc(correos[u.user_id]) : '<small style="color:var(--suave)">—</small>'} <button class="btn chico" data-mail title="Cambiar el correo con el que entra">✎</button></td>
       <td><select data-rol ${u.user_id === APP.user.id ? 'disabled' : ''}>${Object.entries(ROLES).map(([k, v]) => `<option value="${k}" ${u.rol === k ? 'selected' : ''}>${v}</option>`).join('')}</select></td>
       <td><small>${esc(resumen(u))}</small>${u.permisos && Object.keys(u.permisos).length ? ' <span class="chip aviso">a medida</span>' : ''}</td>
       <td><select data-activo ${u.user_id === APP.user.id ? 'disabled' : ''}><option value="true" ${u.activo ? 'selected' : ''}>Sí</option><option value="false" ${!u.activo ? 'selected' : ''}>No</option></select></td>
@@ -73,9 +74,27 @@ APP.ready.then(async () => {
       const tr = sel.closest('tr'); const r = await sb.from('empresa_usuarios').update({ rol: $('[data-rol]', tr).value, activo: $('[data-activo]', tr).value === 'true' }).eq('empresa_id', e).eq('user_id', tr.dataset.id);
       toast(r.error ? mensajeError(r.error) : 'Guardado', r.error ? 'error' : ''); cargar();
     });
-    $$('[data-clave]', tb).forEach(b => b.onclick = async () => {
-      const tr = b.closest('tr'); if (!await confirmar('Se genera una contraseña nueva y la anterior deja de servir. ¿Seguimos?', 'Generar')) return;
-      try { const j = await llamar({ accion: 'resetear', user_id: tr.dataset.id }); mostrarClave($('td', tr).textContent, j.password); } catch (err) { toast(err.message, 'error'); }
+    // contraseña: la escribe administración (o se genera una); la anterior deja de servir
+    $$('[data-clave]', tb).forEach(b => b.onclick = () => {
+      const tr = b.closest('tr'), nombre = (data.find(u => u.user_id === tr.dataset.id) || {}).nombre || '';
+      const m = modal(`<h2>Contraseña de ${esc(nombre)}</h2><p class="sub">La anterior deja de servir. Al menos 8 caracteres.</p>
+        <div class="campo"><label>Contraseña nueva</label><div style="display:flex;gap:6px"><input id="pw-1" type="password" autocomplete="new-password" style="flex:1"><button type="button" class="btn chico" id="pw-ver">Ver</button></div></div>
+        <div class="pie"><button class="btn" data-gen style="margin-right:auto">Generar una</button><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Guardar</button></div>`);
+      $('#pw-ver', m).onclick = () => { const i = $('#pw-1', m); i.type = i.type === 'password' ? 'text' : 'password'; };
+      $('[data-no]', m).onclick = () => m.cerrar();
+      $('[data-si]', m).onclick = async () => { const pw = $('#pw-1', m).value; if (pw.length < 8) { toast('Al menos 8 caracteres', 'error'); return; }
+        try { await llamar({ accion: 'resetear', user_id: tr.dataset.id, password: pw }); m.cerrar(); toast(`Contraseña de ${nombre} cambiada`); } catch (err) { toast(err.message, 'error'); } };
+      $('[data-gen]', m).onclick = async () => { try { const j = await llamar({ accion: 'resetear', user_id: tr.dataset.id }); m.cerrar(); mostrarClave(nombre, j.password); } catch (err) { toast(err.message, 'error'); } };
+      setTimeout(() => $('#pw-1', m).focus(), 30);
+    });
+    // correo con el que entra
+    $$('[data-mail]', tb).forEach(b => b.onclick = () => {
+      const tr = b.closest('tr'), nombre = (data.find(u => u.user_id === tr.dataset.id) || {}).nombre || '';
+      const m = modal(`<h2>Correo de ${esc(nombre)}</h2><p class="sub">Con este correo entra al sistema. La contraseña no cambia.</p>
+        <div class="campo"><label>Correo</label><input id="ml-1" type="email" value="${esc(correos[tr.dataset.id] || '')}"></div>
+        <div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Guardar</button></div>`);
+      $('[data-no]', m).onclick = () => m.cerrar();
+      $('[data-si]', m).onclick = async () => { try { await llamar({ accion: 'email', user_id: tr.dataset.id, email: $('#ml-1', m).value }); m.cerrar(); toast('Correo cambiado'); cargar(); } catch (err) { toast(err.message, 'error'); } };
     });
   }
   function mostrarClave(nombre, clave) {
