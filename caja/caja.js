@@ -130,7 +130,7 @@ APP.ready.then(async () => {
     if (res.exacta) { cont.innerHTML = ''; return; }
     cont.innerHTML = res.productos.map(([pid, vars]) => {
       const v0 = vars[0], st = vars.reduce((s, v) => s + (+v.stock || 0), 0), unico = vars.length === 1 && !v0.talle && !v0.color;
-      return `<div class="res" data-pid="${pid}"><div class="nom">${esc(v0.producto_nombre)}</div><div class="cod">${esc(v0.producto_codigo)} · ${unico ? 'único' : vars.length + ' variantes'}</div><div class="pre">${fmt.pesos(precioLista(v0))}</div><span class="st chip ${st > 0 ? 'ok' : 'gris'}">${fmt.num(st)}</span></div>`;
+      return `<div class="res" data-pid="${pid}"><div class="nom">${esc(v0.producto_nombre)}</div><div class="cod">${esc(v0.producto_codigo)} · ${unico ? 'único' : vars.length + ' variantes'}</div><div class="pre">${precioProducto(vars)}</div><span class="st chip ${st > 0 ? 'ok' : 'gris'}">${fmt.num(st)}</span></div>`;
     }).join('') || '<div class="vacio">Nada con ese nombre.</div>';
     $$('.res', cont).forEach(el => el.onclick = () => elegirProducto(el.dataset.pid));
   }
@@ -302,6 +302,12 @@ APP.ready.then(async () => {
     return PRECIOS.calcular(v, listaId || (lc ? lc.id : carrito.lista), pctx, { canal: o, categoria_id: p.categoria_id, tipo: p.tipo || v.producto_tipo });
   }
   function precioLista(v, listaId) { return precioDe(v, listaId).precio; }
+  // Precio de un producto para mostrar (tarjetas y resultados): el de sus variantes con stock, no el de la primera.
+  // Si los colores tienen precios distintos (cada uno es otra publicación en la web), "desde" el menor.
+  function precioProducto(vars) {
+    const conStock = vars.filter(v => +v.stock > 0), ps = (conStock.length ? conStock : vars).map(v => precioLista(v)), min = Math.min(...ps);
+    return (ps.some(p => p !== min) ? 'desde ' : '') + fmt.pesos(min);
+  }
   function agregar(v, cantidad) {
     if (!v) return;
     if (cantidad == null) cantidad = (APP.caja && APP.caja.tomarCantidad && APP.caja.tomarCantidad()) || 1;   // el teclado del POS puede dejar una cantidad lista
@@ -345,7 +351,7 @@ APP.ready.then(async () => {
   function pintarRecientes() {
     const ids = JSON.parse(localStorage.getItem(LS('recientes')) || '[]'), cont = $('#recientes');
     const items = ids.map(pid => catalogo.find(v => v.producto_id === pid)).filter(Boolean);
-    cont.innerHTML = items.length ? `<h3>Recientes</h3><div class="resultados">${items.map(v0 => `<div class="res" data-pid="${v0.producto_id}"><div class="nom">${esc(v0.producto_nombre)}</div><div class="cod">${esc(v0.producto_codigo)}</div><div class="pre">${fmt.pesos(precioLista(v0))}</div></div>`).join('')}</div>` : '';
+    cont.innerHTML = items.length ? `<h3>Recientes</h3><div class="resultados">${items.map(v0 => `<div class="res" data-pid="${v0.producto_id}"><div class="nom">${esc(v0.producto_nombre)}</div><div class="cod">${esc(v0.producto_codigo)}</div><div class="pre">${precioProducto(catalogo.filter(v => v.producto_id === v0.producto_id))}</div></div>`).join('')}</div>` : '';
     $$('.res', cont).forEach(el => el.onclick = () => elegirProducto(el.dataset.pid));
   }
 
@@ -791,7 +797,7 @@ APP.ready.then(async () => {
   // ================= Arranque =================
   // lo que el POS (pos.js) necesita de la caja: catálogo en memoria, carrito y acciones
   APP.caja = { get catalogo() { return catalogo; }, get productos() { return productos; }, get carrito() { return carrito; }, get turno() { return turno; }, get listas() { return listas; },
-    agregar, elegirProducto, pintar, precioLista, cambiarPrecio, cobrar, calcular: () => calcular(), buscar, abrirTurno, cerrarTurno, movimientoCaja, pintarEstado, colaPendiente, sincronizar, buscadorPick, pintarAvisosStock, revisarStock };
+    agregar, elegirProducto, pintar, precioLista, precioProducto, cambiarPrecio, cobrar, calcular: () => calcular(), buscar, abrirTurno, cerrarTurno, movimientoCaja, pintarEstado, colaPendiente, sincronizar, buscadorPick, pintarAvisosStock, revisarStock };
   // Recordatorio: prendas vendidas sin stock en el sistema (o sin marcar la falla) que hay que corregir
   // Pendientes (prendas sin definir, stock para revisar): la píldora va en el ticket porque el POS no tiene barra superior
   function pintarAvisosStock() {
