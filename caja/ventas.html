@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ventas · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610281723">
+<link rel="stylesheet" href="../shell/shell.css?v=202610281730">
 <style>
   .filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
   .filtros input[type=date],.filtros select{border:1px solid var(--linea);background:var(--superficie-2);padding:8px 10px;border-radius:var(--radio-mini)}
@@ -37,13 +37,14 @@
   @media print{body.con-lateral>*{display:none!important}#impresion{display:block!important;font:12px/1.35 var(--f-mono);color:#000;width:72mm;padding:2mm}#impresion h2{font:700 15px var(--f-ui);margin:0 0 2px}#impresion .c{text-align:center}#impresion .r{text-align:right}#impresion table{width:100%;border-collapse:collapse}#impresion td{padding:2px 0;vertical-align:top}#impresion hr{border:0;border-top:1px dashed #000;margin:6px 0}@page{size:80mm auto;margin:0}}
   .aviso-revisar{margin-left:auto;align-self:center;font:600 12.5px var(--f-ui);color:var(--error);background:var(--error-fondo);border-radius:999px;padding:6px 12px;text-decoration:none;white-space:nowrap}
   .canal-edit{cursor:pointer;white-space:nowrap}.canal-edit small{opacity:.45}.canal-edit:hover small{opacity:1}
+  .periodos{display:inline-flex;gap:4px}.periodos button{border:1px solid var(--linea);background:var(--superficie-2);border-radius:999px;padding:6px 12px;font:600 12.5px var(--f-ui);cursor:pointer;color:var(--tinta-2)}.periodos button.on{background:var(--acento);border-color:var(--acento);color:#fff}
 </style>
 </head>
 <body data-page="ventas" data-etq="Caja" data-title="Ventas" data-subtitle="Tickets, señas, cambios y cierres de caja">
 <main class="app">
   <div class="pestanas"><button class="on" data-t="ventas">Ventas</button><button data-t="senas">Señas pendientes</button><button data-t="cierres">Cierres de caja</button><button data-t="creditos">Créditos y gift cards</button><a class="aviso-revisar" id="n-revisar" href="../catalogo/inventario.html#stock" style="display:none"></a></div>
   <section id="t-ventas">
-    <div class="filtros"><input type="date" id="f-desde"><span class="sub">a</span><input type="date" id="f-hasta"><select id="f-estado"><option value="">Todas</option><option value="completada">Completadas</option><option value="senada">Señadas</option><option value="anulada">Anuladas</option></select><select id="f-origen"><option value="">Local y online</option><option value="local">Solo local</option><option value="online">Solo online (Tienda Nube, WhatsApp…)</option><option value="tiendanube">Tienda Nube</option><option value="whatsapp">WhatsApp</option><option value="factusol">FactuSOL</option></select><span class="sub" id="resumen" style="margin-left:auto"></span></div>
+    <div class="filtros"><span class="periodos" id="f-per"><button type="button" data-per="hoy">Hoy</button><button type="button" data-per="mes" class="on">Este mes</button><button type="button" data-per="pasado">Mes pasado</button></span><input type="date" id="f-desde"><span class="sub">a</span><input type="date" id="f-hasta"><select id="f-estado"><option value="">Todas</option><option value="completada">Completadas</option><option value="senada">Señadas</option><option value="anulada">Anuladas</option></select><select id="f-origen"><option value="">Local y online</option><option value="local">Solo local</option><option value="online">Solo online (Tienda Nube, WhatsApp…)</option><option value="tiendanube">Tienda Nube</option><option value="whatsapp">WhatsApp</option><option value="factusol">FactuSOL</option></select><span class="sub" id="resumen" style="margin-left:auto"></span></div>
     <div class="sub" id="fs-estado" style="display:none;margin:-6px 0 12px;align-items:center;gap:10px"></div>
     <section class="tiles" id="tiles"></section>
     <div class="card" style="padding:0"><table class="lista" id="tb"><thead><tr><th>Ticket</th><th>Fecha</th><th>Canal</th><th>Clienta</th><th>Atendió</th><th>Pago</th><th class="num">Total</th><th>Estado</th><th>Factura</th><th></th></tr></thead><tbody></tbody></table></div>
@@ -54,15 +55,19 @@
 </main>
 <div id="impresion"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610281723"></script>
-<script src="../shared/canales.js?v=202610281723"></script>
-<script src="../shell/shell.js?v=202610281723"></script>
-<script src="../shared/facturar.js?v=202610281723"></script>
+<script src="../shared/supabase.js?v=202610281730"></script>
+<script src="../shared/canales.js?v=202610281730"></script>
+<script src="../shell/shell.js?v=202610281730"></script>
+<script src="../shared/facturar.js?v=202610281730"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
-  const hoy = new Date().toISOString().slice(0, 10);
-  $('#f-desde').value = hoy; $('#f-hasta').value = hoy;
+  // por defecto, el mes en curso (fecha de Argentina); con los botones o las fechas se elige otro período
+  const hoy = new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10);
+  const periodo = k => { const [y, mo] = hoy.split('-').map(Number); if (k === 'hoy') return [hoy, hoy]; if (k === 'pasado') { const d = new Date(Date.UTC(y, mo - 2, 1)), f = new Date(Date.UTC(y, mo - 1, 0)); return [d.toISOString().slice(0, 10), f.toISOString().slice(0, 10)]; } return [hoy.slice(0, 8) + '01', hoy]; };
+  const ponerPeriodo = k => { const [d, h] = periodo(k); $('#f-desde').value = d; $('#f-hasta').value = h; $$('#f-per button').forEach(b => b.classList.toggle('on', b.dataset.per === k)); };
+  ponerPeriodo('mes');
+  $$('#f-per button').forEach(b => b.onclick = () => { ponerPeriodo(b.dataset.per); cargar(); });
   const ESTADO = { completada: '<span class="chip ok">completada</span>', senada: '<span class="chip aviso">señada</span>', anulada: '<span class="chip error">anulada</span>' };
   const TIPO = { venta: '', cambio: ' <span class="chip">cambio</span>', devolucion: ' <span class="chip">devolución</span>' };
   const ORIGEN = { local: 'Local', whatsapp: 'WhatsApp', tiendanube: 'Tienda Nube', mercadolibre: 'Mercado Libre', online: 'Online', factusol: 'FactuSOL' };
@@ -88,7 +93,7 @@ APP.ready.then(async () => {
   let facturaLista = false;
   async function cargar() {
     facturaLista = (await FACTURA.config(e)).estado === 'listo';
-    let c = sb.from('v_ventas').select('*').eq('empresa_id', e).gte('fecha', $('#f-desde').value + 'T00:00:00').lte('fecha', $('#f-hasta').value + 'T23:59:59').order('fecha', { ascending: false }).limit(500);
+    let c = sb.from('v_ventas').select('*').eq('empresa_id', e).gte('fecha', $('#f-desde').value + 'T00:00:00-03:00').lte('fecha', $('#f-hasta').value + 'T23:59:59-03:00').order('fecha', { ascending: false }).limit(500);
     if ($('#f-estado').value) c = c.eq('estado', $('#f-estado').value);
     const fo = $('#f-origen').value; if (fo === 'online') c = c.in('origen', ONLINE); else if (fo) c = c.eq('origen', fo);
     const { data, error } = await c; if (error) { toast(mensajeError(error), 'error'); return; }
@@ -245,6 +250,7 @@ APP.ready.then(async () => {
     const { data } = await sb.from('creditos').select('*, clientes(nombre)').eq('empresa_id', e).order('creado', { ascending: false }).limit(200);
     const tb = $('#tb-creditos tbody'); tb.innerHTML = (data || []).map(c => `<tr><td class="mono">${esc(c.codigo)}</td><td>${c.tipo === 'gift_card' ? 'Gift card' : 'Nota de crédito'}</td><td>${esc(c.clientes ? c.clientes.nombre : '—')}</td><td>${fmt.fecha(c.creado)}</td><td class="num">${fmt.pesos(c.monto)}</td><td class="num num-f">${fmt.pesos(c.saldo)}</td><td><span class="chip ${c.estado === 'vigente' ? 'ok' : 'gris'}">${c.estado}</span></td></tr>`).join('') || '<tr><td colspan="7" class="vacio">No hay créditos emitidos.</td></tr>';
   }
+  ['#f-desde', '#f-hasta'].forEach(s => $(s).addEventListener('change', () => $$('#f-per button').forEach(b => b.classList.remove('on'))));
   ['#f-desde', '#f-hasta', '#f-estado', '#f-origen'].forEach(s => $(s).addEventListener('change', cargar));
   // FactuSOL: mientras el local siga cargando ahí, el script "Sincronizar FactuSOL" (PC de Diego) trae los remitos y acá se ve hasta dónde llegó
   async function estadoFactusol() {
