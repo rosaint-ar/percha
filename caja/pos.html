@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Punto de venta · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610282046">
+<link rel="stylesheet" href="../shell/shell.css?v=202610282057">
 <style>
   /* ===== Punto de venta: pantalla completa, pensada para tocar y vender rápido ===== */
   body.con-lateral{grid-template-columns:1fr}
@@ -270,6 +270,25 @@
   .botonera .btn:not(.cobrar){transition:transform .12s,background .2s}
   .botonera .btn:not(.cobrar):active{transform:scale(.97)}
   @media (prefers-reduced-motion:reduce){.pos *,.pos *::before,.pos *::after,.vuela{animation:none!important;transition:none!important}}
+  /* ===== Teclado (28/10) ===== */
+  .pos kbd,.modal kbd{font:600 10.5px var(--f-mono);border:1px solid var(--linea);border-bottom-width:2px;border-radius:5px;padding:1px 5px;background:#fff;color:var(--tinta-3);white-space:nowrap}
+  .modal .btn.primario kbd{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.35);color:#fff;margin-left:6px}
+  .tile-p.activa{border-color:var(--acento)!important;box-shadow:0 0 0 3px rgba(var(--acento-rgb),.22),0 10px 24px rgba(60,40,90,.12)!important;transform:translateY(-2px)}
+  #cant-pend{flex:none;background:var(--acento);color:#fff;font:800 13px var(--f-mono);border-radius:8px;padding:3px 8px;animation:num-pop .35s cubic-bezier(.3,1.6,.5,1)}
+  .linea.sel{background:rgba(var(--acento-rgb),.07);border-color:rgba(var(--acento-rgb),.28)!important;outline:0;box-shadow:inset 3px 0 0 var(--acento)}
+  .precio-linea{cursor:pointer;border-bottom:1px dashed rgba(var(--acento-rgb),.5);padding-bottom:1px}
+  .precio-linea:hover{color:var(--acento)}
+  .linea .promo.manual{color:var(--acento)}
+  .linea .ctrl .desc input:disabled{opacity:.45}
+  .matriz-pick button:focus{outline:2px solid var(--acento);outline-offset:1px;background:var(--lila)}
+  .mp-btn,.mp-chip{position:relative}
+  .modal kbd.num{position:absolute;top:5px;right:6px;padding:0 5px;font-size:10px;color:var(--acento);border-color:rgba(var(--acento-rgb),.35);background:#fff}
+  .modal .mp-chip kbd.num{top:-7px;right:-5px}
+  .modal:focus{outline:none}
+  .atajos{flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;padding:6px 4px 0;font:500 11.5px var(--f-ui);color:var(--tinta-3);border-top:1px solid rgba(21,23,28,.06)}
+  .atajos span{display:inline-flex;align-items:center;gap:3px;white-space:nowrap}
+  @media (max-width:1100px),(pointer:coarse){.atajos{display:none}}
+  body.reservado .pos kbd,body.reservado .modal kbd{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12)}
   /* modo reservado (oscuro), con la misma estructura */
   body.reservado{background:linear-gradient(165deg,#141118 0%,#100e14 60%,#15121b 100%)!important;background-attachment:fixed!important}
   body.reservado .arriba .buscador,body.reservado .arriba .menu,body.reservado .estado-caja .btn.chico,body.reservado .familias button:not(.on),body.reservado .btn-mas,body.reservado .botonera .btn:not(.primario){background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.09);color:var(--tinta)}
@@ -326,10 +345,11 @@
       <div style="display:flex;align-items:center;gap:8px;min-height:0"><div class="familias" id="familias" style="flex:1;min-width:0"></div><label class="filtro-stock"><input type="checkbox" id="chk-sinstock"> Mostrar sin stock</label></div>
       <div class="grilla" id="grilla"></div>
       <div id="resultados"></div><div id="recientes"></div>
+      <div class="atajos" title="Atajos de teclado"><span><kbd>/</kbd> buscar</span><span><kbd>↑↓←→</kbd> elegir</span><span><kbd>Enter</kbd> agregar</span><span><kbd>3*</kbd> cantidad</span><span><kbd>+</kbd><kbd>-</kbd> sumar / restar</span><span><kbd>Supr</kbd> quitar</span><span><kbd>Alt</kbd>+<kbd>↑↓</kbd> otro renglón</span><span><kbd>F2</kbd> precio</span><span><kbd>F4</kbd> más datos</span><span><kbd>F9</kbd> cobrar</span></div>
     </section>
     <aside class="ticket">
       <div class="cab"><h2 id="ticket-titulo">Ticket</h2><span class="sub" id="ticket-sub">Nueva venta</span><select id="sel-vendedora" title="Quién atendió"></select><button class="btn chico" id="btn-vaciar">Vaciar</button></div>
-      <div class="lineas" id="lineas"><div class="vacio-ticket"><b>Listo para vender</b><span>Tocá una prenda o escaneá el código.</span><small><kbd>/</kbd> buscar · <kbd>Ctrl</kbd>+<kbd>Enter</kbd> cobrar</small></div></div>
+      <div class="lineas" id="lineas"><div class="vacio-ticket"><b>Listo para vender</b><span>Tocá una prenda o escaneá el código.</span><small><kbd>/</kbd> buscar · <kbd>F9</kbd> cobrar</small></div></div>
       <div class="listas" id="listas"></div>
       <div class="mas" id="mas">
         <input id="sel-cliente" placeholder="Clienta (opcional)" list="dl-clientes"><datalist id="dl-clientes"></datalist>
@@ -350,15 +370,15 @@
 </main>
 <div id="impresion"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610282046"></script>
-<script src="../shared/canales.js?v=202610282046"></script>
-<script src="../shared/precios.js?v=202610282046"></script>
-<script src="../shell/shell.js?v=202610282046"></script>
-<script src="../shared/facturar.js?v=202610282046"></script>
-<script src="../shared/medios-pago.js?v=202610282046"></script>
-<script src="../shared/caja-fx.js?v=202610282046"></script>
-<script src="turno.js?v=202610282046"></script>
-<script src="caja.js?v=202610282046"></script>
-<script src="pos.js?v=202610282046"></script>
+<script src="../shared/supabase.js?v=202610282057"></script>
+<script src="../shared/canales.js?v=202610282057"></script>
+<script src="../shared/precios.js?v=202610282057"></script>
+<script src="../shell/shell.js?v=202610282057"></script>
+<script src="../shared/facturar.js?v=202610282057"></script>
+<script src="../shared/medios-pago.js?v=202610282057"></script>
+<script src="../shared/caja-fx.js?v=202610282057"></script>
+<script src="turno.js?v=202610282057"></script>
+<script src="caja.js?v=202610282057"></script>
+<script src="pos.js?v=202610282057"></script>
 </body>
 </html>

@@ -164,7 +164,7 @@ APP.ready.then(async () => {
       if (v.id !== l.variante.id) {
         const otra = carrito.lineas.find(x => x !== l && x.variante.id === v.id && !x.devuelta);
         if (otra) { otra.cantidad += l.cantidad; carrito.lineas.splice(carrito.lineas.indexOf(l), 1); }
-        else { l.variante = v; l.falla = false; delete l.fallaU; delete l.componentes; delete l.componentes_ok; }
+        else { if (v.producto_id !== l.variante.producto_id) delete l.precioManual; l.variante = v; l.falla = false; delete l.fallaU; delete l.componentes; delete l.componentes_ok; }
         recientes(v); toast('Cambiado por ' + [v.producto_nombre, v.talle_nombre, v.color_nombre].filter(Boolean).join(' · '));
       }
       m.cerrar(); pintar();
@@ -289,8 +289,8 @@ APP.ready.then(async () => {
     if (ev.key === 'Escape') { q.value = ''; pintarResultados(null); }
   });
   document.addEventListener('keydown', ev => {
-    if (ev.key === '/' && document.activeElement !== q && !ev.target.closest('.modal')) { ev.preventDefault(); q.focus(); }
-    if (ev.key === 'Enter' && ev.ctrlKey && !ev.target.closest('.modal')) { ev.preventDefault(); $('#btn-cobrar').click(); }   // por el botón: el POS puede interceptarlo
+    if (ev.key === '/' && document.activeElement !== q && !ev.target.closest('.modal') && !/^(INPUT|TEXTAREA|SELECT)$/.test(ev.target.tagName)) { ev.preventDefault(); q.focus(); }
+    if (((ev.key === 'Enter' && ev.ctrlKey) || ev.key === 'F9') && !document.querySelector('.modal-fondo')) { ev.preventDefault(); $('#btn-cobrar').click(); }   // por el botón: el POS puede interceptarlo
   });
 
   // ================= Carrito =================
@@ -367,9 +367,9 @@ APP.ready.then(async () => {
   }
   function calcular() {
     // precio base por lista, descuento de línea, luego la mejor promo por línea (sin acumular)
-    const lineas = carrito.lineas.map(l => { const pc = precioDe(l.variante), pl = pc.precio, df = l.falla ? descFalla(l) : 0; const pu = r2(pl * (1 - Math.max(l.descPct || 0, df) / 100)); return Object.assign(l, { precioLista: pl, precioBase: pc.base, rebaja: pc.rebaja, precioUnit: pu, descFalla: df, promo: null, descPromo: 0 }); });
+    const lineas = carrito.lineas.map(l => { const pc = precioDe(l.variante), pl = pc.precio, df = l.falla ? descFalla(l) : 0; const pu = l.precioManual != null ? r2(l.precioManual) : r2(pl * (1 - Math.max(l.descPct || 0, df) / 100)); return Object.assign(l, { precioLista: pl, precioBase: pc.base, rebaja: pc.rebaja, precioUnit: pu, descFalla: df, promo: null, descPromo: 0 }); });
     promos.forEach(p => {
-      const grupo = lineas.filter(l => l.cantidad > 0 && promoAplica(p, l.variante));
+      const grupo = lineas.filter(l => l.cantidad > 0 && l.precioManual == null && promoAplica(p, l.variante));
       if (!grupo.length) return;
       const unidades = grupo.reduce((s, l) => s + l.cantidad, 0);
       // escalones: vale el más alto alcanzado (3 o más: 20% · 6 o más: 30%)
@@ -396,15 +396,16 @@ APP.ready.then(async () => {
   }
   function pintar() {
     const c = calcular(), cont = $('#lineas');
-    if (!c.lineas.length) cont.innerHTML = '<div class="vacio-ticket"><b>Listo para vender</b><span>Tocá una prenda o escaneá el código.</span><small><kbd>/</kbd> buscar · <kbd>Ctrl</kbd>+<kbd>Enter</kbd> cobrar</small></div>';
+    if (!c.lineas.length) cont.innerHTML = '<div class="vacio-ticket"><b>Listo para vender</b><span>Tocá una prenda o escaneá el código.</span><small><kbd>/</kbd> buscar · <kbd>F9</kbd> cobrar</small></div>';
     else cont.innerHTML = c.lineas.map((l, i) => `<div class="linea">
-      <div><div class="n">${l.devuelta ? esc(l.variante.producto_nombre) : `<span class="cambiable" data-cambiar="${i}" title="Tocá para cambiar el talle, el color o la prenda">${esc(l.variante.producto_nombre)} <span class="lapiz">✎</span></span>`}${l.devuelta ? ' <span class="chip error">devuelve</span>' : ''}</div><div class="v">${l.devuelta ? esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || l.variante.sku || '') : `<span class="cambiable" data-cambiar="${i}">${esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || 'único')}</span>`} · ${fmt.pesos(l.precioLista)}${l.descPct ? ' −' + l.descPct + '%' : ''}${!l.devuelta && controlaStock(l.variante) && llevando(l.variante) > Math.max(+l.variante.stock || 0, 0) ? '<span class="sinstock-chip" title="El sistema dice que no hay suficiente">⚠ sin stock</span>' : ''}</div>${l.rebaja && !l.devuelta ? `<div class="promo">▼ ${esc(l.rebaja.nombre)} · antes ${fmt.pesos(l.precioBase)}</div>` : ''}${l.promo ? `<div class="promo">★ ${esc(l.promo.nombre)} · −${fmt.pesos(l.descPromo)}/u</div>` : ''}${(+l.variante.fallas > 0 || l.falla) && !l.devuelta ? `<button class="falla ${l.falla ? 'on' : ''}" data-falla="${i}" title="${l.falla ? 'Tocá para desmarcar' : esc(l.variante.falla_nota || '')}">${l.falla ? '◆ Con falla' + (l.fallaU && l.fallaU.nota ? ': ' + esc(l.fallaU.nota) : '') + (l.descFalla ? ' · ' + fmt.dec(l.descFalla) + '% off' : '') : '◆ Hay ' + fmt.num(l.variante.fallas) + ' con falla · ¿es esta?'}</button>` : ''}</div>
+      <div><div class="n">${l.devuelta ? esc(l.variante.producto_nombre) : `<span class="cambiable" data-cambiar="${i}" title="Tocá para cambiar el talle, el color o la prenda">${esc(l.variante.producto_nombre)} <span class="lapiz">✎</span></span>`}${l.devuelta ? ' <span class="chip error">devuelve</span>' : ''}</div><div class="v">${l.devuelta ? esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || l.variante.sku || '') : `<span class="cambiable" data-cambiar="${i}">${esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || 'único')}</span>`} · ${l.devuelta ? fmt.pesos(l.precioLista) : `<span class="precio-linea" data-precio="${i}" title="Cambiar el precio (F2)">${fmt.pesos(l.precioManual != null ? l.precioManual : l.precioLista)}</span>`}${l.descPct && l.precioManual == null ? ' −' + l.descPct + '%' : ''}${!l.devuelta && controlaStock(l.variante) && llevando(l.variante) > Math.max(+l.variante.stock || 0, 0) ? '<span class="sinstock-chip" title="El sistema dice que no hay suficiente">⚠ sin stock</span>' : ''}</div>${l.precioManual != null && !l.devuelta ? `<div class="promo manual">✎ Precio a mano · el de lista es ${fmt.pesos(l.precioLista)}</div>` : ''}${l.rebaja && !l.devuelta && l.precioManual == null ? `<div class="promo">▼ ${esc(l.rebaja.nombre)} · antes ${fmt.pesos(l.precioBase)}</div>` : ''}${l.promo ? `<div class="promo">★ ${esc(l.promo.nombre)} · −${fmt.pesos(l.descPromo)}/u</div>` : ''}${(+l.variante.fallas > 0 || l.falla) && !l.devuelta ? `<button class="falla ${l.falla ? 'on' : ''}" data-falla="${i}" title="${l.falla ? 'Tocá para desmarcar' : esc(l.variante.falla_nota || '')}">${l.falla ? '◆ Con falla' + (l.fallaU && l.fallaU.nota ? ': ' + esc(l.fallaU.nota) : '') + (l.descFalla ? ' · ' + fmt.dec(l.descFalla) + '% off' : '') : '◆ Hay ' + fmt.num(l.variante.fallas) + ' con falla · ¿es esta?'}</button>` : ''}</div>
       <div class="t">${fmt.pesos(l.total)}</div>
-      <div class="ctrl"><button data-i="${i}" data-d="-1">−</button><input data-i="${i}" data-q value="${l.cantidad}"><button data-i="${i}" data-d="1">+</button><span class="desc">desc % <input data-i="${i}" data-desc type="number" min="0" max="100" value="${l.descPct || 0}"></span><button class="quitar" data-i="${i}" data-x title="Quitar">×</button></div></div>`).join('');
+      <div class="ctrl"><button data-i="${i}" data-d="-1">−</button><input data-i="${i}" data-q value="${l.cantidad}"><button data-i="${i}" data-d="1">+</button><span class="desc">desc % <input data-i="${i}" data-desc type="number" min="0" max="100" value="${l.precioManual != null ? 0 : l.descPct || 0}"${l.precioManual != null ? ' disabled title="Tiene precio a mano"' : ''}></span><button class="quitar" data-i="${i}" data-x title="Quitar">×</button></div></div>`).join('');
     $$('[data-d]', cont).forEach(b => b.onclick = () => { const l = carrito.lineas[+b.dataset.i]; l.cantidad += +b.dataset.d * (l.devuelta ? -1 : 1); if ((l.devuelta ? -l.cantidad : l.cantidad) <= 0) carrito.lineas.splice(+b.dataset.i, 1); pintar(); });
     $$('[data-q]', cont).forEach(i => i.onchange = () => { const n = parseInt(i.value) || 0; const l = carrito.lineas[+i.dataset.i]; if (n === 0) carrito.lineas.splice(+i.dataset.i, 1); else l.cantidad = l.devuelta ? -Math.abs(n) : Math.abs(n); pintar(); });
     $$('[data-desc]', cont).forEach(i => i.onchange = () => { if (!APP.puede('descuentos') && +i.value > 0) { toast('Los descuentos los habilita administración', 'error'); i.value = 0; return; } carrito.lineas[+i.dataset.i].descPct = Math.min(100, Math.max(0, +i.value || 0)); pintar(); });
     $$('[data-x]', cont).forEach(b => b.onclick = () => { carrito.lineas.splice(+b.dataset.i, 1); pintar(); });
+    $$('[data-precio]', cont).forEach(el => el.onclick = ev => { ev.stopPropagation(); cambiarPrecio(+el.dataset.precio); });
     $$('[data-cambiar]', cont).forEach(el => el.onclick = ev => { ev.stopPropagation(); cambiarLinea(+el.dataset.cambiar); });
     $$('[data-falla]', cont).forEach(b => b.onclick = ev => { ev.stopPropagation(); const l = carrito.lineas[+b.dataset.falla]; if (l.falla) { l.falla = false; delete l.fallaU; pintar(); } else marcarFalla(l); });
     $('#listas').innerHTML = listas.map(l => `<button class="${l.id === carrito.lista ? 'on' : ''}" data-l="${l.id}" title="${+l.porcentaje === 100 ? 'Precio de lista' : (+l.porcentaje < 100 ? '−' + fmt.dec(100 - l.porcentaje) : '+' + fmt.dec(l.porcentaje - 100)) + '% sobre Lista'}">${esc(l.nombre)}</button>`).join('');
@@ -417,6 +418,31 @@ APP.ready.then(async () => {
   $('#btn-vaciar').onclick = async () => { if (!carrito.lineas.length || await confirmar('¿Vaciar el ticket?', 'Vaciar')) { carrito.lineas = []; carrito.cambio = null; carrito.envio = null; pintarEntrega(); carrito.descPct = 0; $('#desc-general').value = 0; $('#nota').value = ''; pintar(); } };
   $('#desc-general').onchange = ev => { if (!APP.puede('descuentos') && +ev.target.value > 0) { toast('Los descuentos los habilita administración', 'error'); ev.target.value = 0; } carrito.descPct = Math.min(100, Math.max(0, +ev.target.value || 0)); pintar(); };
   $('#sel-vendedora').onchange = ev => carrito.vendedora = ev.target.value;
+
+  // ================= Precio a mano =================
+  // Por si el precio está mal o se acuerda otro: manda sobre la lista, el descuento de la línea y las promos. Pide el permiso de descuentos.
+  function cambiarPrecio(i) {
+    const l = carrito.lineas[i]; if (!l || l.devuelta) return;
+    if (!APP.puede('descuentos')) { toast('Cambiar el precio lo habilita administración (permiso de descuentos)', 'error'); return; }
+    calcular();
+    const lista = l.precioLista, actual = l.precioManual != null ? l.precioManual : l.precioFinal;
+    const m = modal(`<h2>Cambiar el precio</h2><p class="sub">${esc([l.variante.producto_nombre, l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · '))} · de lista ${fmt.pesos(lista)}</p>
+      <div class="campo" style="margin-top:12px"><label>Precio por unidad</label><input id="cp-precio" type="number" min="0" step="1" value="${actual}" style="font:700 24px var(--f-mono);text-align:right;padding:10px 12px"></div>
+      <p class="sub" id="cp-dif" style="min-height:20px;margin:6px 0 0"></p>
+      <div class="pie">${l.precioManual != null ? '<button class="btn" data-lista style="margin-right:auto">Volver al de lista</button>' : ''}<button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Aplicar <kbd>Enter</kbd></button></div>`);
+    const inp = $('#cp-precio', m);
+    const dif = () => { const v = +inp.value; $('#cp-dif', m).textContent = inp.value === '' || !(v >= 0) ? '' : v === lista ? 'Igual al de lista' : `${v < lista ? 'Rebaja' : 'Aumento'} de ${fmt.pesos(Math.abs(lista - v))} por unidad${lista ? ' (' + (v < lista ? '−' : '+') + fmt.dec(Math.abs(1 - v / lista) * 100) + '%)' : ''}${l.cantidad > 1 ? ' · ' + l.cantidad + ' u. = ' + fmt.pesos(r2(v * l.cantidad)) : ''}`; };
+    const aplicar = () => {
+      const v = r2(+inp.value); if (inp.value === '' || !(v >= 0)) { toast('Escribí el precio', 'error'); inp.focus(); return; }
+      if (v === lista) delete l.precioManual; else { l.precioManual = v; l.descPct = 0; }
+      m.cerrar(); pintar(); toast(v === lista ? 'Vuelve al precio de lista' : 'Precio cambiado a ' + fmt.pesos(v)); $('#q').focus();
+    };
+    inp.oninput = dif; dif();
+    inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); aplicar(); } });
+    $('[data-si]', m).onclick = aplicar; $('[data-no]', m).onclick = () => { m.cerrar(); $('#q').focus(); };
+    const bl = $('[data-lista]', m); if (bl) bl.onclick = () => { delete l.precioManual; m.cerrar(); pintar(); toast('Vuelve al precio de lista'); $('#q').focus(); };
+    setTimeout(() => { inp.focus(); inp.select(); }, 30);
+  }
 
   // ================= Cobro =================
   // a qué lista pasa el ticket al cobrar con este medio: si el medio vale para todas o para la del ticket, no cambia; si no, va a la primera que admite
@@ -499,7 +525,7 @@ APP.ready.then(async () => {
         descuento_pct: carrito.descPct || 0, descuento: t.descuento, recargo: t.recargo, nota: $('#nota').value.trim() || null,
         envio: carrito.envio || null,
         venta_origen_id: carrito.cambio ? carrito.cambio.id : null, origen: ($('#sel-origen') || {}).value || 'local',
-        lineas: t.lineas.map(l => ({ variante_id: l.variante.id, producto_id: l.variante.producto_id, descripcion: l.variante.producto_nombre, talle: l.variante.talle_nombre, color: l.variante.color_nombre, cantidad: l.cantidad, precio_lista: l.precioLista, precio_unit: l.precioFinal, descuento_pct: l.descPct || 0, promocion_id: l.promo ? l.promo.id : null, promocion_nombre: l.promo ? l.promo.nombre : null, total: l.total, costo_unit: +l.variante.costo || 0, componentes: l.componentes && l.componentes.length ? l.componentes : null, falla: !!l.falla, falla_id: l.fallaU ? l.fallaU.id : null })),
+        lineas: t.lineas.map(l => ({ variante_id: l.variante.id, producto_id: l.variante.producto_id, descripcion: l.variante.producto_nombre, talle: l.variante.talle_nombre, color: l.variante.color_nombre, cantidad: l.cantidad, precio_lista: l.precioLista, precio_unit: l.precioFinal, descuento_pct: l.descPct || 0, promocion_id: l.promo ? l.promo.id : null, promocion_nombre: l.promo ? l.promo.nombre : null, total: l.total, costo_unit: +l.variante.costo || 0, componentes: l.componentes && l.componentes.length ? l.componentes : null, falla: !!l.falla, falla_id: l.fallaU ? l.fallaU.id : null, precio_manual: l.precioManual != null || undefined })),
         pagos: pagosFinal.filter(p => p.monto !== 0).map(p => ({ forma_pago_id: p.forma_pago_id || null, credito_id: p.credito_id || null, monto: p.monto, cuotas: p.cuotas || 1, recargo_pct: p.recargo_pct || 0 })),
         creditos_a_emitir
       };
@@ -666,7 +692,7 @@ APP.ready.then(async () => {
   // ================= Arranque =================
   // lo que el POS (pos.js) necesita de la caja: catálogo en memoria, carrito y acciones
   APP.caja = { get catalogo() { return catalogo; }, get productos() { return productos; }, get carrito() { return carrito; }, get turno() { return turno; }, get listas() { return listas; },
-    agregar, elegirProducto, pintar, precioLista, cobrar, calcular: () => calcular(), buscar, abrirTurno, cerrarTurno, movimientoCaja, pintarEstado, colaPendiente, sincronizar, buscadorPick, pintarAvisosStock, revisarStock };
+    agregar, elegirProducto, pintar, precioLista, cambiarPrecio, cobrar, calcular: () => calcular(), buscar, abrirTurno, cerrarTurno, movimientoCaja, pintarEstado, colaPendiente, sincronizar, buscadorPick, pintarAvisosStock, revisarStock };
   // Recordatorio: prendas vendidas sin stock en el sistema (o sin marcar la falla) que hay que corregir
   // Pendientes (prendas sin definir, stock para revisar): la píldora va en el ticket porque el POS no tiene barra superior
   function pintarAvisosStock() {

@@ -95,6 +95,8 @@ APP.ready.then(async () => {
   // Enter con una sola coincidencia exacta de talle/color la agrega directo (antes de que caja.js abra el selector)
   $('#q').addEventListener('keydown', ev => {
     if (ev.key !== 'Enter') return;
+    // con las flechas se marcó una tarjeta: Enter la agrega (o abre talle y color)
+    const act = $('#grilla .tile-p.activa'); if (act) { ev.preventDefault(); ev.stopImmediatePropagation(); toque = { r: act.getBoundingClientRect(), t: Date.now() }; act.click(); return; }
     const q = $('#q').value.trim(); if (!q || /^\d{8,}$/.test(q) || /^\d{4}$/.test(q)) return;
     const res = buscarModelos(q, (pid, vars) => conStock(pid, vars));
     if (res.length === 1 && res[0].coinciden.length === 1) { ev.preventDefault(); ev.stopImmediatePropagation(); C.agregar(res[0].coinciden[0]); $('#q').value = ''; pintarGrilla(); }
@@ -243,8 +245,8 @@ APP.ready.then(async () => {
       let k = claveLinea(l); cuenta[k] = (cuenta[k] || 0) + 1; k += '#' + cuenta[k]; ahora.set(k, Math.abs(l.cantidad));
       if (!antesLineas || !filas[i]) return;
       const a = antesLineas.get(k);
-      if (a == null) { filas[i].classList.add('entra'); destino = filas[i]; nueva = l; }
-      else if (Math.abs(l.cantidad) > a) { filas[i].classList.add('suma'); destino = filas[i]; nueva = l; }
+      if (a == null) { filas[i].classList.add('entra'); destino = filas[i]; nueva = l; selLinea = l; }
+      else if (Math.abs(l.cantidad) > a) { filas[i].classList.add('suma'); destino = filas[i]; nueva = l; selLinea = l; }
     });
     antesLineas = ahora;
     if (!destino || sinMovimiento) return;
@@ -278,6 +280,101 @@ APP.ready.then(async () => {
     ev.stopPropagation(); ev.preventDefault();
     b.closest('.linea').classList.add('sale'); setTimeout(() => { b.dataset.ya = '1'; b.click(); }, 190);
   }, true);
+
+  // ================= Teclado: vender combinando mouse y teclado =================
+  // Buscador: ↑↓←→ recorren las tarjetas y Enter agrega · "3*" antes del código o del toque = cantidad para la próxima prenda.
+  // Con el buscador vacío: + / − cambian la cantidad del renglón marcado, Supr lo quita · Alt+↑↓ marca otro renglón.
+  // F2 cambia el precio del renglón marcado · F4 abre "Más…" · F9 o Ctrl+Enter cobra. Lo que se tipea sin foco va al buscador (el lector nunca se pierde).
+  const qIn = $('#q'), sinCampo = el => !/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) && !el.isContentEditable;
+  const tiles = () => $$('#grilla .tile-p');
+  function marcarTile(i) {
+    const ts = tiles(); ts.forEach(t => t.classList.remove('activa')); if (!ts.length) return;
+    const t = ts[Math.max(0, Math.min(i, ts.length - 1))]; t.classList.add('activa'); t.scrollIntoView({ block: 'nearest' });
+  }
+  const columnas = () => { const ts = tiles(); let n = 0; while (n < ts.length && ts[n].offsetTop === ts[0].offsetTop) n++; return n || 1; };
+  // renglón marcado: el último que se agregó o tocó (si no hay, el último del ticket)
+  let selLinea = null;
+  const idxSel = () => { const ls = C.carrito.lineas, i = ls.indexOf(selLinea); return i >= 0 ? i : ls.length - 1; };
+  const filaSel = () => $$('#lineas .linea')[idxSel()];
+  function pintarSel() { const i = idxSel(); $$('#lineas .linea').forEach((f, k) => f.classList.toggle('sel', k === i && C.carrito.lineas.length > 1)); }
+  new MutationObserver(pintarSel).observe($('#lineas'), { childList: true });
+  $('#lineas').addEventListener('click', ev => { const f = ev.target.closest('.linea'); if (!f) return; const l = C.carrito.lineas[$$('#lineas .linea').indexOf(f)]; if (l) { selLinea = l; pintarSel(); } });
+  function moverSel(d) { const ls = C.carrito.lineas; if (!ls.length) return; selLinea = ls[Math.max(0, Math.min(idxSel() + d, ls.length - 1))]; pintarSel(); const f = filaSel(); if (f) f.scrollIntoView({ block: 'nearest' }); }
+  const tocarEnSel = sel => { const f = filaSel(), b = f && f.querySelector(sel); if (b) b.click(); };
+  // cantidad para la próxima prenda: "3*" en el buscador
+  let cantPend = null;
+  function pintarCant() { let b = $('#cant-pend'); if (!cantPend) { if (b) b.remove(); return; } if (!b) { qIn.insertAdjacentHTML('beforebegin', '<span id="cant-pend" title="Cantidad para la próxima prenda (Esc la saca)"></span>'); b = $('#cant-pend'); } b.textContent = '×' + cantPend; }
+  C.tomarCantidad = () => { const n = cantPend; if (n) { cantPend = null; pintarCant(); } return n; };
+  qIn.addEventListener('input', () => { const mm = /^(\d{1,3})\s*\*\s*/.exec(qIn.value); if (mm && +mm[1] > 0) { cantPend = +mm[1]; qIn.value = qIn.value.slice(mm[0].length); pintarCant(); } });
+  qIn.addEventListener('keydown', ev => {
+    if (ev.altKey && (ev.key === 'ArrowUp' || ev.key === 'ArrowDown')) { ev.preventDefault(); moverSel(ev.key === 'ArrowUp' ? -1 : 1); return; }
+    const salto = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: columnas(), ArrowUp: -columnas() }[ev.key];
+    if (salto) {
+      const i = tiles().findIndex(t => t.classList.contains('activa'));
+      if (i < 0 && (ev.key === 'ArrowLeft' || ev.key === 'ArrowRight' || ev.key === 'ArrowUp')) return;   // ← → mueven el cursor del texto hasta entrar a la grilla con ↓
+      ev.preventDefault(); marcarTile(i < 0 ? 0 : i + salto); return;
+    }
+    if (ev.key === 'Escape') { tiles().forEach(t => t.classList.remove('activa')); cantPend = null; pintarCant(); return; }
+    if (qIn.value) return;
+    if (ev.key === '+' || ev.key === '-') { ev.preventDefault(); toque = null; tocarEnSel(`[data-d="${ev.key === '+' ? 1 : -1}"]`); }
+    else if (ev.key === 'Delete') { ev.preventDefault(); tocarEnSel('.quitar'); }
+  });
+  // al escribir, la marca de la grilla se va (la grilla se vuelve a dibujar con lo buscado)
+  qIn.addEventListener('input', () => tiles().forEach(t => t.classList.remove('activa')));
+  document.addEventListener('keydown', ev => {
+    if (document.querySelector('.modal-fondo') || ev.ctrlKey || ev.metaKey) return;
+    if (ev.key === 'F2') { ev.preventDefault(); const i = idxSel(); if (i >= 0) C.cambiarPrecio(i); return; }
+    if (ev.key === 'F4') { ev.preventDefault(); $('#btn-mas').click(); return; }
+    if (ev.target === qIn || !sinCampo(ev.target) || ev.altKey) return;
+    // sin foco en un campo: + − Supr actúan sobre el renglón; cualquier otra letra o número va al buscador
+    if (ev.key === '+' || ev.key === '-') { ev.preventDefault(); toque = null; tocarEnSel(`[data-d="${ev.key === '+' ? 1 : -1}"]`); }
+    else if (ev.key === 'Delete') { ev.preventDefault(); tocarEnSel('.quitar'); }
+    else if (ev.key.length === 1 && ev.key !== ' ') qIn.focus();
+  });
+  // ventanas: talle y color con flechas · cobro con números · "Nueva venta" con Enter
+  document.addEventListener('keydown', ev => {
+    const el = document.activeElement; if (!el || !el.closest || !/^Arrow|^Enter$/.test(ev.key)) return;
+    const grid = el.closest('.matriz-pick'), busca = el.classList.contains('pick-busca'), m = el.closest('.modal');
+    if ((!grid && !busca) || !m) return;
+    if (ev.key === 'Enter') { if (grid) toque = { r: el.getBoundingClientRect(), t: Date.now() }; return; }
+    const bs = $$('.matriz-pick button[data-v]', m).filter(b => b.offsetParent !== null); if (!bs.length) return;
+    if (busca) { if (ev.key === 'ArrowDown') { ev.preventDefault(); (bs.find(b => !b.classList.contains('sin')) || bs[0]).focus(); } return; }
+    ev.preventDefault();
+    const i = bs.indexOf(el), r = el.getBoundingClientRect(), cx = r.left + r.width / 2;
+    let dest = ev.key === 'ArrowRight' ? bs[i + 1] : ev.key === 'ArrowLeft' ? bs[i - 1] : null;
+    if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {   // el más cercano en la fila de abajo / arriba
+      const abajo = ev.key === 'ArrowDown', cand = bs.filter(b => { const rb = b.getBoundingClientRect(); return abajo ? rb.top >= r.bottom - 2 : rb.bottom <= r.top + 2; });
+      if (!cand.length) { const inp = !abajo && $('.pick-busca', m); if (inp) inp.focus(); return; }
+      const fila = (abajo ? Math.min : Math.max)(...cand.map(b => b.getBoundingClientRect().top));
+      dest = cand.filter(b => Math.abs(b.getBoundingClientRect().top - fila) < 4).sort((a, b) => { const ca = a.getBoundingClientRect(), cb = b.getBoundingClientRect(); return Math.abs(ca.left + ca.width / 2 - cx) - Math.abs(cb.left + cb.width / 2 - cx); })[0];
+    }
+    if (dest) dest.focus();
+  }, true);
+  function prepararCobro(m) {
+    const md = $('.modal', m), bs = $$('[data-f]', m).filter(b => b.offsetParent !== null).slice(0, 9);
+    bs.forEach((b, i) => b.insertAdjacentHTML('beforeend', `<kbd class="num">${i + 1}</kbd>`));
+    md.tabIndex = -1; md.focus();
+    m.addEventListener('keydown', ev => {
+      if (m !== $$('.modal-fondo').pop() || ev.ctrlKey || ev.altKey || ev.metaKey) return;   // si hay otra ventana encima (crédito), no
+      const enCampo = !sinCampo(ev.target);
+      // 1…9: elige el medio y deja el importe listo para escribir (por ejemplo, con cuánto paga en efectivo)
+      if (!enCampo && /^[1-9]$/.test(ev.key)) { const b = bs[+ev.key - 1]; if (!b) return; ev.preventDefault(); b.click(); setTimeout(() => { const ins = $$('#cb-pagos input', m), x = ins[ins.length - 1]; if (x) { x.focus(); x.select(); } }, 0); return; }
+      if (ev.key !== 'Enter') return;
+      ev.preventDefault();
+      // Enter en el importe: lo toma y muestra el vuelto; el siguiente Enter confirma
+      if (enCampo && ev.target.closest('#cb-pagos')) { ev.target.dispatchEvent(new Event('change')); md.focus(); return; }
+      const si = $('[data-si]', m); if (si && !si.disabled) si.click();
+    });
+  }
+  new MutationObserver(recs => recs.forEach(r => r.addedNodes.forEach(n => {
+    if (!n.classList || !n.classList.contains('modal-fondo')) return;
+    if ($('#cb-pagos', n)) { prepararCobro(n); return; }
+    if ($('[data-monto-venta]', n)) { const ok = $('[data-ok]', n); if (ok) ok.focus(); return; }
+    const mp = $('.matriz-pick', n);
+    if (mp && !$('.pick-busca', n)) { const b = $$('button[data-v]', mp).find(x => !x.classList.contains('sin')) || $('button[data-v]', mp); if (b) b.focus(); }
+    // cualquier otra ventana que quedó sin foco (se dibuja después de abrirse): Enter = el botón principal de abajo
+    setTimeout(() => { if (!n.isConnected || n.contains(document.activeElement)) return; const bs = $$('.pie button:not(:disabled)', n).filter(b => b.offsetParent !== null); const b = bs.find(x => x.classList.contains('primario')) || bs[bs.length - 1]; if (b) b.focus(); }, 60);
+  }))).observe(document.body, { childList: true });
 
   // ================= Más opciones (clienta, nota, descuento, canal) =================
   $('#btn-mas').onclick = () => { const m = $('#mas'); m.classList.toggle('ver'); $('#btn-mas').classList.toggle('on', m.classList.contains('ver')); if (m.classList.contains('ver')) $('#sel-cliente').focus(); };
