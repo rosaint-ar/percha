@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ventas · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610281843">
+<link rel="stylesheet" href="../shell/shell.css?v=202610281847">
 <style>
   .filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
   .filtros input[type=date],.filtros select{border:1px solid var(--linea);background:var(--superficie-2);padding:8px 10px;border-radius:var(--radio-mini)}
@@ -55,10 +55,10 @@
 </main>
 <div id="impresion"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610281843"></script>
-<script src="../shared/canales.js?v=202610281843"></script>
-<script src="../shell/shell.js?v=202610281843"></script>
-<script src="../shared/facturar.js?v=202610281843"></script>
+<script src="../shared/supabase.js?v=202610281847"></script>
+<script src="../shared/canales.js?v=202610281847"></script>
+<script src="../shell/shell.js?v=202610281847"></script>
+<script src="../shared/facturar.js?v=202610281847"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -75,7 +75,7 @@ APP.ready.then(async () => {
   const CANL = await CANALES.cargar(e);
   const ONLINE = CANL.filter(x => x.online).map(x => x.k).concat(['mercadolibre', 'online']);
   const canal = o => CANALES.chip(CANL, o);
-  const canalEditable = (id, o) => `<span class="canal-edit" data-canal="${id}" title="Cambiar el canal">${canal(o)} <small>✎</small></span>`;
+  const canalEditable = (id, o) => `<span class="canal-edit" data-canal="${id}" title="Tocá para cambiar el canal">${canal(o)}</span>`;
   async function cambiarCanal(id, actual, alTerminar) {
     const m = modal(`<h2>Canal de la venta</h2><p class="sub">Se pone solo (caja = Local, pedidos de la web = Tienda Nube); acá se corrige. Los canales se crean en Configuración › Canales de venta.</p><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px">${CANALES.activos(CANL).map(c => `<button class="btn${c.k === actual ? ' primario' : ''}" data-k="${esc(c.k)}">${esc(c.n)}</button>`).join('')}</div><div class="pie"><button class="btn" data-no>Cancelar</button></div>`);
     $('[data-no]', m).onclick = () => m.cerrar();
