@@ -307,7 +307,7 @@ APP.ready.then(async () => {
     if (cantidad == null) cantidad = (APP.caja && APP.caja.tomarCantidad && APP.caja.tomarCantidad()) || 1;   // el teclado del POS puede dejar una cantidad lista
     // devolución sin ticket: lo que se toca o escanea entra como devuelto, al precio de hoy (se puede corregir en el renglón)
     if (carrito.devolviendo) {
-      const dv = carrito.lineas.find(l => l.variante.id === v.id && l.devuelta && l.sinTicket);
+      const dv = carrito.lineas.find(l => l.variante.id === v.id && l.devuelta && l.sinTicket && !l.parte);
       if (dv) dv.cantidad -= cantidad; else carrito.lineas.push({ variante: v, cantidad: -cantidad, descPct: 0, devuelta: true, sinTicket: true, precioFijo: precioLista(v) });
       recientes(v); pintar(); $('#q').focus(); return;
     }
@@ -401,12 +401,13 @@ APP.ready.then(async () => {
     return { lineas, subtotal: r2(subtotal), descuento, total: r2(subtotal - descuento), costo: r2(costo) };
   }
   function pintar() {
+    ajustarPartes();
     const c = calcular(), cont = $('#lineas');
     const avisoDev = carrito.devolviendo ? '<div class="modo-dev"><span><b>↩ Devolución sin ticket</b>Tocá o escaneá lo que trae. Después, “Listo” y cargá lo que se lleva.</span><button class="btn chico primario" data-dev-listo>Listo</button></div>' : '';
     if (!c.lineas.length && carrito.devolviendo) cont.innerHTML = avisoDev;
     else if (!c.lineas.length) cont.innerHTML = '<div class="vacio-ticket"><b>Listo para vender</b><span>Tocá una prenda o escaneá el código.</span><small><kbd>/</kbd> buscar · <kbd>F9</kbd> cobrar</small></div>';
     else cont.innerHTML = avisoDev + c.lineas.map((l, i) => `<div class="linea">
-      <div><div class="n">${l.devuelta ? esc(l.variante.producto_nombre) : `<span class="cambiable" data-cambiar="${i}" title="Tocá para cambiar el talle, el color o la prenda">${esc(l.variante.producto_nombre)}</span>`}${l.devuelta ? ' <span class="chip error">devuelve</span>' : ''}</div><div class="v">${l.devuelta ? esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || l.variante.sku || '') : `<span class="cambiable" data-cambiar="${i}">${esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || 'único')}</span>`} · ${fmt.pesos(l.precioLista)}${l.descPct && l.precioManual == null ? ' −' + l.descPct + '%' : ''}${!l.devuelta && controlaStock(l.variante) && llevando(l.variante) > Math.max(+l.variante.stock || 0, 0) ? '<span class="sinstock-chip" title="El sistema dice que no hay suficiente">⚠ sin stock</span>' : ''}</div>${l.precioManual != null && !l.devuelta ? `<div class="promo manual">Precio cambiado a mano</div>` : ''}${l.rebaja && !l.devuelta && l.precioManual == null ? `<div class="promo">▼ ${esc(l.rebaja.nombre)} · antes ${fmt.pesos(l.precioBase)}</div>` : ''}${l.promo ? `<div class="promo">★ ${esc(l.promo.nombre)} · −${fmt.pesos(l.descPromo)}/u</div>` : ''}${(+l.variante.fallas > 0 || l.falla) && !l.devuelta ? `<button class="falla ${l.falla ? 'on' : ''}" data-falla="${i}" title="${l.falla ? 'Tocá para desmarcar' : esc(l.variante.falla_nota || '')}">${l.falla ? '◆ Con falla' + (l.fallaU && l.fallaU.nota ? ': ' + esc(l.fallaU.nota) : '') + (l.descFalla ? ' · ' + fmt.dec(l.descFalla) + '% off' : '') : '◆ Hay ' + fmt.num(l.variante.fallas) + ' con falla · ¿es esta?'}</button>` : ''}</div>
+      <div><div class="n">${l.parte ? esc(l.desc) + ' <span class="chip ok">queda en el local</span>' : l.devuelta ? esc(l.variante.producto_nombre) : `<span class="cambiable" data-cambiar="${i}" title="Tocá para cambiar el talle, el color o la prenda">${esc(l.variante.producto_nombre)}</span>`}${l.devuelta && !l.parte ? ' <span class="chip error">devuelve</span>' : ''}</div><div class="v">${l.parte ? 'entra a ' + esc(l.variante.producto_nombre) : l.devuelta ? esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || l.variante.sku || '') : `<span class="cambiable" data-cambiar="${i}">${esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || 'único')}</span>`} · ${fmt.pesos(l.precioLista)}${l.descPct && l.precioManual == null ? ' −' + l.descPct + '%' : ''}${!l.devuelta && controlaStock(l.variante) && llevando(l.variante) > Math.max(+l.variante.stock || 0, 0) ? '<span class="sinstock-chip" title="El sistema dice que no hay suficiente">⚠ sin stock</span>' : ''}</div>${l.precioManual != null && !l.devuelta ? `<div class="promo manual">Precio cambiado a mano</div>` : ''}${l.rebaja && !l.devuelta && l.precioManual == null ? `<div class="promo">▼ ${esc(l.rebaja.nombre)} · antes ${fmt.pesos(l.precioBase)}</div>` : ''}${l.promo ? `<div class="promo">★ ${esc(l.promo.nombre)} · −${fmt.pesos(l.descPromo)}/u</div>` : ''}${(+l.variante.fallas > 0 || l.falla) && !l.devuelta ? `<button class="falla ${l.falla ? 'on' : ''}" data-falla="${i}" title="${l.falla ? 'Tocá para desmarcar' : esc(l.variante.falla_nota || '')}">${l.falla ? '◆ Con falla' + (l.fallaU && l.fallaU.nota ? ': ' + esc(l.fallaU.nota) : '') + (l.descFalla ? ' · ' + fmt.dec(l.descFalla) + '% off' : '') : '◆ Hay ' + fmt.num(l.variante.fallas) + ' con falla · ¿es esta?'}</button>` : ''}${puedeSinParte(l) ? `<button class="parte-btn" data-parte="${i}" title="${esc(SP.texto)}: el total baja ${fmt.pesos(SP.monto)} (se puede cambiar en el renglón)">${esc(SP.boton)} · −${fmt.pesos(SP.monto)}</button>` : ''}</div>
       <div class="t">${l.devuelta && !l.sinTicket ? fmt.pesos(l.total) : `<input class="pu${l.precioManual != null ? ' manual' : ''}" data-pu="${i}" type="number" min="0" step="1" value="${l.precioFinal}" data-orig="${l.precioFinal}" title="Precio por unidad: escribí otro para cambiarlo (F2)"${APP.puede('descuentos') ? '' : ' readonly'}>${Math.abs(l.cantidad) > 1 ? `<small>${l.cantidad} u. = ${fmt.pesos(l.total)}</small>` : ''}`}</div>
       <div class="ctrl"><button data-i="${i}" data-d="-1">−</button><input data-i="${i}" data-q value="${l.cantidad}"><button data-i="${i}" data-d="1">+</button><span class="desc">desc % <input data-i="${i}" data-desc type="number" min="0" max="100" value="${l.precioManual != null ? 0 : l.descPct || 0}"${l.precioManual != null ? ' disabled title="Tiene precio a mano"' : ''}></span><button class="quitar" data-i="${i}" data-x title="Quitar">×</button></div></div>`).join('');
     $$('[data-d]', cont).forEach(b => b.onclick = () => { const l = carrito.lineas[+b.dataset.i]; l.cantidad += +b.dataset.d * (l.devuelta ? -1 : 1); if ((l.devuelta ? -l.cantidad : l.cantidad) <= 0) carrito.lineas.splice(+b.dataset.i, 1); pintar(); });
@@ -415,19 +416,40 @@ APP.ready.then(async () => {
     $$('[data-x]', cont).forEach(b => b.onclick = () => { carrito.lineas.splice(+b.dataset.i, 1); pintar(); });
     $$('[data-pu]', cont).forEach(inp => { inp.onfocus = () => inp.select(); inp.onchange = () => ponerPrecio(+inp.dataset.pu, inp.value);
       inp.onkeydown = ev => { if (ev.key === 'Enter') { ev.preventDefault(); $('#q').focus(); } else if (ev.key === 'Escape') { inp.value = inp.dataset.orig; $('#q').focus(); } }; });
+    $$('[data-parte]', cont).forEach(b => b.onclick = ev => { ev.stopPropagation(); sinParte(carrito.lineas[+b.dataset.parte]); });
     $$('[data-cambiar]', cont).forEach(el => el.onclick = ev => { ev.stopPropagation(); cambiarLinea(+el.dataset.cambiar); });
     $$('[data-falla]', cont).forEach(b => b.onclick = ev => { ev.stopPropagation(); const l = carrito.lineas[+b.dataset.falla]; if (l.falla) { l.falla = false; delete l.fallaU; pintar(); } else marcarFalla(l); });
     $('#listas').innerHTML = listas.map(l => `<button class="${l.id === carrito.lista ? 'on' : ''}" data-l="${l.id}" title="${+l.porcentaje === 100 ? 'Precio de lista' : (+l.porcentaje < 100 ? '−' + fmt.dec(100 - l.porcentaje) : '+' + fmt.dec(l.porcentaje - 100)) + '% sobre Lista'}">${esc(l.nombre)}</button>`).join('');
     $$('#listas button').forEach(b => b.onclick = () => { carrito.lista = b.dataset.l; pintar(); });
     $('#totales').innerHTML = `<div><span>Subtotal</span><span class="mono">${fmt.pesos(c.subtotal)}</span></div>${c.descuento ? `<div><span>Descuento ${carrito.descPct}%</span><span class="mono">−${fmt.pesos(c.descuento)}</span></div>` : ''}<div class="gran"><span>Total</span><span>${fmt.pesos(c.total)}</span></div>`;
     { const dl = $('[data-dev-listo]', cont); if (dl) dl.onclick = () => { carrito.devolviendo = false; pintar(); $('#q').focus(); }; }
-    $('#ticket-sub').textContent = carrito.cambio ? (carrito.cambio.numero ? `Cambio sobre la venta #${carrito.cambio.numero}` : 'Cambio sin ticket') : (c.lineas.length ? `${c.lineas.reduce((s, l) => s + Math.abs(l.cantidad), 0)} prendas` : 'Nueva venta');
+    $('#ticket-sub').textContent = carrito.cambio ? (carrito.cambio.numero ? `Cambio sobre la venta #${carrito.cambio.numero}` : 'Cambio sin ticket') : (c.lineas.length ? (n => n + (n === 1 ? ' prenda' : ' prendas'))(c.lineas.filter(l => !l.parte).reduce((s, l) => s + Math.abs(l.cantidad), 0)) : 'Nueva venta');
     $('#btn-cobrar').disabled = !c.lineas.length;
     $('#btn-sena').disabled = !c.lineas.length || !!carrito.cambio;
   }
   $('#btn-vaciar').onclick = async () => { if (!carrito.lineas.length || await confirmar('¿Vaciar el ticket?', 'Vaciar')) { carrito.lineas = []; carrito.cambio = null; carrito.devolviendo = false; carrito.envio = null; pintarEntrega(); carrito.descPct = 0; $('#desc-general').value = 0; $('#nota').value = ''; pintar(); } };
   $('#desc-general').onchange = ev => { if (!APP.puede('descuentos') && +ev.target.value > 0) { toast('Los descuentos los habilita administración', 'error'); ev.target.value = 0; } carrito.descPct = Math.min(100, Math.max(0, +ev.target.value || 0)); pintar(); };
   $('#sel-vendedora').onchange = ev => carrito.vendedora = ev.target.value;
+
+  // ================= Conjunto sin una pieza ("Solo corpiño") =================
+  // Config de la empresa (config.sin_parte): en los productos de esa familia, un toque agrega la pieza que queda en el local
+  // en −1 con −$monto (editable en el renglón): el conjunto sale entero del stock y la pieza entra a la variante indicada
+  // (no está en la web). Sigue siendo una venta.
+  const SP = ((APP.empresa.config || {}).sin_parte) || null;
+  const partesDe = l => carrito.lineas.filter(x => x.parte && x.de === l).reduce((s, x) => s - x.cantidad, 0);
+  const puedeSinParte = l => !!SP && !l.devuelta && !l.parte && l.cantidad > 0 && (productos[l.variante.producto_id] || {}).categoria_id === SP.categoria_id && partesDe(l) < l.cantidad;
+  function sinParte(l) {
+    if (!l || !puedeSinParte(l)) return;
+    const v = catalogo.find(x => x.id === SP.variante_id); if (!v) { toast('No encuentro la prenda que recibe la pieza: revisá la configuración', 'error'); return; }
+    const ya = carrito.lineas.find(x => x.parte && x.de === l);
+    if (ya) ya.cantidad -= 1; else carrito.lineas.splice(carrito.lineas.indexOf(l) + 1, 0, { variante: v, cantidad: -1, descPct: 0, devuelta: true, sinTicket: true, parte: true, de: l, desc: SP.texto, precioFijo: +SP.monto || 0 });
+    pintar();
+  }
+  // si se quita el conjunto (o baja su cantidad), su pieza lo acompaña
+  function ajustarPartes() {
+    for (let k = carrito.lineas.length - 1; k >= 0; k--) { const x = carrito.lineas[k]; if (!x.parte) continue;
+      if (!carrito.lineas.includes(x.de) || x.de.cantidad <= 0) carrito.lineas.splice(k, 1); else if (-x.cantidad > x.de.cantidad) x.cantidad = -x.de.cantidad; }
+  }
 
   // ================= Precio a mano =================
   // El precio por unidad es un campo en el renglón: se escribe otro y manda sobre la lista, el desc % y las promos. Pide el permiso de descuentos.
@@ -530,7 +552,7 @@ APP.ready.then(async () => {
         envio: carrito.envio || null,
         numero: reservado ? null : numeroRes,   // el número que se ve en el ticket desde que empezó la venta
         venta_origen_id: carrito.cambio ? carrito.cambio.id : null, origen: ($('#sel-origen') || {}).value || 'local',
-        lineas: t.lineas.map(l => ({ variante_id: l.variante.id, producto_id: l.variante.producto_id, descripcion: l.variante.producto_nombre, talle: l.variante.talle_nombre, color: l.variante.color_nombre, cantidad: l.cantidad, precio_lista: l.precioLista, precio_unit: l.precioFinal, descuento_pct: l.descPct || 0, promocion_id: l.promo ? l.promo.id : null, promocion_nombre: l.promo ? l.promo.nombre : null, total: l.total, costo_unit: +l.variante.costo || 0, componentes: l.componentes && l.componentes.length ? l.componentes : null, falla: !!l.falla, falla_id: l.fallaU ? l.fallaU.id : null, precio_manual: l.precioManual != null || undefined })),
+        lineas: t.lineas.map(l => ({ variante_id: l.variante.id, producto_id: l.variante.producto_id, descripcion: l.desc || l.variante.producto_nombre, talle: l.variante.talle_nombre, color: l.variante.color_nombre, cantidad: l.cantidad, precio_lista: l.precioLista, precio_unit: l.precioFinal, descuento_pct: l.descPct || 0, promocion_id: l.promo ? l.promo.id : null, promocion_nombre: l.promo ? l.promo.nombre : null, total: l.total, costo_unit: +l.variante.costo || 0, componentes: l.componentes && l.componentes.length ? l.componentes : null, falla: !!l.falla, falla_id: l.fallaU ? l.fallaU.id : null, precio_manual: l.precioManual != null || undefined })),
         pagos: pagosFinal.filter(p => p.monto !== 0).map(p => ({ forma_pago_id: p.forma_pago_id || null, credito_id: p.credito_id || null, monto: p.monto, cuotas: p.cuotas || 1, recargo_pct: p.recargo_pct || 0 })),
         creditos_a_emitir
       };
