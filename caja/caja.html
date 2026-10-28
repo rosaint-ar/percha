@@ -130,7 +130,7 @@ APP.ready.then(async () => {
     const efv = a.find(x => /efectivo/i.test(x.nombre || '')), contado = efv ? +efv.declarado : null;
     return { dif, retirado: contado != null && t.efectivo_queda != null ? Math.max(0, contado - t.efectivo_queda) : null };
   };
-  const corto = n => String(n || '').replace(/s*(.*)$/, '').replace(/^Transferencia Bancaria$/i, 'Transferencia');
+  const corto = n => String(n || '').replace(/\s*\(.*\)$/, '').replace(/^Transferencia Bancaria$/i, 'Transferencia');
   const cobro = t => (t.medios || []).map(x => `${esc(corto(x.nombre))} <b>${fmt.pesos(x.monto)}</b>`).join('<br>') || '<span style="color:var(--tinta-4)">—</span>';
   function pintarHistorial() {
     const tb = $('#tb-hist tbody'), l = hist.filter(t => t.estado === 'cerrado');
