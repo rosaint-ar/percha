@@ -43,7 +43,7 @@
     const caja = $('[data-res]', m);
     if (c && c.estado === 'autorizado') {
       caja.innerHTML = `<div class="aviso-caja ok" style="display:block">✓ <b>${esc(c.nombre_tipo)} ${esc(c.numero_mostrar)}</b> autorizada por ARCA<br><small>CAE ${esc(c.cae)} · vence ${new Date(c.cae_vence + 'T12:00').toLocaleDateString('es-AR')}</small></div>
-        <div class="pie" style="justify-content:space-between"><div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn primario" target="_blank" href="${urlFactura(c.id)}">Ver e imprimir</a><a class="btn" target="_blank" href="https://api.whatsapp.com/send?text=${textoWsp(emp, c)}">WhatsApp</a></div><button class="btn" data-cerrar>Listo</button></div>`;
+        <div class="pie" style="justify-content:space-between"><div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn primario" target="_blank" href="${urlFactura(c.id)}">Ver e imprimir</a><a class="btn" href="whatsapp://send?text=${textoWsp(emp, c)}">WhatsApp</a></div><button class="btn" data-cerrar>Listo</button></div>`;
     } else if (c && c.estado === 'rechazado') {
       caja.innerHTML = `<div class="aviso-caja error" style="display:block"><b>ARCA la rechazó.</b><br><small>${esc(c.errores || '')}</small></div><div class="pie"><button class="btn" data-cerrar>Cerrar</button></div>`;
     } else {

@@ -227,6 +227,13 @@
     return APP;
   })();
 
+  // WhatsApp con texto: se abre la app directo (whatsapp://). La página intermedia de api.whatsapp.com/wa.me sin número
+  // rompe los emojis (se ven como �). Además el texto queda copiado, por si se usa WhatsApp Web.
+  APP.whatsapp = texto => {
+    try { navigator.clipboard.writeText(texto); } catch (_) { }
+    location.href = 'whatsapp://send?text=' + encodeURIComponent(texto);
+    toast('Abriendo WhatsApp… (el texto también quedó copiado)');
+  };
   APP.de = tabla => sb.from(tabla).select('*').eq('empresa_id', APP.empresa.id);
   APP.conEmpresa = obj => Object.assign({ empresa_id: APP.empresa.id }, obj);
 
