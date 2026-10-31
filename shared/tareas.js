@@ -122,12 +122,13 @@
     }
     return false;
   }
-  function mostrarTarjeta(t) {
+  function mostrarTarjeta(t, prueba) {
     estilos(); if (tarjeta) tarjeta.remove();
     tarjeta = document.createElement('div'); tarjeta.className = 'tar-tarjeta';
     tarjeta.innerHTML = `<span class="em">${h(t.emoji)}</span><b>${h(t.nombre)}</b><small>${t.ayuda ? h(t.ayuda) + ' ' : ''}Cuando puedas 😊</small><div class="bts"><button class="si">✓ Listo</button><button class="luego">Más tarde</button></div>`;
     document.body.appendChild(tarjeta);
     const cerrar = () => { if (tarjeta) { tarjeta.remove(); tarjeta = null; } };
+    if (prueba) { tarjeta.querySelector('.si').onclick = ev => { brillito(ev.currentTarget); fx().sonido('ok'); setTimeout(cerrar, 500); }; tarjeta.querySelector('.luego').onclick = cerrar; return; }
     tarjeta.querySelector('.si').onclick = async ev => { const b = ev.currentTarget; b.disabled = true; if (await marcar(t, b)) cerrar(); else b.disabled = false; };
     tarjeta.querySelector('.luego').onclick = () => { posponer(t); cerrar(); };
   }
@@ -140,5 +141,5 @@
     const b = document.getElementById('btn-tareas'); if (b) b.onclick = panel;
     if (reloj) clearInterval(reloj); reloj = setInterval(revisar, 60e3); setTimeout(revisar, 20e3);
   }
-  window.TAREAS = { iniciar, momento, panel, cargar, pintarChip, revisar };
+  window.TAREAS = { iniciar, momento, panel, cargar, pintarChip, revisar, probar: t => mostrarTarjeta(t, true) };
 })();

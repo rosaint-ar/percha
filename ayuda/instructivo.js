@@ -41,6 +41,8 @@ window.INSTRUCTIVO = {
     ] },
     { id: 'tareas-config', grupo: 'dia', p: 'configuracion', titulo: 'Configurar las tareas del local', nuevo: '2026-10-31', resumen: '**Configuración** › {{Tareas del local}}.', bloques: [
       { tipo: 'pasos', items: ['{{+ Agregar tarea}}: qué hay que hacer, un emoji y cuándo.', 'En cada tarea elegís **cuándo**: al abrir la caja, a una hora, cada tanto durante el día (cada 1, 2, 3 o 4 h) o al cerrar.', 'Los **días**: tocá los que corresponden (ninguno marcado = todos los días).', 'Un **detalle amable** (opcional) explica para qué sirve. Se guarda solo al escribir.'] },
+      { tipo: 'texto', texto: 'Debajo de cada tarea, **📅 Hoy** dice qué pasa hoy con ella: si sale al abrir, a qué hora, si ya se hizo o si **hoy no le toca** (por ejemplo, porque el sábado no está marcado).' },
+      { tipo: 'tip', texto: '{{Probar el aviso}} muestra la tarjetita tal cual la ve la vendedora. Los avisos aparecen en el **Punto de venta**, con la caja abierta.' },
       { tipo: 'tip', texto: 'Apagá una tarea con el interruptor si no hace falta por un tiempo.' }
     ] },
 

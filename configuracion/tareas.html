@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Tareas del local · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610311539">
+<link rel="stylesheet" href="../shell/shell.css?v=202610311600">
 <style>
   .pestanas{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
   .pestanas a{font:600 13px var(--f-ui);color:var(--tinta);text-decoration:none;padding:8px 14px;border:1px solid var(--linea);background:var(--superficie-2);border-radius:10px}
@@ -22,6 +22,9 @@
   .dias{display:flex;gap:3px}.dias button{width:30px;height:30px;border-radius:50%;border:1px solid var(--linea);background:var(--superficie);font:700 12px var(--f-ui);cursor:pointer;color:var(--tinta-3)}
   .dias button.on{background:var(--acento);border-color:var(--acento);color:#fff}
   .tc .acc{margin-left:auto;display:flex;gap:8px;align-items:center}
+  .donde{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:4px 0 14px}.donde div{border:1px solid var(--linea);border-radius:14px;background:var(--superficie-2);padding:12px}.donde b{display:block;font:700 13.5px var(--f-ui);margin-bottom:2px}.donde small{color:var(--tinta-3);font-size:12.5px}
+  .hoy{grid-column:2;font-size:12.5px;color:var(--tinta-3);display:flex;gap:8px;align-items:center;flex-wrap:wrap}.hoy b{color:var(--tinta-2)}.hoy.toca b{color:var(--acento)}.hoy.ok b{color:var(--ok)}
+  @media (max-width:760px){.donde{grid-template-columns:1fr}}
   .grupo-t{font:700 12px var(--f-ui);color:var(--tinta-3);letter-spacing:.05em;text-transform:uppercase;margin:16px 0 8px}
 </style>
 </head>
@@ -30,23 +33,42 @@
   <div class="pestanas"><a href="empresa.html">Empresa</a><a href="atributos.html">Talles, colores y familias</a><a href="curvas.html">Curvas de talle</a><a href="listas.html">Listas de precios</a><a href="promociones.html">Promociones</a><a href="envios.html">Envíos</a><a href="canales.html">Canales de venta</a><a href="facturacion.html">Facturación</a><a class="on" href="tareas.html">Tareas del local</a><a href="usuarios.html">Usuarios</a></div>
   <div class="card">
     <div class="card-cab"><div><h2>Tareas del local</h2><p class="sub">Aparecen como un recordatorio amable, con un festejo al hacerlas. Se guarda solo al escribir.</p></div><div class="acciones"><button class="btn primario" id="btn-nueva">+ Agregar tarea</button></div></div>
+    <div class="donde"><div><b>☀️ Al abrir la caja</b><small>En el Punto de venta, apenas se abre la caja: "Para arrancar el día".</small></div><div><b>🕐 Durante el día</b><small>En el Punto de venta, con la caja abierta: una tarjetita abajo a la izquierda cuando toca. <a href="#" id="ver-tarjeta">Ver cómo se ve</a></small></div><div><b>🌙 Al cerrar la caja</b><small>Antes de contar la plata: "Antes de irte".</small></div></div>
     <div id="lista"><p class="sub">Cargando…</p></div>
   </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610311539"></script>
-<script src="../shell/shell.js?v=202610311539"></script>
+<script src="../shared/supabase.js?v=202610311600"></script>
+<script src="../shared/caja-fx.js?v=202610311600"></script>
+<script src="../shared/tareas.js?v=202610311600"></script>
+<script src="../shell/shell.js?v=202610311600"></script>
 <script>
 APP.ready.then(async () => {
   const { esc, $, $$, toast, confirmar, mensajeError } = APP, e = APP.empresa.id;
   if (!APP.puede('configuracion')) { document.querySelector('main').innerHTML = '<div class="card"><p>Esta sección es solo para administración.</p></div>'; return; }
   const MOMENTOS = [['apertura', '☀️ Al abrir la caja'], ['hora', '🕐 A una hora'], ['cada', '🔁 Cada tanto, durante el día'], ['cierre', '🌙 Al cerrar la caja']];
   const DIAS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
-  let tareas = [];
+  let tareas = [], hechasHoy = [];
+  const hoyAR = () => new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10);
+  const DIA_NOMBRE = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
   async function cargar() {
     const { data, error } = await sb.from('tareas').select('*').eq('empresa_id', e).order('orden').order('hora');
     if (error) { $('#lista').innerHTML = `<p class="sub">${esc(mensajeError(error))}</p>`; return; }
-    tareas = data || []; pintar();
+    tareas = data || [];
+    const { data: hh } = await sb.from('tareas_hechas').select('tarea_id,hecha,hecha_por').eq('empresa_id', e).eq('fecha', hoyAR()).order('hecha');
+    hechasHoy = hh || []; pintar();
+  }
+  // hoy: ¿le toca? ¿ya se hizo? ¿cuándo sale?
+  function hoyDe(t) {
+    const dow = ((new Date(hoyAR() + 'T12:00').getDay() + 6) % 7) + 1, ahora = new Date(), min = ahora.getHours() * 60 + ahora.getMinutes();
+    const hs = hechasHoy.filter(x => x.tarea_id === t.id), hora = d => new Date(d).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+    if (!t.activa) return ['', 'Apagada: no aparece'];
+    if (t.dias && t.dias.length && !t.dias.includes(dow)) return ['', `Hoy no le toca: es ${DIA_NOMBRE[dow - 1]} y no está marcado`];
+    if (hs.length && t.momento !== 'cada') return ['ok', `✓ Hecha hoy a las ${hora(hs[hs.length - 1].hecha)}`];
+    if (t.momento === 'apertura') return ['toca', 'Hoy sale al abrir la caja'];
+    if (t.momento === 'cierre') return ['toca', 'Hoy sale al cerrar la caja'];
+    if (t.momento === 'hora') { const [a, b] = String(t.hora || '0:0').split(':'), hm = +a * 60 + +b; return ['toca', hm > min ? `Hoy sale a las ${String(t.hora).slice(0, 5)}` : `Le tocaba a las ${String(t.hora).slice(0, 5)}: aparece en el Punto de venta (con la caja abierta) hasta que la marquen`]; }
+    return ['toca', `Hoy sale cada ${t.cada_min % 60 ? t.cada_min + ' min' : t.cada_min / 60 + ' h'} desde que se abre la caja${hs.length ? ' · hecha ' + hs.length + ' vez' + (hs.length > 1 ? 'es' : '') + ', la última a las ' + hora(hs[hs.length - 1].hecha) : ''}`];
   }
   const tarjeta = t => `<div class="tc${t.activa ? '' : ' apagada'}" data-id="${t.id}"><input class="emo" data-k="emoji" value="${esc(t.emoji)}" maxlength="4" title="Emoji">
     <div><input class="nom" data-k="nombre" value="${esc(t.nombre)}" placeholder="Qué hay que hacer"><input class="ayu" data-k="ayuda" value="${esc(t.ayuda || '')}" placeholder="Un detalle amable (opcional): para qué sirve o cómo hacerla"></div>
@@ -54,7 +76,7 @@ APP.ready.then(async () => {
       ${t.momento === 'hora' ? `<input type="time" data-k="hora" value="${t.hora ? t.hora.slice(0, 5) : '13:00'}">` : ''}
       ${t.momento === 'cada' ? `<select data-k="cada_min">${[60, 90, 120, 180, 240].map(x => `<option value="${x}"${+t.cada_min === x ? ' selected' : ''}>cada ${x % 60 ? x + ' min' : x / 60 + ' h'}</option>`).join('')}</select>` : ''}
       <span class="dias" title="Qué días (ninguno marcado = todos)">${DIAS.map((d, i) => `<button type="button" data-dia="${i + 1}" class="${(t.dias || []).includes(i + 1) ? 'on' : ''}">${d}</button>`).join('')}</span>
-      <span class="acc"><label class="switch" title="Activa"><input type="checkbox" data-k="activa" ${t.activa ? 'checked' : ''}><span></span></label><button class="btn chico" data-borrar>Eliminar</button></span></div></div>`;
+      <span class="acc"><button class="btn chico" data-probar title="Muestra el aviso como lo ve la vendedora">Probar el aviso</button><label class="switch" title="Activa"><input type="checkbox" data-k="activa" ${t.activa ? 'checked' : ''}><span></span></label><button class="btn chico" data-borrar>Eliminar</button></span></div>${(([c, x]) => `<div class="hoy ${c}">📅 <b>${esc(x)}</b></div>`)(hoyDe(t))}</div>`;
   function pintar() {
     $('#lista').innerHTML = tareas.length ? MOMENTOS.map(([k, n]) => { const l = tareas.filter(t => t.momento === k); return l.length ? `<div class="grupo-t">${n}</div><div class="tc-lista">${l.map(tarjeta).join('')}</div>` : ''; }).join('') : '<div class="vacio">Todavía no hay tareas. Agregá la primera con <b>+ Agregar tarea</b>.</div>';
     const guardar = async (id, cambio, redibujar) => {
@@ -77,6 +99,7 @@ APP.ready.then(async () => {
       const dias = (t.dias || []).includes(d) ? t.dias.filter(x => x !== d) : [...(t.dias || []), d].sort();
       guardar(t.id, { dias: dias.length ? dias : null }, true);
     });
+    $$('#lista [data-probar]').forEach(b => b.onclick = () => { const t = tareas.find(x => x.id === b.closest('[data-id]').dataset.id); if (window.TAREAS) TAREAS.probar(t); });
     $$('#lista [data-borrar]').forEach(b => b.onclick = async () => {
       const t = tareas.find(x => x.id === b.closest('[data-id]').dataset.id);
       if (!await confirmar(`¿Eliminar "${t.nombre}"?`, 'Eliminar')) return;
@@ -93,6 +116,7 @@ APP.ready.then(async () => {
     const r = await sb.from('tareas').insert(APP.conEmpresa({ nombre: d.nombre.trim(), emoji: (d.emoji || '').trim() || '✨', momento: d.momento || 'apertura', hora: d.momento === 'hora' ? '13:00' : null, cada_min: d.momento === 'cada' ? 180 : null, puntos: 10, orden: tareas.length + 1 }));
     toast(r.error ? mensajeError(r.error) : 'Tarea agregada', r.error ? 'error' : ''); cargar();
   };
+  $('#ver-tarjeta').onclick = ev => { ev.preventDefault(); const t = tareas.find(x => x.momento === 'hora' || x.momento === 'cada') || tareas[0]; if (t && window.TAREAS) TAREAS.probar(t); };
   cargar();
 });
 </script>
