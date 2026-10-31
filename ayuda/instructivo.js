@@ -97,6 +97,15 @@ window.INSTRUCTIVO = {
     { id: 'sena', grupo: 'vender', p: 'vender', titulo: 'Dejar una seña', resumen: 'Paga una parte ahora y el resto al retirar.', bloques: [
       { tipo: 'pasos', items: ['Cargá las prendas y tocá {{Dejar seña}}.', 'Propone la **mitad**: cambiala si deja otro monto.', 'Cuando vuelve a retirar: **Ventas** › pestaña {{Señas}} › {{Cobrar saldo y entregar}}.'] }
     ] },
+    { id: 'ticket-regalo', grupo: 'vender', p: 'vender', titulo: 'Ticket de cambio para regalo', nuevo: '2026-10-31', resumen: 'Un ticket sin precios para que quien recibe el regalo lo pueda cambiar.', bloques: [
+      { tipo: 'pasos', items: [
+        'Después de cobrar, tocá {{🎁 Ticket de cambio}}.',
+        'Dejá marcadas las prendas que van de regalo.',
+        'Si son regalos para **personas distintas**, marcá **"Un ticket por cada prenda"**.',
+        'Tocá {{Imprimir}}: sale con el **número de ticket**, las prendas y **hasta cuándo se puede cambiar**, sin precios.'] },
+      { tipo: 'tip', texto: 'Si en {{Más…}} escribís **"regalo"** en la nota, el botón {{🎁 Ticket de cambio}} aparece resaltado.' },
+      { tipo: 'tip', texto: '¿Se olvidaron de pedirlo? En **Ventas** abrí la venta y tocá {{🎁 Ticket de cambio}}.' }
+    ] },
     { id: 'prueba', grupo: 'vender', p: 'vender', titulo: 'Si te equivocaste en una venta', resumen: 'Se corrige, se anula o, si fue de prueba, se borra.', bloques: [
       { tipo: 'tabla', filas: [
         ['Estaba mal algo (prenda, precio, clienta)', '**Ventas** › tocá la venta › {{Editar}}'],
@@ -174,6 +183,7 @@ window.INSTRUCTIVO = {
         'Tocá el medio con que paga la diferencia: **el importe ya está bien**. Confirmá.',
         'Imprimí el **comprobante del cambio**: dice qué devolvió, qué se llevó y la diferencia.'] },
       { tipo: 'tip', texto: 'Si en el ticket dice "Pagó $18.000 a precio Contado = $22.500 a precio Lista", es el sistema mostrando la cuenta: está bien.' },
+      { tipo: 'tip', texto: '**¿Viene con un ticket de cambio de regalo?** Buscá la venta por el **número** que dice el ticket. La prenda vale lo que pagó quien la regaló; si le sobra, hacele una nota de crédito.' },
       { tipo: 'ojo', texto: 'Buscá **siempre el ticket original** cuando lo hay: así el sistema sabe cuánto y cómo pagó. Sin ticket, la prenda se toma al precio de hoy.' }
     ] },
     { id: 'cambios-ejemplos', grupo: 'cambios', p: 'vender', titulo: 'Ejemplos con un caso real', nuevo: '2026-10-31', resumen: 'Conjunto Alondra comprado a $18.000 por transferencia.', bloques: [
