@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ventas · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610311413">
+<link rel="stylesheet" href="../shell/shell.css?v=202610311422">
 <style>
   .filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
   .filtros input[type=date],.filtros select{border:1px solid var(--linea);background:var(--superficie-2);padding:8px 10px;border-radius:var(--radio-mini)}
@@ -55,12 +55,12 @@
 </main>
 <div id="impresion"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610311413"></script>
-<script src="../shared/canales.js?v=202610311413"></script>
-<script src="../shell/shell.js?v=202610311413"></script>
-<script src="../shared/ticket-cambio.js?v=202610311413"></script>
-<script src="../shared/nota-credito.js?v=202610311413"></script>
-<script src="../shared/facturar.js?v=202610311413"></script>
+<script src="../shared/supabase.js?v=202610311422"></script>
+<script src="../shared/canales.js?v=202610311422"></script>
+<script src="../shell/shell.js?v=202610311422"></script>
+<script src="../shared/ticket-cambio.js?v=202610311422"></script>
+<script src="../shared/nota-credito.js?v=202610311422"></script>
+<script src="../shared/facturar.js?v=202610311422"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -123,10 +123,11 @@ APP.ready.then(async () => {
       ${+v.saldo ? `<tr><td><b>Saldo pendiente</b></td><td class="num" style="color:var(--aviso)"><b>${fmt.pesos(v.saldo)}</b></td></tr>` : ''}</table>
       ${v.factura_id || (v.estado === 'completada' && facturaLista) ? `<div class="aviso-caja ${v.factura_estado === 'autorizado' ? 'ok' : v.factura_estado === 'rechazado' ? 'error' : 'info'}" style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px"><span>${v.factura_estado === 'autorizado' ? 'Factura ' + esc(v.factura_numero) + (v.nc_id ? (v.nc_estado === 'autorizado' ? ' · anulada con nota de crédito' : ' · nota de crédito en cola') : '') : v.factura_estado === 'pendiente' ? 'Factura en cola: sale sola apenas ARCA responda' : v.factura_estado === 'rechazado' ? 'ARCA rechazó la factura' : 'Sin factura'}</span><span style="display:flex;gap:6px">${v.factura_estado === 'autorizado' ? `<a class="btn chico" target="_blank" href="${FACTURA.urlFactura(v.factura_id)}">Ver factura</a>${v.nc_id && v.nc_estado === 'autorizado' ? `<a class="btn chico" target="_blank" href="${FACTURA.urlFactura(v.nc_id)}">Ver nota de crédito</a>` : ''}` : v.estado === 'completada' && v.factura_estado !== 'pendiente' ? `<button class="btn chico primario" data-facturar>${v.factura_estado === 'rechazado' ? 'Volver a facturar' : 'Facturar'}</button>` : ''}</span></div>` : ''}
       ${(ncs || []).map(c => `<div class="aviso-caja ok" style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px"><span>${c.tipo === 'gift_card' ? 'Gift card' : 'Nota de crédito'} <b class="mono">${esc(c.codigo)}</b> · ${fmt.pesos(c.monto)}${+c.saldo !== +c.monto ? ' · saldo ' + fmt.pesos(c.saldo) : ''}</span><button class="btn chico" data-nc="${c.id}">Ver e imprimir</button></div>`).join('')}
-      <div class="pie" style="justify-content:space-between"><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn" data-print>Reimprimir</button>${v.estado !== 'anulada' && TICKET_CAMBIO.prendas(ls).length ? '<button class="btn" data-regalo title="Para regalo: el número de ticket y las prendas, sin precios">🎁 Ticket de cambio</button>' : ''}${v.estado !== 'anulada' ? `<button class="btn primario" data-editar>Editar</button><a class="btn" href="pos.html?cambio=${v.numero}">Cambio / devolución</a>` : ''}</div>
+      <div class="pie" style="justify-content:space-between"><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn" data-print>Reimprimir</button>${v.estado === 'senada' ? '<button class="btn" data-comp>🎟️ Comprobante de seña</button>' : ''}${v.estado !== 'anulada' && TICKET_CAMBIO.prendas(ls).length ? '<button class="btn" data-regalo title="Para regalo: el número de ticket y las prendas, sin precios">🎁 Ticket de cambio</button>' : ''}${v.estado !== 'anulada' ? `<button class="btn primario" data-editar>Editar</button><a class="btn" href="pos.html?cambio=${v.numero}">Cambio / devolución</a>` : ''}</div>
       <div style="display:flex;gap:6px">${v.origen !== 'tiendanube' && v.factura_estado !== 'autorizado' ? '<button class="btn" data-prueba title="Borra la venta como si no hubiera existido: vuelve el stock y sale de la caja">🧪 Era de prueba</button>' : ''}${v.estado !== 'anulada' ? '<button class="btn peligro" data-anular>Anular</button>' : ''}</div></div>`);
     { const ce = $('[data-canal]', m); if (ce) ce.onclick = () => cambiarCanal(v.id, v.origen, () => { m.cerrar(); cargar(); }); }
     $('[data-print]', m).onclick = () => { imprimir(v, ls, ps); window.print(); };
+    { const bc = $('[data-comp]', m); if (bc) bc.onclick = () => verSena(v); }
     { const br = $('[data-regalo]', m); if (br) br.onclick = () => TICKET_CAMBIO.elegir({ empresa: APP.empresa, numero: '#' + String(v.numero).padStart(6, '0'), fecha: v.fecha, lineas: ls }); }
     $$('[data-nc]', m).forEach(b => b.onclick = () => verCredito((ncs || []).find(c => c.id === b.dataset.nc)));
     const bf = $('[data-facturar]', m); if (bf) bf.onclick = () => { m.cerrar(); FACTURA.abrir(v, { alTerminar: cargar }); };
@@ -236,22 +237,21 @@ APP.ready.then(async () => {
   }
   async function cargarSenas() {
     const { data } = await sb.from('v_ventas').select('*').eq('empresa_id', e).eq('estado', 'senada').order('fecha');
-    const tb = $('#tb-senas tbody'); tb.innerHTML = (data || []).map(x => `<tr><td class="mono">#${String(x.numero).padStart(6, '0')}</td><td>${fmt.fechaHora(x.fecha)}</td><td>${esc(x.cliente_nombre || '—')}</td><td class="num">${fmt.pesos(x.total)}</td><td class="num">${fmt.pesos(x.pagado)}</td><td class="num num-f">${fmt.pesos(x.saldo)}</td><td><button class="btn chico primario" data-ret="${x.id}">Cobrar saldo y entregar</button> <button class="btn chico" data-ver="${x.id}">Ver</button></td></tr>`).join('') || '<tr><td colspan="7" class="vacio">No hay señas pendientes.</td></tr>';
+    const tb = $('#tb-senas tbody'); tb.innerHTML = (data || []).map(x => `<tr><td class="mono">#${String(x.numero).padStart(6, '0')}</td><td>${fmt.fechaHora(x.fecha)}</td><td>${esc(x.cliente_nombre || '—')}</td><td class="num">${fmt.pesos(x.total)}</td><td class="num">${fmt.pesos(x.pagado)}</td><td class="num num-f">${fmt.pesos(x.saldo)}</td><td><a class="btn chico primario" href="pos.html?sena=${x.numero}">Retirar en la caja</a> <button class="btn chico" data-comp="${x.id}">🎟️ Comprobante</button> <button class="btn chico" data-ver="${x.id}">Ver</button></td></tr>`).join('') || '<tr><td colspan="7" class="vacio">No hay señas pendientes.</td></tr>';
     $$('[data-ver]', tb).forEach(b => b.onclick = () => verVenta(b.dataset.ver));
-    $$('[data-ret]', tb).forEach(b => b.onclick = () => retirarSena((data || []).find(x => x.id === b.dataset.ret)));
+    $$('[data-comp]', tb).forEach(b => b.onclick = () => verSena((data || []).find(x => x.id === b.dataset.comp)));
   }
-  async function retirarSena(v) {
-    const { data: formas } = await sb.from('formas_pago').select('*').eq('empresa_id', e).eq('activa', true).order('orden');
-    const { data: turnos } = await sb.from('caja_turnos').select('id').eq('empresa_id', e).eq('estado', 'abierto').limit(1);
-    if (!(turnos || []).length) { toast('Abrí la caja antes de cobrar', 'error'); return; }
-    const m = modal(`<h2>Entregar seña #${String(v.numero).padStart(6, '0')}</h2><p class="sub">Saldo a cobrar: <b class="mono">${fmt.pesos(v.saldo)}</b></p>
-      <div class="campo" style="margin-top:12px"><label>Medio de pago</label><select id="s-forma">${formas.map(f => `<option value="${f.id}">${esc(f.nombre)}</option>`).join('')}</select></div>
-      <div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Cobrar ${fmt.pesos(v.saldo)}</button></div>`);
+  // el comprobante de una seña (número para retirar, prendas, lo que pagó y lo que falta según el medio): ver, imprimir, WhatsApp
+  async function verSena(v) {
+    if (!v) return;
+    const [d, { data: ls }, { data: cli }] = await Promise.all([datosNC(), sb.from('venta_lineas').select('cantidad,descripcion,talle,color,total').eq('venta_id', v.id).order('id'), v.cliente_id ? sb.from('clientes').select('nombre,telefono').eq('id', v.cliente_id).maybeSingle() : Promise.resolve({ data: null })]);
+    const s = { numero: v.numero, fecha: v.fecha, total: +v.total, pagado: +v.pagado, saldo: +v.saldo, lista_id: v.lista_id, lineas: ls || [], estado: v.estado };
+    const o = { empresa: APP.empresa, listas: d.listas, formas: d.formas, clienta: (cli && cli.nombre) || v.cliente_nombre || null, reimpresion: true };
+    const m = modal(`<h2>Seña #${String(v.numero).padStart(6, '0')}</h2><div class="nc-vista">${SENA.html(s, o)}</div>
+      <div class="pie">${v.estado === 'senada' ? `<a class="btn" href="pos.html?sena=${v.numero}" style="margin-right:auto">Retirar en la caja</a>` : ''}<button class="btn" data-no>Cerrar</button><button class="btn" data-wsp>📷 WhatsApp (foto)</button><button class="btn primario" data-print>Imprimir</button></div>`);
     $('[data-no]', m).onclick = () => m.cerrar();
-    $('[data-si]', m).onclick = async () => {
-      const { error } = await sb.rpc('caja_completar_sena', { p: { empresa_id: e, venta_id: v.id, turno_id: turnos[0].id, pagos: [{ forma_pago_id: $('#s-forma', m).value, monto: +v.saldo }] } });
-      if (error) { toast(mensajeError(error), 'error'); return; } m.cerrar(); toast('Seña completada'); cargarSenas();
-    };
+    $('[data-print]', m).onclick = () => { $('#impresion').innerHTML = SENA.html(s, o); window.print(); };
+    $('[data-wsp]', m).onclick = async () => { const r = await SENA.compartir(s, o, cli && cli.telefono); if (SENA.AVISO[r]) toast(SENA.AVISO[r]); };
   }
   async function cargarCierres() {
     const { data } = await sb.from('caja_turnos').select('*, cajas(nombre)').eq('empresa_id', e).order('abierto', { ascending: false }).limit(60);

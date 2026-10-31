@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pasar de bolsa a modelo · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610311413">
+<link rel="stylesheet" href="../shell/shell.css?v=202610311422">
 <style>
   .origen{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center}
   .origen select{border:1px solid var(--linea);background:var(--superficie-2);border-radius:10px;padding:10px 12px;font-size:14px;width:100%}
@@ -37,7 +37,7 @@
   .pestanas-inv a.on{background:var(--superficie-2);color:var(--tinta);box-shadow:0 1px 2px rgba(21,23,28,.08)}
 </style>
 </head>
-<body data-page="inventario" data-etq="Catálogo" data-title="Inventario" data-subtitle="De bolsa a modelo: lo cargado en un código común (BOMBIS «VARIAS», PANTUFLÓN «ANIMADOS»…) se reparte a su modelo, talle y color reales. Cada pase queda registrado.">
+<body data-page="inventario" data-etq="Catálogo" data-title="Inventario" data-subtitle="De bolsa a modelo: lo cargado en un código común (BOMBIS «VARIAS», MEDIAS VARIAS) se reparte a su modelo, talle y color reales. Cada pase queda registrado.">
 <main class="app">
   <nav class="pestanas-inv"><a href="inventario.html#stock">Stock</a><a href="inventario.html#fallas">Con falla</a><a href="inventario.html#recuentos">Recuentos</a><a class="on" href="conteo.html">De bolsa a modelo</a><a href="inventario.html#movimientos">Movimientos</a></nav>
   <div class="card">
@@ -52,8 +52,8 @@
   <div class="card" id="card-hoy" style="display:none"><div class="card-cab"><h2>Contado en esta sesión</h2><span class="sub" id="hoy-total"></span></div><table class="lista hoy" id="tb-hoy"></table></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610311413"></script>
-<script src="../shell/shell.js?v=202610311413"></script>
+<script src="../shared/supabase.js?v=202610311422"></script>
+<script src="../shell/shell.js?v=202610311422"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, mensajeError } = APP, e = APP.empresa.id;
@@ -72,7 +72,7 @@ APP.ready.then(async () => {
     porProducto = new Map(); catalogo.forEach(v => { if (!porProducto.has(v.producto_id)) porProducto.set(v.producto_id, []); porProducto.get(v.producto_id).push(v); });
     pintarBolsas(); pintarFamilias(); pintarGrilla();
   }
-  // bolsas: los genéricos (códigos comunes como BOMBIS «VARIAS» o PANTUFLÓN «ANIMADOS»), con lo que tengan
+  // bolsas: los genéricos (códigos comunes como BOMBIS «VARIAS» o MEDIAS VARIAS), con lo que tengan
   const esBolsa = v => !!(productos[v.producto_id] || {}).es_generico;
   function pintarBolsas() {
     const unicas = catalogo.filter(esBolsa).sort((a, b) => (+b.stock > 0) - (+a.stock > 0) || a.producto_nombre.localeCompare(b.producto_nombre));

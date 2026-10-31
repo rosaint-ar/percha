@@ -220,7 +220,7 @@ APP.ready.then(async () => {
   }
   // cobrar y seña pasan primero por la definición de genéricos y de kits
   $('#btn-cobrar').onclick = async () => { if (!C.carrito.lineas.length) return; if (await definirModelos() && await definirKits()) C.cobrar(false); };
-  $('#btn-sena').onclick = async () => { if (!C.carrito.lineas.length) return; if (await definirModelos() && await definirKits()) C.cobrar(true); };
+  $('#btn-sena').onclick = async () => { if (!C.carrito.lineas.length) return C.retirarSena(); if (await definirModelos() && await definirKits()) C.cobrar(true); };
 
   // ================= Movimiento: la prenda vuela al ticket, el renglón entra, el total sube =================
   // Todo es visual: se mira el ticket después de que caja.js lo dibuja (no cambia nada de la venta).

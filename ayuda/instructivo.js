@@ -78,8 +78,8 @@ window.INSTRUCTIVO = {
       { tipo: 'texto', texto: 'Si en el renglón aparece **⚠ sin stock** o al cobrar te dice "el sistema dice que hay N", es porque el número cargado no coincide con lo que tenés en la mano.' },
       { tipo: 'pasos', items: ['Fijate que sea **la prenda, el talle y el color correctos**.', 'Si está bien, **vendé igual**: queda un aviso para corregir el stock.'] }
     ] },
-    { id: 'genericos', grupo: 'vender', p: 'vender', titulo: 'Bombachas varias y otros códigos comunes', resumen: 'BOMBIS «VARIAS», PANTUFLÓN «ANIMADOS», CHUNAS y MEDIAS VARIAS: se venden rápido y al cobrar se elige el modelo.', bloques: [
-      { tipo: 'texto', texto: 'Algunas prendas se cargan con un **código común** para vender rápido: **BOMBIS «VARIAS»**, **PANTUFLÓN «ANIMADOS»**, **CHUNAS «VARIAS»** y **MEDIAS VARIAS**.' },
+    { id: 'genericos', grupo: 'vender', p: 'vender', titulo: 'Bombachas y medias varias (códigos comunes)', resumen: 'BOMBIS «VARIAS» y MEDIAS VARIAS: se venden rápido y al cobrar se elige el modelo.', bloques: [
+      { tipo: 'texto', texto: 'Las bombachas y las medias se pueden cargar con un **código común** para vender rápido: **BOMBIS «VARIAS»** y **MEDIAS VARIAS**. Todo lo demás (pantuflones, chunas, conjuntos…) se carga con su modelo, talle y color, como siempre.' },
       { tipo: 'pasos', items: [
         'Cargalas en el ticket como cualquier prenda.',
         'Al tocar {{Cobrar}} aparece **"¿Qué modelos se lleva?"**.',
@@ -94,8 +94,23 @@ window.INSTRUCTIVO = {
         ['{{Cambio bombacha}}', 'Se lleva el conjunto pero cambia la bombacha por una suelta del "arma tu pack": **no paga diferencia**. Al cobrar elegís cuál se llevó.']] },
       { tipo: 'tip', texto: 'La bombacha que se lleva en el cambio se elige en la misma ventana "¿Qué modelos se lleva?" y va sin cargo.' }
     ] },
-    { id: 'sena', grupo: 'vender', p: 'vender', titulo: 'Dejar una seña', resumen: 'Paga una parte ahora y el resto al retirar.', bloques: [
-      { tipo: 'pasos', items: ['Cargá las prendas y tocá {{Dejar seña}}.', 'Propone la **mitad**: cambiala si deja otro monto.', 'Cuando vuelve a retirar: **Ventas** › pestaña {{Señas}} › {{Cobrar saldo y entregar}}.'] }
+    { id: 'sena', grupo: 'vender', p: 'vender', titulo: 'Dejar una seña', nuevo: '2026-10-31', resumen: 'Paga una parte, las prendas quedan reservadas y se lleva un comprobante con el número para retirar.', bloques: [
+      { tipo: 'pasos', items: [
+        'Cargá las prendas y tocá {{Dejar seña}}.',
+        'Tocá con qué paga la seña: propone la **mitad** (cambiala si deja otro monto). Confirmá.',
+        'Sale el **comprobante de seña**: el **número para retirar**, las prendas, lo que pagó y **lo que falta según con qué pague**.',
+        '{{Imprimir comprobante de seña}} o {{📷 WhatsApp (foto)}} para mandárselo (en la compu se pega con [[Ctrl]]+[[V]]).'] },
+      { tipo: 'tip', texto: 'Los precios quedan congelados desde que deja la seña.' },
+      { tipo: 'tip', texto: 'Para volver a mandar el comprobante: **Ventas** › pestaña {{Señas}} › {{🎟️ Comprobante}}.' }
+    ] },
+    { id: 'sena-retirar', grupo: 'vender', p: 'vender', titulo: 'Retirar una seña', nuevo: '2026-10-31', resumen: 'Con el ticket vacío, {{🎟️ Retirar seña}}: buscás la seña y cobrás lo que falta.', bloques: [
+      { tipo: 'pasos', items: [
+        'Con el ticket **vacío**, tocá {{🎟️ Retirar seña}} (es el mismo botón de "Dejar seña").',
+        'Buscá por el **número del comprobante**, el nombre o el teléfono de la clienta, y tocá la seña.',
+        'Tocá con qué paga **lo que falta**: el importe ya está bien según el medio.',
+        '{{Cobrar y entregar}}: entregale las prendas.'] },
+      { tipo: 'ejemplo', titulo: 'Dejó $13.000 en efectivo de un conjunto de $26.000 (precio Contado)', filas: [['Paga lo que falta en efectivo o transferencia', '**$13.000**'], ['Con débito', '**$14.625**'], ['Con tarjeta', '**$16.250**'], ['¿Por qué?', 'como en los cambios: el descuento del efectivo vale solo para la plata que entra en efectivo']] },
+      { tipo: 'tip', texto: 'También desde **Ventas** › {{Señas}} › {{Retirar en la caja}}: te lleva al Punto de venta con la seña lista.' }
     ] },
     { id: 'ticket-regalo', grupo: 'vender', p: 'vender', titulo: 'Ticket de cambio para regalo', nuevo: '2026-10-31', resumen: 'Un ticket sin precios para que quien recibe el regalo lo pueda cambiar.', bloques: [
       { tipo: 'pasos', items: [
@@ -235,7 +250,7 @@ window.INSTRUCTIVO = {
 
     // ======================= CONSULTAS =======================
     { id: 'ventas', grupo: 'consultas', p: ['ventas_propias', 'ventas_todas'], titulo: 'Ver las ventas', resumen: '**Ventas**: tickets, señas, notas de crédito y cierres.', bloques: [
-      { tipo: 'tabla', filas: [['Tocar un ticket', 'ver el detalle, {{Reimprimir}}, {{Editar}} o hacer un {{Cambio / devolución}} desde ahí'], ['{{Señas}}', 'las señas pendientes de retirar'], ['{{Créditos}}', 'notas de crédito: tocá una para verla, imprimirla o mandarla por WhatsApp']] },
+      { tipo: 'tabla', filas: [['Tocar un ticket', 'ver el detalle, {{Reimprimir}}, {{Editar}} o hacer un {{Cambio / devolución}} desde ahí'], ['{{Señas}}', 'las señas pendientes: {{Retirar en la caja}} o {{🎟️ Comprobante}} para reenviarlo'], ['{{Créditos}}', 'notas de crédito: tocá una para verla, imprimirla o mandarla por WhatsApp']] },
       { tipo: 'tip', texto: 'La etiqueta del canal (Local, WhatsApp, Web) se puede tocar para corregirla si quedó mal.' }
     ] },
     { id: 'pendientes', grupo: 'consultas', p: 'vender', titulo: '📌 Pendientes', resumen: 'Las prendas vendidas que quedaron sin definir el modelo.', bloques: [
@@ -261,7 +276,7 @@ window.INSTRUCTIVO = {
         ['Código común', 'un código para vender rápido muchas prendas parecidas (ej. BOMBIS «VARIAS»); al cobrar se elige el modelo'],
         ['📌 Pendientes', 'prendas vendidas que quedaron sin decir qué modelo eran'],
         ['Falla', 'una unidad con algún defecto; no se muestra en la web'],
-        ['Seña', 'pago a cuenta: el resto se cobra al retirar'],
+        ['Seña', 'pago a cuenta: las prendas quedan reservadas y el resto se cobra al retirar, con el número del comprobante'],
         ['Nota de crédito', 'saldo a favor de la clienta, con un código para usarlo después'],
         ['Turno o caja', 'desde que abrís la caja hasta que la cerrás'],
         ['Arqueo', 'contar la plata al cerrar y ver si coincide con lo vendido']] }

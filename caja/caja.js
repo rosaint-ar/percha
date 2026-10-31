@@ -451,7 +451,7 @@ APP.ready.then(async () => {
     { const dl = $('[data-dev-listo]', cont); if (dl) dl.onclick = () => { carrito.devolviendo = false; pintar(); $('#q').focus(); }; }
     $('#ticket-sub').textContent = carrito.cambio ? (carrito.cambio.numero ? `Cambio sobre la venta #${carrito.cambio.numero}` : 'Cambio sin ticket') : (c.lineas.length ? (n => n + (n === 1 ? ' prenda' : ' prendas'))(c.lineas.filter(l => !l.parte && !l.canje).reduce((s, l) => s + Math.abs(l.cantidad), 0)) : 'Nueva venta');
     $('#btn-cobrar').disabled = !c.lineas.length;
-    $('#btn-sena').disabled = !c.lineas.length || !!carrito.cambio;
+    { const bs = $('#btn-sena'); bs.disabled = !!carrito.cambio; bs.textContent = c.lineas.length ? 'Dejar seña' : '🎟️ Retirar seña'; }
   }
   $('#btn-vaciar').onclick = async () => { if (!carrito.lineas.length || await confirmar('¿Vaciar el ticket?', 'Vaciar')) { carrito.lineas = []; carrito.cambio = null; carrito.devolviendo = false; carrito.envio = null; pintarEntrega(); carrito.descPct = 0; $('#desc-general').value = 0; $('#nota').value = ''; pintar(); } };
   $('#desc-general').onchange = ev => { if (!APP.puede('descuentos') && +ev.target.value > 0) { toast('Los descuentos los habilita administración', 'error'); ev.target.value = 0; } carrito.descPct = Math.min(100, Math.max(0, +ev.target.value || 0)); pintar(); };
@@ -707,7 +707,7 @@ APP.ready.then(async () => {
   }
   { const n = document.getElementById('nota'); if (n && !document.getElementById('btn-entrega')) { n.insertAdjacentHTML('afterend', '<button class="btn chico" id="btn-entrega" type="button" title="Envío o retiro: medio, costo y dirección">🚚 Entrega</button>'); document.getElementById('btn-entrega').onclick = entrega; } }
   $('#btn-cobrar').onclick = () => cobrar(false);
-  $('#btn-sena').onclick = () => cobrar(true);
+  $('#btn-sena').onclick = () => carrito.lineas.length ? cobrar(true) : retirarSena();
 
   // ---- envío con cola sin internet ----
   const colaPendiente = () => JSON.parse(localStorage.getItem(LS('cola_ventas')) || '[]');
@@ -765,22 +765,30 @@ APP.ready.then(async () => {
     const imprimirTicket = () => { $('#impresion').innerHTML = html; window.print(); };
     $('#impresion').innerHTML = html;
     const nc = window.NOTA_CREDITO && ncs[0];
+    // seña: su comprobante (número para retirar, prendas, lo que pagó y lo que falta según el medio), como la nota de crédito
+    const sena = p.estado === 'senada' && !res.pendiente && window.SENA ? { numero: res.numero, fecha: new Date().toISOString(), total: aPagar, pagado: r2(extra.pagos.reduce((s, x) => s + x.monto, 0)), lista_id: p.lista_id, lineas: p.lineas, estado: 'senada' } : null;
+    if (sena) sena.saldo = r2(sena.total - sena.pagado);
+    const senaOpts = { empresa: emp, listas, formas, clienta: (clientes.find(c => c.id === p.cliente_id) || {}).nombre || null };
     // ticket de cambio para regalo (sin precios): se resalta si la nota dice "regalo"
-    const regalable = !nc && !res.pendiente && window.TICKET_CAMBIO && TICKET_CAMBIO.prendas(p.lineas).length > 0, regalo = /regalo/i.test(p.nota || '');
+    const regalable = !nc && p.estado !== 'senada' && !res.pendiente && window.TICKET_CAMBIO && TICKET_CAMBIO.prendas(p.lineas).length > 0, regalo = /regalo/i.test(p.nota || '');
     const texto = encodeURIComponent(nc ? NOTA_CREDITO.texto(ncDe(nc), ncOpts) : `${emp.nombre} · ${esCambio ? 'Cambio' : 'Ticket'} ${num}\n` + p.lineas.map(l => `${l.cantidad}× ${l.descripcion} ${[l.talle, l.color].filter(Boolean).join(' ')} ${fmt.pesos(l.total)}`).join('\n') + `\n${rotulo} ${fmt.pesos(esCambio ? Math.abs(aPagar) : aPagar)}` + (p.estado === 'senada' ? `\nSeña: saldo ${fmt.pesos(r2(aPagar - extra.pagos.reduce((s, x) => s + x.monto, 0)))}` : '') + `\n¡Gracias por tu compra!`);
-    const titulo = res.pendiente ? (esCambio ? 'Cambio guardado' : 'Venta guardada') + ' (se sube al volver internet)' : nc ? '✓ Nota de crédito emitida' : esCambio ? (aPagar < 0 ? '✓ Devolución ' + num + ' registrada' : '✓ Cambio ' + num + ' registrado') : '✓ Venta ' + num + ' registrada';
-    const cuerpo = nc ? `<p class="sub">Cambio ${esc(num)}${origenNum ? ' del ticket ' + origenNum : ''}. Así se imprime:</p><div class="nc-vista">${NOTA_CREDITO.html(ncDe(nc), ncOpts)}</div>`
+    const titulo = res.pendiente ? (esCambio ? 'Cambio guardado' : 'Venta guardada') + ' (se sube al volver internet)' : sena ? '✓ Seña ' + num + ' registrada' : nc ? '✓ Nota de crédito emitida' : esCambio ? (aPagar < 0 ? '✓ Devolución ' + num + ' registrada' : '✓ Cambio ' + num + ' registrado') : '✓ Venta ' + num + ' registrada';
+    const cuerpo = sena ? `<p class="sub">Las prendas quedan reservadas. Mandale el comprobante: con ese número la retira y paga lo que falta.</p><div class="nc-vista">${SENA.html(sena, senaOpts)}</div>`
+      : nc ? `<p class="sub">Cambio ${esc(num)}${origenNum ? ' del ticket ' + origenNum : ''}. Así se imprime:</p><div class="nc-vista">${NOTA_CREDITO.html(ncDe(nc), ncOpts)}</div>`
       : esCambio ? `<div style="font:800 30px var(--f-titulo);letter-spacing:-.03em;margin:6px 0">${aPagar > 0 ? 'Cobrado ' + fmt.pesos(aPagar) : aPagar < 0 ? 'Devuelto ' + fmt.pesos(-aPagar) : 'Sin diferencia'}</div>${aPagar < 0 ? `<p class="sub">Por ${esc(extra.pagos.filter(x => x.monto).map(x => x.nombre).join(' y '))}</p>` : ''}`
       : `<div style="font:800 30px var(--f-titulo);letter-spacing:-.03em;margin:6px 0"><span data-monto-venta>${fmt.pesos(aPagar)}</span> ${res.pendiente ? '' : '🎉'}</div>`;
     const m = modal(`<h2>${titulo}</h2>${cuerpo}
       ${extra.vuelto ? `<div class="aviso-caja info">Vuelto: <b>${fmt.pesos(extra.vuelto)}</b></div>` : ''}
       ${(res.creditos || []).filter(c => c !== nc).map(c => `<div class="aviso-caja ok">${c.tipo === 'gift_card' ? 'Gift card' : 'Nota de crédito'} emitida · código <b class="mono">${c.codigo}</b> · ${fmt.pesos(c.monto)}</div>`).join('')}
-      <div class="pie" style="justify-content:space-between"><div style="display:flex;gap:8px;flex-wrap:wrap">${res.id && p.estado === 'completada' && aPagar > 0 && !p.reservada && !res.reservada && window.FACTURA ? '<button class="btn" data-facturar hidden>Facturar</button>' : ''}${nc ? '<button class="btn primario" data-print-nc>Imprimir nota de crédito</button><button class="btn" data-print>Imprimir el cambio</button>' : `<button class="btn" data-print>Imprimir ${esCambio ? 'comprobante' : 'ticket'}</button>`}${regalable ? `<button class="btn${regalo ? ' primario' : ''}" data-regalo title="Para regalo: el número de ticket y las prendas, sin precios">🎁 Ticket de cambio</button>` : ''}${nc ? '<button class="btn" data-wsp-nc>📷 WhatsApp (foto)</button>' : `<a class="btn" href="whatsapp://send?text=${texto}">WhatsApp</a>`}${res.id && !res.pendiente ? '<button class="btn" data-prueba title="Borra esta venta como si no hubiera existido">🧪 Era de prueba</button>' : ''}</div><button class="btn${nc ? '' : ' primario'}" data-ok>Nueva venta</button></div>`, { fijo: true });
+      <div class="pie" style="justify-content:space-between"><div style="display:flex;gap:8px;flex-wrap:wrap">${res.id && p.estado === 'completada' && aPagar > 0 && !p.reservada && !res.reservada && window.FACTURA ? '<button class="btn" data-facturar hidden>Facturar</button>' : ''}${sena ? '<button class="btn primario" data-print-sena>Imprimir comprobante de seña</button>' : nc ? '<button class="btn primario" data-print-nc>Imprimir nota de crédito</button><button class="btn" data-print>Imprimir el cambio</button>' : `<button class="btn" data-print>Imprimir ${esCambio ? 'comprobante' : 'ticket'}</button>`}${regalable ? `<button class="btn${regalo ? ' primario' : ''}" data-regalo title="Para regalo: el número de ticket y las prendas, sin precios">🎁 Ticket de cambio</button>` : ''}${sena ? '<button class="btn" data-wsp-sena>📷 WhatsApp (foto)</button>' : nc ? '<button class="btn" data-wsp-nc>📷 WhatsApp (foto)</button>' : `<a class="btn" href="whatsapp://send?text=${texto}">WhatsApp</a>`}${res.id && !res.pendiente ? '<button class="btn" data-prueba title="Borra esta venta como si no hubiera existido">🧪 Era de prueba</button>' : ''}</div><button class="btn${nc || sena ? '' : ' primario'}" data-ok>Nueva venta</button></div>`, { fijo: true });
+    if (sena) { const md = $('.modal', m); if (md) md.style.maxWidth = '560px';
+      $('[data-print-sena]', m).onclick = () => { $('#impresion').innerHTML = SENA.html(sena, senaOpts); window.print(); };
+      $('[data-wsp-sena]', m).onclick = async () => { const r = await SENA.compartir(sena, senaOpts, (clientes.find(c => c.id === p.cliente_id) || {}).telefono); if (SENA.AVISO[r]) toast(SENA.AVISO[r]); }; }
     if (nc) { const md = $('.modal', m); if (md) md.style.maxWidth = '560px'; $('[data-print-nc]', m).onclick = () => { $('#impresion').innerHTML = NOTA_CREDITO.html(ncDe(nc), ncOpts); window.print(); };
       $('[data-wsp-nc]', m).onclick = async () => { const r = await NOTA_CREDITO.compartir(ncDe(nc), ncOpts, (clientes.find(c => c.id === p.cliente_id) || {}).telefono); if (NOTA_CREDITO.AVISO[r]) toast(NOTA_CREDITO.AVISO[r]); }; }
     { const br = $('[data-regalo]', m); if (br) br.onclick = () => TICKET_CAMBIO.elegir({ empresa: emp, numero: num, fecha: new Date().toISOString(), lineas: p.lineas }); }
     if (!res.pendiente && !esCambio) { fx.sonido('venta'); fx.pop($('[data-monto-venta]', m)); if (fx.brillo) fx.brillo($('.modal', m) || m); }
-    $('[data-print]', m).onclick = imprimirTicket;
+    { const bp = $('[data-print]', m); if (bp) bp.onclick = imprimirTicket; }   // la seña no tiene ticket: tiene su comprobante
     const bf = $('[data-facturar]', m);
     if (bf) FACTURA.config(e).then(c => { if (c.estado !== 'listo') return; bf.hidden = false; bf.onclick = () => FACTURA.abrir({ id: res.id, numero: res.numero, total: extra.total.aPagar, cliente_id: p.cliente_id || null, cliente_nombre: null }, { alTerminar: c2 => { if (c2 && c2.estado === 'autorizado') { bf.textContent = '✓ ' + c2.nombre_tipo + ' ' + c2.numero_mostrar; bf.onclick = () => window.open(FACTURA.urlFactura(c2.id), '_blank'); } } }); });
     $('[data-ok]', m).onclick = () => { m.cerrar(); $('#q').focus(); };
@@ -791,6 +799,58 @@ APP.ready.then(async () => {
       if (error) { toast(mensajeError(error), 'error'); return; }
       m.cerrar(); toast('Venta de prueba borrada ✓ · stock devuelto'); if (window.empujarStock) empujarStock(e); $('#q').focus();
     };
+  }
+
+  // ================= Retirar una seña =================
+  // Con el ticket vacío, el botón de la seña la retira: se busca por número (el del comprobante), clienta o teléfono y se cobra
+  // lo que falta. Como en los cambios, lo que falta vale lo mismo en otra lista: una seña de Contado con $12.000 de saldo son
+  // $15.000 pagando con tarjeta (la diferencia queda como recargo de la venta).
+  const datosSena = s => ({ numero: s.numero, fecha: s.fecha, total: +s.total, pagado: +s.pagado, saldo: +s.saldo, lista_id: s.lista_id, lineas: s.lineas || [], estado: s.estado || 'senada' });
+  const saldoEn = (s, f) => { const ls = listasDe(f), dest = !ls || ls.includes(s.lista_id) ? s.lista_id : ls[0]; return { lista: dest, monto: dest === s.lista_id || !s.lista_id ? +s.saldo : Math.round(+s.saldo * pctLista(dest) / pctLista(s.lista_id)) }; };
+  async function retirarSena(q0) {
+    if (!turno) { toast('Primero abrí la caja', 'error'); abrirTurno(); return; }
+    const m = modal(`<h2>🎟️ Retirar una seña</h2><p class="sub">Buscá por el número del comprobante, el nombre o el teléfono de la clienta.</p>
+      <input id="rs-q" class="pick-busca" placeholder="Ej. 75, María, 358…" autocomplete="off" value="${esc(q0 || '')}">
+      <div id="rs-lista" style="margin-top:10px;max-height:52vh;overflow:auto"></div><div id="rs-det"></div>`, { fijo: true });
+    { const md = $('.modal', m); if (md) md.style.maxWidth = '660px'; }
+    const qIn = $('#rs-q', m), lista = $('#rs-lista', m), det = $('#rs-det', m); let filas = [], tq = null;
+    const pintarLista = () => { lista.innerHTML = filas.map((x, i) => `<button type="button" class="cv-fila" data-i="${i}"><span class="cv-num">#${String(x.numero).padStart(6, '0')}</span><span class="cv-info"><b>${esc(x.cliente || 'Sin clienta')}</b><small>${esc((x.lineas || []).map(l => (+l.cantidad) + '× ' + l.descripcion).join(' | '))}</small></span><span class="cv-der"><b>Falta ${fmt.pesos(x.saldo)}</b><small>${fmt.fechaHora(x.fecha)}</small></span></button>`).join('') || '<div class="vacio">No hay señas pendientes con eso.</div>';
+      $$('[data-i]', lista).forEach(b => b.onclick = () => abrir(filas[+b.dataset.i])); };
+    const buscar = async () => { const { data, error } = await sb.rpc('senas_buscar', { e, q: qIn.value.trim() }); if (error) { lista.innerHTML = `<div class="vacio">${esc(mensajeError(error))}</div>`; return; } filas = data || []; pintarLista(); if (filas.length === 1 && qIn.value.trim()) abrir(filas[0]); };
+    qIn.addEventListener('input', () => { clearTimeout(tq); tq = setTimeout(buscar, 220); });
+    function abrir(s) {
+      lista.hidden = true; qIn.hidden = true;
+      const ver = [...new Map(formas.map(f => { const x = saldoEn(s, f); return [x.lista, x]; })).values()].sort((a, b) => a.monto - b.monto);
+      det.innerHTML = `<div class="nc-vista" style="width:auto;margin:6px 0 10px">${window.SENA ? SENA.html(datosSena(s), { empresa: APP.empresa, listas, formas, clienta: s.cliente }) : ''}</div>
+        ${ver.length > 1 ? `<div class="aviso-caja info"><b>Lo que falta, según con qué pague:</b> ${ver.map(x => `precio ${esc(nombreLista(x.lista))} <b>${fmt.pesos(x.monto)}</b>`).join(' · ')}</div>` : ''}
+        <p class="sub" style="margin:10px 0 6px">Tocá con qué paga lo que falta:</p>
+        ${window.MEDIOS ? MEDIOS.botonera(formas, usosFormas, listaDeForma) : `<div class="formas">${formas.map(f => `<button data-f="${f.id}">${esc(f.nombre)}</button>`).join('')}</div>`}
+        <div class="resto" id="rs-resto"></div>
+        <div class="pie"><button class="btn" data-volver style="margin-right:auto">← Otra seña</button><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si disabled>Cobrar y entregar</button></div>`;
+      $$('[data-cred]', det).forEach(b => b.remove());
+      let elegido = null;
+      $$('[data-f]', det).forEach(b => b.onclick = () => {
+        const f = formas.find(x => x.id === b.dataset.f); elegido = { f, ...saldoEn(s, f) };
+        $$('[data-f]', det).forEach(x => x.classList.toggle('on', x === b));
+        const r = $('#rs-resto', det); r.className = 'resto ok'; r.innerHTML = `<span>${esc(f.nombre)}</span><span>${fmt.pesos(elegido.monto)}</span>`;
+        $('[data-si]', det).disabled = false; $('[data-si]', det).textContent = 'Cobrar ' + fmt.pesos(elegido.monto) + ' y entregar';
+      });
+      $('[data-volver]', det).onclick = () => { det.innerHTML = ''; lista.hidden = false; qIn.hidden = false; qIn.focus(); };
+      $('[data-no]', det).onclick = () => m.cerrar();
+      $('[data-si]', det).onclick = async () => {
+        if (!elegido) return; const b = $('[data-si]', det); b.disabled = true; b.textContent = 'Registrando…';
+        const { data, error } = await sb.rpc('caja_completar_sena', { p: { empresa_id: e, venta_id: s.id, turno_id: turno.id, recargo: r2(elegido.monto - s.saldo),
+          pagos: [{ forma_pago_id: elegido.f.id, monto: elegido.monto, cuotas: elegido.f.cuotas || 1, recargo_pct: 0 }] } });
+        if (error) { b.disabled = false; b.textContent = 'Cobrar y entregar'; toast(mensajeError(error), 'error'); return; }
+        m.cerrar(); fx.sonido('venta'); toast(`✓ Seña #${String(s.numero).padStart(6, '0')} retirada`);
+        const fin = modal(`<h2>✓ Seña #${String(s.numero).padStart(6, '0')} retirada</h2><div style="font:800 30px var(--f-titulo);letter-spacing:-.03em;margin:6px 0">Cobrado ${fmt.pesos(elegido.monto)}</div>
+          <p class="sub">${esc(s.cliente || 'La clienta')} ya pagó todo: entregale las prendas.</p>
+          <div class="aviso-caja info" style="margin-top:8px">${(s.lineas || []).filter(l => +l.cantidad > 0).map(l => `${+l.cantidad}× <b>${esc(l.descripcion)}</b> ${esc([l.talle, l.color].filter(Boolean).join(' · '))}`).join('<br>')}</div>
+          <div class="pie"><button class="btn primario" data-ok>Listo</button></div>`);
+        $('[data-ok]', fin).onclick = () => { fin.cerrar(); $('#q').focus(); };
+      };
+    }
+    buscar(); qIn.focus();
   }
 
   // ================= Cambio / devolución =================
@@ -887,7 +947,7 @@ APP.ready.then(async () => {
   // ================= Arranque =================
   // lo que el POS (pos.js) necesita de la caja: catálogo en memoria, carrito y acciones
   APP.caja = { get catalogo() { return catalogo; }, get productos() { return productos; }, get carrito() { return carrito; }, get turno() { return turno; }, get listas() { return listas; },
-    agregar, elegirProducto, pintar, precioLista, precioProducto, cambiarPrecio, cobrar, calcular: () => calcular(), buscar, abrirTurno, cerrarTurno, movimientoCaja, pintarEstado, colaPendiente, sincronizar, buscadorPick, pintarAvisosStock, revisarStock };
+    agregar, elegirProducto, pintar, precioLista, precioProducto, retirarSena, cambiarPrecio, cobrar, calcular: () => calcular(), buscar, abrirTurno, cerrarTurno, movimientoCaja, pintarEstado, colaPendiente, sincronizar, buscadorPick, pintarAvisosStock, revisarStock };
   // Recordatorio: prendas vendidas sin stock en el sistema (o sin marcar la falla) que hay que corregir
   // Pendientes (prendas sin definir, stock para revisar): la píldora va en el ticket porque el POS no tiene barra superior
   function pintarAvisosStock() {
@@ -897,4 +957,5 @@ APP.ready.then(async () => {
   reservarNumero(); await cargarBase(); await cargarTurno(); pintar(); pintarRecientes(); sincronizar(); pintarAvisosStock();
   if (APP.caja.alCargar) APP.caja.alCargar();
   const params = new URLSearchParams(location.search); if (params.get('cambio')) { $('#btn-cambio').click(); }
+  if (params.get('sena')) setTimeout(() => retirarSena(params.get('sena')), 600);
 });
