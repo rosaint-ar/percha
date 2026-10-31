@@ -100,7 +100,7 @@ window.INSTRUCTIVO = {
         'Tocá con qué paga la seña: propone la **mitad** (cambiala si deja otro monto). Confirmá.',
         'Sale el **comprobante de seña**: el **número para retirar**, las prendas, lo que pagó y **lo que falta según con qué pague**.',
         '{{Imprimir comprobante de seña}} o {{📷 WhatsApp (foto)}} para mandárselo (en la compu se pega con [[Ctrl]]+[[V]]).'] },
-      { tipo: 'tip', texto: 'Los precios quedan congelados desde que deja la seña.' },
+      { tipo: 'texto', texto: 'Los precios quedan **congelados 15 días**: el comprobante dice hasta qué fecha.' },
       { tipo: 'tip', texto: 'Para volver a mandar el comprobante: **Ventas** › pestaña {{Señas}} › {{🎟️ Comprobante}}.' }
     ] },
     { id: 'sena-retirar', grupo: 'vender', p: 'vender', titulo: 'Retirar una seña', nuevo: '2026-10-31', resumen: 'Con el ticket vacío, {{🎟️ Retirar seña}}: buscás la seña y cobrás lo que falta.', bloques: [
@@ -110,6 +110,7 @@ window.INSTRUCTIVO = {
         'Tocá con qué paga **lo que falta**: el importe ya está bien según el medio.',
         '{{Cobrar y entregar}}: entregale las prendas.'] },
       { tipo: 'ejemplo', titulo: 'Dejó $13.000 en efectivo de un conjunto de $26.000 (precio Contado)', filas: [['Paga lo que falta en efectivo o transferencia', '**$13.000**'], ['Con débito', '**$14.625**'], ['Con tarjeta', '**$16.250**'], ['¿Por qué?', 'como en los cambios: el descuento del efectivo vale solo para la plata que entra en efectivo']] },
+      { tipo: 'ojo', texto: 'Si pasaron **más de 15 días**, lo que falta se cobra **al precio de hoy**. La caja lo calcula sola y te avisa con ⏰ cuánto era y cuánto es ahora.' },
       { tipo: 'tip', texto: 'También desde **Ventas** › {{Señas}} › {{Retirar en la caja}}: te lleva al Punto de venta con la seña lista.' }
     ] },
     { id: 'ticket-regalo', grupo: 'vender', p: 'vender', titulo: 'Ticket de cambio para regalo', nuevo: '2026-10-31', resumen: 'Un ticket sin precios para que quien recibe el regalo lo pueda cambiar.', bloques: [

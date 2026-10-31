@@ -40,6 +40,9 @@
   }
   /* s: { numero, fecha, total, pagado, saldo, lista_id, lineas: [{ cantidad, descripcion, talle, color, total }], estado }
      o: { empresa, listas, formas, clienta, reimpresion } */
+  // los precios de una seña quedan congelados 15 días (o lo que diga la empresa en config.sena_dias); después se cobra al precio de hoy
+  const senaDias = o => +(((o || {}).empresa || {}).config || {}).sena_dias || 15;
+  const senaHasta = (s, o) => new Date(new Date(s.fecha || Date.now()).getTime() + senaDias(o) * 864e5);
   function docSena(s, o) {
     o = o || {}; const vs = valores({ saldo: s.saldo, lista_id: s.lista_id }, o.listas, o.formas), retirada = s.estado && s.estado !== 'senada';
     return { empresa: o.empresa, titulo: 'SEÑA', codigo: num(s.numero), codigoNota: 'número para retirar',
@@ -47,7 +50,7 @@
       principal: retirada || !vs[0].texto ? null : [`Pagando con ${vs[0].texto}: `, pesos(vs[0].valor), '.'], otros: retirada ? [] : vs.slice(1),
       pares: [['Fecha', fechaTxt(s.fecha) + (o.reimpresion ? ' (copia)' : '')]].concat(o.clienta ? [['Clienta', o.clienta]] : [], [['Total', pesos(s.total)], ['Pagó de seña', pesos(s.pagado)]]),
       grupos: [['PRENDAS RESERVADAS', (s.lineas || []).filter(l => +l.cantidad > 0)]], conPrecios: true,
-      vence: 'Los precios quedan congelados.',
+      vence: (() => { const d = senaHasta(s, o); return retirada ? '' : `Precios congelados hasta el ${d.toLocaleDateString('es-AR')}` + (Date.now() > d ? ' (ya venció: se cobra al precio de hoy)' : ''); })(),
       pie: ['Presentá este comprobante para retirar tus prendas.', 'Documento no válido como factura.'] };
   }
 
@@ -155,5 +158,5 @@
   }
   const AVISO = { copiada: 'La foto quedó copiada: en WhatsApp pegala con Ctrl+V', descargada: 'La foto se descargó: adjuntala en WhatsApp' };
   window.NOTA_CREDITO = { html: (nc, o) => htmlDoc(docNC(nc, o)), texto: (nc, o) => textoDoc(docNC(nc, o)), imagen: (nc, o) => imagenDoc(docNC(nc, o)), compartir: (nc, o, t) => compartirDoc(docNC(nc, o), t), valores, medios, AVISO };
-  window.SENA = { html: (s, o) => htmlDoc(docSena(s, o)), texto: (s, o) => textoDoc(docSena(s, o)), imagen: (s, o) => imagenDoc(docSena(s, o)), compartir: (s, o, t) => compartirDoc(docSena(s, o), t), valores, AVISO };
+  window.SENA = { dias: senaDias, hasta: senaHasta, html: (s, o) => htmlDoc(docSena(s, o)), texto: (s, o) => textoDoc(docSena(s, o)), imagen: (s, o) => imagenDoc(docSena(s, o)), compartir: (s, o, t) => compartirDoc(docSena(s, o), t), valores, AVISO };
 })();

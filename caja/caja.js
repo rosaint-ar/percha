@@ -818,10 +818,15 @@ APP.ready.then(async () => {
       $$('[data-i]', lista).forEach(b => b.onclick = () => abrir(filas[+b.dataset.i])); };
     const buscar = async () => { const { data, error } = await sb.rpc('senas_buscar', { e, q: qIn.value.trim() }); if (error) { lista.innerHTML = `<div class="vacio">${esc(mensajeError(error))}</div>`; return; } filas = data || []; pintarLista(); if (filas.length === 1 && qIn.value.trim()) abrir(filas[0]); };
     qIn.addEventListener('input', () => { clearTimeout(tq); tq = setTimeout(buscar, 220); });
-    function abrir(s) {
+    function abrir(s0) {
       lista.hidden = true; qIn.hidden = true;
+      // precios congelados 15 días: después, lo que falta sale del precio de hoy de cada prenda (a la lista de la seña)
+      const hasta = window.SENA ? SENA.hasta(s0, { empresa: APP.empresa }) : null, vencida = hasta && Date.now() > hasta;
+      const totalHoy = vencida ? r2((s0.lineas || []).reduce((t, l) => { const v = l.variante_id && catalogo.find(x => x.id === l.variante_id); return t + (v ? precioLista(v, s0.lista_id) * +l.cantidad : +l.total); }, 0)) : +s0.total;
+      const s = vencida && totalHoy !== +s0.total ? Object.assign({}, s0, { total: totalHoy, saldo: Math.max(0, r2(totalHoy - s0.pagado)) }) : s0;
       const ver = [...new Map(formas.map(f => { const x = saldoEn(s, f); return [x.lista, x]; })).values()].sort((a, b) => a.monto - b.monto);
-      det.innerHTML = `<div class="nc-vista" style="width:auto;margin:6px 0 10px">${window.SENA ? SENA.html(datosSena(s), { empresa: APP.empresa, listas, formas, clienta: s.cliente }) : ''}</div>
+      det.innerHTML = `<div class="nc-vista" style="width:auto;margin:6px 0 10px">${window.SENA ? SENA.html(datosSena(s0), { empresa: APP.empresa, listas, formas, clienta: s0.cliente }) : ''}</div>
+        ${s !== s0 ? `<div class="aviso-caja error" style="margin-bottom:8px">⏰ <b>Pasaron más de ${SENA.dias({ empresa: APP.empresa })} días</b> (los precios estaban congelados hasta el ${hasta.toLocaleDateString('es-AR')}): se cobra al precio de hoy. Total ${fmt.pesos(s0.total)} → <b>${fmt.pesos(s.total)}</b>.</div>` : ''}
         ${ver.length > 1 ? `<div class="aviso-caja info"><b>Lo que falta, según con qué pague:</b> ${ver.map(x => `precio ${esc(nombreLista(x.lista))} <b>${fmt.pesos(x.monto)}</b>`).join(' · ')}</div>` : ''}
         <p class="sub" style="margin:10px 0 6px">Tocá con qué paga lo que falta:</p>
         ${window.MEDIOS ? MEDIOS.botonera(formas, usosFormas, listaDeForma) : `<div class="formas">${formas.map(f => `<button data-f="${f.id}">${esc(f.nombre)}</button>`).join('')}</div>`}
@@ -839,7 +844,7 @@ APP.ready.then(async () => {
       $('[data-no]', det).onclick = () => m.cerrar();
       $('[data-si]', det).onclick = async () => {
         if (!elegido) return; const b = $('[data-si]', det); b.disabled = true; b.textContent = 'Registrando…';
-        const { data, error } = await sb.rpc('caja_completar_sena', { p: { empresa_id: e, venta_id: s.id, turno_id: turno.id, recargo: r2(elegido.monto - s.saldo),
+        const { data, error } = await sb.rpc('caja_completar_sena', { p: { empresa_id: e, venta_id: s.id, turno_id: turno.id, recargo: r2(elegido.monto - s0.saldo),
           pagos: [{ forma_pago_id: elegido.f.id, monto: elegido.monto, cuotas: elegido.f.cuotas || 1, recargo_pct: 0 }] } });
         if (error) { b.disabled = false; b.textContent = 'Cobrar y entregar'; toast(mensajeError(error), 'error'); return; }
         m.cerrar(); fx.sonido('venta'); toast(`✓ Seña #${String(s.numero).padStart(6, '0')} retirada`);
