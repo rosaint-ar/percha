@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ventas · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610311330">
+<link rel="stylesheet" href="../shell/shell.css?v=202610311337">
 <style>
   .filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
   .filtros input[type=date],.filtros select{border:1px solid var(--linea);background:var(--superficie-2);padding:8px 10px;border-radius:var(--radio-mini)}
@@ -55,11 +55,11 @@
 </main>
 <div id="impresion"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610311330"></script>
-<script src="../shared/canales.js?v=202610311330"></script>
-<script src="../shell/shell.js?v=202610311330"></script>
-<script src="../shared/nota-credito.js?v=202610311330"></script>
-<script src="../shared/facturar.js?v=202610311330"></script>
+<script src="../shared/supabase.js?v=202610311337"></script>
+<script src="../shared/canales.js?v=202610311337"></script>
+<script src="../shell/shell.js?v=202610311337"></script>
+<script src="../shared/nota-credito.js?v=202610311337"></script>
+<script src="../shared/facturar.js?v=202610311337"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -113,7 +113,7 @@ APP.ready.then(async () => {
   }
   async function verVenta(id) {
     const [{ data: v }, { data: ls }, { data: ps }] = await Promise.all([sb.from('v_ventas').select('*').eq('id', id).single(), sb.from('venta_lineas').select('*').eq('venta_id', id).order('id'), sb.from('venta_pagos').select('*, formas_pago(nombre), creditos(codigo,tipo)').eq('venta_id', id)]);
-    const { data: ncs } = await sb.from('creditos').select('*, clientes(nombre)').eq('empresa_id', e).eq('origen_venta_id', id);
+    const { data: ncs } = await sb.from('creditos').select('*, clientes(nombre,telefono)').eq('empresa_id', e).eq('origen_venta_id', id);
     const m = modal(`<h2>Ticket #${String(v.numero).padStart(6, '0')} ${ESTADO[v.estado]} ${canalEditable(v.id, v.origen)}</h2><p class="sub">${fmt.fechaHora(v.fecha)} · ${v.vendedora_nombre ? 'atendió ' + esc(v.vendedora_nombre) : 'sin vendedora'}${v.cliente_nombre ? ' · ' + esc(v.cliente_nombre) : ''}${v.referencia ? ' · ref. ' + esc(v.referencia) : ''}${v.nota ? ' · ' + esc(v.nota) : ''}${v.anulada_motivo ? ' · anulada: ' + esc(v.anulada_motivo) : ''}</p>
       <table class="lista detalle" style="margin-top:10px">${ls.map(l => `<tr><td>${l.cantidad}× ${esc(l.descripcion)}${l.falla ? ' <span title="Prenda con falla" style="color:#8a6400">◆</span>' : ''}<br><small>${esc([l.talle, l.color].filter(Boolean).join(' · '))}${l.promocion_nombre ? ' · ★ ' + esc(l.promocion_nombre) : ''}${l.descuento_pct ? ' · −' + l.descuento_pct + '%' : ''}</small></td><td class="num">${fmt.pesos(l.total)}</td></tr>`).join('')}
       ${+v.descuento ? `<tr><td>Descuento ${v.descuento_pct}%</td><td class="num">−${fmt.pesos(v.descuento)}</td></tr>` : ''}${+v.recargo ? `<tr><td>Recargo</td><td class="num">${fmt.pesos(v.recargo)}</td></tr>` : ''}
@@ -277,12 +277,13 @@ APP.ready.then(async () => {
     const m = modal(`<h2>${c.tipo === 'gift_card' ? 'Gift card' : 'Nota de crédito'} <span class="mono">${esc(c.codigo)}</span> <span class="chip ${c.estado === 'vigente' ? 'ok' : 'gris'}">${esc(c.estado)}</span></h2>
       <div class="nc-vista">${NOTA_CREDITO.html(c, o)}</div>
       ${(usos || []).length ? `<p class="sub">Usada en ${usos.map(u => u.ventas ? `el ticket #${String(u.ventas.numero).padStart(6, '0')} (${fmt.fecha(u.ventas.fecha)}): ${fmt.pesos(u.monto)}` : fmt.pesos(u.monto)).join(' · ')}</p>` : ''}
-      <div class="pie"><button class="btn" data-no>Cerrar</button><button class="btn primario" data-print>Imprimir</button></div>`);
+      <div class="pie"><button class="btn" data-no>Cerrar</button><button class="btn" data-wsp>📷 WhatsApp (foto)</button><button class="btn primario" data-print>Imprimir</button></div>`);
     $('[data-no]', m).onclick = () => m.cerrar();
     $('[data-print]', m).onclick = () => { $('#impresion').innerHTML = NOTA_CREDITO.html(c, o); window.print(); };
+    $('[data-wsp]', m).onclick = async () => { const r = await NOTA_CREDITO.compartir(c, o, c.clientes && c.clientes.telefono); if (NOTA_CREDITO.AVISO[r]) toast(NOTA_CREDITO.AVISO[r]); };
   }
   async function cargarCreditos() {
-    const { data } = await sb.from('creditos').select('*, clientes(nombre)').eq('empresa_id', e).order('creado', { ascending: false }).limit(200);
+    const { data } = await sb.from('creditos').select('*, clientes(nombre,telefono)').eq('empresa_id', e).order('creado', { ascending: false }).limit(200);
     const tb = $('#tb-creditos tbody'); tb.innerHTML = (data || []).map(c => `<tr class="clic" data-c="${c.id}"><td class="mono">${esc(c.codigo)}</td><td>${c.tipo === 'gift_card' ? 'Gift card' : 'Nota de crédito'}</td><td>${esc(c.clientes ? c.clientes.nombre : '—')}</td><td>${fmt.fecha(c.creado)}</td><td class="num">${fmt.pesos(c.monto)}</td><td class="num num-f">${fmt.pesos(c.saldo)}</td><td><span class="chip ${c.estado === 'vigente' ? 'ok' : 'gris'}">${c.estado}</span></td></tr>`).join('') || '<tr><td colspan="7" class="vacio">No hay créditos emitidos.</td></tr>';
     $$('[data-c]', tb).forEach(r => r.onclick = () => verCredito((data || []).find(c => c.id === r.dataset.c)));
   }

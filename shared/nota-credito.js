@@ -49,12 +49,88 @@
       ${saldo < +nc.monto ? `<div class="nc-chico">Monto original ${pesos(nc.monto)} · ya usado ${pesos(+nc.monto - saldo)}</div>` : ''}
       ${vs[0].texto ? `<div class="nc-vale">Vale <b>${pesos(vs[0].valor)}</b> pagando con ${h(vs[0].texto)}.</div>${vs.length > 1 ? `<div class="nc-vale nc-chico">${vs.slice(1).map(x => `Con ${h(x.texto)}: <b>${pesos(x.valor)}</b>`).join(' · ')}</div>` : ''}` : ''}
       <div class="nc-vale nc-chico">${nc.vence ? 'Vence el ' + new Date(nc.vence + 'T12:00').toLocaleDateString('es-AR') : 'Sin vencimiento'}${nc.estado && nc.estado !== 'vigente' ? ' · <b>' + h(nc.estado.toUpperCase()) + '</b>' : ''}</div>
-      <hr><div class="c nc-chico">Presentá este código en tu próxima compra.<br>Se puede usar en partes.<br>Documento no válido como factura.</div></div>`;
+      <hr><div class="c nc-chico">Presentá este código en tu próxima compra.<br>Documento no válido como factura.</div></div>`;
   }
   // texto para mandar por WhatsApp
   function texto(nc, o) {
     const vs = valores(nc, (o || {}).listas, (o || {}).formas), emp = ((o || {}).empresa || {}).nombre || '';
     return `${emp} · *Nota de crédito ${nc.codigo}*\nSaldo a favor: ${pesos(nc.saldo != null ? nc.saldo : nc.monto)}` + (vs[0].texto ? `\nVale ${pesos(vs[0].valor)} pagando con ${vs[0].texto}` + vs.slice(1).map(x => `\nCon ${x.texto}: ${pesos(x.valor)}`).join('') : '') + '\nPresentá este código en tu próxima compra.';
   }
-  window.NOTA_CREDITO = { html, texto, valores, medios };
+  // ================= La nota como foto (PNG), para mandarla por WhatsApp =================
+  const cargarImg = url => new Promise(r => { if (!url) return r(null); const i = new Image(); i.crossOrigin = 'anonymous'; i.onload = () => r(i); i.onerror = () => r(null); i.src = url; setTimeout(() => r(null), 4000); });
+  async function imagen(nc, o) {
+    o = o || {}; const emp = o.empresa || {}, vs = valores(nc, o.listas, o.formas), saldo = nc.saldo != null ? +nc.saldo : +nc.monto;
+    const raiz = getComputedStyle(document.documentElement), UI = raiz.getPropertyValue('--f-ui').trim() || 'sans-serif', MONO = raiz.getPropertyValue('--f-mono').trim() || 'monospace';
+    const AC = raiz.getPropertyValue('--acento').trim() || '#5B4B8A', TINTA = '#1d1a24', GRIS = '#6e6878', LINEA = '#e4dfeb';
+    try { await document.fonts.ready; } catch (_) {}
+    let logo = await cargarImg(emp.logo_url);
+    const W = 600, P = 40, S = 2, num = n => '#' + String(n).padStart(6, '0');
+    const fecha = new Date(nc.creado || Date.now()).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    // se dibuja dos veces: la primera solo mide el alto
+    const dibujar = (ctx, medir) => {
+      let y = 0;
+      const txt = (t, x, f, c, al) => { if (!medir) { ctx.font = f; ctx.fillStyle = c; ctx.textAlign = al || 'left'; ctx.fillText(t, x, y); } };
+      const partir = (t, f, ancho) => { ctx.font = f; const ps = String(t).split(' '), ls = []; let l = ''; ps.forEach(p => { const n = l ? l + ' ' + p : p; if (ctx.measureText(n).width > ancho && l) { ls.push(l); l = p; } else l = n; }); if (l) ls.push(l); return ls; };
+      const rect = (x, yy, w, h, r, fill, stroke, dash) => { if (medir) return; ctx.beginPath(); ctx.roundRect(x, yy, w, h, r); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.setLineDash(dash || []); ctx.strokeStyle = stroke; ctx.lineWidth = 2; ctx.stroke(); ctx.setLineDash([]); } };
+      if (!medir) { ctx.fillStyle = '#f3f0f7'; ctx.fillRect(0, 0, W, ctx.canvas.height / S); }
+      const card0 = 20; y = card0;
+      const cardAlto = ctx.__alto || 0; rect(20, card0, W - 40, cardAlto - card0 - 20, 22, '#fff');
+      // encabezado: logo (o el nombre) y dirección
+      y += 30;
+      if (logo) { const h = 64, w = Math.min(260, logo.width * h / logo.height); if (!medir) ctx.drawImage(logo, (W - w) / 2, y, w, h); y += h + 22; }
+      else { y += 26; txt(emp.nombre || '', W / 2, `800 28px ${UI}`, TINTA, 'center'); y += 24; }
+      const dir = [emp.domicilio, emp.localidad].filter(Boolean).join(' · ') + (emp.telefono ? ' · ' + emp.telefono : '');
+      if (dir) { txt(dir, W / 2, `500 14px ${UI}`, GRIS, 'center'); y += 26; }
+      // franja del título
+      rect(20, y, W - 40, 50, 0, AC); y += 33; txt(nc.tipo === 'gift_card' ? 'G I F T   C A R D' : 'N O T A   D E   C R É D I T O', W / 2, `800 19px ${UI}`, '#fff', 'center'); y += 45;
+      // el código
+      rect(P + 40, y, W - 2 * P - 80, 84, 16, '#faf8fc', AC, [10, 7]); y += 56;
+      txt(String(nc.codigo).split('').join(' '), W / 2, `800 40px ${MONO}`, TINTA, 'center'); y += 20;
+      txt('código para usarla', W / 2, `600 12px ${UI}`, GRIS, 'center'); y += 46;
+      // el saldo
+      txt('SALDO A FAVOR', W / 2, `700 13px ${UI}`, GRIS, 'center'); y += 52;
+      txt(pesos(saldo), W / 2, `800 50px ${UI}`, AC, 'center'); y += 34;
+      if (vs[0].texto) {
+        partir(`Vale ${pesos(vs[0].valor)} pagando con ${vs[0].texto}`, `600 16px ${UI}`, W - 2 * P - 20).forEach(l => { txt(l, W / 2, `600 16px ${UI}`, TINTA, 'center'); y += 23; });
+        vs.slice(1).forEach(x => { txt(`Con ${x.texto}: ${pesos(x.valor)}`, W / 2, `500 14px ${UI}`, GRIS, 'center'); y += 21; });
+      }
+      if (saldo < +nc.monto) { txt(`Monto original ${pesos(nc.monto)} · ya usado ${pesos(+nc.monto - saldo)}`, W / 2, `500 13px ${UI}`, GRIS, 'center'); y += 20; }
+      // el detalle
+      y += 14; if (!medir) { ctx.fillStyle = LINEA; ctx.fillRect(P, y, W - 2 * P, 1.5); } y += 30;
+      const par = (a, b) => { txt(a, P, `500 14px ${UI}`, GRIS); txt(b, W - P, `600 14px ${UI}`, TINTA, 'right'); y += 24; };
+      par('Fecha', fecha); if (o.clienta) par('Clienta', o.clienta);
+      if (o.origen) par('Por', 'cambio del ticket ' + num(o.origen)); else if (o.ticket) par('Comprobante', num(o.ticket));
+      par('Vence', nc.vence ? new Date(nc.vence + 'T12:00').toLocaleDateString('es-AR') : 'sin vencimiento');
+      const grupo = (t, ls) => { if (!(ls || []).length) return; y += 10; txt(t, P, `700 12px ${UI}`, AC); y += 22;
+        ls.forEach(l => { const d = `${Math.abs(l.cantidad)}× ${l.descripcion}` + ([l.talle, l.color].filter(Boolean).length ? ' · ' + [l.talle, l.color].filter(Boolean).join(' · ') : ''); partir(d, `500 14px ${UI}`, W - 2 * P - 110).forEach((x, i) => { txt(x, P, `500 14px ${UI}`, TINTA); if (!i) txt(pesos(Math.abs(l.total)), W - P, `600 14px ${UI}`, TINTA, 'right'); y += 21; }); }); };
+      grupo('DEVOLVIÓ', o.devuelve); grupo('SE LLEVÓ', o.lleva);
+      y += 16; if (!medir) { ctx.fillStyle = LINEA; ctx.fillRect(P, y, W - 2 * P, 1.5); } y += 30;
+      txt('Presentá este código en tu próxima compra.', W / 2, `600 14px ${UI}`, TINTA, 'center'); y += 21;
+      txt('Documento no válido como factura.', W / 2, `500 12px ${UI}`, GRIS, 'center'); y += 40;
+      return y + 20;
+    };
+    const cv = document.createElement('canvas'), ctx = cv.getContext('2d');
+    cv.width = W * S; cv.height = 10; const alto = dibujar(ctx, true);
+    cv.height = alto * S; ctx.scale(S, S); ctx.__alto = alto;
+    try { dibujar(ctx, false); return await new Promise((r, x) => cv.toBlob(b => b ? r(b) : x(new Error('sin imagen')), 'image/png')); }
+    catch (_) { logo = null; ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); ctx.scale(S, S); dibujar(ctx, false); return await new Promise(r => cv.toBlob(r, 'image/png')); }   // logo sin permiso: sin logo
+  }
+  // Mandarla como foto. Celular: el menú de compartir (elegís WhatsApp y el chat). Compu: la foto queda copiada y se abre
+  // WhatsApp (en el chat de la clienta si tiene teléfono) para pegarla con Ctrl+V. Si nada de eso se puede, se descarga.
+  function telWsp(t) { let d = String(t || '').replace(/\D/g, '').replace(/^0+/, ''); if (!d) return ''; if (d.startsWith('54')) return d; if (d.length === 10) return '549' + d; return d.length > 10 ? d : ''; }
+  async function compartir(nc, o, telefono) {
+    const nombre = `nota-credito-${nc.codigo}.png`, prom = imagen(nc, o);
+    const tactil = window.matchMedia && matchMedia('(pointer:coarse)').matches;
+    const abrirWsp = () => { const t = telWsp(telefono); location.href = 'whatsapp://send' + (t ? '?phone=' + t : ''); };
+    if (!tactil && navigator.clipboard && window.ClipboardItem) {
+      try { await navigator.clipboard.write([new ClipboardItem({ 'image/png': prom })]); abrirWsp(); return 'copiada'; } catch (_) {}
+    }
+    const blob = await prom, file = new File([blob], nombre, { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: 'Nota de crédito ' + nc.codigo }); return 'compartida'; } catch (e) { if (e && e.name === 'AbortError') return 'cancelada'; }
+    }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nombre; document.body.appendChild(a); a.click(); a.remove(); return 'descargada';
+  }
+  const AVISO = { copiada: 'La foto de la nota quedó copiada: en WhatsApp pegala con Ctrl+V', descargada: 'La foto de la nota se descargó: adjuntala en WhatsApp' };
+  window.NOTA_CREDITO = { html, texto, valores, medios, imagen, compartir, AVISO };
 })();
