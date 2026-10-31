@@ -792,7 +792,7 @@ APP.ready.then(async () => {
 
   // ================= Cambio / devolución =================
   $('#btn-cambio').onclick = () => {
-    const m = modal(`<h2>Cambio o devolución</h2><p class="sub">Buscá la venta por número (o parte), clienta, fecha (27/10, oct), prenda, talle, color o total.</p>
+    const m = modal(`<h2>Cambio o devolución</h2><p class="sub">Buscá la venta por número (o parte), clienta, fecha (27/10, oct), prenda, talle, color o total. <a href="../ayuda/instructivo.html#cambios-pasos" target="_blank">¿Cómo se hace un cambio?</a></p>
       <input class="cv-busca" id="cv-q" placeholder="Ej. 123 · maría · 27/10 · conjunto negro 95" autocomplete="off">
       <div id="cv-lista" class="cv-lista"></div><div id="cv-res"></div>
       <div class="sin-ticket"><span><b>¿No tiene ticket?</b>Se carga lo que trae tocándolo o escaneándolo, al precio de hoy.</span><button class="btn" data-sin-ticket>Devolver sin ticket</button></div>`);

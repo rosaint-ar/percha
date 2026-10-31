@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Instructivo · Percha</title>
+<meta name="app-root" content="../">
+<link rel="stylesheet" href="../shell/shell.css?v=202610311353">
+<style>
+  /* Instructivo: el contenido vive en instructivo.js; acá solo se arma. */
+  .ins{display:grid;grid-template-columns:220px minmax(0,1fr);gap:18px;align-items:start}
+  .ins-indice{position:sticky;top:14px;padding:14px 12px}
+  .ins-indice a{display:flex;gap:8px;align-items:center;padding:7px 10px;border-radius:9px;color:var(--tinta-2);text-decoration:none;font-weight:600;font-size:13px}
+  .ins-indice a:hover{background:var(--relleno)}
+  .ins-indice a.on{background:var(--lila);color:var(--acento)}
+  .ins-indice .n{margin-left:auto;font:600 11px var(--f-mono);color:var(--tinta-4)}
+  .ins-arriba{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+  .ins-busca{flex:1;min-width:220px;border:1.5px solid var(--linea);background:var(--superficie-2);border-radius:12px;padding:11px 14px;font:500 15px var(--f-ui)}
+  .ins-busca:focus{outline:0;border-color:var(--acento);box-shadow:0 0 0 4px var(--lila)}
+  .ins-nuevo{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:-4px 0 14px;font-size:13px;color:var(--tinta-3)}
+  .ins-nuevo a{background:var(--lila);color:var(--acento);border-radius:99px;padding:4px 11px;font-weight:700;text-decoration:none;font-size:12.5px}
+  .ins-grupo{margin:22px 0 10px;display:flex;align-items:center;gap:10px;scroll-margin-top:72px}
+  .ins-grupo:first-child{margin-top:0}
+  .ins-grupo h2{font-size:19px}
+  .ins-grupo .ico{font-size:22px}
+  details.tema{background:var(--superficie);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--superficie-borde);border-radius:var(--radio);box-shadow:var(--sombra);margin-bottom:10px;scroll-margin-top:72px}
+  details.tema>summary{list-style:none;cursor:pointer;padding:14px 18px;display:grid;grid-template-columns:1fr auto;gap:2px 12px;align-items:center}
+  details.tema>summary::-webkit-details-marker{display:none}
+  details.tema>summary b{font:700 15.5px var(--f-titulo);letter-spacing:-.01em}
+  details.tema>summary .res{grid-column:1;color:var(--tinta-3);font-size:13px}
+  details.tema>summary .flecha{grid-row:1 / span 2;grid-column:2;color:var(--tinta-4);transition:transform .2s;font-size:18px}
+  details.tema[open]>summary .flecha{transform:rotate(90deg)}
+  details.tema[open]>summary{border-bottom:1px solid var(--linea-suave)}
+  .chip-nuevo{display:inline-block;background:var(--acento);color:#fff;border-radius:99px;font:700 10px var(--f-ui);letter-spacing:.06em;padding:2px 8px;margin-left:8px;vertical-align:2px}
+  .tema-cuerpo{padding:14px 18px 16px;display:grid;gap:12px;font-size:14px;line-height:1.55}
+  .tema-cuerpo p{margin:0}
+  ol.pasos{margin:0;padding:0;list-style:none;counter-reset:p;display:grid;gap:8px}
+  ol.pasos li{counter-increment:p;display:grid;grid-template-columns:26px 1fr;gap:10px;align-items:start}
+  ol.pasos li::before{content:counter(p);width:24px;height:24px;border-radius:50%;background:var(--acento);color:#fff;font:700 12px var(--f-ui);display:grid;place-items:center;margin-top:1px}
+  .caja-tip,.caja-ojo,.caja-decir{border-radius:11px;padding:10px 13px;display:grid;grid-template-columns:22px 1fr;gap:8px}
+  .caja-tip{background:var(--ok-fondo)} .caja-ojo{background:var(--aviso-fondo)} .caja-decir{background:var(--lila)}
+  .caja-decir i{font-style:normal;color:var(--tinta-2)}
+  table.ins-t{width:100%;border-collapse:collapse;font-size:13.5px}
+  table.ins-t td{padding:8px 10px;border-bottom:1px solid var(--linea-suave);vertical-align:top}
+  table.ins-t td:first-child{width:42%;color:var(--tinta-2);font-weight:600}
+  table.ins-t tr:last-child td{border-bottom:0}
+  .ejemplo{border:1px solid var(--linea);border-radius:12px;overflow:hidden}
+  .ejemplo .et{background:var(--relleno);padding:8px 12px;font-weight:700;font-size:13px}
+  .ejemplo table.ins-t td:first-child{font-weight:500}
+  kbd{display:inline-block;min-width:22px;text-align:center;font:600 11.5px var(--f-mono);background:#fff;border:1px solid var(--linea);border-bottom-width:2px;border-radius:6px;padding:1px 6px;margin:0 1px;color:var(--tinta)}
+  .bt{display:inline-block;background:var(--superficie-2);border:1px solid var(--linea);border-radius:8px;padding:0 7px;font-weight:600;font-size:.94em;white-space:nowrap}
+  mark{background:rgba(255,214,0,.45);border-radius:3px;padding:0 1px}
+  .ins-vacio{padding:30px;text-align:center;color:var(--tinta-3)}
+  .ins-pie{color:var(--tinta-4);font-size:12px;margin-top:18px;text-align:center}
+  @media (max-width:860px){.ins{grid-template-columns:1fr}.ins-indice{position:static;display:flex;gap:6px;overflow-x:auto;padding:8px}.ins-indice a{white-space:nowrap}.ins-indice .n{display:none}.ins-indice .etq{display:none}}
+  @media print{.lateral,.barra,.ins-indice,.ins-arriba,.ins-nuevo,.flecha{display:none!important}.ins{display:block}details.tema{box-shadow:none;break-inside:avoid;border:1px solid #ccc}body{background:#fff}}
+</style>
+</head>
+<body data-page="instructivo" data-etq="Ayuda" data-title="Instructivo" data-subtitle="Todo lo que hay que saber para vender con Percha, paso a paso">
+<main class="app">
+  <div class="ins">
+    <nav class="card ins-indice" id="indice"></nav>
+    <div>
+      <div class="ins-arriba">
+        <input class="ins-busca" id="q" type="search" placeholder="Buscá: cambio, seña, nota de crédito, cerrar caja…" autocomplete="off">
+        <button class="btn" id="todo" type="button">Abrir todo</button>
+        <button class="btn" id="imprimir" type="button">Imprimir</button>
+      </div>
+      <div class="ins-nuevo" id="nuevo"></div>
+      <div id="temas"></div>
+      <p class="ins-pie" id="pie"></p>
+    </div>
+  </div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../shared/supabase.js?v=202610311353"></script>
+<script src="../shell/shell.js?v=202610311353"></script>
+<script src="instructivo.js?v=202610311353"></script>
+<script>
+APP.ready.then(() => {
+  const { esc, $, $$ } = APP, D = window.INSTRUCTIVO;
+  const sinTildes = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  // marcas del contenido: **negrita** · [[tecla]] · {{botón}}
+  const marcar = s => esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\[\[(.+?)\]\]/g, '<kbd>$1</kbd>').replace(/\{\{(.+?)\}\}/g, '<span class="bt">$1</span>');
+  const plano = t => [t.titulo, t.resumen].concat(t.bloques.flatMap(b => [b.texto, b.titulo].concat(b.items || [], (b.filas || []).flat()))).filter(Boolean).join(' ').replace(/\*\*|\[\[|\]\]|\{\{|\}\}/g, '');
+  const reciente = t => t.nuevo && (Date.now() - new Date(t.nuevo + 'T12:00')) / 864e5 <= 21;
+  const fecha = f => new Date(f + 'T12:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'long' });
+  const bloque = b => {
+    if (b.tipo === 'pasos') return `<ol class="pasos">${b.items.map(x => `<li><span>${marcar(x)}</span></li>`).join('')}</ol>`;
+    if (b.tipo === 'tip') return `<div class="caja-tip"><span>💡</span><span>${marcar(b.texto)}</span></div>`;
+    if (b.tipo === 'ojo') return `<div class="caja-ojo"><span>⚠️</span><span>${marcar(b.texto)}</span></div>`;
+    if (b.tipo === 'decir') return `<div class="caja-decir"><span>💬</span><span><b>Qué decirle:</b> <i>“${marcar(b.texto)}”</i></span></div>`;
+    if (b.tipo === 'tabla') return `<table class="ins-t">${b.filas.map(f => `<tr><td>${marcar(f[0])}</td><td>${marcar(f[1])}</td></tr>`).join('')}</table>`;
+    if (b.tipo === 'ejemplo') return `<div class="ejemplo"><div class="et">${marcar(b.titulo)}</div><table class="ins-t">${b.filas.map(f => `<tr><td>${marcar(f[0])}</td><td>${marcar(f[1])}</td></tr>`).join('')}</table></div>`;
+    return `<p>${marcar(b.texto)}</p>`;
+  };
+  const tema = t => `<details class="tema" id="${t.id}" data-grupo="${t.grupo}"><summary><b>${esc(t.titulo)}${reciente(t) ? '<span class="chip-nuevo">NUEVO</span>' : ''}</b><span class="flecha">›</span><span class="res">${marcar(t.resumen || '')}</span></summary><div class="tema-cuerpo">${t.bloques.map(bloque).join('')}</div></details>`;
+
+  function pintar() {
+    const q = sinTildes($('#q').value.trim()), ws = q.split(/\s+/).filter(Boolean);
+    const ts = D.temas.filter(t => !ws.length || ws.every(w => sinTildes(plano(t)).includes(w)));
+    $('#temas').innerHTML = D.grupos.map(g => { const xs = ts.filter(t => t.grupo === g.id); return xs.length ? `<div class="ins-grupo" id="g-${g.id}"><span class="ico">${g.icono}</span><h2>${esc(g.titulo)}</h2></div>` + xs.map(tema).join('') : ''; }).join('')
+      || '<div class="card ins-vacio">No encontré nada con eso. Probá con otra palabra (ej. "cambio", "seña", "caja").</div>';
+    $('#indice').innerHTML = '<p class="etq" style="margin:2px 10px 8px">Temas</p>' + D.grupos.map(g => { const n = ts.filter(t => t.grupo === g.id).length; return n ? `<a href="#g-${g.id}" data-g="${g.id}">${g.icono} ${esc(g.titulo)}<span class="n">${n}</span></a>` : ''; }).join('');
+    if (ws.length) $$('details.tema').forEach(d => { d.open = true; resaltar(d, ws); });
+  }
+  // resalta lo buscado en el texto (sin tocar las etiquetas)
+  function resaltar(el, ws) {
+    const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), nodos = []; while (w.nextNode()) nodos.push(w.currentNode);
+    nodos.forEach(n => { const t = n.nodeValue, s = sinTildes(t); let i = -1, w0 = null; for (const x of ws) { const j = s.indexOf(x); if (j >= 0 && (i < 0 || j < i)) { i = j; w0 = x; } } if (i < 0) return;
+      const m = document.createElement('mark'); const r = document.createRange(); r.setStart(n, i); r.setEnd(n, i + w0.length); r.surroundContents(m); });
+  }
+  const nuevos = D.temas.filter(reciente);
+  $('#nuevo').innerHTML = nuevos.length ? `<span>✨ Novedades:</span>${nuevos.map(t => `<a href="#${t.id}">${esc(t.titulo)}</a>`).join('')}` : '';
+  $('#pie').textContent = `Actualizado el ${fecha(D.actualizado)}. Si algo no está o no se entiende, avisale a Emi.`;
+  $('#q').addEventListener('input', () => { pintar(); });
+  $('#todo').onclick = () => { const abrir = $$('details.tema').some(d => !d.open); $$('details.tema').forEach(d => d.open = abrir); $('#todo').textContent = abrir ? 'Cerrar todo' : 'Abrir todo'; };
+  $('#imprimir').onclick = () => { $$('details.tema').forEach(d => d.open = true); window.print(); };
+  // ir a un tema (#cambios-pasos) o a un grupo (#g-cambios): se abre y se muestra
+  function irA() {
+    const id = decodeURIComponent(location.hash.slice(1)); if (!id) return;
+    const el = document.getElementById(id); if (!el) return;
+    if (el.tagName === 'DETAILS') el.open = true;
+    if (id.startsWith('g-')) $$(`details.tema[data-grupo="${id.slice(2)}"]`).forEach(d => d.open = true);
+    el.scrollIntoView({ block: 'start' });
+  }
+  $('#nuevo').addEventListener('click', ev => { const a = ev.target.closest('a'); if (a) setTimeout(irA, 0); });
+  window.addEventListener('hashchange', irA);
+  pintar();
+  if (location.hash) setTimeout(irA, 150); else $('#q').focus({ preventScroll: true });
+});
+</script>
+</body>
+</html>

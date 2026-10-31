@@ -17,6 +17,7 @@
 
   // ---------- íconos (trazo, 24x24) ----------
   const I = {
+    ayuda: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5V5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M6 21h13"/><path d="M9 7h6M9 11h4"/></svg>',
     percha: '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><path d="M32 24c-5 0-8-3-8-7s3.5-7 8-7 8 3 8 7c0 3-2 5-5 6.5"/><path d="M32 24v5"/><path d="M32 29 8 44c-2 1.3-1.2 4.5 1.3 4.5h45.4c2.5 0 3.3-3.2 1.3-4.5L32 29z"/></svg>',
     inicio: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>',
     catalogo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.3"/></svg>',
@@ -137,7 +138,9 @@
     { id: 'informes', label: 'Informes', href: '#', icono: 'informes', prox: true, p: 'inicio' },
     { grupo: 'Sistema', p: ['conexiones', 'configuracion'] },
     { id: 'conexiones', label: 'Conexiones', href: 'conexiones/conexiones.html', icono: 'conexiones', p: 'conexiones' },
-    { id: 'configuracion', label: 'Configuración', href: 'configuracion/empresa.html', icono: 'config', p: 'configuracion' }
+    { id: 'configuracion', label: 'Configuración', href: 'configuracion/empresa.html', icono: 'config', p: 'configuracion' },
+    { grupo: 'Ayuda' },
+    { id: 'instructivo', label: 'Instructivo', href: 'ayuda/instructivo.html', icono: 'ayuda' }
   ];
   // qué permiso pide cada pantalla (data-page del body); la primera permitida es adonde se manda a quien no puede
   const PERMISO_PAGINA = { inicio: 'inicio', pos: 'vender', caja: 'vender', ventas: ['ventas_todas', 'ventas_propias'], envios: 'vender', productos: 'catalogo_ver', catalogo: 'catalogo_ver', etiquetas: 'catalogo_editar', inventario: 'catalogo_ver', conteo: 'catalogo_editar', compras: 'compras', conexiones: 'conexiones', configuracion: 'configuracion' };
