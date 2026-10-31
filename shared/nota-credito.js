@@ -38,6 +38,16 @@
       vence: (nc.vence ? 'Vence el ' + new Date(nc.vence + 'T12:00').toLocaleDateString('es-AR') : 'Sin vencimiento') + (nc.estado && nc.estado !== 'vigente' ? ' · ' + nc.estado.toUpperCase() : ''),
       pie: ['Presentá este código en tu próxima compra.', 'Documento no válido como factura.'] };
   }
+  /* Gift card: siempre a precio de lista (lo que dice es lo que vale en la web). nc.dedicatoria = { para, de, mensaje }.
+     o.web = true si la tienda tiene la web conectada (la gift card también es un cupón de descuento ahí). */
+  function docGift(nc, o) {
+    o = o || {}; const saldo = nc.saldo != null ? +nc.saldo : +nc.monto, ded = nc.dedicatoria || {};
+    return { empresa: o.empresa, titulo: 'GIFT CARD', codigo: nc.codigo, codigoNota: 'tu código', dedicatoria: ded,
+      montoNota: saldo < +nc.monto ? 'SALDO' : 'VALE', monto: saldo, extra: saldo < +nc.monto ? `De ${pesos(nc.monto)} · ya usado ${pesos(+nc.monto - saldo)}` : '',
+      principal: null, otros: [], pares: [['Fecha', fechaTxt(nc.creado) + (o.reimpresion ? ' (copia)' : '')]], grupos: [], conPrecios: false,
+      vence: (nc.vence ? 'Vence el ' + new Date(nc.vence + 'T12:00').toLocaleDateString('es-AR') : 'Sin vencimiento') + (nc.estado && nc.estado !== 'vigente' ? ' · ' + nc.estado.toUpperCase() : ''),
+      pie: [o.web ? 'Usala en el local o como cupón de descuento en la tienda online.' : 'Presentá este código en el local.', 'Documento no válido como factura.'] };
+  }
   /* s: { numero, fecha, total, pagado, saldo, lista_id, lineas: [{ cantidad, descripcion, talle, color, total }], estado }
      o: { empresa, listas, formas, clienta, reimpresion } */
   // los precios de una seña quedan congelados 15 días (o lo que diga la empresa en config.sena_dias); después se cobra al precio de hoy
@@ -56,7 +66,7 @@
 
   // ================= En papel (80 mm) =================
   const css = `.nc .nc-tit{font:800 17px var(--f-ui,sans-serif);letter-spacing:.12em;text-align:center;border:2px solid #000;padding:5px 0;margin:8px 0 6px}
-    .nc .nc-cod{font:800 24px var(--f-mono,monospace);letter-spacing:.18em;text-align:center;border:1.5px dashed #000;padding:6px 0 4px;margin:0 4mm}
+    .nc .nc-cod{font:800 24px var(--f-mono,monospace);letter-spacing:.18em;text-align:center;border:1.5px dashed #000;padding:6px 0 4px;margin:0 4mm;word-break:break-all}
     .nc .nc-cod small{display:block;font:500 10px var(--f-ui,sans-serif);letter-spacing:0;margin-top:2px}
     .nc .nc-sec{font-weight:700;font-size:11px;letter-spacing:.06em;margin:6px 0 2px}
     .nc .nc-monto{display:flex;justify-content:space-between;align-items:baseline;border-top:2px solid #000;border-bottom:2px solid #000;padding:6px 0;margin:8px 0 6px;font-weight:800}
@@ -66,12 +76,14 @@
     .nc-vista h2{font:700 15px var(--f-ui,sans-serif);margin:0 0 2px}.nc-vista .c{text-align:center}.nc-vista .r{text-align:right}
     .nc-vista table{width:100%;border-collapse:collapse}.nc-vista td{padding:2px 0;vertical-align:top}.nc-vista hr{border:0;border-top:1px dashed #000;margin:6px 0}`;
   function estilos() { if (document.getElementById('nc-css')) return; const s = document.createElement('style'); s.id = 'nc-css'; s.textContent = css; document.head.appendChild(s); }
+  const dedHtml = x => x && (x.para || x.de || x.mensaje) ? `<div class="c" style="margin:4px 0 8px">${x.para ? 'Para <b>' + h(x.para) + '</b>' : ''}${x.para && x.de ? '<br>' : ''}${x.de ? 'De <b>' + h(x.de) + '</b>' : ''}${x.mensaje ? '<br><i>“' + h(x.mensaje) + '”</i>' : ''}</div>` : '';
   function htmlDoc(d) {
     estilos(); const emp = d.empresa || {};
     const fila = l => `<tr><td>${Math.abs(l.cantidad)}× ${h(l.descripcion)}<br><small>${h([l.talle, l.color].filter(Boolean).join(' · '))}</small></td>${d.conPrecios ? `<td class="r">${pesos(Math.abs(l.total))}</td>` : ''}</tr>`;
     return `<div class="nc">${emp.logo_url ? `<div class="c"><img src="${h(emp.logo_url)}" alt="" style="max-width:42mm;max-height:20mm;margin:0 auto 4px;display:block"></div>` : ''}<h2 class="c">${h(emp.nombre)}</h2>
       <div class="c">${h([emp.domicilio, emp.localidad].filter(Boolean).join(' · '))}${emp.telefono ? '<br>' + h(emp.telefono) : ''}</div>
       <div class="nc-tit">${h(d.titulo)}</div>
+      ${dedHtml(d.dedicatoria)}
       <div class="nc-cod">${h(d.codigo)}<small>${h(d.codigoNota)}</small></div>
       <table style="margin-top:8px">${d.pares.map(p => `<tr><td>${h(p[0])}</td><td class="r">${h(p[1])}${p[2] ? '<br><small>' + h(p[2]) + '</small>' : ''}</td></tr>`).join('')}</table>
       ${d.grupos.filter(g => (g[1] || []).length).map((g, i) => `${i ? '' : '<hr>'}<div class="nc-sec">${h(g[0])}</div><table>${g[1].map(fila).join('')}</table>`).join('')}
@@ -111,9 +123,19 @@
       if (dir) { txt(dir, W / 2, `500 14px ${UI}`, GRIS, 'center'); y += 26; }
       // franja del título
       rect(20, y, W - 40, 50, 0, AC); y += 33; txt(d.titulo.split('').join(' '), W / 2, `800 19px ${UI}`, '#fff', 'center'); y += 45;
+      const dd = d.dedicatoria || {};
+      if (dd.para || dd.de || dd.mensaje) {
+        if (dd.para) { txt('Para ' + dd.para, W / 2, `700 22px ${UI}`, TINTA, 'center'); y += 30; }
+        if (dd.de) { txt('De ' + dd.de, W / 2, `500 17px ${UI}`, GRIS, 'center'); y += 26; }
+        if (dd.mensaje) partir('“' + dd.mensaje + '”', `italic 500 16px ${UI}`, W - 2 * P - 40).forEach(l => { txt(l, W / 2, `italic 500 16px ${UI}`, TINTA, 'center'); y += 23; });
+        y += 18;
+      }
       // el código
       rect(P + 40, y, W - 2 * P - 80, 84, 16, '#faf8fc', AC, [10, 7]); y += 56;
-      txt(String(d.codigo).split('').join(' '), W / 2, `800 40px ${MONO}`, TINTA, 'center'); y += 20;
+      { // el código entra siempre en el recuadro: letras separadas si es corto, y la letra se achica si hace falta
+        const cd = String(d.codigo), t = cd.length <= 10 ? cd.split('').join(' ') : cd; let fs_ = 40; ctx.font = `800 ${fs_}px ${MONO}`;
+        while (fs_ > 16 && ctx.measureText(t).width > W - 2 * P - 110) { fs_ -= 2; ctx.font = `800 ${fs_}px ${MONO}`; }
+        txt(t, W / 2, `800 ${fs_}px ${MONO}`, TINTA, 'center'); y += 20; }
       txt(d.codigoNota, W / 2, `600 12px ${UI}`, GRIS, 'center'); y += 46;
       // el monto
       txt(d.montoNota, W / 2, `700 13px ${UI}`, GRIS, 'center'); y += 52;
@@ -157,6 +179,15 @@
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nombre; document.body.appendChild(a); a.click(); a.remove(); return 'descargada';
   }
   const AVISO = { copiada: 'La foto quedó copiada: en WhatsApp pegala con Ctrl+V', descargada: 'La foto se descargó: adjuntala en WhatsApp' };
-  window.NOTA_CREDITO = { html: (nc, o) => htmlDoc(docNC(nc, o)), texto: (nc, o) => textoDoc(docNC(nc, o)), imagen: (nc, o) => imagenDoc(docNC(nc, o)), compartir: (nc, o, t) => compartirDoc(docNC(nc, o), t), valores, medios, AVISO };
+  const doc = (nc, o) => nc.tipo === 'gift_card' ? docGift(nc, o) : docNC(nc, o);
+  // el cupón de la web de una gift card (función tn-cupon): accion 'crear' | 'sincronizar'
+  async function cupon(empresa_id, credito_id, accion) {
+    const { data: { session } } = await sb.auth.getSession();
+    const r = await fetch(`${SUPABASE_URL}/functions/v1/tn-cupon`, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SUPABASE_KEY, Authorization: `Bearer ${session.access_token}` }, body: JSON.stringify({ empresa_id, credito_id, accion: accion || 'crear' }) });
+    const j = await r.json().catch(() => ({ error: 'La web no respondió (' + r.status + ')' }));
+    if (!r.ok || j.error) throw new Error(j.error || 'Error ' + r.status);
+    return j;
+  }
+  window.NOTA_CREDITO = { html: (nc, o) => htmlDoc(doc(nc, o)), texto: (nc, o) => textoDoc(doc(nc, o)), imagen: (nc, o) => imagenDoc(doc(nc, o)), compartir: (nc, o, t) => compartirDoc(doc(nc, o), t), cupon, valores, medios, AVISO };
   window.SENA = { dias: senaDias, hasta: senaHasta, html: (s, o) => htmlDoc(docSena(s, o)), texto: (s, o) => textoDoc(docSena(s, o)), imagen: (s, o) => imagenDoc(docSena(s, o)), compartir: (s, o, t) => compartirDoc(docSena(s, o), t), valores, AVISO };
 })();

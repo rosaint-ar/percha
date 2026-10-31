@@ -11,6 +11,7 @@ window.INSTRUCTIVO = {
     { id: 'vender', titulo: 'Vender', icono: '🛍️' },
     { id: 'whatsapp', titulo: 'Ventas por WhatsApp y envíos', icono: '📲' },
     { id: 'cambios', titulo: 'Cambios y devoluciones', icono: '🔁' },
+    { id: 'gift', titulo: 'Gift cards', icono: '🎁' },
     { id: 'caja', titulo: 'La caja', icono: '💵' },
     { id: 'consultas', titulo: 'Consultar y corregir', icono: '🔎' },
     { id: 'atajos', titulo: 'Atajos de teclado', icono: '⌨️' },
@@ -235,6 +236,29 @@ window.INSTRUCTIVO = {
       { tipo: 'tip', texto: 'Antes de hacerlo sin ticket, probá buscar la venta por el nombre o el teléfono de la clienta: casi siempre aparece.' }
     ] },
 
+    // ======================= GIFT CARDS =======================
+    { id: 'gift-vender', grupo: 'gift', p: 'vender', titulo: 'Vender una gift card', nuevo: '2026-10-31', resumen: 'Tocás GIFT CARD, elegís el valor y el código, y se cobra como cualquier venta.', bloques: [
+      { tipo: 'pasos', items: [
+        'En el Punto de venta buscá **GIFT CARD** y tocala.',
+        'Elegí el **valor** (ej. $25.000). Abajo te muestra **cuánto paga según el medio**.',
+        'Escribí el **código**: lo elige la clienta (ej. **#FELIZCUMPLE**) o tocá {{Inventar uno}}. Te avisa si ya existe.',
+        'Si querés, completá **Para**, **De** y un **mensaje**: salen impresos en la gift card.',
+        '{{Agregar al ticket}} y cobrá como siempre.',
+        'Después de cobrar: {{Imprimir gift card}} o {{📷 WhatsApp (foto)}}.'] },
+      { tipo: 'ejemplo', titulo: 'Gift card de $25.000', filas: [['Paga en efectivo o transferencia', '**$20.000**'], ['Paga con débito', '**$22.500**'], ['Paga con tarjeta', '**$25.000**'], ['Vale', '**$25.000** siempre (a precio de lista, como en la web)']] },
+      { tipo: 'texto', texto: 'Con la tienda online conectada, al cobrar se crea solo un **cupón de descuento en la web** con el mismo código y el mismo valor, sin vencimiento. Así la puede usar en el local o en la web.' },
+      { tipo: 'ojo', texto: 'Si dice **"⚠"** al lado de la gift card, el cupón de la web no se creó: tocá {{Reintentar}}, o después desde **Ventas** › {{Créditos}}. La gift card igual quedó hecha.' }
+    ] },
+    { id: 'gift-usar', grupo: 'gift', p: 'vender', titulo: 'Cobrar con una gift card', nuevo: '2026-10-31', resumen: 'En el cobro: {{Nota de crédito / gift card}} y el código.', bloques: [
+      { tipo: 'pasos', items: ['Cargá lo que se lleva y tocá {{Cobrar}}.', 'Tocá {{Nota de crédito / gift card}} y escribí el **código** (ej. #FELIZCUMPLE).', 'Si no alcanza, tocá otro medio para el resto.'] },
+      { tipo: 'texto', texto: 'La gift card vale su monto **a precio de lista**. Si el resto lo paga en efectivo, el sistema hace la cuenta solo (una de $25.000 cubre lo que en efectivo son $20.000).' },
+      { tipo: 'tip', texto: 'Si se usa una parte, el saldo que queda sigue en la gift card, y el cupón de la web se actualiza solo. Si se usa en la web, se descuenta sola en el local.' }
+    ] },
+    { id: 'gift-cargar', grupo: 'gift', p: 'configuracion', titulo: 'Cargar una gift card a mano', nuevo: '2026-10-31', resumen: 'Para las vendidas por la web, por WhatsApp sin pasar por la caja, o las viejas.', bloques: [
+      { tipo: 'pasos', items: ['**Ventas** › pestaña {{Créditos}} › {{🎁 Cargar gift card}}.', 'Poné el **valor** (precio de lista), el **código** que eligió la clienta, y si querés para, de y mensaje.', 'Anotá en la **nota interna** de dónde salió (ej. "vendida por la web, pedido #2420").', '{{Cargar}}: queda lista y, con la web conectada, se crea el cupón con ese código.'] },
+      { tipo: 'tip', texto: 'Tocá la gift card en {{Créditos}} para imprimirla, mandarla por WhatsApp o ver cómo está su cupón en la web.' }
+    ] },
+
     // ======================= CAJA =======================
     { id: 'movimientos', grupo: 'caja', p: 'vender', titulo: 'Sacar o poner plata en la caja', resumen: 'Pagos, retiros o cambio que entra: {{💵 Ingreso / retiro}}.', bloques: [
       { tipo: 'pasos', items: ['Arriba en el Punto de venta tocá {{💰 Caja}}.', '{{💵 Ingreso / retiro}}: elegí si sale o entra plata, el monto y el concepto (ej. "pago a proveedor").'] },
@@ -279,6 +303,7 @@ window.INSTRUCTIVO = {
         ['Falla', 'una unidad con algún defecto; no se muestra en la web'],
         ['Seña', 'pago a cuenta: las prendas quedan reservadas y el resto se cobra al retirar, con el número del comprobante'],
         ['Nota de crédito', 'saldo a favor de la clienta, con un código para usarlo después'],
+        ['Gift card', 'un regalo con código: vale su monto a precio de lista, en el local y en la web'],
         ['Turno o caja', 'desde que abrís la caja hasta que la cerrás'],
         ['Arqueo', 'contar la plata al cerrar y ver si coincide con lo vendido']] }
     ] }

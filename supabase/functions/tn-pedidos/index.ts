@@ -160,6 +160,14 @@ Deno.serve(async (req) => {
       const { data: venta, error } = await admin.rpc("caja_registrar_venta", { p: payload });
       if (error) { problemas.push("No se pudo registrar: " + error.message); conProblema++; await admin.from("canal_pedidos").upsert({ ...datosPedido, problema: problemas.join(" · ") }, { onConflict: "conexion_id,pedido_ext" }); continue; }
       nuevos++; if (problemas.length) conProblema++;
+      // gift card usada en la web: el cupón tiene el mismo código que la gift card de Percha → se le descuenta el saldo (tn-cupon)
+      for (const cu of (o.coupon || [])) {
+        const code = String(cu?.code || '').toUpperCase().replace(/\s+/g, ''); if (!code) continue;
+        const { data: gc } = await admin.from('creditos').select('id,saldo,nota').eq('empresa_id', e).eq('tipo', 'gift_card').eq('codigo', code).maybeSingle();
+        if (!gc || +gc.saldo <= 0) continue;
+        const usado = Math.min(+gc.saldo, +(o.discount_coupon ?? cu.value ?? 0) || +gc.saldo), queda = Math.max(0, r2(+gc.saldo - usado));
+        await admin.from('creditos').update({ saldo: queda, estado: queda <= 0 ? 'usado' : 'vigente', nota: [gc.nota, 'Usada en la web: pedido #' + o.number + ' (' + usado + ')'].filter(Boolean).join(' · ') }).eq('id', gc.id);
+      }
       if (o.has_shippable_products !== false) { const en = envioDe(o); if (en.envio_costo == null) en.envio_costo = envio || null; await admin.from("ventas").update({ ...en, envio_actualizado: ahora }).eq("id", venta.id); }
       await admin.from("canal_pedidos").upsert({ ...datosPedido, venta_id: venta.id, problema: problemas.length ? problemas.join(" · ") : null }, { onConflict: "conexion_id,pedido_ext" });
     }

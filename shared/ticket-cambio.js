@@ -23,7 +23,7 @@
   }
   function html(o, porPrenda) { estilos(); return porPrenda ? o.lineas.map(l => uno(o, [l])).join('<div class="tc"><div class="tc-corte">✂</div></div>') : uno(o, o.lineas); }
   // solo prendas (sin el envío ni lo devuelto)
-  const prendas = ls => (ls || []).filter(l => +l.cantidad > 0 && l.variante_id && !/^Env[ií]o\b/i.test(l.descripcion || ''));
+  const prendas = ls => (ls || []).filter(l => +l.cantidad > 0 && l.variante_id && !/^Env[ií]o\b/i.test(l.descripcion || '') && !/^GIFT CARD/i.test(l.descripcion || ''));
   // ventanita: qué va de regalo · uno por prenda · imprimir
   function elegir(o) {
     const { modal, $, $$, toast } = APP, ls = prendas(o.lineas);

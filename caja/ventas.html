@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ventas · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610311424">
+<link rel="stylesheet" href="../shell/shell.css?v=202610311437">
 <style>
   .filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
   .filtros input[type=date],.filtros select{border:1px solid var(--linea);background:var(--superficie-2);padding:8px 10px;border-radius:var(--radio-mini)}
@@ -51,16 +51,16 @@
   </section>
   <section id="t-senas" style="display:none"><div class="card" style="padding:0"><table class="lista" id="tb-senas"><thead><tr><th>Ticket</th><th>Fecha</th><th>Clienta</th><th class="num">Total</th><th class="num">Pagado</th><th class="num">Saldo</th><th></th></tr></thead><tbody></tbody></table></div></section>
   <section id="t-cierres" style="display:none"><div class="card" style="padding:0"><table class="lista" id="tb-cierres"><thead><tr><th>Caja</th><th>Abierta</th><th>Cerrada</th><th class="num">Ventas</th><th class="num">Diferencia</th><th></th></tr></thead><tbody></tbody></table></div></section>
-  <section id="t-creditos" style="display:none"><div class="card" style="padding:0"><table class="lista" id="tb-creditos"><thead><tr><th>Código</th><th>Tipo</th><th>Clienta</th><th>Emitido</th><th class="num">Monto</th><th class="num">Saldo</th><th>Estado</th></tr></thead><tbody></tbody></table></div></section>
+  <section id="t-creditos" style="display:none"><div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button class="btn primario" id="btn-gift" hidden>🎁 Cargar gift card</button></div><div class="card" style="padding:0"><table class="lista" id="tb-creditos"><thead><tr><th>Código</th><th>Tipo</th><th>Clienta</th><th>Emitido</th><th class="num">Monto</th><th class="num">Saldo</th><th>Estado</th></tr></thead><tbody></tbody></table></div></section>
 </main>
 <div id="impresion"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610311424"></script>
-<script src="../shared/canales.js?v=202610311424"></script>
-<script src="../shell/shell.js?v=202610311424"></script>
-<script src="../shared/ticket-cambio.js?v=202610311424"></script>
-<script src="../shared/nota-credito.js?v=202610311424"></script>
-<script src="../shared/facturar.js?v=202610311424"></script>
+<script src="../shared/supabase.js?v=202610311437"></script>
+<script src="../shared/canales.js?v=202610311437"></script>
+<script src="../shell/shell.js?v=202610311437"></script>
+<script src="../shared/ticket-cambio.js?v=202610311437"></script>
+<script src="../shared/nota-credito.js?v=202610311437"></script>
+<script src="../shared/facturar.js?v=202610311437"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -264,12 +264,12 @@ APP.ready.then(async () => {
   let ncDatos = null;
   async function datosNC() {
     if (!ncDatos) { const [{ data: listas }, { data: formas }] = await Promise.all([sb.from('listas_precios').select('id,nombre,porcentaje,canal').eq('empresa_id', e).eq('activa', true), sb.from('formas_pago').select('id,nombre,tipo,lista_id,listas').eq('empresa_id', e).eq('activa', true).order('orden')]);
-      ncDatos = { listas: (listas || []).filter(l => !l.canal), formas: formas || [] }; }
+      ncDatos = { listas: (listas || []).filter(l => !l.canal), formas: formas || [], web: (listas || []).some(l => l.canal === 'tiendanube') }; }
     return ncDatos;
   }
   async function verCredito(c) {
     if (!c) return;
-    const d = await datosNC(), o = { empresa: APP.empresa, listas: d.listas, formas: d.formas, clienta: c.clientes ? c.clientes.nombre : null, reimpresion: true };
+    const d = await datosNC(), o = { empresa: APP.empresa, listas: d.listas, formas: d.formas, web: d.web, clienta: c.clientes ? c.clientes.nombre : null, reimpresion: true };
     if (c.origen_venta_id) {
       const [{ data: v }, { data: ls }] = await Promise.all([sb.from('ventas').select('numero,venta_origen_id').eq('id', c.origen_venta_id).maybeSingle(), sb.from('venta_lineas').select('descripcion,talle,color,cantidad,total').eq('venta_id', c.origen_venta_id).order('id')]);
       if (v) { o.ticket = v.numero; if (v.venta_origen_id) { const { data: vo } = await sb.from('ventas').select('numero').eq('id', v.venta_origen_id).maybeSingle(); o.origen = vo && vo.numero; } }
@@ -279,11 +279,40 @@ APP.ready.then(async () => {
     const m = modal(`<h2>${c.tipo === 'gift_card' ? 'Gift card' : 'Nota de crédito'} <span class="mono">${esc(c.codigo)}</span> <span class="chip ${c.estado === 'vigente' ? 'ok' : 'gris'}">${esc(c.estado)}</span></h2>
       <div class="nc-vista">${NOTA_CREDITO.html(c, o)}</div>
       ${(usos || []).length ? `<p class="sub">Usada en ${usos.map(u => u.ventas ? `el ticket #${String(u.ventas.numero).padStart(6, '0')} (${fmt.fecha(u.ventas.fecha)}): ${fmt.pesos(u.monto)}` : fmt.pesos(u.monto)).join(' · ')}</p>` : ''}
+      ${c.tipo === 'gift_card' && d.web ? `<div class="aviso-caja ${c.cupon_web && c.cupon_web.id && !c.cupon_web.error ? 'ok' : 'error'}" style="display:flex;justify-content:space-between;align-items:center;gap:10px" id="gc-web"><span>${c.cupon_web && c.cupon_web.id ? (c.cupon_web.valido ? '🌐 Cupón en la web: activo por ' + fmt.pesos(c.cupon_web.valor) : '🌐 Cupón en la web: apagado (ya no tiene saldo)') + (c.cupon_web.error ? ' · ⚠ ' + esc(c.cupon_web.error) : '') : '🌐 Todavía no tiene cupón en la web' + (c.cupon_web && c.cupon_web.error ? ': ⚠ ' + esc(c.cupon_web.error) : '')}</span><button class="btn chico" data-web>${c.cupon_web && c.cupon_web.id ? 'Actualizar en la web' : 'Crear cupón en la web'}</button></div>` : ''}
       <div class="pie"><button class="btn" data-no>Cerrar</button><button class="btn" data-wsp>📷 WhatsApp (foto)</button><button class="btn primario" data-print>Imprimir</button></div>`);
+    { const bw = $('[data-web]', m); if (bw) bw.onclick = async () => { bw.disabled = true; try { const r = await NOTA_CREDITO.cupon(e, c.id, c.cupon_web && c.cupon_web.id ? 'sincronizar' : 'crear'); toast(r.sin_web ? 'La tienda no tiene la web conectada' : '🌐 Cupón de la web listo'); m.cerrar(); cargarCreditos(); } catch (err) { toast(err.message, 'error'); bw.disabled = false; } }; }
     $('[data-no]', m).onclick = () => m.cerrar();
     $('[data-print]', m).onclick = () => { $('#impresion').innerHTML = NOTA_CREDITO.html(c, o); window.print(); };
     $('[data-wsp]', m).onclick = async () => { const r = await NOTA_CREDITO.compartir(c, o, c.clientes && c.clientes.telefono); if (NOTA_CREDITO.AVISO[r]) toast(NOTA_CREDITO.AVISO[r]); };
   }
+  // cargar una gift card a mano: vendida por la web, por WhatsApp sin pasar por la caja, o una vieja. Valor = precio de lista.
+  async function cargarGift() {
+    const d = await datosNC();
+    const m = modal(`<h2>🎁 Cargar gift card</h2><p class="sub">Para una gift card que no se vendió en la caja (por la web, por WhatsApp o una vieja). El valor es a <b>precio de lista</b>${d.web ? ' y se crea el cupón de descuento en la web con el mismo código' : ''}.</p>
+      <div class="fila c2" style="margin-top:10px"><div class="campo"><label>Valor</label><input id="g-val" type="number" min="0" step="1000" placeholder="25000" style="font:700 18px var(--f-mono)"></div>
+        <div class="campo"><label>Código</label><div style="display:flex;gap:6px"><input id="g-cod" placeholder="Ej. #FELIZCUMPLE" autocomplete="off" style="text-transform:uppercase;font-family:var(--f-mono);flex:1"><button type="button" class="btn" data-inventar>Inventar</button></div><div id="g-msg" class="sub" style="margin-top:4px"></div></div></div>
+      <div class="fila c2"><div class="campo"><label>Para</label><input id="g-para" placeholder="Opcional"></div><div class="campo"><label>De</label><input id="g-de" placeholder="Opcional"></div></div>
+      <div class="campo"><label>Mensaje</label><input id="g-men" placeholder="Opcional" maxlength="120"></div>
+      <div class="campo"><label>Nota interna</label><input id="g-nota" placeholder="Ej. vendida por la web, pedido #2420"></div>
+      <div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Cargar</button></div>`);
+    const cod = $('#g-cod', m), msg = $('#g-msg', m); let tq = null;
+    const revisar = async () => { const c = cod.value.trim().toUpperCase().replace(/\s+/g, ''); if (!c) { msg.textContent = ''; return; } const { data } = await sb.rpc('credito_codigo_libre', { e, p_codigo: c }); msg.innerHTML = data ? '<span style="color:var(--ok)">✓ Libre</span>' : '<span style="color:var(--error)">Ese código ya existe</span>'; };
+    cod.oninput = () => { clearTimeout(tq); tq = setTimeout(revisar, 300); };
+    $('[data-inventar]', m).onclick = () => { cod.value = '#' + Math.random().toString(36).slice(2, 8).toUpperCase(); revisar(); };
+    $('[data-no]', m).onclick = () => m.cerrar();
+    $('[data-si]', m).onclick = async () => {
+      const b = $('[data-si]', m); b.disabled = true;
+      const { data, error } = await sb.rpc('credito_emitir_gift', { e, p: { monto: +$('#g-val', m).value || 0, codigo: cod.value, nota: $('#g-nota', m).value.trim(), dedicatoria: { para: $('#g-para', m).value.trim() || null, de: $('#g-de', m).value.trim() || null, mensaje: $('#g-men', m).value.trim() || null } } });
+      if (error) { toast(mensajeError(error), 'error'); b.disabled = false; return; }
+      m.cerrar(); toast('Gift card ' + data.codigo + ' cargada');
+      if (d.web) { try { await NOTA_CREDITO.cupon(e, data.id, 'crear'); toast('🌐 Cupón ' + data.codigo + ' creado en la web'); } catch (err) { toast('La gift card quedó cargada, pero el cupón de la web no: ' + err.message, 'error'); } }
+      await cargarCreditos();
+      const { data: c } = await sb.from('creditos').select('*, clientes(nombre,telefono)').eq('id', data.id).maybeSingle(); if (c) verCredito(c);
+    };
+    $('#g-val', m).focus();
+  }
+  { const bg = document.getElementById('btn-gift'); if (bg && APP.esAdmin) { bg.hidden = false; bg.onclick = cargarGift; } }
   async function cargarCreditos() {
     const { data } = await sb.from('creditos').select('*, clientes(nombre,telefono)').eq('empresa_id', e).order('creado', { ascending: false }).limit(200);
     const tb = $('#tb-creditos tbody'); tb.innerHTML = (data || []).map(c => `<tr class="clic" data-c="${c.id}"><td class="mono">${esc(c.codigo)}</td><td>${c.tipo === 'gift_card' ? 'Gift card' : 'Nota de crédito'}</td><td>${esc(c.clientes ? c.clientes.nombre : '—')}</td><td>${fmt.fecha(c.creado)}</td><td class="num">${fmt.pesos(c.monto)}</td><td class="num num-f">${fmt.pesos(c.saldo)}</td><td><span class="chip ${c.estado === 'vigente' ? 'ok' : 'gris'}">${c.estado}</span></td></tr>`).join('') || '<tr><td colspan="7" class="vacio">No hay créditos emitidos.</td></tr>';

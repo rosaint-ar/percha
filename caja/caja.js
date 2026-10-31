@@ -329,6 +329,7 @@ APP.ready.then(async () => {
   }
   function agregar(v, cantidad) {
     if (!v) return;
+    if (v.producto_tipo === 'gift_card' && !carrito.devolviendo) { venderGift(v); return; }
     if (cantidad == null) cantidad = (APP.caja && APP.caja.tomarCantidad && APP.caja.tomarCantidad()) || 1;   // el teclado del POS puede dejar una cantidad lista
     // devolución sin ticket: lo que se toca o escanea entra como devuelto, al precio de hoy (se puede corregir en el renglón)
     if (carrito.devolviendo) {
@@ -432,7 +433,7 @@ APP.ready.then(async () => {
     if (!c.lineas.length && carrito.devolviendo) cont.innerHTML = avisoDev;
     else if (!c.lineas.length) cont.innerHTML = '<div class="vacio-ticket"><b>Listo para vender</b><span>Tocá una prenda o escaneá el código.</span><small><kbd>/</kbd> buscar · <kbd>F9</kbd> cobrar</small></div>';
     else cont.innerHTML = avisoDev + c.lineas.map((l, i) => `<div class="linea">
-      <div><div class="n">${l.canje ? (esGen(l) ? esc(pieza) + ' suelta' : `<span class="cambiable" data-cambiar="${i}" title="Tocá para cambiarla por otra">${esc(l.variante.producto_nombre)}</span>`) + ' <span class="chip">cambio</span>' : l.parte ? esc(l.desc) + ' <span class="chip ok">queda en el local</span>' : l.devuelta ? esc(l.variante.producto_nombre) : `<span class="cambiable" data-cambiar="${i}" title="Tocá para cambiar el talle, el color o la prenda">${esc(l.variante.producto_nombre)}</span>`}${l.devuelta && !l.parte ? ' <span class="chip error">devuelve</span>' : ''}</div><div class="v">${l.canje ? (esGen(l) ? 'se elige al cobrar' : esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || 'único')) + ' · por la del conjunto' : l.parte ? 'entra a ' + esc(l.variante.producto_nombre) : l.devuelta ? esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || l.variante.sku || '') : `<span class="cambiable" data-cambiar="${i}">${esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || 'único')}</span>`}${l.canje ? "" : " · " + fmt.pesos(l.precioLista)}${l.descPct && l.precioManual == null ? ' −' + l.descPct + '%' : ''}${!l.devuelta && controlaStock(l.variante) && llevando(l.variante) > Math.max(+l.variante.stock || 0, 0) ? '<span class="sinstock-chip" title="El sistema dice que no hay suficiente">⚠ sin stock</span>' : ''}</div>${l.precioManual != null && !l.devuelta && !l.canje ? `<div class="promo manual">Precio cambiado a mano</div>` : ''}${l.conv ? `<div class="promo">Pagó ${fmt.pesos(l.conv.pago)} a precio ${esc(nombreLista(l.conv.de))} = ${fmt.pesos(l.precioFinal)} a precio ${esc(nombreLista(carrito.lista))}</div>` : ''}${l.mismoModelo ? `<div class="promo">↔ Mismo modelo y color: se cambia sin diferencia</div>` : ''}${l.rebaja && !l.devuelta && l.precioManual == null ? `<div class="promo">▼ ${esc(l.rebaja.nombre)} · antes ${fmt.pesos(l.precioBase)}</div>` : ''}${l.promo ? `<div class="promo">★ ${esc(l.promo.nombre)} · −${fmt.pesos(l.descPromo)}/u</div>` : ''}${(+l.variante.fallas > 0 || l.falla) && !l.devuelta && !l.canje ? `<button class="falla ${l.falla ? 'on' : ''}" data-falla="${i}" title="${l.falla ? 'Tocá para desmarcar' : esc(l.variante.falla_nota || '')}">${l.falla ? '◆ Con falla' + (l.fallaU && l.fallaU.nota ? ': ' + esc(l.fallaU.nota) : '') + (l.descFalla ? ' · ' + fmt.dec(l.descFalla) + '% off' : '') : '◆ Hay ' + fmt.num(l.variante.fallas) + ' con falla · ¿es esta?'}</button>` : ''}${puedeSinParte(l) ? `<button class="parte-btn" data-parte="${i}" title="${esc(SP.texto)}: el total baja ${fmt.pesos(SP.monto)} (se puede cambiar en el renglón)">${esc(SP.boton)} · −${fmt.pesos(SP.monto)}</button>` : ''}${puedeSinParte(l) && genCanje() ? `<button class="parte-btn" data-cambio="${i}" title="La ${esc(pieza.toLowerCase())} del conjunto queda en el local y se lleva una suelta: al cobrar se elige cuál">${esc(SP.cambio_boton || 'Cambio ' + pieza.toLowerCase())}</button>` : ''}</div>
+      <div><div class="n">${l.canje ? (esGen(l) ? esc(pieza) + ' suelta' : `<span class="cambiable" data-cambiar="${i}" title="Tocá para cambiarla por otra">${esc(l.variante.producto_nombre)}</span>`) + ' <span class="chip">cambio</span>' : l.parte ? esc(l.desc) + ' <span class="chip ok">queda en el local</span>' : l.devuelta ? esc(l.variante.producto_nombre) : `<span class="cambiable" data-cambiar="${i}" title="Tocá para cambiar el talle, el color o la prenda">${esc(l.variante.producto_nombre)}</span>`}${l.devuelta && !l.parte ? ' <span class="chip error">devuelve</span>' : ''}</div><div class="v">${l.canje ? (esGen(l) ? 'se elige al cobrar' : esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || 'único')) + ' · por la del conjunto' : l.parte ? 'entra a ' + esc(l.variante.producto_nombre) : l.devuelta ? esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || l.variante.sku || '') : `<span class="cambiable" data-cambiar="${i}">${esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || 'único')}</span>`}${l.canje ? "" : " · " + fmt.pesos(l.precioLista)}${l.descPct && l.precioManual == null ? ' −' + l.descPct + '%' : ''}${!l.devuelta && controlaStock(l.variante) && llevando(l.variante) > Math.max(+l.variante.stock || 0, 0) ? '<span class="sinstock-chip" title="El sistema dice que no hay suficiente">⚠ sin stock</span>' : ''}</div>${l.precioManual != null && !l.devuelta && !l.canje ? `<div class="promo manual">Precio cambiado a mano</div>` : ''}${l.conv ? `<div class="promo">Pagó ${fmt.pesos(l.conv.pago)} a precio ${esc(nombreLista(l.conv.de))} = ${fmt.pesos(l.precioFinal)} a precio ${esc(nombreLista(carrito.lista))}</div>` : ''}${l.mismoModelo ? `<div class="promo">↔ Mismo modelo y color: se cambia sin diferencia</div>` : ''}${l.gift ? `<div class="promo">🎁 Código <b>${esc(l.gift.codigo)}</b>${l.gift.para ? ' · para ' + esc(l.gift.para) : ''} · vale ${fmt.pesos(l.gift.valor)} · <a href="#" data-gift="${i}">cambiar</a></div>` : ''}${l.rebaja && !l.devuelta && l.precioManual == null ? `<div class="promo">▼ ${esc(l.rebaja.nombre)} · antes ${fmt.pesos(l.precioBase)}</div>` : ''}${l.promo ? `<div class="promo">★ ${esc(l.promo.nombre)} · −${fmt.pesos(l.descPromo)}/u</div>` : ''}${(+l.variante.fallas > 0 || l.falla) && !l.devuelta && !l.canje ? `<button class="falla ${l.falla ? 'on' : ''}" data-falla="${i}" title="${l.falla ? 'Tocá para desmarcar' : esc(l.variante.falla_nota || '')}">${l.falla ? '◆ Con falla' + (l.fallaU && l.fallaU.nota ? ': ' + esc(l.fallaU.nota) : '') + (l.descFalla ? ' · ' + fmt.dec(l.descFalla) + '% off' : '') : '◆ Hay ' + fmt.num(l.variante.fallas) + ' con falla · ¿es esta?'}</button>` : ''}${puedeSinParte(l) ? `<button class="parte-btn" data-parte="${i}" title="${esc(SP.texto)}: el total baja ${fmt.pesos(SP.monto)} (se puede cambiar en el renglón)">${esc(SP.boton)} · −${fmt.pesos(SP.monto)}</button>` : ''}${puedeSinParte(l) && genCanje() ? `<button class="parte-btn" data-cambio="${i}" title="La ${esc(pieza.toLowerCase())} del conjunto queda en el local y se lleva una suelta: al cobrar se elige cuál">${esc(SP.cambio_boton || 'Cambio ' + pieza.toLowerCase())}</button>` : ''}</div>
       <div class="t">${l.devuelta && !l.sinTicket ? fmt.pesos(l.total) : `<input class="pu${l.precioManual != null && !l.canje ? ' manual' : ''}" data-pu="${i}" type="number" min="0" step="1" value="${l.precioFinal}" data-orig="${l.precioFinal}" title="Precio por unidad: escribí otro para cambiarlo (F2)"${APP.puede('descuentos') ? '' : ' readonly'}>${Math.abs(l.cantidad) > 1 ? `<small>${l.cantidad} u. = ${fmt.pesos(l.total)}</small>` : ''}`}</div>
       <div class="ctrl"><button data-i="${i}" data-d="-1">−</button><input data-i="${i}" data-q value="${l.cantidad}"><button data-i="${i}" data-d="1">+</button><span class="desc">desc % <input data-i="${i}" data-desc type="number" min="0" max="100" value="${l.precioManual != null ? 0 : l.descPct || 0}"${l.precioManual != null ? ' disabled title="Tiene precio a mano"' : ''}></span><button class="quitar" data-i="${i}" data-x title="Quitar">×</button></div></div>`).join('');
     $$('[data-d]', cont).forEach(b => b.onclick = () => { const l = carrito.lineas[+b.dataset.i]; l.cantidad += +b.dataset.d * (l.devuelta ? -1 : 1); if ((l.devuelta ? -l.cantidad : l.cantidad) <= 0) carrito.lineas.splice(+b.dataset.i, 1); pintar(); });
@@ -442,6 +443,7 @@ APP.ready.then(async () => {
     $$('[data-pu]', cont).forEach(inp => { inp.onfocus = () => inp.select(); inp.onchange = () => ponerPrecio(+inp.dataset.pu, inp.value);
       inp.onkeydown = ev => { if (ev.key === 'Enter') { ev.preventDefault(); $('#q').focus(); } else if (ev.key === 'Escape') { inp.value = inp.dataset.orig; $('#q').focus(); } }; });
     $$('[data-parte]', cont).forEach(b => b.onclick = ev => { ev.stopPropagation(); sinParte(carrito.lineas[+b.dataset.parte]); });
+    $$('[data-gift]', cont).forEach(a => a.onclick = ev => { ev.preventDefault(); ev.stopPropagation(); const l = carrito.lineas[+a.dataset.gift]; venderGift(l.variante, l); });
     $$('[data-cambio]', cont).forEach(b => b.onclick = ev => { ev.stopPropagation(); sinParte(carrito.lineas[+b.dataset.cambio], true); });
     $$('[data-cambiar]', cont).forEach(el => el.onclick = ev => { ev.stopPropagation(); cambiarLinea(+el.dataset.cambiar); });
     $$('[data-falla]', cont).forEach(b => b.onclick = ev => { ev.stopPropagation(); const l = carrito.lineas[+b.dataset.falla]; if (l.falla) { l.falla = false; delete l.fallaU; pintar(); } else marcarFalla(l); });
@@ -533,6 +535,7 @@ APP.ready.then(async () => {
   async function cobrar(modoSena) {
     const c = calcular(); if (!c.lineas.length) return;
     if (!turno && !reservado) { toast('Primero abrí la caja', 'error'); abrirTurno(); return; }
+    if (modoSena && c.lineas.some(l => l.gift)) { toast('Las gift cards no se señan: cobralas completas', 'error'); return; }
     if (!(await revisarStock())) return;
     const pagos = []; let creditoUsado = null;
     const total = () => { const cc = calcular(); const recargo = pagos.reduce((s, p) => s + r2(p.monto * (p.recargo_pct || 0) / 100), 0); return { ...cc, recargo: r2(recargo), aPagar: r2(cc.total + recargo) }; };
@@ -613,7 +616,7 @@ APP.ready.then(async () => {
         if (!data || data.estado !== 'vigente' || +data.saldo <= 0) { toast('Ese código no tiene saldo vigente', 'error'); return; }
         if (pagos.some(p => p.credito_id === data.id)) { toast('Ese crédito ya está aplicado', 'error'); return; }
         const t = total(); const pagado = pagos.reduce((s, p) => s + p.monto, 0);
-        const pc = { credito_id: data.id, nombre: `${data.tipo === 'gift_card' ? 'Gift card' : 'Nota de crédito'} ${data.codigo} (saldo ${fmt.pesos(data.saldo)}${data.lista_id ? ' a precio ' + nombreLista(data.lista_id) : ''})`, tipo: 'credito', saldo: +data.saldo, listaNc: data.lista_id || null };
+        const pc = { credito_id: data.id, nombre: `${data.tipo === 'gift_card' ? 'Gift card' : 'Nota de crédito'} ${data.codigo} (saldo ${fmt.pesos(data.saldo)}${data.lista_id ? ' a precio ' + nombreLista(data.lista_id) : ''})`, tipo: 'credito', saldo: +data.saldo, listaNc: data.lista_id || null, esGift: data.tipo === 'gift_card' };
         pc.monto = Math.max(0, Math.min(valorCredito(pc), r2(t.aPagar - pagado))); pagos.push(pc);
         m2.cerrar(); pintarPagos();
       };
@@ -632,6 +635,8 @@ APP.ready.then(async () => {
         const devuelto = pagosFinal.reduce((s, p) => s + p.monto, 0);
         if (Math.abs(devuelto - t.aPagar) > 0.5) { creditos_a_emitir.push({ tipo: 'nota_credito', monto: r2(-t.aPagar - (-devuelto)), cliente_id: carrito.cliente, vence: null, nota: 'Por cambio/devolución', lista_id: carrito.lista }); }
       }
+      // gift cards vendidas: una por renglón, con el código elegido, a precio de lista (lo que vale en la web)
+      if (!modoSena) t.lineas.filter(l => l.gift && l.cantidad > 0).forEach(l => creditos_a_emitir.push({ tipo: 'gift_card', codigo: l.gift.codigo, monto: l.gift.valor, lista_id: listaBase(), cliente_id: carrito.cliente, vence: null, nota: 'Gift card vendida', dedicatoria: { para: l.gift.para || null, de: l.gift.de || null, mensaje: l.gift.mensaje || null } }));
       const cliente = await resolverCliente();
       const payload = {
         empresa_id: e, offline_id: crypto.randomUUID(), tipo: carrito.cambio ? 'cambio' : 'venta', estado: modoSena ? 'senada' : 'completada',
@@ -640,7 +645,7 @@ APP.ready.then(async () => {
         envio: carrito.envio || null,
         numero: reservado ? null : numeroRes,   // el número que se ve en el ticket desde que empezó la venta
         venta_origen_id: carrito.cambio ? carrito.cambio.id : null, origen: ($('#sel-origen') || {}).value || 'local',
-        lineas: t.lineas.map(l => ({ variante_id: l.variante.id, producto_id: l.variante.producto_id, descripcion: l.desc || l.variante.producto_nombre, talle: l.variante.talle_nombre, color: l.variante.color_nombre, cantidad: l.cantidad, precio_lista: l.precioLista, precio_unit: l.precioFinal, descuento_pct: l.descPct || 0, promocion_id: l.promo ? l.promo.id : null, promocion_nombre: l.promo ? l.promo.nombre : null, total: l.total, costo_unit: +l.variante.costo || 0, componentes: l.componentes && l.componentes.length ? l.componentes : null, falla: !!l.falla, falla_id: l.fallaU ? l.fallaU.id : null, precio_manual: l.precioManual != null || undefined })),
+        lineas: t.lineas.map(l => ({ variante_id: l.variante.id, producto_id: l.variante.producto_id, descripcion: (l.desc || l.variante.producto_nombre) + (l.gift ? ' ' + l.gift.codigo : ''), talle: l.variante.talle_nombre, color: l.variante.color_nombre, cantidad: l.cantidad, precio_lista: l.precioLista, precio_unit: l.precioFinal, descuento_pct: l.descPct || 0, promocion_id: l.promo ? l.promo.id : null, promocion_nombre: l.promo ? l.promo.nombre : null, total: l.total, costo_unit: +l.variante.costo || 0, componentes: l.componentes && l.componentes.length ? l.componentes : null, falla: !!l.falla, falla_id: l.fallaU ? l.fallaU.id : null, precio_manual: l.precioManual != null || undefined })),
         pagos: pagosFinal.filter(p => p.monto !== 0).map(p => ({ forma_pago_id: p.forma_pago_id || null, credito_id: p.credito_id || null, monto: p.monto, cuotas: p.cuotas || 1, recargo_pct: p.recargo_pct || 0,
           // nota de crédito de otra lista: lo que se descuenta de su saldo (paga $2.500 a precio Lista, descuenta $2.000 de Contado)
           consumo: p.credito_id && p.listaNc && p.listaNc !== carrito.lista ? (p.monto >= valorCredito(p) - 0.5 ? p.saldo : r2(p.monto * pctLista(p.listaNc) / pctLista(carrito.lista))) : undefined })),
@@ -652,6 +657,8 @@ APP.ready.then(async () => {
       try { res = await enviarVenta(payload); }
       catch (err) { bSi.disabled = false; bSi.textContent = 'Confirmar'; const r = $('#cb-resto', m); if (r) { r.className = 'resto falta'; r.innerHTML = `<span>No se pudo registrar: ${esc(mensajeError(err))}</span><span>Probá de nuevo</span>`; } return; }
       m.cerrar();
+      // si se pagó con gift cards, su cupón de la web baja al saldo que queda (o se apaga)
+      if (!res.pendiente && window.NOTA_CREDITO) pagosFinal.filter(p => p.credito_id && p.esGift).forEach(p => NOTA_CREDITO.cupon(e, p.credito_id, 'sincronizar').catch(err => toast('No se pudo actualizar el cupón de la web: ' + err.message, 'error')));
       const numTxt = res.numero_mostrar || (res.numero ? '#' + String(res.numero).padStart(6, '0') : '');
       toast(res.pendiente ? 'Venta guardada: se sube sola cuando vuelva internet' : payload.tipo === 'cambio' ? `✓ Cambio ${numTxt} registrado` : `✓ Venta ${numTxt} registrada`);
       try { mostrarTicket(payload, res, { vuelto: vuelto > 0 ? vuelto : 0, pagos: pagosFinal, total: t }); }
@@ -765,6 +772,8 @@ APP.ready.then(async () => {
     const imprimirTicket = () => { $('#impresion').innerHTML = html; window.print(); };
     $('#impresion').innerHTML = html;
     const nc = window.NOTA_CREDITO && ncs[0];
+    const gifts = window.NOTA_CREDITO ? (res.creditos || []).filter(c => c.tipo === 'gift_card').map(c => ({ id: c.id, codigo: c.codigo, tipo: 'gift_card', monto: +c.monto, saldo: +c.monto, creado: new Date().toISOString(), lista_id: c.lista_id || listaBase(), dedicatoria: c.dedicatoria || null, estado: 'vigente' })) : [];
+    const giftOpts = { empresa: emp, listas, formas, web: conWeb() };
     // seña: su comprobante (número para retirar, prendas, lo que pagó y lo que falta según el medio), como la nota de crédito
     const sena = p.estado === 'senada' && !res.pendiente && window.SENA ? { numero: res.numero, fecha: new Date().toISOString(), total: aPagar, pagado: r2(extra.pagos.reduce((s, x) => s + x.monto, 0)), lista_id: p.lista_id, lineas: p.lineas, estado: 'senada' } : null;
     if (sena) sena.saldo = r2(sena.total - sena.pagado);
@@ -777,10 +786,22 @@ APP.ready.then(async () => {
       : nc ? `<p class="sub">Cambio ${esc(num)}${origenNum ? ' del ticket ' + origenNum : ''}. Así se imprime:</p><div class="nc-vista">${NOTA_CREDITO.html(ncDe(nc), ncOpts)}</div>`
       : esCambio ? `<div style="font:800 30px var(--f-titulo);letter-spacing:-.03em;margin:6px 0">${aPagar > 0 ? 'Cobrado ' + fmt.pesos(aPagar) : aPagar < 0 ? 'Devuelto ' + fmt.pesos(-aPagar) : 'Sin diferencia'}</div>${aPagar < 0 ? `<p class="sub">Por ${esc(extra.pagos.filter(x => x.monto).map(x => x.nombre).join(' y '))}</p>` : ''}`
       : `<div style="font:800 30px var(--f-titulo);letter-spacing:-.03em;margin:6px 0"><span data-monto-venta>${fmt.pesos(aPagar)}</span> ${res.pendiente ? '' : '🎉'}</div>`;
-    const m = modal(`<h2>${titulo}</h2>${cuerpo}
+    const giftsHtml = gifts.map((g, i) => `<div style="margin-top:12px"><div class="nc-vista">${NOTA_CREDITO.html(g, giftOpts)}</div><div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;align-items:center"><button class="btn primario" data-gc-print="${i}">Imprimir gift card</button><button class="btn" data-gc-wsp="${i}">📷 WhatsApp (foto)</button>${conWeb() ? `<span class="sub" data-gc-web="${i}">🌐 Creando el cupón en la web…</span>` : ''}</div></div>`).join('');
+    const m = modal(`<h2>${titulo}</h2>${cuerpo}${giftsHtml}
       ${extra.vuelto ? `<div class="aviso-caja info">Vuelto: <b>${fmt.pesos(extra.vuelto)}</b></div>` : ''}
-      ${(res.creditos || []).filter(c => c !== nc).map(c => `<div class="aviso-caja ok">${c.tipo === 'gift_card' ? 'Gift card' : 'Nota de crédito'} emitida · código <b class="mono">${c.codigo}</b> · ${fmt.pesos(c.monto)}</div>`).join('')}
+      ${(res.creditos || []).filter(c => c !== nc && !(gifts.length && c.tipo === 'gift_card')).map(c => `<div class="aviso-caja ok">${c.tipo === 'gift_card' ? 'Gift card' : 'Nota de crédito'} emitida · código <b class="mono">${c.codigo}</b> · ${fmt.pesos(c.monto)}</div>`).join('')}
       <div class="pie" style="justify-content:space-between"><div style="display:flex;gap:8px;flex-wrap:wrap">${res.id && p.estado === 'completada' && aPagar > 0 && !p.reservada && !res.reservada && window.FACTURA ? '<button class="btn" data-facturar hidden>Facturar</button>' : ''}${sena ? '<button class="btn primario" data-print-sena>Imprimir comprobante de seña</button>' : nc ? '<button class="btn primario" data-print-nc>Imprimir nota de crédito</button><button class="btn" data-print>Imprimir el cambio</button>' : `<button class="btn" data-print>Imprimir ${esCambio ? 'comprobante' : 'ticket'}</button>`}${regalable ? `<button class="btn${regalo ? ' primario' : ''}" data-regalo title="Para regalo: el número de ticket y las prendas, sin precios">🎁 Ticket de cambio</button>` : ''}${sena ? '<button class="btn" data-wsp-sena>📷 WhatsApp (foto)</button>' : nc ? '<button class="btn" data-wsp-nc>📷 WhatsApp (foto)</button>' : `<a class="btn" href="whatsapp://send?text=${texto}">WhatsApp</a>`}${res.id && !res.pendiente ? '<button class="btn" data-prueba title="Borra esta venta como si no hubiera existido">🧪 Era de prueba</button>' : ''}</div><button class="btn${nc || sena ? '' : ' primario'}" data-ok>Nueva venta</button></div>`, { fijo: true });
+    if (gifts.length) {
+      const md = $('.modal', m); if (md) md.style.maxWidth = '560px';
+      const tel = (clientes.find(c => c.id === p.cliente_id) || {}).telefono;
+      $$('[data-gc-print]', m).forEach(b => b.onclick = () => { $('#impresion').innerHTML = NOTA_CREDITO.html(gifts[+b.dataset.gcPrint], giftOpts); window.print(); });
+      $$('[data-gc-wsp]', m).forEach(b => b.onclick = async () => { const r = await NOTA_CREDITO.compartir(gifts[+b.dataset.gcWsp], giftOpts, tel); if (NOTA_CREDITO.AVISO[r]) toast(NOTA_CREDITO.AVISO[r]); });
+      // el cupón de descuento en la web, con el mismo código y el mismo valor
+      const crearCupon = i => { const s = $(`[data-gc-web="${i}"]`, m); if (!s) return; s.textContent = '🌐 Creando el cupón en la web…';
+        NOTA_CREDITO.cupon(e, gifts[i].id, 'crear').then(r => { s.innerHTML = r.sin_web ? '' : `<span style="color:var(--ok)">🌐 Cupón ${esc(gifts[i].codigo)} creado en la web ✓</span>`; })
+          .catch(err => { s.innerHTML = `<span style="color:var(--error)">⚠ ${esc(err.message)}</span> <button class="btn chico" type="button">Reintentar</button>`; $('button', s).onclick = () => crearCupon(i); }); };
+      gifts.forEach((g, i) => crearCupon(i));
+    }
     if (sena) { const md = $('.modal', m); if (md) md.style.maxWidth = '560px';
       $('[data-print-sena]', m).onclick = () => { $('#impresion').innerHTML = SENA.html(sena, senaOpts); window.print(); };
       $('[data-wsp-sena]', m).onclick = async () => { const r = await SENA.compartir(sena, senaOpts, (clientes.find(c => c.id === p.cliente_id) || {}).telefono); if (SENA.AVISO[r]) toast(SENA.AVISO[r]); }; }
@@ -799,6 +820,55 @@ APP.ready.then(async () => {
       if (error) { toast(mensajeError(error), 'error'); return; }
       m.cerrar(); toast('Venta de prueba borrada ✓ · stock devuelto'); if (window.empujarStock) empujarStock(e); $('#q').focus();
     };
+  }
+
+  // ================= Gift card =================
+  // Se vende a precio de lista (como en la web): una de $25.000 sale $20.000 pagando de contado y vale $25.000.
+  // El código lo elige quien vende (o la clienta). Con la web conectada, al cobrar se crea el cupón de descuento con ese código.
+  const listaBase = () => (listas.find(x => x.predeterminada) || listas[0] || {}).id;
+  const conWeb = () => (pctx.listas || []).some(l => l.canal === 'tiendanube');
+  const normCod = c => String(c || '').trim().toUpperCase().replace(/\s+/g, '');
+  function venderGift(v, l0) {
+    const g = (l0 && l0.gift) || {};
+    const m = modal(`<h2>🎁 Gift card</h2><p class="sub">Vale lo que dice, a <b>precio de lista</b>${conWeb() ? ' (como en la web: con el mismo código se crea el cupón de descuento)' : ''}.</p>
+      <div class="campo" style="margin-top:10px"><label>Valor</label><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">${[20000, 25000, 30000, 40000, 50000, 100000].map(x => `<button type="button" class="btn chico" data-val="${x}">${fmt.pesos(x)}</button>`).join('')}</div>
+        <input id="gc-val" type="number" min="0" step="1000" value="${g.valor || ''}" placeholder="Otro valor" style="font:700 20px var(--f-mono);max-width:200px"></div>
+      <div id="gc-paga" class="sub" style="margin:-4px 0 10px"></div>
+      <div class="campo"><label>Código <small class="sub">(lo elige la clienta o vos)</small></label><div style="display:flex;gap:6px"><input id="gc-cod" value="${esc(g.codigo || '')}" placeholder="Ej. #FELIZCUMPLE" autocomplete="off" style="text-transform:uppercase;font-family:var(--f-mono);flex:1"><button type="button" class="btn" data-inventar>Inventar uno</button></div><div id="gc-cod-msg" class="sub" style="margin-top:4px"></div></div>
+      <div class="fila c2"><div class="campo"><label>Para</label><input id="gc-para" value="${esc(g.para || '')}" placeholder="Opcional"></div><div class="campo"><label>De</label><input id="gc-de" value="${esc(g.de || '')}" placeholder="Opcional"></div></div>
+      <div class="campo"><label>Mensaje</label><input id="gc-msg" value="${esc(g.mensaje || '')}" placeholder="Opcional (ej. ¡Feliz cumple!)" maxlength="120"></div>
+      <div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>${l0 ? 'Guardar' : 'Agregar al ticket'}</button></div>`);
+    const val = $('#gc-val', m), cod = $('#gc-cod', m), msg = $('#gc-cod-msg', m); let libre = false, tq = null;
+    // cuánto paga según el medio (la gift card vale lo mismo: el valor de lista)
+    const pintarPaga = () => {
+      const x = +val.value || 0, caja_ = $('#gc-paga', m); if (!x) { caja_.textContent = ''; return; }
+      const ids = [...new Set(formas.map(f => (listaDeForma(f) || {}).id || carrito.lista))], vv = Object.assign({}, v, { precio: x });
+      caja_.innerHTML = 'Paga: ' + listas.filter(L => ids.includes(L.id)).map(L => [L.nombre, precioLista(vv, L.id)]).sort((a, b) => a[1] - b[1]).map(([n, p]) => `${esc(n)} <b>${fmt.pesos(p)}</b>`).join(' · ');
+    };
+    const revisar = async () => {
+      const c = normCod(cod.value); libre = false;
+      if (!c) { msg.textContent = ''; return; }
+      if (!/^[A-Z0-9#/_.\-ÑÁÉÍÓÚ]{3,30}$/.test(c)) { msg.innerHTML = '<span style="color:var(--error)">De 3 a 30 letras o números (puede llevar # - / . _)</span>'; return; }
+      if (carrito.lineas.some(l => l.gift && l !== l0 && l.gift.codigo === c)) { msg.innerHTML = '<span style="color:var(--error)">Ya está en este ticket</span>'; return; }
+      const { data, error } = await sb.rpc('credito_codigo_libre', { e, p_codigo: c });
+      if (error) { msg.textContent = ''; libre = true; return; }   // sin internet: lo revisa la base al cobrar
+      libre = !!data; msg.innerHTML = data ? '<span style="color:var(--ok)">✓ Libre</span>' : '<span style="color:var(--error)">Ese código ya existe: elegí otro</span>';
+    };
+    $$('[data-val]', m).forEach(b => b.onclick = () => { val.value = b.dataset.val; pintarPaga(); cod.focus(); });
+    val.oninput = pintarPaga; cod.oninput = () => { clearTimeout(tq); tq = setTimeout(revisar, 300); };
+    $('[data-inventar]', m).onclick = () => { cod.value = '#' + Math.random().toString(36).slice(2, 8).toUpperCase(); revisar(); };
+    $('[data-no]', m).onclick = () => m.cerrar();
+    $('[data-si]', m).onclick = async () => {
+      const x = Math.round(+val.value || 0); if (x <= 0) { toast('Poné el valor de la gift card', 'error'); return; }
+      await revisar(); const c = normCod(cod.value);
+      if (!c) { toast('Poné el código (o tocá Inventar uno)', 'error'); return; }
+      if (!libre) { toast('Revisá el código', 'error'); return; }
+      const gift = { valor: x, codigo: c, para: $('#gc-para', m).value.trim(), de: $('#gc-de', m).value.trim(), mensaje: $('#gc-msg', m).value.trim() };
+      const vv = Object.assign({}, v, { precio: x });
+      if (l0) Object.assign(l0, { variante: vv, gift }); else carrito.lineas.push({ variante: vv, cantidad: 1, descPct: 0, gift });
+      m.cerrar(); pintar(); $('#q').focus();
+    };
+    pintarPaga(); if (g.valor) cod.focus(); else val.focus();
   }
 
   // ================= Retirar una seña =================
@@ -918,7 +988,7 @@ APP.ready.then(async () => {
   // lista, lo equivalente (valorDevuelta). Mismo modelo y mismo color en otro talle: se cambia sin diferencia, aunque el precio haya subido.
   // Otro color ya es otra prenda: paga la diferencia como cualquier cambio.
   const calcularBase = calcular;
-  calcular = function () { const c = calcularBase();
+  calcular = function () { carrito.lineas.forEach(l => { if (l.gift && l.cantidad > 1) l.cantidad = 1; }); const c = calcularBase();
     c.lineas.forEach(l => { l.conv = null; if (l.devuelta && l.precioFijo != null) { const val = valorDevuelta(l, carrito.lista); l.conv = val !== l.precioFijo && !l.parte ? { pago: l.precioFijo, de: l.listaOrigen } : null; l.precioLista = val; l.precioUnit = val; l.promo = null; l.descPromo = 0; l.precioFinal = val; l.total = r2(val * l.cantidad); } });
     const pool = new Map(), clave = v => v.producto_id + '|' + String(v.color_nombre || '').trim().toLowerCase();
     c.lineas.forEach(l => { if (l.devuelta && !l.parte && l.precioFijo != null) { const k = clave(l.variante); if (!pool.has(k)) pool.set(k, []); pool.get(k).push({ val: l.precioFinal, n: -l.cantidad }); } });
