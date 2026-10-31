@@ -66,8 +66,9 @@
 
   // ================= En papel (80 mm) =================
   const css = `.nc .nc-tit{font:800 17px var(--f-ui,sans-serif);letter-spacing:.12em;text-align:center;border:2px solid #000;padding:5px 0;margin:8px 0 6px}
-    .nc .nc-cod{font:800 24px var(--f-mono,monospace);letter-spacing:.18em;text-align:center;border:1.5px dashed #000;padding:6px 0 4px;margin:0 4mm;word-break:break-all}
-    .nc .nc-cod small{display:block;font:500 10px var(--f-ui,sans-serif);letter-spacing:0;margin-top:2px}
+    .nc .nc-cod{font:800 24px var(--f-mono,monospace);letter-spacing:.18em;text-align:center;border:1.5px dashed #000;border-radius:6px;padding:10px 4px 8px;margin:4px 3mm;word-break:break-all;line-height:1.1}
+    .nc .nc-cod.largo{font-size:18px;letter-spacing:.08em}
+    .nc .nc-cod small{display:block;font:600 9.5px var(--f-ui,sans-serif);letter-spacing:.08em;text-transform:uppercase;margin-top:8px}
     .nc .nc-sec{font-weight:700;font-size:11px;letter-spacing:.06em;margin:6px 0 2px}
     .nc .nc-monto{display:flex;justify-content:space-between;align-items:baseline;border-top:2px solid #000;border-bottom:2px solid #000;padding:6px 0;margin:8px 0 6px;font-weight:800}
     .nc .nc-monto b{font-size:20px}
@@ -84,7 +85,7 @@
       <div class="c">${h([emp.domicilio, emp.localidad].filter(Boolean).join(' · '))}${emp.telefono ? '<br>' + h(emp.telefono) : ''}</div>
       <div class="nc-tit">${h(d.titulo)}</div>
       ${dedHtml(d.dedicatoria)}
-      <div class="nc-cod">${h(d.codigo)}<small>${h(d.codigoNota)}</small></div>
+      <div class="nc-cod${String(d.codigo).length > 12 ? ' largo' : ''}">${h(d.codigo)}<small>${h(d.codigoNota)}</small></div>
       <table style="margin-top:8px">${d.pares.map(p => `<tr><td>${h(p[0])}</td><td class="r">${h(p[1])}${p[2] ? '<br><small>' + h(p[2]) + '</small>' : ''}</td></tr>`).join('')}</table>
       ${d.grupos.filter(g => (g[1] || []).length).map((g, i) => `${i ? '' : '<hr>'}<div class="nc-sec">${h(g[0])}</div><table>${g[1].map(fila).join('')}</table>`).join('')}
       <div class="nc-monto"><span>${h(d.montoNota)}</span><b>${pesos(d.monto)}</b></div>
@@ -130,13 +131,14 @@
         if (dd.mensaje) partir('“' + dd.mensaje + '”', `italic 500 16px ${UI}`, W - 2 * P - 40).forEach(l => { txt(l, W / 2, `italic 500 16px ${UI}`, TINTA, 'center'); y += 23; });
         y += 18;
       }
-      // el código
-      rect(P + 40, y, W - 2 * P - 80, 84, 16, '#faf8fc', AC, [10, 7]); y += 56;
-      { // el código entra siempre en el recuadro: letras separadas si es corto, y la letra se achica si hace falta
-        const cd = String(d.codigo), t = cd.length <= 10 ? cd.split('').join(' ') : cd; let fs_ = 40; ctx.font = `800 ${fs_}px ${MONO}`;
-        while (fs_ > 16 && ctx.measureText(t).width > W - 2 * P - 110) { fs_ -= 2; ctx.font = `800 ${fs_}px ${MONO}`; }
-        txt(t, W / 2, `800 ${fs_}px ${MONO}`, TINTA, 'center'); y += 20; }
-      txt(d.codigoNota, W / 2, `600 12px ${UI}`, GRIS, 'center'); y += 46;
+      // el código, con aire: recuadro de 112, el código arriba y "tu código" abajo, separados
+      rect(P + 30, y, W - 2 * P - 60, 112, 18, '#faf8fc', AC, [10, 7]);
+      { const cd = String(d.codigo), ancho = W - 2 * P - 120; let fs_ = 42;
+        // espacio entre letras proporcional a la letra; si no entra, se achica todo junto
+        const poner = () => { ctx.font = `800 ${fs_}px ${MONO}`; ctx.letterSpacing = Math.round(fs_ * (cd.length <= 8 ? 0.32 : cd.length <= 12 ? 0.16 : 0.06)) + 'px'; return ctx.measureText(cd).width; };
+        while (fs_ > 18 && poner() > ancho) fs_ -= 2;
+        y += 62; txt(cd, W / 2, `800 ${fs_}px ${MONO}`, TINTA, 'center'); ctx.letterSpacing = '0px'; }
+      y += 30; txt(d.codigoNota.toUpperCase(), W / 2, `700 11px ${UI}`, GRIS, 'center'); y += 20 + 40;
       // el monto
       txt(d.montoNota, W / 2, `700 13px ${UI}`, GRIS, 'center'); y += 52;
       txt(pesos(d.monto), W / 2, `800 50px ${UI}`, AC, 'center'); y += 34;

@@ -241,7 +241,7 @@ window.INSTRUCTIVO = {
       { tipo: 'pasos', items: [
         'En el Punto de venta buscá **GIFT CARD** y tocala.',
         'Elegí el **valor** (ej. $25.000). Abajo te muestra **cuánto paga según el medio**.',
-        'Escribí el **código**: lo elige la clienta (ej. **#FELIZCUMPLE**) o tocá {{Inventar uno}}. Te avisa si ya existe.',
+        'Escribí el **código**: lo elige la clienta (ej. **#FELIZCUMPLE**) o tocá {{Inventar uno}}. Te avisa si ya existe. **Ideal: de 6 a 12 letras o números** (así se ve grande en la gift card; más largo entra, pero más chico).',
         'Si querés, completá **Para**, **De** y un **mensaje**: salen impresos en la gift card.',
         '{{Agregar al ticket}} y cobrá como siempre.',
         'Después de cobrar: {{Imprimir gift card}} o {{📷 WhatsApp (foto)}}.'] },

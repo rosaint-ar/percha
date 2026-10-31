@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ventas · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610311437">
+<link rel="stylesheet" href="../shell/shell.css?v=202610311443">
 <style>
   .filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
   .filtros input[type=date],.filtros select{border:1px solid var(--linea);background:var(--superficie-2);padding:8px 10px;border-radius:var(--radio-mini)}
@@ -55,12 +55,12 @@
 </main>
 <div id="impresion"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610311437"></script>
-<script src="../shared/canales.js?v=202610311437"></script>
-<script src="../shell/shell.js?v=202610311437"></script>
-<script src="../shared/ticket-cambio.js?v=202610311437"></script>
-<script src="../shared/nota-credito.js?v=202610311437"></script>
-<script src="../shared/facturar.js?v=202610311437"></script>
+<script src="../shared/supabase.js?v=202610311443"></script>
+<script src="../shared/canales.js?v=202610311443"></script>
+<script src="../shell/shell.js?v=202610311443"></script>
+<script src="../shared/ticket-cambio.js?v=202610311443"></script>
+<script src="../shared/nota-credito.js?v=202610311443"></script>
+<script src="../shared/facturar.js?v=202610311443"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -291,13 +291,13 @@ APP.ready.then(async () => {
     const d = await datosNC();
     const m = modal(`<h2>🎁 Cargar gift card</h2><p class="sub">Para una gift card que no se vendió en la caja (por la web, por WhatsApp o una vieja). El valor es a <b>precio de lista</b>${d.web ? ' y se crea el cupón de descuento en la web con el mismo código' : ''}.</p>
       <div class="fila c2" style="margin-top:10px"><div class="campo"><label>Valor</label><input id="g-val" type="number" min="0" step="1000" placeholder="25000" style="font:700 18px var(--f-mono)"></div>
-        <div class="campo"><label>Código</label><div style="display:flex;gap:6px"><input id="g-cod" placeholder="Ej. #FELIZCUMPLE" autocomplete="off" style="text-transform:uppercase;font-family:var(--f-mono);flex:1"><button type="button" class="btn" data-inventar>Inventar</button></div><div id="g-msg" class="sub" style="margin-top:4px"></div></div></div>
+        <div class="campo"><label>Código</label><div style="display:flex;gap:6px"><input id="g-cod" placeholder="Ej. #FELIZCUMPLE" autocomplete="off" style="text-transform:uppercase;font-family:var(--f-mono);flex:1"><button type="button" class="btn" data-inventar>Inventar</button></div><div id="g-msg" class="sub" style="margin-top:4px">Ideal: de 6 a 12 letras o números.</div></div></div>
       <div class="fila c2"><div class="campo"><label>Para</label><input id="g-para" placeholder="Opcional"></div><div class="campo"><label>De</label><input id="g-de" placeholder="Opcional"></div></div>
       <div class="campo"><label>Mensaje</label><input id="g-men" placeholder="Opcional" maxlength="120"></div>
       <div class="campo"><label>Nota interna</label><input id="g-nota" placeholder="Ej. vendida por la web, pedido #2420"></div>
       <div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Cargar</button></div>`);
     const cod = $('#g-cod', m), msg = $('#g-msg', m); let tq = null;
-    const revisar = async () => { const c = cod.value.trim().toUpperCase().replace(/\s+/g, ''); if (!c) { msg.textContent = ''; return; } const { data } = await sb.rpc('credito_codigo_libre', { e, p_codigo: c }); msg.innerHTML = data ? '<span style="color:var(--ok)">✓ Libre</span>' : '<span style="color:var(--error)">Ese código ya existe</span>'; };
+    const revisar = async () => { const c = cod.value.trim().toUpperCase().replace(/\s+/g, ''); if (!c) { msg.textContent = ''; return; } const { data } = await sb.rpc('credito_codigo_libre', { e, p_codigo: c }); msg.innerHTML = data ? '<span style="color:var(--ok)">✓ Libre</span>' + (c.length > 12 ? ' · <span style="color:var(--aviso)">es largo: se va a ver más chico (ideal hasta 12)</span>' : c.length < 6 ? ' · <span style="color:var(--aviso)">es corto: mejor de 6 a 12</span>' : ' · ' + c.length + ' caracteres') : '<span style="color:var(--error)">Ese código ya existe</span>'; };
     cod.oninput = () => { clearTimeout(tq); tq = setTimeout(revisar, 300); };
     $('[data-inventar]', m).onclick = () => { cod.value = '#' + Math.random().toString(36).slice(2, 8).toUpperCase(); revisar(); };
     $('[data-no]', m).onclick = () => m.cerrar();

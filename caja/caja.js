@@ -834,7 +834,7 @@ APP.ready.then(async () => {
       <div class="campo" style="margin-top:10px"><label>Valor</label><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">${[20000, 25000, 30000, 40000, 50000, 100000].map(x => `<button type="button" class="btn chico" data-val="${x}">${fmt.pesos(x)}</button>`).join('')}</div>
         <input id="gc-val" type="number" min="0" step="1000" value="${g.valor || ''}" placeholder="Otro valor" style="font:700 20px var(--f-mono);max-width:200px"></div>
       <div id="gc-paga" class="sub" style="margin:-4px 0 10px"></div>
-      <div class="campo"><label>Código <small class="sub">(lo elige la clienta o vos)</small></label><div style="display:flex;gap:6px"><input id="gc-cod" value="${esc(g.codigo || '')}" placeholder="Ej. #FELIZCUMPLE" autocomplete="off" style="text-transform:uppercase;font-family:var(--f-mono);flex:1"><button type="button" class="btn" data-inventar>Inventar uno</button></div><div id="gc-cod-msg" class="sub" style="margin-top:4px"></div></div>
+      <div class="campo"><label>Código <small class="sub">(lo elige la clienta o vos)</small></label><div style="display:flex;gap:6px"><input id="gc-cod" value="${esc(g.codigo || '')}" placeholder="Ej. #FELIZCUMPLE" autocomplete="off" style="text-transform:uppercase;font-family:var(--f-mono);flex:1"><button type="button" class="btn" data-inventar>Inventar uno</button></div><div id="gc-cod-msg" class="sub" style="margin-top:4px">Ideal: de 6 a 12 letras o números, ej. <b>#FELIZCUMPLE</b>.</div></div>
       <div class="fila c2"><div class="campo"><label>Para</label><input id="gc-para" value="${esc(g.para || '')}" placeholder="Opcional"></div><div class="campo"><label>De</label><input id="gc-de" value="${esc(g.de || '')}" placeholder="Opcional"></div></div>
       <div class="campo"><label>Mensaje</label><input id="gc-msg" value="${esc(g.mensaje || '')}" placeholder="Opcional (ej. ¡Feliz cumple!)" maxlength="120"></div>
       <div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>${l0 ? 'Guardar' : 'Agregar al ticket'}</button></div>`);
@@ -847,12 +847,12 @@ APP.ready.then(async () => {
     };
     const revisar = async () => {
       const c = normCod(cod.value); libre = false;
-      if (!c) { msg.textContent = ''; return; }
+      if (!c) { msg.innerHTML = 'Ideal: de 6 a 12 letras o números, ej. <b>#FELIZCUMPLE</b>.'; return; }
       if (!/^[A-Z0-9#/_.\-ÑÁÉÍÓÚ]{3,30}$/.test(c)) { msg.innerHTML = '<span style="color:var(--error)">De 3 a 30 letras o números (puede llevar # - / . _)</span>'; return; }
       if (carrito.lineas.some(l => l.gift && l !== l0 && l.gift.codigo === c)) { msg.innerHTML = '<span style="color:var(--error)">Ya está en este ticket</span>'; return; }
       const { data, error } = await sb.rpc('credito_codigo_libre', { e, p_codigo: c });
       if (error) { msg.textContent = ''; libre = true; return; }   // sin internet: lo revisa la base al cobrar
-      libre = !!data; msg.innerHTML = data ? '<span style="color:var(--ok)">✓ Libre</span>' : '<span style="color:var(--error)">Ese código ya existe: elegí otro</span>';
+      libre = !!data; msg.innerHTML = data ? '<span style="color:var(--ok)">✓ Libre</span>' + (c.length > 12 ? ' · <span style="color:var(--aviso)">es largo: se va a ver más chico (ideal hasta 12)</span>' : c.length < 6 ? ' · <span style="color:var(--aviso)">es corto: mejor de 6 a 12</span>' : ' · ' + c.length + ' caracteres') : '<span style="color:var(--error)">Ese código ya existe: elegí otro</span>';
     };
     $$('[data-val]', m).forEach(b => b.onclick = () => { val.value = b.dataset.val; pintarPaga(); cod.focus(); });
     val.oninput = pintarPaga; cod.oninput = () => { clearTimeout(tq); tq = setTimeout(revisar, 300); };
