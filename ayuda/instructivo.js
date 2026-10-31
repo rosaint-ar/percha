@@ -176,7 +176,7 @@ window.INSTRUCTIVO = {
         ['6. **Envíos**', 'Preparado → Enviado cuando sale con el cadete → Entregado']] }
     ] },
     { id: 'pedidos-web', grupo: 'whatsapp', p: 'vender', titulo: 'Los pedidos de la web', nuevo: '2026-10-31', resumen: 'Entran solos: no se cargan a mano.', bloques: [
-      { tipo: 'texto', texto: 'Cuando alguien compra en la tienda online, el pedido **entra solo** a Percha en un ratito: aparece en **Ventas** (canal Web), si tiene envío en **Envíos**, y en el **cierre de caja** como "fuera de la caja". El stock se descuenta solo.' },
+      { tipo: 'texto', texto: 'Cuando alguien compra en la tienda online, el pedido **entra solo** a Percha **en el momento** (apenas se paga): aparece en **Ventas** (canal Web), si tiene envío en **Envíos**, y en el **cierre de caja** como "fuera de la caja". El stock se descuenta solo.' },
       { tipo: 'ojo', texto: '**No lo cargues de nuevo en la caja**: quedaría vendido dos veces.' }
     ] },
 
