@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Caja · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610311443">
+<link rel="stylesheet" href="../shell/shell.css?v=202610311500">
 <style>
   /* Caja: la plata del cajón. No se vende acá (eso es el Punto de venta). */
   .estado{display:grid;grid-template-columns:1fr auto;gap:18px;align-items:center;padding:22px 24px;margin-bottom:14px}
@@ -64,10 +64,10 @@
 </main>
 <div id="impresion"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610311443"></script>
-<script src="../shell/shell.js?v=202610311443"></script>
-<script src="../shared/caja-fx.js?v=202610311443"></script>
-<script src="turno.js?v=202610311443"></script>
+<script src="../shared/supabase.js?v=202610311500"></script>
+<script src="../shell/shell.js?v=202610311500"></script>
+<script src="../shared/caja-fx.js?v=202610311500"></script>
+<script src="turno.js?v=202610311500"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal } = APP, e = APP.empresa.id;
@@ -106,6 +106,7 @@ APP.ready.then(async () => {
         <div class="tile"><div class="t">Efectivo inicial</div><div class="n">${fmt.pesos(esp.efectivo_inicial)}</div><div class="d">con lo que arrancó</div></div>
         <div class="tile"><div class="t">Ingresos y retiros</div><div class="n">${(esp.movimientos > 0 ? '+' : '') + fmt.pesos(esp.movimientos)}</div><div class="d">${movs.length} movimiento${movs.length === 1 ? '' : 's'}</div></div>`;
       const medios = (esp.formas || []).filter(f => f.ventas);
+      { let fz = document.getElementById('fuera'); if (!fz) { fz = document.createElement('div'); fz.id = 'fuera'; $('#medios').after(fz); } fz.innerHTML = TURNO.fueraHtml(esp.fuera); }
       $('#medios').innerHTML = (medios.length ? medios.map(f => `<div class="medio"><span>${esc(f.nombre)}</span><small>${f.ventas} venta${f.ventas > 1 ? 's' : ''}</small><b>${fmt.pesos(f.tipo === 'efectivo' ? f.esperado - esp.efectivo_inicial - esp.movimientos : f.esperado)}</b></div>`).join('') : '<div class="vacio-c">Todavía no se cobró nada en este turno.</div>')
         + (efv ? `<div class="efv-det">Efectivo: arrancó con ${fmt.pesos(esp.efectivo_inicial)} + ventas ${fmt.pesos(efv.esperado - esp.efectivo_inicial - esp.movimientos)} ${esp.movimientos >= 0 ? '+' : '−'} ingresos/retiros ${fmt.pesos(Math.abs(esp.movimientos))} = <b>${fmt.pesos(efv.esperado)}</b></div>` : '');
       $('#movs').innerHTML = movs.length ? movs.map(m => `<div class="mov"><span class="ic">${m.tipo === 'retiro' ? '↗️' : '↙️'}</span><span>${esc(m.concepto || (m.tipo === 'retiro' ? 'Retiro' : 'Ingreso'))}<small>${m.tipo === 'retiro' ? 'Retiro' : 'Ingreso'} · ${hora(m.fecha)}</small></span><span class="monto ${m.tipo === 'retiro' ? 'menos' : 'mas'}">${m.tipo === 'retiro' ? '−' : '+'}${fmt.pesos(m.monto)}</span></div>`).join('') : '<div class="vacio-c">No hubo ingresos ni retiros en este turno.</div>';
@@ -135,7 +136,7 @@ APP.ready.then(async () => {
   function pintarHistorial() {
     const tb = $('#tb-hist tbody'), l = hist.filter(t => t.estado === 'cerrado');
     tb.innerHTML = l.length ? l.map(t => { const r = resumenArqueo(t);
-      return `<tr class="clic" data-id="${t.id}"><td>${dia(t.abierto)}</td><td>${hora(t.abierto)} – ${hora(t.cerrado)}</td><td>${esc(t.cerro || t.abrio || '—')}</td><td class="num">${t.ventas}</td><td class="num num-f">${fmt.pesos(t.total)}</td><td class="cobro">${cobro(t)}</td>
+      return `<tr class="clic" data-id="${t.id}"><td>${dia(t.abierto)}</td><td>${hora(t.abierto)} – ${hora(t.cerrado)}</td><td>${esc(t.cerro || t.abrio || '—')}</td><td class="num">${t.ventas}</td><td class="num num-f">${fmt.pesos(t.total)}${t.fuera_caja && +t.fuera_caja.ventas ? `<br><small style="color:var(--tinta-3);font-weight:500">+ ${fmt.pesos(t.fuera_caja.total)} fuera de caja</small>` : ''}</td><td class="cobro">${cobro(t)}</td>
         <td>${!(t.arqueo || []).length ? '<span class="chip gris">sin arqueo</span>' : Math.abs(r.dif) < 1 ? '<span class="chip ok">✓ cuadró</span>' : `<span class="chip ${r.dif < 0 ? 'error' : 'aviso'}">${r.dif < 0 ? 'faltó ' : 'sobró '}${fmt.pesos(Math.abs(r.dif))}</span>`}</td>
         <td class="num">${r.retirado != null ? fmt.pesos(r.retirado) : '—'}</td><td class="num"><b>${t.efectivo_queda != null ? fmt.pesos(t.efectivo_queda) : '—'}</b></td></tr>`; }).join('')
       : '<tr><td colspan="9" class="vacio">Todavía no se cerró ninguna caja.</td></tr>';
@@ -147,6 +148,7 @@ APP.ready.then(async () => {
       <div class="tiles" style="grid-template-columns:repeat(3,1fr);margin:12px 0"><div class="tile"><div class="t">Ventas</div><div class="n">${t.ventas}</div></div><div class="tile"><div class="t">Vendido</div><div class="n" style="font-size:22px">${fmt.pesos(t.total)}</div></div><div class="tile"><div class="t">Arrancó con</div><div class="n" style="font-size:22px">${fmt.pesos(t.efectivo_inicial)}</div></div></div>
       <h3 style="margin:4px 0 6px">Cobrado por medio de pago</h3>
       <table class="lista">${(t.medios || []).map(x => `<tr><td>${esc(x.nombre)}</td><td class="num"><small>${x.ventas} venta${x.ventas > 1 ? 's' : ''}</small></td><td class="num"><b>${fmt.pesos(x.monto)}</b></td></tr>`).join('') || '<tr><td class="vacio">No hubo cobros.</td></tr>'}</table>
+      ${TURNO.fueraHtml(t.fuera_caja)}
       <h3 style="margin:14px 0 6px">Arqueo</h3>
       <table class="lista"><tr><th>Medio</th><th class="num">Debería haber</th><th class="num">Se contó</th><th class="num">Diferencia</th></tr>
       ${(t.arqueo || []).map(a => `<tr><td>${esc(a.nombre)}</td><td class="num">${fmt.pesos(a.esperado)}</td><td class="num">${fmt.pesos(a.declarado)}</td><td class="num" style="color:${Math.abs(a.diferencia) < 1 ? 'var(--ok)' : 'var(--error)'}">${Math.abs(a.diferencia) < 1 ? '✓' : (a.diferencia > 0 ? '+' : '') + fmt.pesos(a.diferencia)}</td></tr>`).join('') || '<tr><td colspan="4" class="vacio">Sin arqueo.</td></tr>'}</table>

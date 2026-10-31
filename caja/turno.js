@@ -53,6 +53,15 @@
     });
   }
 
+  // Ventas fuera de la caja (sql/104): pedidos de la web y ventas cargadas con la caja cerrada, desde el cierre anterior.
+  // No van al cajón ni al arqueo: se muestran aparte y suman al total del día.
+  const CANAL = { tiendanube: 'Web', whatsapp: 'WhatsApp', local: 'Local', online: 'Online' };
+  function fueraHtml(fu) {
+    const { fmt, esc } = APP; if (!fu || !+fu.ventas) return '';
+    const hora = d => new Date(d).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    return `<div class="aviso-caja info" style="margin-top:10px"><b>🌐 Además, ${fu.ventas} venta${fu.ventas > 1 ? 's' : ''} fuera de la caja: ${fmt.pesos(fu.total)}</b><small style="display:block;margin:2px 0 6px">Pedidos de la web o ventas cargadas con la caja cerrada. No van al cajón ni al arqueo.</small>` +
+      `<table class="lista">${(fu.lista || []).map(v => `<tr><td class="mono">#${String(v.numero).padStart(6, '0')}</td><td>${esc(CANAL[v.origen] || v.origen || '')}${v.cliente ? ' · ' + esc(v.cliente) : ''}<br><small>${hora(v.fecha)}${v.pagos ? ' · ' + esc(v.pagos) : ''}${v.estado !== 'completada' ? ' · ' + esc(v.estado) : ''}</small></td><td class="num">${fmt.pesos(v.total)}</td></tr>`).join('')}</table></div>`;
+  }
   async function cerrar(caja, turno, op) {
     const { fmt, esc, $, $$, toast, modal, mensajeError } = APP;
     if (op && op.pendientes) { toast('Primero subí las ventas que quedaron sin internet (desde el Punto de venta)', 'error'); return false; }
@@ -69,6 +78,7 @@
             <div class="tile"><div class="t">Vendido</div><div class="n" style="font-size:22px">${fmt.pesos(esp.total)}</div></div>
             <div class="tile"><div class="t">Ticket promedio</div><div class="n" style="font-size:22px">${esp.ventas ? fmt.pesos(esp.total / esp.ventas) : '—'}</div></div></div>
           <table class="lista">${filas.filter(f => f.ventas).map(f => `<tr><td>${esc(f.nombre)}</td><td class="num"><small>${f.ventas} venta${f.ventas > 1 ? 's' : ''}</small></td><td class="num">${fmt.pesos(f.tipo === 'efectivo' ? f.esperado - esp.efectivo_inicial - esp.movimientos : f.esperado)}</td></tr>`).join('') || '<tr><td class="vacio">No hubo cobros en este turno.</td></tr>'}</table>
+          ${fueraHtml(esp.fuera)}${esp.fuera && +esp.fuera.ventas ? `<p class="sub" style="margin-top:8px"><b>Total del día: ${fmt.pesos(+esp.total + +esp.fuera.total)}</b> (caja ${fmt.pesos(esp.total)} + fuera de la caja ${fmt.pesos(esp.fuera.total)})</p>` : ''}
           <div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-ir="2">Contar la plata →</button></div></div>
         <div data-paso="2" hidden>
           <h2>🧮 Contá lo que hay</h2><p class="sub">Anotá lo que contaste en cada medio. Si coincide, queda en verde.</p>
@@ -104,7 +114,7 @@
         const arqueo = $$('tr[data-id]', m).map(tr => ({ forma_pago_id: tr.dataset.id, nombre: $('td', tr).textContent.trim().split(' (')[0], esperado: +tr.dataset.esp, declarado: +$('input', tr).value || 0, diferencia: r2((+$('input', tr).value || 0) - +tr.dataset.esp) }));
         if (efv && quedaDe() < 0) { toast('Estás retirando más efectivo del que contaste', 'error'); return; }
         const queda = efv ? Math.max(0, quedaDe()) : null;
-        const r = await sb.from('caja_turnos').update({ estado: 'cerrado', cerrado: new Date().toISOString(), cerrado_por: APP.user.id, arqueo, efectivo_queda: queda, notas: $('#c-notas', m).value.trim() || null }).eq('id', turno.id);
+        const r = await sb.from('caja_turnos').update({ estado: 'cerrado', cerrado: new Date().toISOString(), cerrado_por: APP.user.id, arqueo, efectivo_queda: queda, fuera_caja: esp.fuera || null, notas: $('#c-notas', m).value.trim() || null }).eq('id', turno.id);
         if (r.error) { b.disabled = false; fx().sonido('error'); toast(mensajeError(r.error), 'error'); return; }
         m.cerrar(); resolve(true);
         const dif = arqueo.reduce((s, a) => s + a.diferencia, 0);
@@ -124,6 +134,7 @@
       <div>Abrió: ${f(t.abierto)}<br>Cerró: ${f(t.cerrado || new Date())}${quien ? '<br>Responsable: ' + esc(quien) : ''}</div><hr>
       <table><tr><td>Ventas</td><td class="r">${esp.ventas}</td></tr><tr><td><b>Vendido</b></td><td class="r"><b>${fmt.pesos(esp.total)}</b></td></tr><tr><td>Efectivo inicial</td><td class="r">${fmt.pesos(esp.efectivo_inicial)}</td></tr><tr><td>Ingresos/retiros</td><td class="r">${fmt.pesos(esp.movimientos)}</td></tr></table><hr>
       ${(esp.medios || []).length ? `<div><b>Cobrado por medio</b></div><table>${esp.medios.map(x => `<tr><td>${esc(x.nombre)}</td><td class="r">${fmt.pesos(x.monto)}</td></tr>`).join('')}</table><hr>` : ''}
+      ${esp.fuera && +esp.fuera.ventas ? `<div><b>Fuera de la caja</b> (web / caja cerrada)</div><table>${(esp.fuera.lista || []).map(v => `<tr><td>#${String(v.numero).padStart(6, '0')} ${esc(CANAL[v.origen] || v.origen || '')}</td><td class="r">${fmt.pesos(v.total)}</td></tr>`).join('')}<tr><td><b>Total del día</b></td><td class="r"><b>${fmt.pesos(+esp.total + +esp.fuera.total)}</b></td></tr></table><hr>` : ''}
       <table><tr><td><b>Medio</b></td><td class="r"><b>Esperado</b></td><td class="r"><b>Contado</b></td></tr>${(arqueo || []).map(a => `<tr><td>${esc(a.nombre)}</td><td class="r">${fmt.pesos(a.esperado)}</td><td class="r">${fmt.pesos(a.declarado)}${Math.abs(a.diferencia) >= 1 ? ' (' + (a.diferencia > 0 ? '+' : '') + fmt.pesos(a.diferencia) + ')' : ''}</td></tr>`).join('')}</table>
       ${queda != null ? (() => { const e = (arqueo || []).find(a => /efectivo/i.test(a.nombre || '')); return `<hr><table>${e ? `<tr><td>Retiro</td><td class="r">${fmt.pesos(Math.max(0, e.declarado - queda))}</td></tr>` : ''}<tr><td><b>Cambio para mañana</b></td><td class="r"><b>${fmt.pesos(queda)}</b></td></tr></table>`; })() : ''}`;
     setTimeout(() => window.print(), 50);
@@ -136,6 +147,7 @@
     const hora = d => new Date(d).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
     const l = [`*Cierre de caja · ${emp.nombre || ''}*`, `${dia.charAt(0).toUpperCase() + dia.slice(1)} · ${hora(t.abierto)} a ${hora(t.cerrado || Date.now())}${quien ? ' · ' + quien : ''}`, '',
       `🛍️ Ventas: ${esp.ventas} · Vendido: *${fmt.pesos(esp.total)}*`];
+    const fu = esp.fuera; if (fu && +fu.ventas) { l.push(`🌐 Fuera de la caja (web / caja cerrada): ${fu.ventas} · ${fmt.pesos(fu.total)}`); (fu.lista || []).forEach(v => l.push(`   • #${String(v.numero).padStart(6, '0')} ${CANAL[v.origen] || v.origen || ''}${v.cliente ? ' · ' + v.cliente : ''} · ${fmt.pesos(v.total)}`)); l.push(`📊 *Total del día: ${fmt.pesos(+esp.total + +fu.total)}*`); }
     if ((esp.medios || []).length) { l.push('', '*Cobrado por medio:*'); esp.medios.forEach(x => l.push(`• ${x.nombre}: ${fmt.pesos(x.monto)}`)); }
     const efv = (arqueo || []).find(a => /efectivo/i.test(a.nombre || ''));
     l.push('', `💵 Efectivo: arrancó con ${fmt.pesos(esp.efectivo_inicial)}${+esp.movimientos ? ', ingresos/retiros ' + fmt.pesos(esp.movimientos) : ''}${efv ? ', se contó ' + fmt.pesos(efv.declarado) : ''}`);
@@ -147,5 +159,5 @@
   }
   function whatsappCierre(...a) { APP.whatsapp(textoCierre(...a)); }
 
-  window.TURNO = { cajaDe, abierto, abrir, movimiento, cerrar, imprimirCierre, textoCierre, whatsappCierre };
+  window.TURNO = { fueraHtml, cajaDe, abierto, abrir, movimiento, cerrar, imprimirCierre, textoCierre, whatsappCierre };
 })();

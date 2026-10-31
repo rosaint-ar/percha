@@ -176,7 +176,7 @@ window.INSTRUCTIVO = {
         ['6. **Envíos**', 'Preparado → Enviado cuando sale con el cadete → Entregado']] }
     ] },
     { id: 'pedidos-web', grupo: 'whatsapp', p: 'vender', titulo: 'Los pedidos de la web', nuevo: '2026-10-31', resumen: 'Entran solos: no se cargan a mano.', bloques: [
-      { tipo: 'texto', texto: 'Cuando alguien compra en la tienda online, el pedido **entra solo** a Percha: aparece en **Ventas** (canal Web) y, si tiene envío, en **Envíos**. El stock se descuenta solo.' },
+      { tipo: 'texto', texto: 'Cuando alguien compra en la tienda online, el pedido **entra solo** a Percha en un ratito: aparece en **Ventas** (canal Web), si tiene envío en **Envíos**, y en el **cierre de caja** como "fuera de la caja". El stock se descuenta solo.' },
       { tipo: 'ojo', texto: '**No lo cargues de nuevo en la caja**: quedaría vendido dos veces.' }
     ] },
 
@@ -270,7 +270,8 @@ window.INSTRUCTIVO = {
         '**Contá lo que hay** en cada medio (efectivo, transferencias, tarjetas). Si coincide, queda en **verde**.',
         'Decí **cuánto retirás**: lo que queda es el **cambio para mañana**.',
         'Imprimí el resumen o mandalo por {{WhatsApp}}.'] },
-      { tipo: 'ojo', texto: 'Si no cuadra, revisá antes de cerrar: un retiro sin registrar, una venta cobrada con otro medio, un vuelto mal dado.' }
+      { tipo: 'ojo', texto: 'Si no cuadra, revisá antes de cerrar: un retiro sin registrar, una venta cobrada con otro medio, un vuelto mal dado.' },
+      { tipo: 'texto', texto: '**🌐 Fuera de la caja:** al cerrar también aparecen, aparte, los **pedidos de la web** y las ventas cargadas **con la caja cerrada** desde el cierre anterior (por ejemplo, un pedido de la noche). No van al cajón ni al arqueo, pero suman al **total del día**.' }
     ] },
 
     // ======================= CONSULTAS =======================

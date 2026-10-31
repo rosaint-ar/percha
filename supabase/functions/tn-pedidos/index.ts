@@ -1,6 +1,10 @@
 // tn-pedidos · trae los pedidos de Tienda Nube y los registra como ventas en Percha (origen "tiendanube").
 // Descuenta stock (prendas y kits) por el mismo camino que la caja. Los pedidos cancelados anulan la venta.
-// Auth: sesión de un miembro de la empresa ({conexion_id}) o header x-cron-key (todas las conexiones).
+// Auth: sesión de un miembro de la empresa ({conexion_id}), header x-cron-key (todas las conexiones, cada 2 minutos) o el aviso
+// de Tienda Nube (webhook a ?k=<app_config.tn_webhook_key>, body {store_id, event, id}): apenas se paga / actualiza / cancela un
+// pedido se trae esa tienda en el momento. Del aviso solo se usa store_id: los pedidos se leen siempre de la API.
+// Un trabajo por vez por tienda (conexiones.pedidos_hasta): el aviso y el cron juntos no cargan dos veces el mismo pedido.
+declare const EdgeRuntime: { waitUntil: (p: Promise<unknown>) => void };
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 const SB_URL = Deno.env.get("SUPABASE_URL")!, ANON = Deno.env.get("SUPABASE_ANON_KEY")!, SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const UA = "Percha (rosaint.ar@gmail.com)";
@@ -27,8 +31,16 @@ Deno.serve(async (req) => {
   const admin = createClient(SB_URL, SERVICE);
   const body = await req.json().catch(() => ({}));
   const { data: ck } = await admin.from("app_config").select("valor").eq("clave", "cron_key").maybeSingle();
-  let conexiones: any[] = [];
-  if (req.headers.get("x-cron-key") && ck?.valor && req.headers.get("x-cron-key") === ck.valor) {
+  let conexiones: any[] = [], esAviso = false;
+  const k = new URL(req.url).searchParams.get("k");
+  if (k) {
+    // aviso de Tienda Nube: se responde enseguida y se trabaja después (la web espera una respuesta rápida)
+    const { data: wk } = await admin.from("app_config").select("valor").eq("clave", "tn_webhook_key").maybeSingle();
+    if (!wk?.valor || k !== wk.valor) return json({ error: "Llave inválida" }, 401);
+    const { data: cx } = await admin.from("conexiones").select("*").eq("canal", "tiendanube").eq("estado", "activa").eq("externo_id", String(body.store_id ?? "")).maybeSingle();
+    if (!cx) return json({ ok: true, ignorado: true });
+    conexiones = [cx]; esAviso = true;
+  } else if (req.headers.get("x-cron-key") && ck?.valor && req.headers.get("x-cron-key") === ck.valor) {
     conexiones = (await admin.from("conexiones").select("*").eq("estado", "activa").eq("canal", "tiendanube")).data || [];
   } else {
     const comoUsuario = createClient(SB_URL, ANON, { global: { headers: { Authorization: req.headers.get("Authorization") || "" } } });
@@ -40,11 +52,17 @@ Deno.serve(async (req) => {
     if (!ok) return json({ error: "No pertenecés a esta empresa" }, 403);
     conexiones = [cx];
   }
+  const trabajar = async () => {
   const resumen: any[] = [];
   for (const cx of conexiones) {
     const e = cx.empresa_id;
     const { data: sec } = await admin.from("conexion_secretos").select("access_token").eq("conexion_id", cx.id).maybeSingle();
     if (!sec) continue;
+    // un trabajo por vez por tienda: si hay otro en curso (el cron o un aviso), este no hace nada
+    if (!body.solo_ver) {
+      const { data: tomado } = await admin.from("conexiones").update({ pedidos_hasta: new Date(Date.now() + 120000).toISOString() }).eq("id", cx.id).or(`pedidos_hasta.is.null,pedidos_hasta.lt.${new Date().toISOString()}`).select("id");
+      if (!tomado || !tomado.length) { resumen.push({ conexion: cx.id, ocupado: true }); continue; }
+    }
     const headers = { Authentication: `bearer ${sec.access_token}`, "User-Agent": UA, "Content-Type": "application/json" };
     const base = `https://api.tiendanube.com/2025-03/${cx.externo_id}`;
     // desde la última vez (con margen de 2 h); la primera vez, solo desde que se activó la conexión (no importa el pasado)
@@ -172,7 +190,15 @@ Deno.serve(async (req) => {
       await admin.from("canal_pedidos").upsert({ ...datosPedido, venta_id: venta.id, problema: problemas.length ? problemas.join(" · ") : null }, { onConflict: "conexion_id,pedido_ext" });
     }
     if (!body.solo_pedido && !body.desde) await admin.from("conexiones").update({ ultima_sync_pedidos: ahora }).eq("id", cx.id);
+    await admin.from("conexiones").update({ pedidos_hasta: null }).eq("id", cx.id);
     resumen.push({ conexion: cx.id, pedidos_leidos: pedidos.length, nuevos, anulados, con_problema: conProblema });
   }
-  return json({ ok: true, resumen });
+  return resumen;
+  };
+  if (esAviso) {
+    // si justo había otro trabajo en curso, se reintenta a los 10 s (el pedido nuevo puede no haber entrado en ese)
+    EdgeRuntime.waitUntil((async () => { const r = await trabajar(); if (r.some((x: any) => x.ocupado)) { await new Promise((ok) => setTimeout(ok, 10000)); await trabajar(); } })());
+    return json({ ok: true });
+  }
+  return json({ ok: true, resumen: await trabajar() });
 });
