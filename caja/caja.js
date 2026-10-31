@@ -94,12 +94,13 @@ APP.ready.then(async () => {
     const cola = colaPendiente().length;
     $('#estado-caja').innerHTML = turno
       ? `<span class="punto" id="punto-red"></span><span class="chip ok">Caja abierta</span><span style="font-size:12.5px;color:var(--tinta-3)">${esc(caja.nombre)} · desde ${fmt.fechaHora(turno.abierto)}</span>
-         <a class="btn chico" href="caja.html" title="Ingresos, retiros y cierre de caja">💰 Caja</a><a class="btn chico" href="ventas.html">Ventas del día</a><button class="btn chico" id="btn-sonido" title="Prender o apagar los sonidos de la caja">${fx.sonidoActivo() ? '🔊' : '🔇'}</button>
+         <a class="btn chico" href="caja.html" title="Ingresos, retiros y cierre de caja">💰 Caja</a><a class="btn chico" href="ventas.html">Ventas del día</a><button class="btn chico" id="btn-pedido" type="button" title="Una clienta pidió algo que no hay: anotalo">📝 Lo pidieron</button><button class="btn chico" id="btn-sonido" title="Prender o apagar los sonidos de la caja">${fx.sonidoActivo() ? '🔊' : '🔇'}</button>
          ${cola ? `<button class="btn chico suave" id="btn-sync">${cola} venta${cola > 1 ? 's' : ''} por subir</button>` : ''}`
       : `<span class="punto off"></span><span class="chip aviso">Caja cerrada</span><button class="btn chico primario" id="btn-abrir">🔓 Abrir caja</button><a class="btn chico" href="ventas.html">Ventas</a><button class="btn chico" id="btn-sonido" title="Prender o apagar los sonidos de la caja">${fx.sonidoActivo() ? '🔊' : '🔇'}</button>`;
     const b = $('#btn-abrir'); if (b) b.onclick = abrirTurno;
     const m = $('#btn-mov'); if (m) m.onclick = movimientoCaja;
     const c = $('#btn-cerrar'); if (c) c.onclick = cerrarTurno;
+    const bp = $('#btn-pedido'); if (bp) bp.onclick = () => window.PEDIDO_CLIENTA && PEDIDO_CLIENTA.anotar({ texto: ($('#q') || {}).value ? $('#q').value.trim() : '' });
     const s = $('#btn-sync'); if (s) s.onclick = sincronizar;
     const so = $('#btn-sonido'); if (so) so.onclick = () => { const on = fx.alternarSonido(); so.textContent = on ? '🔊' : '🔇'; toast(on ? 'Sonidos prendidos' : 'Sonidos apagados'); };
     actualizarRed();

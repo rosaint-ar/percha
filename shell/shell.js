@@ -17,6 +17,7 @@
 
   // ---------- íconos (trazo, 24x24) ----------
   const I = {
+    piden: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M9 10h6M9 14h4"/></svg>',
     ayuda: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5V5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M6 21h13"/><path d="M9 7h6M9 11h4"/></svg>',
     percha: '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><path d="M32 24c-5 0-8-3-8-7s3.5-7 8-7 8 3 8 7c0 3-2 5-5 6.5"/><path d="M32 24v5"/><path d="M32 29 8 44c-2 1.3-1.2 4.5 1.3 4.5h45.4c2.5 0 3.3-3.2 1.3-4.5L32 29z"/></svg>',
     inicio: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>',
@@ -130,6 +131,7 @@
     { id: 'caja', label: 'Caja', href: 'caja/caja.html', icono: 'caja', p: 'vender' },
     { id: 'ventas', label: 'Ventas', href: 'caja/ventas.html', icono: 'informes', p: ['ventas_todas', 'ventas_propias'] },
     { id: 'envios', label: 'Envíos', href: 'caja/envios.html', icono: 'envios', p: 'vender' },
+    { id: 'pedidos', label: 'Lo que piden', href: 'caja/pedidos.html', icono: 'piden', p: ['vender', 'compras'] },
     { id: 'productos', label: 'Catálogo', href: 'catalogo/productos.html', icono: 'catalogo', p: 'catalogo_ver' },
     { id: 'etiquetas', label: 'Etiquetas', href: 'catalogo/etiquetas.html', icono: 'etiquetas', p: 'catalogo_editar' },
     { id: 'inventario', label: 'Inventario', href: 'catalogo/inventario.html', icono: 'conteo', p: 'catalogo_ver' },
@@ -143,7 +145,7 @@
     { id: 'instructivo', label: 'Instructivo', href: 'ayuda/instructivo.html', icono: 'ayuda', p: 'instructivo' }
   ];
   // qué permiso pide cada pantalla (data-page del body); la primera permitida es adonde se manda a quien no puede
-  const PERMISO_PAGINA = { instructivo: 'instructivo', inicio: 'inicio', pos: 'vender', caja: 'vender', ventas: ['ventas_todas', 'ventas_propias'], envios: 'vender', productos: 'catalogo_ver', catalogo: 'catalogo_ver', etiquetas: 'catalogo_editar', inventario: 'catalogo_ver', conteo: 'catalogo_editar', compras: 'compras', conexiones: 'conexiones', configuracion: 'configuracion' };
+  const PERMISO_PAGINA = { instructivo: 'instructivo', pedidos: ['vender', 'compras'], inicio: 'inicio', pos: 'vender', caja: 'vender', ventas: ['ventas_todas', 'ventas_propias'], envios: 'vender', productos: 'catalogo_ver', catalogo: 'catalogo_ver', etiquetas: 'catalogo_editar', inventario: 'catalogo_ver', conteo: 'catalogo_editar', compras: 'compras', conexiones: 'conexiones', configuracion: 'configuracion' };
   const permite = p => !p || [].concat(p).some(k => APP.puede(k));
   function pintarLateral() {
     const pagina = body.dataset.page, esAdmin = APP.esAdmin;

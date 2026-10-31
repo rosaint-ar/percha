@@ -130,6 +130,15 @@ window.INSTRUCTIVO = {
         ['Se vendió pero se canceló', '{{Anular}}: queda registrada como anulada y el stock vuelve']] },
       { tipo: 'tip', texto: '{{🧪 Era de prueba}} está en la ventana que aparece después de cobrar y también al abrir la venta en **Ventas**.' }
     ] },
+    { id: 'lo-pidieron', grupo: 'vender', p: 'vender', titulo: 'Anotar lo que piden y no hay', nuevo: '2026-10-31', resumen: 'Una clienta pide algo que no tenemos (o no en su talle): {{📝 Lo pidieron}} y se anota.', bloques: [
+      { tipo: 'pasos', items: [
+        'Arriba en el Punto de venta tocá {{📝 Lo pidieron}}. (Si la buscaste y no apareció, abajo te ofrece {{📝 ¿Lo pidió una clienta? Anotalo}}.)',
+        'En **¿Qué pidió?** escribí y elegí la prenda del catálogo. Si no la tenemos, dejala escrita como la pidió (ej. "kimono de raso").',
+        'Si es del catálogo, tocá el **talle y color** que quiere (te muestra cuántas hay de cada uno).',
+        'Poné la **clienta** y su **teléfono**: así se le avisa por WhatsApp cuando llegue.',
+        '{{Anotar}}. Listo: lo ve administración en **Lo que piden**.'] },
+      { tipo: 'tip', texto: 'Anotá todo lo que te pidan, aunque sea una sola vez: así se sabe qué conviene reponer o traer.' }
+    ] },
     { id: 'sin-internet', grupo: 'vender', p: 'vender', titulo: 'Si se corta internet', resumen: 'Seguí vendiendo: las ventas se guardan y se suben solas.', bloques: [
       { tipo: 'texto', texto: 'La caja sigue funcionando. Arriba vas a ver **"N ventas por subir"**: cuando vuelve internet se suben solas.' },
       { tipo: 'ojo', texto: 'Sin internet no se pueden buscar ventas viejas (para un cambio) ni usar notas de crédito. Esperá a que vuelva.' }
@@ -279,6 +288,15 @@ window.INSTRUCTIVO = {
       { tipo: 'tabla', filas: [['Tocar un ticket', 'ver el detalle, {{Reimprimir}}, {{Editar}} o hacer un {{Cambio / devolución}} desde ahí'], ['{{Señas}}', 'las señas pendientes: {{Retirar en la caja}} o {{🎟️ Comprobante}} para reenviarlo'], ['{{Créditos}}', 'notas de crédito: tocá una para verla, imprimirla o mandarla por WhatsApp']] },
       { tipo: 'tip', texto: 'La etiqueta del canal (Local, WhatsApp, Web) se puede tocar para corregirla si quedó mal.' }
     ] },
+    { id: 'lo-que-piden', grupo: 'consultas', p: ['vender', 'compras'], titulo: 'Lo que piden: para reponer y avisar', nuevo: '2026-10-31', resumen: 'En el menú, **Lo que piden**: todo lo anotado, agrupado por prenda.', bloques: [
+      { tipo: 'texto', texto: 'Muestra cada prenda pedida con **cuántas veces la pidieron**, qué talles y colores, quiénes, y **si hoy ya hay stock**. Lo más pedido va arriba, y lo que ya llegó aparece primero con **✓ ya hay stock: avisales**.' },
+      { tipo: 'pasos', items: [
+        'Cuando llega o se consigue: {{✓ Conseguido}} (o {{✓ Conseguido (todos)}} para toda la prenda).',
+        'Para avisarle a la clienta: {{📲 Avisarle}} abre WhatsApp con el mensaje listo ("Ya tenemos … que nos pediste. ¿Querés que te lo guardemos?") y queda como **Avisada**.',
+        'Si no tiene teléfono y le avisaste de otra forma: {{Ya le avisé}}.',
+        'Si no se va a conseguir o ya no lo quiere: {{✕}} (descartar).'] },
+      { tipo: 'tip', texto: 'Arriba podés ver las {{Avisadas}} y los {{Descartados}}, o anotar un pedido nuevo con {{📝 Anotar un pedido}}.' }
+    ] },
     { id: 'pendientes', grupo: 'consultas', p: 'vender', titulo: '📌 Pendientes', resumen: 'Las prendas vendidas que quedaron sin definir el modelo.', bloques: [
       { tipo: 'texto', texto: 'Cuando una prenda de código común (ej. BOMBIS «VARIAS») se vendió sin decir qué modelo era, queda en **📌 Pendientes** (arriba de la pantalla, o en el ticket del Punto de venta).' },
       { tipo: 'pasos', items: ['Tocá **📌 Pendientes**.', 'Elegí qué modelo fue cada una (o {{+ BOMBIS «LOCAL»}} si no está en la web).'] }
@@ -306,7 +324,8 @@ window.INSTRUCTIVO = {
         ['Nota de crédito', 'saldo a favor de la clienta, con un código para usarlo después'],
         ['Gift card', 'un regalo con código: vale su monto a precio de lista, en el local y en la web'],
         ['Turno o caja', 'desde que abrís la caja hasta que la cerrás'],
-        ['Arqueo', 'contar la plata al cerrar y ver si coincide con lo vendido']] }
+        ['Arqueo', 'contar la plata al cerrar y ver si coincide con lo vendido'],
+        ['Lo que piden', 'lo que las clientas pidieron y no había, anotado para reponerlo y avisarles']] }
     ] }
   ]
 };

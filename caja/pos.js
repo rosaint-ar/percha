@@ -82,7 +82,8 @@ APP.ready.then(async () => {
     else if (!q) lista.sort((a, b) => a.vars[0].producto_nombre.localeCompare(b.vars[0].producto_nombre));
     // se dibujan de a 60 para que la pantalla arranque al instante; "Ver más" trae el resto
     const max = q ? 120 : grillaMax;
-    $('#grilla').classList.toggle('con-fotos', !!q); $('#grilla').innerHTML = lista.slice(0, max).map(x => tile(x.pid, x.vars, x.coinciden, !!q)).join('') || '<div class="vacio">Nada con ese nombre.</div>';
+    $('#grilla').classList.toggle('con-fotos', !!q); $('#grilla').innerHTML = lista.slice(0, max).map(x => tile(x.pid, x.vars, x.coinciden, !!q)).join('') || '<div class="vacio">Nada con ese nombre.<br><button class="btn chico" type="button" data-lo-piden style="margin-top:8px">📝 ¿Lo pidió una clienta? Anotalo</button></div>';
+    { const bl = $('#grilla [data-lo-piden]'); if (bl && window.PEDIDO_CLIENTA) bl.onclick = () => PEDIDO_CLIENTA.anotar({ texto: ($('#q') || {}).value || '' }); }
     if (lista.length > max) $('#grilla').insertAdjacentHTML('beforeend', `<div class="vacio"><button class="btn" id="btn-grilla-mas">Ver ${fmt.num(Math.min(120, lista.length - max))} más</button></div>`);
     const bm = $('#btn-grilla-mas'); if (bm) bm.onclick = () => { grillaMax += 120; pintarGrilla(); };
     // al cambiar de familia (o al empezar / dejar de buscar) las tarjetas entran en cascada; mientras se escribe, no

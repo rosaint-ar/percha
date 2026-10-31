@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lo que piden · Percha</title>
+<meta name="app-root" content="../">
+<link rel="stylesheet" href="../shell/shell.css?v=202610311518">
+<style>
+  /* Lo que piden y no hay: agrupado por prenda, para conseguir o reponer y avisarle a la clienta */
+  .lp-arriba{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+  .lp-filtros{display:flex;gap:6px;flex-wrap:wrap;flex:1}
+  .lp-filtros button{border:1px solid var(--linea);background:var(--superficie-2);border-radius:999px;padding:7px 14px;font:600 13px var(--f-ui);cursor:pointer;color:var(--tinta-2)}
+  .lp-filtros button.on{background:var(--acento);border-color:var(--acento);color:#fff}
+  .lp-grupos{display:grid;gap:10px}
+  .lp-g{border:1px solid var(--linea);border-radius:14px;background:var(--superficie-2);padding:12px 14px}
+  .lp-g.hay{border-left:4px solid var(--ok)}
+  .lp-cab{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+  .lp-cab b{font:700 15.5px var(--f-ui)}
+  .lp-cab .res{color:var(--tinta-3);font-size:12.5px;margin-top:2px}
+  .lp-acc{display:flex;gap:6px;flex-wrap:wrap}
+  .lp-ped{display:grid;grid-template-columns:1fr auto;gap:4px 12px;padding:8px 0;border-top:1px solid var(--linea-suave);margin-top:8px;font-size:13.5px}
+  .lp-ped .q{color:var(--tinta-3);font-size:12px}
+  .lp-ped .acc{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+  @media (max-width:640px){.lp-ped{grid-template-columns:1fr}.lp-ped .acc{justify-content:flex-start}}
+</style>
+</head>
+<body data-page="pedidos" data-etq="Operación" data-title="Lo que piden" data-subtitle="Lo que las clientas pidieron y no había: para conseguirlo o reponerlo, y avisarles cuando llegue">
+<main class="app">
+  <section class="tiles" id="tiles"></section>
+  <div class="card">
+    <div class="lp-arriba"><div class="lp-filtros" id="filtros"><button class="on" data-f="abiertos">Por resolver</button><button data-f="avisada">Avisadas</button><button data-f="descartado">Descartados</button><button data-f="todos">Todos</button></div>
+      <button class="btn primario" id="btn-anotar">📝 Anotar un pedido</button></div>
+    <div class="lp-grupos" id="lista"><p class="sub">Cargando…</p></div>
+  </div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../shared/supabase.js?v=202610311518"></script>
+<script src="../shell/shell.js?v=202610311518"></script>
+<script src="../shared/pedido-clienta.js?v=202610311518"></script>
+<script>
+APP.ready.then(async () => {
+  const { fmt, esc, $, $$, toast, confirmar, mensajeError } = APP, e = APP.empresa.id;
+  const ESTADO = { pendiente: ['Pendiente', 'aviso'], conseguido: ['Conseguido', 'ok'], avisada: ['Avisada', 'gris'], descartado: ['Descartado', 'gris'] };
+  let filtro = 'abiertos', datos = [];
+  const sinTildes = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+  const tc = p => [p.talle, p.color].filter(Boolean).join(' · ');
+  const telWsp = t => { let d = String(t || '').replace(/\D/g, '').replace(/^0+/, ''); if (!d) return ''; if (d.startsWith('54')) return d; if (d.length === 10) return '549' + d; return d.length > 10 ? d : ''; };
+  async function cargar() {
+    const { data, error } = await sb.rpc('pedidos_clientas_listar', { e, p_estado: filtro });
+    if (error) { $('#lista').innerHTML = `<p class="sub">${esc(mensajeError(error))}</p>`; return; }
+    datos = data || []; pintar();
+  }
+  function pintar() {
+    // agrupado por prenda del catálogo (o por lo que se escribió, si no está): lo más pedido primero, y arriba lo que ya hay
+    const grupos = new Map();
+    datos.forEach(p => { const k = p.producto_id || 'x:' + sinTildes(p.descripcion); if (!grupos.has(k)) grupos.set(k, { k, nombre: p.producto_nombre || p.descripcion, pedidos: [] }); grupos.get(k).pedidos.push(p); });
+    const gs = [...grupos.values()].map(g => Object.assign(g, { unidades: g.pedidos.reduce((s, p) => s + (+p.cantidad || 1), 0), hay: g.pedidos.some(p => p.estado === 'pendiente' && +p.stock_hoy > 0) }))
+      .sort((a, b) => (b.hay - a.hay) || (b.pedidos.length - a.pedidos.length) || (new Date(b.pedidos[0].creado) - new Date(a.pedidos[0].creado)));
+    if (filtro === 'abiertos') {
+      const hay = gs.filter(g => g.hay).length;
+      $('#tiles').innerHTML = `<div class="tile"><div class="t">Pedidos por resolver</div><div class="n">${datos.length}</div><div class="d">${gs.reduce((s, g) => s + g.unidades, 0)} unidades</div></div>
+        <div class="tile"><div class="t">Prendas distintas</div><div class="n">${gs.length}</div><div class="d">la más pedida: ${gs[0] ? esc(gs[0].nombre) : '—'}</div></div>
+        <div class="tile${hay ? ' destacada' : ''}"><div class="t">Ya hay stock</div><div class="n">${hay}</div><div class="d">${hay ? 'avisales a las clientas' : 'nada para avisar todavía'}</div></div>`;
+    } else $('#tiles').innerHTML = '';
+    $('#lista').innerHTML = gs.length ? gs.map(g => {
+      const resumen = [...g.pedidos.reduce((mp, p) => { const t = tc(p) || 'sin talle/color'; mp.set(t, (mp.get(t) || 0) + (+p.cantidad || 1)); return mp; }, new Map())].map(([t, n]) => `${esc(t)} ×${n}`).join(' · ');
+      const stock = g.pedidos.find(p => p.stock_hoy != null && !p.variante_id);   // de todo el producto (el de un talle y color va en su renglón)
+      return `<div class="lp-g${g.hay ? ' hay' : ''}"><div class="lp-cab"><div><b>${esc(g.nombre)}</b>${g.pedidos[0].producto_id ? '' : ' <span class="chip gris">no está en el catálogo</span>'}${g.hay ? ' <span class="chip ok">✓ ya hay stock: avisales</span>' : ''}
+          <div class="res">${g.pedidos.length} pedido${g.pedidos.length > 1 ? 's' : ''} · ${g.unidades} unidad${g.unidades > 1 ? 'es' : ''} · ${resumen}${stock ? ' · hoy hay ' + fmt.num(Math.max(0, +stock.stock_hoy)) : ''}</div></div>
+        ${g.pedidos.some(p => p.estado === 'pendiente') ? `<div class="lp-acc"><button class="btn chico" data-gc="${esc(g.k)}">✓ Conseguido (todos)</button><button class="btn chico" data-gd="${esc(g.k)}">Descartar</button></div>` : ''}</div>
+        ${g.pedidos.map(p => `<div class="lp-ped"><div><b>${esc(p.cliente_nombre || 'Sin nombre')}</b>${p.telefono ? ' · ' + esc(p.telefono) : ''}${tc(p) ? ' · ' + esc(tc(p)) : ''}${+p.cantidad > 1 ? ' · ×' + p.cantidad : ''}${p.producto_id && p.variante_id && +p.stock_hoy > 0 ? ' <span class="chip ok">hay ' + p.stock_hoy + '</span>' : ''}
+            <div class="q">${fmt.fechaHora(p.creado)}${p.anoto ? ' · anotó ' + esc(p.anoto) : ''}${p.nota ? ' · ' + esc(p.nota) : ''}</div></div>
+          <div class="acc"><span class="chip ${ESTADO[p.estado][1]}">${ESTADO[p.estado][0]}</span>${p.estado !== 'avisada' && p.estado !== 'descartado' ? `${telWsp(p.telefono) ? `<button class="btn chico primario" data-av="${p.id}">📲 Avisarle</button>` : `<button class="btn chico" data-avm="${p.id}" title="No tiene teléfono: marcala como avisada si le avisaste">Ya le avisé</button>`}${p.estado === 'pendiente' ? `<button class="btn chico" data-co="${p.id}">✓ Conseguido</button>` : ''}<button class="btn chico" data-de="${p.id}" title="Descartar">✕</button>` : ''}</div></div>`).join('')}
+      </div>`; }).join('')
+      : `<div class="vacio">${filtro === 'abiertos' ? 'No hay pedidos por resolver. Cuando una clienta pide algo que no hay, anotalo desde la caja con <b>📝 Lo pidieron</b>.' : 'Nada por acá.'}</div>`;
+    const cambiar = async (ids, estado) => { const { error } = await sb.from('pedidos_clientas').update({ estado, resuelto: estado === 'pendiente' ? null : new Date().toISOString(), resuelto_por: APP.user.id }).in('id', ids); if (error) { toast(mensajeError(error), 'error'); return false; } await cargar(); return true; };
+    const grupo = k => gs.find(g => g.k === k);
+    $$('[data-co]').forEach(b => b.onclick = () => cambiar([b.dataset.co], 'conseguido'));
+    $$('[data-de]').forEach(b => b.onclick = async () => { if (await confirmar('¿Descartar este pedido? (no se consigue o ya no lo quiere)', 'Descartar')) cambiar([b.dataset.de], 'descartado'); });
+    $$('[data-avm]').forEach(b => b.onclick = () => cambiar([b.dataset.avm], 'avisada'));
+    $$('[data-gc]').forEach(b => b.onclick = () => cambiar(grupo(b.dataset.gc).pedidos.filter(p => p.estado === 'pendiente').map(p => p.id), 'conseguido'));
+    $$('[data-gd]').forEach(b => b.onclick = async () => { const g = grupo(b.dataset.gd); if (await confirmar(`¿Descartar los ${g.pedidos.length} pedidos de ${g.nombre}?`, 'Descartar')) cambiar(g.pedidos.filter(p => p.estado !== 'avisada').map(p => p.id), 'descartado'); });
+    // avisarle por WhatsApp (a su número) y queda como avisada
+    $$('[data-av]').forEach(b => b.onclick = async () => {
+      const p = datos.find(x => x.id === b.dataset.av), nom = (p.cliente_nombre || '').split(' ')[0];
+      const txt = `¡Hola${nom ? ' ' + nom : ''}! Te escribimos de ${APP.empresa.nombre} 😊 Ya tenemos ${p.producto_nombre || p.descripcion}${tc(p) ? ' (' + tc(p) + ')' : ''} que nos pediste. ¿Querés que te lo guardemos?`;
+      window.open(`https://api.whatsapp.com/send?phone=${telWsp(p.telefono)}&text=${encodeURIComponent(txt)}`, '_blank');
+      await cambiar([p.id], 'avisada'); toast('Quedó como avisada');
+    });
+  }
+  $$('#filtros button').forEach(b => b.onclick = () => { $$('#filtros button').forEach(x => x.classList.toggle('on', x === b)); filtro = b.dataset.f; cargar(); });
+  $('#btn-anotar').onclick = () => PEDIDO_CLIENTA.anotar({ alGuardar: cargar });
+  cargar();
+});
+</script>
+</body>
+</html>
