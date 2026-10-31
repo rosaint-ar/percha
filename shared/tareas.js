@@ -28,6 +28,7 @@
     .tar-tarjeta b{font:700 15px var(--f-ui);color:var(--tinta)}.tar-tarjeta small{color:var(--tinta-2);font-size:12.5px}
     .tar-tarjeta .bts{display:flex;gap:6px;margin-top:8px}.tar-tarjeta .bts button{border:0;border-radius:999px;padding:8px 14px;font:700 12.5px var(--f-ui);cursor:pointer}
     .tar-tarjeta .bts .si{background:linear-gradient(180deg,rgba(var(--acento-rgb),1),rgba(var(--acento-rgb),.85));color:#fff;box-shadow:0 4px 14px rgba(var(--acento-rgb),.4)}.tar-tarjeta .bts .luego{background:rgba(255,255,255,.8);color:var(--tinta-2);box-shadow:inset 0 0 0 1px var(--linea)}
+    @media (min-width:901px){body.con-lateral:not([data-page="pos"]) .tar-tarjeta{left:calc(var(--ancho-lateral) + 18px)}}
     @keyframes tarHalo{0%,100%{box-shadow:0 0 0 3px rgba(var(--acento-rgb),.10),0 0 18px rgba(var(--acento-rgb),.30),0 16px 44px rgba(21,23,28,.22)}50%{box-shadow:0 0 0 6px rgba(var(--acento-rgb),.16),0 0 36px rgba(var(--acento-rgb),.55),0 16px 44px rgba(21,23,28,.22)}}
     @keyframes tarBorde{0%{background-position:0% 50%}100%{background-position:300% 50%}}
     @media (prefers-reduced-motion:reduce){.tar-tarjeta,.tar-tarjeta::before{animation:none}}

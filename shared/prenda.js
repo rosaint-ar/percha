@@ -39,7 +39,8 @@
   .pr-unidad.nueva{border-style:dashed}
   .pr-u-fila{display:flex;gap:8px;align-items:center}
   .pr-u-fila .num{font:700 12px var(--f-mono);color:#8a6400;flex:none;width:22px}
-  .pr-desc{display:flex;align-items:center;border:1px solid var(--linea);border-radius:10px;background:var(--superficie-2);height:38px;width:112px;flex:none;overflow:hidden}
+  .pr-desc{display:flex;align-items:center;border:1px solid var(--linea);border-radius:10px;background:var(--superficie-2);height:38px;width:168px;flex:none;overflow:hidden}
+  .pr-desc select{border:0;border-left:1px solid var(--linea);background:var(--relleno);height:100%;font:600 12px var(--f-ui);color:var(--tinta-2);padding:0 6px;cursor:pointer;outline:0}
   .pr-desc input{width:100%;border:0;outline:0;background:transparent;text-align:right;font:700 14px var(--f-mono);padding:0 4px 0 8px}
   .pr-desc span{padding:0 10px 0 2px;font:600 12px var(--f-ui);color:var(--tinta-3)}
   .pr-u-acc{display:flex;gap:4px;flex:none}
@@ -76,7 +77,7 @@
     const precioBase = +(v.precio != null ? v.precio : pr.precio) || 0;
     // estado editable
     let nuevo = actual, motivo = null;
-    const unidades = (d.fallas || []).map(f => ({ id: f.id, nota: f.nota || '', descuento_pct: f.descuento_pct == null ? '' : +f.descuento_pct, listas: f.listas || null, creado: f.creado }));
+    const unidades = (d.fallas || []).map(f => ({ id: f.id, nota: f.nota || '', descuento_pct: f.descuento_pct == null ? '' : +f.descuento_pct, precio: f.precio == null ? '' : +f.precio, modo: f.precio != null ? 'precio' : 'pct', listas: f.listas || null, creado: f.creado }));
     const cerrar = [];   // {id, estado}
     const nom = [v.talle_nombre, v.color_nombre].filter(Boolean).join(' · ') || 'Único';
     const m = modal('<div id="pr"></div>');
@@ -84,19 +85,22 @@
 
     // el precio de cada lista sale de las reglas (shared/precios.js); la falla descuenta sobre eso, como en la caja
     const enLista = l => pctxCache ? PRECIOS.calcular({ id: v.id, producto_id: pr.id, precio: precioBase }, l.id, pctxCache, { categoria_id: pr.categoria_id, tipo: pr.tipo }).precio : Math.round(precioBase * (+l.porcentaje || 100) / 100);
-    const precioCon = (u, l) => Math.round(enLista(l) * (1 - (+u.descuento_pct || 0) / 100));
+    const lBase0 = () => listas.find(l => l.predeterminada) || listas[0];
+    const tieneDesc = u => u.modo === 'precio' ? u.precio !== '' && +u.precio >= 0 : +u.descuento_pct > 0;
+    // con precio: ese precio a precio de lista; en las otras listas, la misma proporción (como cualquier prenda)
+    const precioCon = (u, l) => u.modo === 'precio' && u.precio !== '' ? Math.round(+u.precio * enLista(l) / (enLista(lBase0()) || 1)) : Math.round(enLista(l) * (1 - (+u.descuento_pct || 0) / 100));
     const pintarUnidad = (u, i) => {
       const ls = u.listas && u.listas.length ? listas.filter(l => u.listas.includes(l.id)) : listas;
       const lBase = listas.find(l => l.predeterminada) || listas[0];
       return `<div class="pr-unidad${u.id ? '' : ' nueva'}" data-u="${i}">
         <div class="pr-u-fila"><span class="num">◆${i + 1}</span><input class="pr-in" data-k="nota" value="${esc(u.nota)}" placeholder="Qué falla tiene (ej. descosido en el bretel)" ${puede ? '' : 'disabled'}>
-          ${admin ? `<label class="pr-desc" title="Descuento para esta prenda"><input data-k="descuento_pct" inputmode="decimal" value="${u.descuento_pct === '' ? '' : esc(u.descuento_pct)}" placeholder="0"><span>% off</span></label>` : (+u.descuento_pct ? `<span class="pr-u-precio">${fmt.dec(u.descuento_pct)}% off</span>` : '')}
+          ${admin ? `<label class="pr-desc" title="Descuento o precio para esta prenda">${u.modo === 'precio' ? `<input data-k="precio" inputmode="decimal" value="${u.precio === '' ? '' : esc(u.precio)}" placeholder="Precio">` : `<input data-k="descuento_pct" inputmode="decimal" value="${u.descuento_pct === '' ? '' : esc(u.descuento_pct)}" placeholder="0">`}<select data-modo="${i}" title="Descuento en % o un precio"><option value="pct"${u.modo !== 'precio' ? ' selected' : ''}>% off</option><option value="precio"${u.modo === 'precio' ? ' selected' : ''}>$ precio</option></select></label>` : (u.modo === 'precio' && u.precio !== '' ? `<span class="pr-u-precio">a ${fmt.pesos(u.precio)}</span>` : +u.descuento_pct ? `<span class="pr-u-precio">${fmt.dec(u.descuento_pct)}% off</span>` : '')}
           ${puede ? `<div class="pr-u-acc"><button type="button" data-arreglada="${i}" title="Se arregló: vuelve a ser una prenda normal">Arreglada</button></div>` : ''}</div>
         <div class="pr-u-extra">${extraUnidad(u, i)}</div>
       </div>`;
     };
     function extraUnidad(u, i) {
-      if (!+u.descuento_pct) return '';
+      if (!tieneDesc(u)) return '';
       const ls = u.listas && u.listas.length ? listas.filter(l => u.listas.includes(l.id)) : listas, lBase = listas.find(l => l.predeterminada) || listas[0];
       return `${admin ? `<div class="pr-u-listas">Se aplica en: <button type="button" class="pr-chip${!u.listas || !u.listas.length ? ' on' : ''}" data-todas="${i}">Todas</button>${listas.map(l => `<button type="button" class="pr-chip${u.listas && u.listas.includes(l.id) ? ' on' : ''}" data-lista="${i}:${l.id}">${esc(l.nombre)}</button>`).join('')}</div>` : ''}
         <div class="pr-u-precio">Se vende a ${ls.map(l => `<b>${fmt.pesos(precioCon(u, l))}</b> en ${esc(l.nombre)}`).join(' · ')}${lBase ? ` <span style="color:var(--tinta-3)">(normal ${fmt.pesos(enLista(lBase) || Math.round(precioBase * (+lBase.porcentaje || 100) / 100))})</span>` : ''}</div>`;
@@ -144,7 +148,7 @@
         <div class="pie"><button class="btn" data-cerrar>Cerrar</button>${puede ? '<button class="btn primario" data-guardar>Guardar</button>' : ''}</div>`;
       enganchar();
     };
-    const leerUnidades = () => $$('.pr-unidad', m).forEach(el => { const u = unidades[+el.dataset.u]; $$('[data-k]', el).forEach(inp => { u[inp.dataset.k] = inp.dataset.k === 'descuento_pct' ? (inp.value.trim() === '' ? '' : Math.min(100, Math.max(0, +inp.value.replace(',', '.') || 0))) : inp.value; }); });
+    const leerUnidades = () => $$('.pr-unidad', m).forEach(el => { const u = unidades[+el.dataset.u]; $$('[data-k]', el).forEach(inp => { const k = inp.dataset.k, t = inp.value.trim(); u[k] = k === 'descuento_pct' ? (t === '' ? '' : Math.min(100, Math.max(0, +t.replace(',', '.') || 0))) : k === 'precio' ? (t === '' ? '' : Math.max(0, Math.round(+t.replace(/\./g, '').replace(',', '.') || 0))) : inp.value; }); });
     const repintar = () => { const nota = ($('#pr-nota', m) || {}).value || ''; const abierto = $('.pr-mas', m) && $('.pr-mas', m).open; pintar(); if ($('#pr-nota', m)) $('#pr-nota', m).value = nota; if (abierto) $('.pr-mas', m).open = true; };
     function enganchar() {
       const iS = $('#pr-stock', m);
@@ -153,7 +157,8 @@
       $$('[data-mo]', m).forEach(b => b.onclick = () => { motivo = b.dataset.mo; $$('[data-mo]', m).forEach(x => x.classList.toggle('on', x === b)); });
       const mf = $('#pr-mas-falla', m); if (mf) mf.onclick = () => { leerUnidades(); unidades.push({ id: null, nota: '', descuento_pct: '', listas: null }); repintar(); const ult = $$('.pr-unidad [data-k="nota"]', m).pop(); if (ult) ult.focus(); };
       $$('[data-arreglada]', m).forEach(b => b.onclick = () => { leerUnidades(); const u = unidades.splice(+b.dataset.arreglada, 1)[0]; if (u.id) cerrar.push({ id: u.id, estado: 'arreglada' }); repintar(); });
-      $$('[data-k="descuento_pct"]', m).forEach(inp => inp.oninput = () => { const i = +inp.closest('.pr-unidad').dataset.u; leerUnidades(); refrescarUnidad(i); });
+      $$('[data-k="descuento_pct"], [data-k="precio"]', m).forEach(inp => inp.oninput = () => { const i = +inp.closest('.pr-unidad').dataset.u; leerUnidades(); refrescarUnidad(i); });
+      $$('[data-modo]', m).forEach(sel => sel.onchange = () => { leerUnidades(); const u = unidades[+sel.dataset.modo]; u.modo = sel.value; if (u.modo === 'precio') u.descuento_pct = ''; else u.precio = ''; repintar(); const inp = $(`.pr-unidad[data-u="${sel.dataset.modo}"] .pr-desc input`, m); if (inp) inp.focus(); });
       unidades.forEach((_, i) => refrescarUnidad(i));
       $('#pr-etq-b', m).onclick = () => { agregarEtiquetas([{ variante_id: v.id, cantidad: +$('#pr-etq', m).value || 1 }]); toast('Agregado a la cola de etiquetas'); };
       $('[data-cerrar]', m).onclick = () => m.cerrar();
@@ -169,8 +174,8 @@
       try {
         if (dif) { const dep = $('#pr-dep', m); const r = await sb.rpc('stock_ajustar', { p: { variante_id: v.id, modo: 'fijar', cantidad: nuevo, motivo, nota: ($('#pr-nota', m).value || '').trim(), deposito_id: dep ? dep.value : null } }); if (r.error) throw r.error; }
         const orig = d.fallas || [];
-        const cambiadas = unidades.filter(u => !u.id || (() => { const o = orig.find(x => x.id === u.id); return !o || (o.nota || '') !== u.nota || String(o.descuento_pct ?? '') !== String(u.descuento_pct) || JSON.stringify(o.listas || null) !== JSON.stringify(u.listas || null); })());
-        if (cambiadas.length || cerrar.length) { const r = await sb.rpc('fallas_guardar', { p: { variante_id: v.id, unidades: cambiadas.map(u => ({ id: u.id, nota: u.nota, descuento_pct: u.descuento_pct === '' ? null : u.descuento_pct, listas: u.listas })), cerrar } }); if (r.error) throw r.error; }
+        const cambiadas = unidades.filter(u => !u.id || (() => { const o = orig.find(x => x.id === u.id); return !o || (o.nota || '') !== u.nota || String(o.descuento_pct ?? '') !== String(u.descuento_pct) || String(o.precio ?? '') !== String(u.precio) || JSON.stringify(o.listas || null) !== JSON.stringify(u.listas || null); })());
+        if (cambiadas.length || cerrar.length) { const r = await sb.rpc('fallas_guardar', { p: { variante_id: v.id, unidades: cambiadas.map(u => ({ id: u.id, nota: u.nota, descuento_pct: u.modo === 'precio' || u.descuento_pct === '' ? null : u.descuento_pct, precio: u.modo === 'precio' && u.precio !== '' ? u.precio : null, listas: u.listas })), cerrar } }); if (r.error) throw r.error; }
         if (admin) {
           const ean = $('#pr-ean', m).value.trim() || null, pv = $('#pr-precio', m).value, precio = pv === '' ? null : +pv, ch = $('#pr-chequeado', m), cambios = {};
           if (ean !== (v.ean || null)) cambios.ean = ean;

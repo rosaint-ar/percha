@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Tareas del local · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610311601">
+<link rel="stylesheet" href="../shell/shell.css?v=202610311610">
 <style>
   .pestanas{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
   .pestanas a{font:600 13px var(--f-ui);color:var(--tinta);text-decoration:none;padding:8px 14px;border:1px solid var(--linea);background:var(--superficie-2);border-radius:10px}
@@ -33,15 +33,15 @@
   <div class="pestanas"><a href="empresa.html">Empresa</a><a href="atributos.html">Talles, colores y familias</a><a href="curvas.html">Curvas de talle</a><a href="listas.html">Listas de precios</a><a href="promociones.html">Promociones</a><a href="envios.html">Envíos</a><a href="canales.html">Canales de venta</a><a href="facturacion.html">Facturación</a><a class="on" href="tareas.html">Tareas del local</a><a href="usuarios.html">Usuarios</a></div>
   <div class="card">
     <div class="card-cab"><div><h2>Tareas del local</h2><p class="sub">Aparecen como un recordatorio amable, con un festejo al hacerlas. Se guarda solo al escribir.</p></div><div class="acciones"><button class="btn primario" id="btn-nueva">+ Agregar tarea</button></div></div>
-    <div class="donde"><div><b>☀️ Al abrir la caja</b><small>En el Punto de venta, apenas se abre la caja: "Para arrancar el día".</small></div><div><b>🕐 Durante el día</b><small>En el Punto de venta, con la caja abierta: una tarjetita abajo a la izquierda cuando toca. <a href="#" id="ver-tarjeta">Ver cómo se ve</a></small></div><div><b>🌙 Al cerrar la caja</b><small>Antes de contar la plata: "Antes de irte".</small></div></div>
+    <div class="donde"><div><b>☀️ Al abrir la caja</b><small>En el Punto de venta, apenas se abre la caja: "Para arrancar el día".</small></div><div><b>🕐 Durante el día</b><small>En cualquier pantalla de Percha, con la caja abierta: una tarjetita abajo a la izquierda cuando toca. <a href="#" id="ver-tarjeta">Ver cómo se ve</a></small></div><div><b>🌙 Al cerrar la caja</b><small>Antes de contar la plata: "Antes de irte".</small></div></div>
     <div id="lista"><p class="sub">Cargando…</p></div>
   </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610311601"></script>
-<script src="../shared/caja-fx.js?v=202610311601"></script>
-<script src="../shared/tareas.js?v=202610311601"></script>
-<script src="../shell/shell.js?v=202610311601"></script>
+<script src="../shared/supabase.js?v=202610311610"></script>
+<script src="../shared/caja-fx.js?v=202610311610"></script>
+<script src="../shared/tareas.js?v=202610311610"></script>
+<script src="../shell/shell.js?v=202610311610"></script>
 <script>
 APP.ready.then(async () => {
   const { esc, $, $$, toast, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -67,7 +67,7 @@ APP.ready.then(async () => {
     if (hs.length && t.momento !== 'cada') return ['ok', `✓ Hecha hoy a las ${hora(hs[hs.length - 1].hecha)}`];
     if (t.momento === 'apertura') return ['toca', 'Hoy sale al abrir la caja'];
     if (t.momento === 'cierre') return ['toca', 'Hoy sale al cerrar la caja'];
-    if (t.momento === 'hora') { const [a, b] = String(t.hora || '0:0').split(':'), hm = +a * 60 + +b; return ['toca', hm > min ? `Hoy sale a las ${String(t.hora).slice(0, 5)}` : `Le tocaba a las ${String(t.hora).slice(0, 5)}: aparece en el Punto de venta (con la caja abierta) hasta que la marquen`]; }
+    if (t.momento === 'hora') { const [a, b] = String(t.hora || '0:0').split(':'), hm = +a * 60 + +b; return ['toca', hm > min ? `Hoy sale a las ${String(t.hora).slice(0, 5)}` : `Le tocaba a las ${String(t.hora).slice(0, 5)}: aparece (con la caja abierta) hasta que la marquen`]; }
     return ['toca', `Hoy sale cada ${t.cada_min % 60 ? t.cada_min + ' min' : t.cada_min / 60 + ' h'} desde que se abre la caja${hs.length ? ' · hecha ' + hs.length + ' vez' + (hs.length > 1 ? 'es' : '') + ', la última a las ' + hora(hs[hs.length - 1].hecha) : ''}`];
   }
   const tarjeta = t => `<div class="tc${t.activa ? '' : ' apagada'}" data-id="${t.id}"><input class="emo" data-k="emoji" value="${esc(t.emoji)}" maxlength="4" title="Emoji">

@@ -202,6 +202,17 @@
     const avisos = () => cargar('shared/avisos.js', () => AVISOS.iniciar());
     if (window.CAJAFX) avisos(); else cargar('shared/caja-fx.js', avisos);
   }
+  // Tareas del local: el recordatorio amable sale en cualquier pantalla mientras haya una caja abierta (el Punto de venta lo maneja solo)
+  function iniciarTareas() {
+    if (!APP.puede('vender') || body.dataset.page === 'pos') return;
+    const v = ((document.querySelector('script[src*="shell.js"]') || {}).src || '').split('v=')[1] || '';
+    const cargar = (src, listo) => { const s = document.createElement('script'); s.src = ROOT + src + '?v=' + v; s.onload = listo; document.head.appendChild(s); };
+    let turno = null;
+    const buscar = async () => { const { data } = await sb.from('caja_turnos').select('id,abierto').eq('empresa_id', APP.empresa.id).eq('estado', 'abierto').order('abierto', { ascending: false }).limit(1); turno = (data || [])[0] || null; };
+    const arrancar = async () => { await buscar(); setInterval(buscar, 120000); TAREAS.iniciar({ turno: () => turno }); };
+    const conTareas = () => window.TAREAS ? arrancar() : cargar('shared/tareas.js', arrancar);
+    if (window.CAJAFX) conTareas(); else cargar('shared/caja-fx.js', conTareas);
+  }
   function rolNombre(r) { return { duenio: 'Dueña', admin: 'Administración', vendedora: 'Vendedora', visor: 'Solo ver' }[r] || r; }
 
   // ---------- arranque ----------
@@ -229,6 +240,7 @@
     document.title = ((body.dataset.title || '').replace(/<[^>]+>/g, '') || 'Inicio') + ' · ' + APP.empresa.nombre + ' · ' + SISTEMA;
     iniciarPendientes();
     iniciarAvisos();
+    iniciarTareas();
     return APP;
   })();
 
