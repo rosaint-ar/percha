@@ -139,11 +139,11 @@
     { grupo: 'Sistema', p: ['conexiones', 'configuracion'] },
     { id: 'conexiones', label: 'Conexiones', href: 'conexiones/conexiones.html', icono: 'conexiones', p: 'conexiones' },
     { id: 'configuracion', label: 'Configuración', href: 'configuracion/empresa.html', icono: 'config', p: 'configuracion' },
-    { grupo: 'Ayuda' },
-    { id: 'instructivo', label: 'Instructivo', href: 'ayuda/instructivo.html', icono: 'ayuda' }
+    { grupo: 'Ayuda', p: 'instructivo' },
+    { id: 'instructivo', label: 'Instructivo', href: 'ayuda/instructivo.html', icono: 'ayuda', p: 'instructivo' }
   ];
   // qué permiso pide cada pantalla (data-page del body); la primera permitida es adonde se manda a quien no puede
-  const PERMISO_PAGINA = { inicio: 'inicio', pos: 'vender', caja: 'vender', ventas: ['ventas_todas', 'ventas_propias'], envios: 'vender', productos: 'catalogo_ver', catalogo: 'catalogo_ver', etiquetas: 'catalogo_editar', inventario: 'catalogo_ver', conteo: 'catalogo_editar', compras: 'compras', conexiones: 'conexiones', configuracion: 'configuracion' };
+  const PERMISO_PAGINA = { instructivo: 'instructivo', inicio: 'inicio', pos: 'vender', caja: 'vender', ventas: ['ventas_todas', 'ventas_propias'], envios: 'vender', productos: 'catalogo_ver', catalogo: 'catalogo_ver', etiquetas: 'catalogo_editar', inventario: 'catalogo_ver', conteo: 'catalogo_editar', compras: 'compras', conexiones: 'conexiones', configuracion: 'configuracion' };
   const permite = p => !p || [].concat(p).some(k => APP.puede(k));
   function pintarLateral() {
     const pagina = body.dataset.page, esAdmin = APP.esAdmin;

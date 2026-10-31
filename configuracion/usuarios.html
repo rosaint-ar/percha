@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Usuarios · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610311353">
+<link rel="stylesheet" href="../shell/shell.css?v=202610311404">
 <style>
   .pestanas{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
   .pestanas a{font:600 13px var(--f-ui);color:var(--tinta);text-decoration:none;padding:8px 14px;border:1px solid var(--linea);background:var(--superficie-2);border-radius:10px}
@@ -23,8 +23,8 @@
   </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610311353"></script>
-<script src="../shell/shell.js?v=202610311353"></script>
+<script src="../shared/supabase.js?v=202610311404"></script>
+<script src="../shell/shell.js?v=202610311404"></script>
 <script>
 APP.ready.then(async () => {
   const { esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -35,7 +35,8 @@ APP.ready.then(async () => {
     ['Vender', [['vender', 'Vender en la caja', 'Cobrar, señas, cambios y devoluciones'], ['descuentos', 'Hacer descuentos a mano', 'Poner % de descuento en una prenda o en el ticket'], ['clientes', 'Cargar clientas', 'Dar de alta y buscar clientas']]],
     ['Ventas', [['ventas_propias', 'Ver sus ventas del día', 'Solo las que hizo, de hoy'], ['ventas_todas', 'Ver todas las ventas', 'De todos los días y de todo el equipo, con totales']]],
     ['Mercadería', [['catalogo_ver', 'Ver stock y precios', 'Buscar prendas, cuántas hay y a cuánto se venden'], ['catalogo_editar', 'Editar catálogo y stock', 'Productos, precios, etiquetas, ajustes y recuentos'], ['costos', 'Ver costos y márgenes', 'Costo de cada prenda, margen y valor del stock'], ['compras', 'Compras', 'Pedidos a proveedores y recepciones']]],
-    ['Negocio', [['inicio', 'Inicio y totales', 'El tablero con lo vendido y el stock valorizado'], ['conexiones', 'Conexiones', 'Tienda Nube: stock, precios y pedidos'], ['configuracion', 'Configuración', 'Empresa, listas de precios, promociones, facturación y usuarios']]]];
+    ['Negocio', [['inicio', 'Inicio y totales', 'El tablero con lo vendido y el stock valorizado'], ['conexiones', 'Conexiones', 'Tienda Nube: stock, precios y pedidos'], ['configuracion', 'Configuración', 'Empresa, listas de precios, promociones, facturación y usuarios']]],
+    ['Ayuda', [['instructivo', 'Ver el instructivo', 'La guía paso a paso de Percha: le muestra los temas de lo que tiene habilitado']]]];
   const TODOS = PERMISOS.flatMap(g => g[1]);
   const BASE = {}; await Promise.all(Object.keys(ROLES).map(async r => { const { data } = await sb.rpc('permisos_rol', { p_rol: r }); BASE[r] = data || {}; }));
   const efectivos = u => Object.assign({}, BASE[u.rol] || {}, u.permisos || {});

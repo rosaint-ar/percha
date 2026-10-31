@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Instructivo · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610311353">
+<link rel="stylesheet" href="../shell/shell.css?v=202610311404">
 <style>
   /* Instructivo: el contenido vive en instructivo.js; acá solo se arma. */
   .ins{display:grid;grid-template-columns:220px minmax(0,1fr);gap:18px;align-items:start}
@@ -73,12 +73,15 @@
   </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610311353"></script>
-<script src="../shell/shell.js?v=202610311353"></script>
-<script src="instructivo.js?v=202610311353"></script>
+<script src="../shared/supabase.js?v=202610311404"></script>
+<script src="../shell/shell.js?v=202610311404"></script>
+<script src="instructivo.js?v=202610311404"></script>
 <script>
 APP.ready.then(() => {
-  const { esc, $, $$ } = APP, D = window.INSTRUCTIVO;
+  const { esc, $, $$ } = APP, D0 = window.INSTRUCTIVO;
+  // cada persona ve los temas de lo que tiene habilitado (p = permiso del tema; sin p = para todos)
+  const permite = p => !p || [].concat(p).some(k => APP.puede(k));
+  const D = Object.assign({}, D0, { temas: D0.temas.filter(t => permite(t.p)) });
   const sinTildes = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
   // marcas del contenido: **negrita** · [[tecla]] · {{botón}}
   const marcar = s => esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\[\[(.+?)\]\]/g, '<kbd>$1</kbd>').replace(/\{\{(.+?)\}\}/g, '<span class="bt">$1</span>');
@@ -112,7 +115,7 @@ APP.ready.then(() => {
   }
   const nuevos = D.temas.filter(reciente);
   $('#nuevo').innerHTML = nuevos.length ? `<span>✨ Novedades:</span>${nuevos.map(t => `<a href="#${t.id}">${esc(t.titulo)}</a>`).join('')}` : '';
-  $('#pie').textContent = `Actualizado el ${fecha(D.actualizado)}. Si algo no está o no se entiende, avisale a Emi.`;
+  $('#pie').textContent = `Actualizado el ${fecha(D.actualizado)}. Ves los temas de lo que tenés habilitado. Si algo no está o no se entiende, avisale a administración.`;
   $('#q').addEventListener('input', () => { pintar(); });
   $('#todo').onclick = () => { const abrir = $$('details.tema').some(d => !d.open); $$('details.tema').forEach(d => d.open = abrir); $('#todo').textContent = abrir ? 'Cerrar todo' : 'Abrir todo'; };
   $('#imprimir').onclick = () => { $$('details.tema').forEach(d => d.open = true); window.print(); };
