@@ -68,7 +68,7 @@
     const base = +v.precio || 0;
     const lista = ctx.listas.find(l => l.id === listaId) || ctx.base;
     op = Object.assign({}, op || {}); if (!op.canal) op.canal = lista.canal || 'local';
-    let fijo = ctx.fijos.get(lista.id + '|' + v.producto_id + '|' + v.id); if (fijo == null) fijo = ctx.fijos.get(lista.id + '|' + v.producto_id + '|');
+    let fijo = op.sinFijo ? null : ctx.fijos.get(lista.id + '|' + v.producto_id + '|' + v.id); if (fijo == null && !op.sinFijo) fijo = ctx.fijos.get(lista.id + '|' + v.producto_id + '|');
     if (fijo != null) return { base, lista, rebaja: null, pct: null, fijo: true, precio: fijo };
     const rebaja = lista.toma_rebajas !== false && !op.sinRebajas ? rebajaDe(v, ctx, op) : null;
     const punto = rebaja ? rebaja.precio : base;
@@ -100,5 +100,7 @@
   }
   // las listas que se eligen en el local (sin las de los canales online)
   const delLocal = ctx => ctx.listas.filter(l => !l.canal);
-  window.PRECIOS = { cargar, armar, calcular, rebajaDe, redondear, vigente, delLocal, REDONDEOS, reglaTxt, reglaControles, leerRegla, reglaEnganchar };
+  // un número como lo escribe cualquiera: "18.750", "18750", "$ 18.750,50" (punto de miles, coma decimal)
+  function num(t) { let s = String(t == null ? '' : t).replace(/[$\s]/g, ''); if (!s) return 0; if (/,\d{1,2}$/.test(s)) s = s.replace(/\./g, '').replace(',', '.'); else s = s.replace(/[.,](?=\d{3}(\D|$))/g, '').replace(',', '.'); return +s || 0; }
+  window.PRECIOS = { num, cargar, armar, calcular, rebajaDe, redondear, vigente, delLocal, REDONDEOS, reglaTxt, reglaControles, leerRegla, reglaEnganchar };
 })();

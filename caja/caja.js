@@ -64,7 +64,9 @@ APP.ready.then(async () => {
   const unidadesLibres = (v, salvo) => ((fallasU && fallasU.get(v.id)) || []).filter(u => !carrito.lineas.some(l => l !== salvo && l.fallaU && l.fallaU.id === u.id));
   // la falla: % off, o un precio (a precio de lista; en las otras listas, la misma proporción) que se pasa a % para esta línea
   const descFalla = l => { const u = l.fallaU; if (!u || !(+u.descuento_pct || u.precio != null)) return 0; if (u.listas && u.listas.length && !u.listas.includes(carrito.lista)) return 0;
-    if (u.precio != null) { const lb = (listas.find(x => x.predeterminada) || listas[0] || {}).id, pb = precioLista(l.variante, lb), pa = precioLista(l.variante); if (!(pb > 0) || !(pa > 0)) return 0; return Math.max(0, 100 * (1 - Math.round(+u.precio * pa / pb) / pa)); }
+    if (u.precio != null) { const pa = precioLista(l.variante); if (!(pa > 0)) return 0; const o = origenVenta(), lc = o !== 'local' && pctx.listas.find(x => x.canal === o), p = productos[l.variante.producto_id] || {};
+      const objetivo = PRECIOS.calcular({ id: l.variante.id, producto_id: l.variante.producto_id, precio: +u.precio }, lc ? lc.id : carrito.lista, pctx, { canal: o, categoria_id: p.categoria_id, tipo: p.tipo || l.variante.producto_tipo, sinRebajas: true, sinFijo: true }).precio;
+      return Math.max(0, 100 * (1 - objetivo / pa)); }
     return +u.descuento_pct; };
   // "es la de la falla": cada prenda fallada queda en su propia línea, con su nota y su descuento
   function marcarFalla(l) {

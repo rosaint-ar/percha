@@ -301,6 +301,15 @@ window.INSTRUCTIVO = {
     ] },
 
     // ======================= CONSULTAS =======================
+    { id: 'cambiar-precio', grupo: 'consultas', p: 'catalogo_editar', titulo: 'Cambiar el precio de una prenda', nuevo: '2026-10-31', resumen: 'En la ficha del producto: {{Cambiar precio}} en la fila de Lista; las demás listas bajan solas.', bloques: [
+      { tipo: 'pasos', items: [
+        '**Catálogo** › abrí la prenda.',
+        'En **Precios por lista**, fila **Lista**: {{Cambiar precio}}.',
+        'Escribí el precio nuevo (podés poner **18.750** o **18750**): abajo ves al instante cómo quedan las demás listas (Contado, Débito…).',
+        '{{Guardar}}. Las demás listas se calculan solas, en escalera.'] },
+      { tipo: 'tip', texto: '**Precio especial** (en otra lista) es solo para casos raros: fija el precio de ESA lista y deja de seguir al de Lista. Con {{Volver a la regla}} vuelve a calcularse solo.' },
+      { tipo: 'tip', texto: 'El **redondeo** de cada lista (por ejemplo, para arriba a $10) se configura en **Configuración** › {{Listas de precios}}.' }
+    ] },
     { id: 'ventas', grupo: 'consultas', p: ['ventas_propias', 'ventas_todas'], titulo: 'Ver las ventas', resumen: '**Ventas**: tickets, señas, notas de crédito y cierres.', bloques: [
       { tipo: 'tabla', filas: [['Tocar un ticket', 'ver el detalle, {{Reimprimir}}, {{Editar}} o hacer un {{Cambio / devolución}} desde ahí'], ['{{Señas}}', 'las señas pendientes: {{Retirar en la caja}} o {{🎟️ Comprobante}} para reenviarlo'], ['{{Créditos}}', 'notas de crédito: tocá una para verla, imprimirla o mandarla por WhatsApp']] },
       { tipo: 'tip', texto: 'La etiqueta del canal (Local, WhatsApp, Web) se puede tocar para corregirla si quedó mal.' }

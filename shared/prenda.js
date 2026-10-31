@@ -88,7 +88,7 @@
     const lBase0 = () => listas.find(l => l.predeterminada) || listas[0];
     const tieneDesc = u => u.modo === 'precio' ? u.precio !== '' && +u.precio >= 0 : +u.descuento_pct > 0;
     // con precio: ese precio a precio de lista; en las otras listas, la misma proporción (como cualquier prenda)
-    const precioCon = (u, l) => u.modo === 'precio' && u.precio !== '' ? Math.round(+u.precio * enLista(l) / (enLista(lBase0()) || 1)) : Math.round(enLista(l) * (1 - (+u.descuento_pct || 0) / 100));
+    const precioCon = (u, l) => u.modo === 'precio' && u.precio !== '' ? (pctxCache ? PRECIOS.calcular({ id: v.id, producto_id: pr.id, precio: +u.precio }, l.id, pctxCache, { categoria_id: pr.categoria_id, tipo: pr.tipo, sinRebajas: true, sinFijo: true }).precio : Math.round(+u.precio * (+l.porcentaje || 100) / 100)) : Math.round(enLista(l) * (1 - (+u.descuento_pct || 0) / 100));
     const pintarUnidad = (u, i) => {
       const ls = u.listas && u.listas.length ? listas.filter(l => u.listas.includes(l.id)) : listas;
       const lBase = listas.find(l => l.predeterminada) || listas[0];
@@ -138,7 +138,7 @@
         <details class="pr-mas"${op.abrirMas ? ' open' : ''}><summary>Código de barras, precio de este talle, etiquetas y movimientos</summary>
           <div class="fila c2" style="margin-top:10px">
             <div class="campo"><label>Código de barras</label><input id="pr-ean" value="${esc(v.ean || '')}" ${admin ? '' : 'disabled'}></div>
-            <div class="campo"><label>Precio distinto para ${esc(nom)}</label><input id="pr-precio" type="number" step="0.01" value="${v.precio != null && +v.precio !== +pr.precio ? +v.precio : ''}" placeholder="Vacío = ${fmt.pesos(pr.precio)}, como el resto" ${admin ? '' : 'disabled'}><span class="ayuda">Solo si este talle o color vale distinto (ej. el XXL más caro). Vacío: usa el precio del producto.</span></div>
+            <div class="campo"><label>Precio distinto para ${esc(nom)}</label><input id="pr-precio" type="text" inputmode="decimal" value="${v.precio != null && +v.precio !== +pr.precio ? +v.precio : ''}" placeholder="Vacío = ${fmt.pesos(pr.precio)}, como el resto" ${admin ? '' : 'disabled'}><span class="ayuda">Solo si este talle o color vale distinto (ej. el XXL más caro). Vacío: usa el precio del producto.</span></div>
           </div>
           ${porDep.length > 1 && puede ? `<div class="campo"><label>Depósito donde se ajusta</label><select id="pr-dep">${porDep.map(x => `<option value="${x.id}" ${x.principal ? 'selected' : ''}>${esc(x.nombre)}</option>`).join('')}</select></div>` : ''}
           <div style="display:flex;gap:8px;align-items:flex-end"><div class="campo" style="margin:0;width:130px"><label>Etiquetas</label><input id="pr-etq" type="number" min="1" value="${Math.max(1, actual)}"></div><button type="button" class="btn" id="pr-etq-b">Agregar a etiquetas</button></div>
@@ -177,7 +177,7 @@
         const cambiadas = unidades.filter(u => !u.id || (() => { const o = orig.find(x => x.id === u.id); return !o || (o.nota || '') !== u.nota || String(o.descuento_pct ?? '') !== String(u.descuento_pct) || String(o.precio ?? '') !== String(u.precio) || JSON.stringify(o.listas || null) !== JSON.stringify(u.listas || null); })());
         if (cambiadas.length || cerrar.length) { const r = await sb.rpc('fallas_guardar', { p: { variante_id: v.id, unidades: cambiadas.map(u => ({ id: u.id, nota: u.nota, descuento_pct: u.modo === 'precio' || u.descuento_pct === '' ? null : u.descuento_pct, precio: u.modo === 'precio' && u.precio !== '' ? u.precio : null, listas: u.listas })), cerrar } }); if (r.error) throw r.error; }
         if (admin) {
-          const ean = $('#pr-ean', m).value.trim() || null, pv = $('#pr-precio', m).value, precio = pv === '' ? null : +pv, ch = $('#pr-chequeado', m), cambios = {};
+          const ean = $('#pr-ean', m).value.trim() || null, pv = $('#pr-precio', m).value.trim(), precio = pv === '' ? null : (window.PRECIOS ? PRECIOS.num(pv) : +pv.replace(/\./g, '').replace(',', '.')), ch = $('#pr-chequeado', m), cambios = {};
           if (ean !== (v.ean || null)) cambios.ean = ean;
           if (precio !== (v.precio != null && +v.precio !== +pr.precio ? +v.precio : null)) cambios.precio = precio;
           if (ch && ch.checked) cambios.chequear = null;

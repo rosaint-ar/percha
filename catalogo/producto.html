@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Producto · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610311610">
+<link rel="stylesheet" href="../shell/shell.css?v=202610311633">
 <style>
   .dos{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
   .dos>.card{min-width:0;overflow-x:auto}
@@ -124,8 +124,8 @@
         <div class="campo"><label>Proveedor</label><select name="proveedor_id"><option value="">—</option></select></div>
       </div>
       <div class="fila c4">
-        <div class="campo solo-admin"><label>Costo</label><input name="costo" type="number" step="0.01" min="0"></div>
-        <div class="campo"><label>Precio de lista</label><input name="precio" type="number" step="0.01" min="0" required></div>
+        <div class="campo solo-admin"><label>Costo</label><input name="costo" type="text" inputmode="decimal" placeholder="Ej. 14.000"></div>
+        <div class="campo"><label>Precio de lista</label><input name="precio" type="text" inputmode="decimal" placeholder="Ej. 18.750" required></div>
         <div class="campo solo-admin"><label>Margen</label><div class="margen" id="margen">—</div></div>
         <div class="campo"><label>Stock total</label><input id="stock-total" readonly></div>
       </div>
@@ -147,7 +147,7 @@
 
 
   <div class="card">
-    <div class="card-cab"><div><h2>Precios por lista</h2><p class="sub">Salen del precio de lista con las reglas de cada lista (<a href="../configuracion/listas.html">Listas de precios</a>); se puede fijar uno distinto</p></div></div>
+    <div class="card-cab"><div><h2>Precios por lista</h2><p class="sub">Cambiá el precio de <b>Lista</b> y las demás se calculan solas, en escalera (con las reglas de <a href="../configuracion/listas.html">Listas de precios</a>). Solo si una lista necesita otro precio, poné un <b>precio especial</b>.</p></div></div>
     <div id="rebaja-prod"></div>
     <table class="lista precios-lista" id="tb-precios"><tr><th>Lista</th><th>Regla</th><th class="num">Precio hoy</th><th></th></tr></table>
     <div class="hist-precios" id="hist-precios"></div>
@@ -159,10 +159,10 @@
   </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610311610"></script>
-<script src="../shared/precios.js?v=202610311610"></script>
-<script src="../shared/prenda.js?v=202610311610"></script>
-<script src="../shell/shell.js?v=202610311610"></script>
+<script src="../shared/supabase.js?v=202610311633"></script>
+<script src="../shared/precios.js?v=202610311633"></script>
+<script src="../shared/prenda.js?v=202610311633"></script>
+<script src="../shell/shell.js?v=202610311633"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$ , toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -241,7 +241,7 @@ APP.ready.then(async () => {
     const d = {
       codigo: form.codigo.value.trim(), nombre: form.nombre.value.trim(), tipo: form.tipo.value,
       categoria_id: form.categoria_id.value || null, proveedor_id: form.proveedor_id.value || null, temporada_id: form.temporada_id.value || null, marca_id: form.marca_id.value || null,
-      costo: +form.costo.value || 0, precio: +form.precio.value || 0, ean: form.ean.value.trim() || null,
+      costo: PRECIOS.num(form.costo.value), precio: PRECIOS.num(form.precio.value), ean: form.ean.value.trim() || null,
       tiene_variantes: form.tiene_variantes.value === 'true', activo: form.activo.value === 'true', es_generico: form.es_generico.value === 'true', descripcion: form.descripcion.value.trim() || null
     };
     if (d.tipo === 'kit') { d.tiene_variantes = false; form.tiene_variantes.value = 'false'; }
@@ -300,7 +300,7 @@ APP.ready.then(async () => {
   form.addEventListener('submit', ev => ev.preventDefault());
 
   function pintarMargen() {
-    const c = +form.costo.value || 0, pr = +form.precio.value || 0, m = $('#margen');
+    const c = PRECIOS.num(form.costo.value), pr = PRECIOS.num(form.precio.value), m = $('#margen');
     if (!c || !pr) { m.className = 'margen'; m.innerHTML = '—'; return; }
     const pct = 100 * (pr - c) / pr;
     m.className = 'margen ' + (pct < 40 ? 'bajo' : 'ok');
@@ -403,7 +403,7 @@ APP.ready.then(async () => {
   let pctx = null;
   const cargarPctx = async () => { try { pctx = await PRECIOS.cargar(sb, e); } catch (_) { pctx = null; } pintarPrecios(); };
   function calc(lista) {
-    const base = +form.precio.value || (producto && +producto.precio) || 0;
+    const base = PRECIOS.num(form.precio.value) || (producto && +producto.precio) || 0;
     const v = { id: '', producto_id: id || '', precio: base };
     if (pctx) return PRECIOS.calcular(v, lista.id, pctx, { categoria_id: form.categoria_id ? form.categoria_id.value : producto && producto.categoria_id, tipo: producto && producto.tipo });
     const fijo = precios.find(p => p.lista_id === lista.id && !p.variante_id);
@@ -411,7 +411,7 @@ APP.ready.then(async () => {
   }
   const precioDe = lista => calc(lista).precio;
   const reglaTxt = (l, c) => (l.canal ? '<b>web</b> · ' : '') + reglaTxt0(l, c);
-  const reglaTxt0 = (l, c) => c.fijo ? 'precio fijo' : l.predeterminada ? 'precio de la prenda' : (c.pct === 100 ? 'igual a Lista' : (c.pct < 100 ? '−' + fmt.dec(100 - c.pct) : '+' + fmt.dec(c.pct - 100)) + '% sobre Lista') + (c.pct !== +l.porcentaje ? ' <span class="chip" title="Excepción para esta familia o producto">excepción</span>' : '') + (l.toma_rebajas === false ? ' · sin rebajas' : '');
+  const reglaTxt0 = (l, c) => c.fijo ? 'precio especial: no sigue al de Lista' : l.predeterminada ? 'precio de la prenda' : (c.pct === 100 ? 'igual a Lista' : (c.pct < 100 ? '−' + fmt.dec(100 - c.pct) : '+' + fmt.dec(c.pct - 100)) + '% sobre Lista') + (c.pct !== +l.porcentaje ? ' <span class="chip" title="Excepción para esta familia o producto">excepción</span>' : '') + (l.toma_rebajas === false ? ' · sin rebajas' : '');
   function pintarPrecios() {
     const tb = $('#tb-precios'); tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());
     const lb = listas.find(l => l.predeterminada) || listas[0], cb = lb ? calc(lb) : null;
@@ -419,15 +419,23 @@ APP.ready.then(async () => {
     listas.forEach(l => {
       const c = calc(l), fijo = c.fijo;
       tb.insertAdjacentHTML('beforeend', `<tr><td>${esc(l.nombre)}${l.predeterminada ? ' <span class="chip">base</span>' : ''}</td><td><small>${reglaTxt(l, c)}</small></td>
-        <td class="num num-f">${c.rebaja ? `<s style="color:var(--tinta-3);font-weight:400">${fmt.pesos(l.predeterminada ? c.base : PRECIOS.calcular({ id: '', producto_id: id || '', precio: c.base }, l.id, pctx, { sinRebajas: true, categoria_id: form.categoria_id.value || null }).precio)}</s> ` : ''}${fmt.pesos(c.precio)}${fijo ? ' <span class="chip aviso" title="Precio fijado a mano">fijo</span>' : ''}</td>
-        <td>${APP.esAdmin && id ? `<button class="btn chico" data-fijar="${l.id}">${fijo ? 'Quitar fijo' : 'Fijar'}</button>` : ''}</td></tr>`);
+        <td class="num num-f">${c.rebaja ? `<s style="color:var(--tinta-3);font-weight:400">${fmt.pesos(l.predeterminada ? c.base : PRECIOS.calcular({ id: '', producto_id: id || '', precio: c.base }, l.id, pctx, { sinRebajas: true, categoria_id: form.categoria_id.value || null }).precio)}</s> ` : ''}${fmt.pesos(c.precio)}${fijo ? ' <span class="chip aviso" title="Precio especial puesto a mano: no cambia cuando cambia el de Lista">especial</span>' : ''}</td>
+        <td>${APP.esAdmin && id ? (l.predeterminada && !fijo ? `<button class="btn chico primario" data-cambiar>Cambiar precio</button>` : `<button class="btn chico" data-fijar="${l.id}" title="${fijo ? 'Vuelve a calcularse solo desde el de Lista' : 'Un precio a mano solo para esta lista (deja de seguir al de Lista)'}">${fijo ? 'Volver a la regla' : 'Precio especial'}</button>`) : ''}</td></tr>`);
     });
+    // cambiar el precio de Lista: se ve en el momento cómo quedan las demás listas
+    { const bc = $('[data-cambiar]', tb); if (bc) bc.onclick = () => {
+      const m = modal(`<h2>Cambiar el precio</h2><p class="sub">Es el precio de <b>Lista</b>. Las demás listas se calculan solas.</p><div class="campo" style="margin-top:10px"><label>Precio de lista</label><input id="cp-v" type="text" inputmode="decimal" value="${esc(form.precio.value)}" style="font:700 20px var(--f-mono);max-width:220px"></div><table class="lista" id="cp-t" style="margin-top:6px"></table><div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Guardar</button></div>`);
+      const inp = $('#cp-v', m), ver = () => { const p = PRECIOS.num(inp.value), antes = form.precio.value; form.precio.value = p || ''; $('#cp-t', m).innerHTML = listas.map(l => `<tr><td>${esc(l.nombre)}</td><td class="num"><b>${fmt.pesos(calc(l).precio)}</b></td></tr>`).join(''); form.precio.value = antes; };
+      inp.oninput = ver; ver(); inp.focus(); inp.select();
+      $('[data-no]', m).onclick = () => m.cerrar();
+      $('[data-si]', m).onclick = () => { const p = PRECIOS.num(inp.value); if (!(p > 0)) { toast('Poné el precio', 'error'); return; } form.precio.value = p; m.cerrar(); pintarPrecios(); form.precio.dispatchEvent(new Event('change', { bubbles: true })); };
+    }; }
     $$('[data-fijar]', tb).forEach(b => b.onclick = async () => {
       const l = listas.find(x => x.id === b.dataset.fijar), fijo = precios.find(p => p.lista_id === l.id && !p.variante_id);
       if (fijo) { await sb.from('precios').delete().eq('lista_id', l.id).eq('producto_id', id).is('variante_id', null); }
       else {
-        const m = modal(`<h2>Fijar precio · ${esc(l.nombre)}</h2><div class="campo"><label>Precio</label><input id="p-fijo" type="number" step="1" value="${precioDe(l)}"></div><div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Fijar</button></div>`);
-        await new Promise(res => { $('[data-no]', m).onclick = () => { m.cerrar(); res(); }; $('[data-si]', m).onclick = async () => { const r = await sb.from('precios').insert(APP.conEmpresa({ lista_id: l.id, producto_id: id, precio: +$('#p-fijo', m).value || 0 })); if (r.error) toast(mensajeError(r.error), 'error'); m.cerrar(); res(); }; });
+        const m = modal(`<h2>Precio especial · ${esc(l.nombre)}</h2><p class="sub">Solo para la lista ${esc(l.nombre)}: queda fijo y <b>no cambia</b> cuando cambia el precio de Lista. Para cambiar el precio de la prenda, usá <b>Cambiar precio</b> en la fila de Lista.</p><div class="campo" style="margin-top:10px"><label>Precio</label><input id="p-fijo" type="text" inputmode="decimal" value="${precioDe(l)}"></div><div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Poner precio especial</button></div>`);
+        await new Promise(res => { $('[data-no]', m).onclick = () => { m.cerrar(); res(); }; $('[data-si]', m).onclick = async () => { const r = await sb.from('precios').insert(APP.conEmpresa({ lista_id: l.id, producto_id: id, precio: PRECIOS.num($('#p-fijo', m).value) })); if (r.error) toast(mensajeError(r.error), 'error'); m.cerrar(); res(); }; });
       }
       precios = (await sb.from('precios').select('*').eq('producto_id', id)).data || []; await cargarPctx();
     });
