@@ -308,13 +308,32 @@ APP.ready.then(async () => {
     const conStock = vars.filter(v => +v.stock > 0), ps = (conStock.length ? conStock : vars).map(v => precioLista(v)), min = Math.min(...ps);
     return (ps.some(p => p !== min) ? 'desde ' : '') + fmt.pesos(min);
   }
+  // ================= Cambios con otro medio de pago =================
+  // Lo que devuelve vale lo que pagó, en el medio con que lo pagó: cada prenda devuelta recuerda su lista (listaOrigen) y, si la
+  // diferencia se paga con un medio de otra lista, vale lo equivalente ($18.000 por transferencia = $22.500 de Lista).
+  // Así el descuento del medio cae solo sobre la diferencia que se paga ahora.
+  const pctLista = id => +((listas.find(x => x.id === id) || {}).porcentaje) || 100;
+  const nombreLista = id => (listas.find(x => x.id === id) || {}).nombre || '';
+  function valorDevuelta(l, listaId) {
+    if (!l.listaOrigen || l.listaOrigen === listaId) return l.precioFijo;
+    const a = precioLista(l.variante, listaId), b = precioLista(l.variante, l.listaOrigen);
+    return Math.round(l.precioFijo * (a > 0 && b > 0 ? a / b : pctLista(listaId) / pctLista(l.listaOrigen)));
+  }
+  // una nota de crédito vale lo mismo: la de Contado paga más a precio Lista
+  const valorCredito = p => !p.listaNc || p.listaNc === carrito.lista ? p.saldo : Math.round(p.saldo * pctLista(carrito.lista) / pctLista(p.listaNc));
+  const listasDe = f => f && (f.listas && f.listas.length ? f.listas : f.lista_id ? [f.lista_id] : null);
+  // la lista a la que se pagó la venta: la del medio con que se pagó (el ticket puede decir otra si vino de FactuSOL); con varios medios, la del ticket
+  function listaPagada(v) {
+    const ls = [...new Set((v.pagos || []).filter(p => p.forma_pago_id).map(p => { const lf = listasDe(formas.find(x => x.id === p.forma_pago_id)); return lf && !lf.includes(v.lista_id) ? lf[0] : v.lista_id; }))];
+    return (ls.length === 1 ? ls[0] : v.lista_id) || carrito.lista;
+  }
   function agregar(v, cantidad) {
     if (!v) return;
     if (cantidad == null) cantidad = (APP.caja && APP.caja.tomarCantidad && APP.caja.tomarCantidad()) || 1;   // el teclado del POS puede dejar una cantidad lista
     // devolución sin ticket: lo que se toca o escanea entra como devuelto, al precio de hoy (se puede corregir en el renglón)
     if (carrito.devolviendo) {
       const dv = carrito.lineas.find(l => l.variante.id === v.id && l.devuelta && l.sinTicket && !l.parte);
-      if (dv) dv.cantidad -= cantidad; else carrito.lineas.push({ variante: v, cantidad: -cantidad, descPct: 0, devuelta: true, sinTicket: true, precioFijo: precioLista(v) });
+      if (dv) dv.cantidad -= cantidad; else carrito.lineas.push({ variante: v, cantidad: -cantidad, descPct: 0, devuelta: true, sinTicket: true, precioFijo: precioLista(v), listaOrigen: carrito.lista });
       recientes(v); pintar(); $('#q').focus(); return;
     }
     const ya = carrito.lineas.find(l => l.variante.id === v.id && !l.devuelta && !l.canje);
@@ -413,7 +432,7 @@ APP.ready.then(async () => {
     if (!c.lineas.length && carrito.devolviendo) cont.innerHTML = avisoDev;
     else if (!c.lineas.length) cont.innerHTML = '<div class="vacio-ticket"><b>Listo para vender</b><span>Tocá una prenda o escaneá el código.</span><small><kbd>/</kbd> buscar · <kbd>F9</kbd> cobrar</small></div>';
     else cont.innerHTML = avisoDev + c.lineas.map((l, i) => `<div class="linea">
-      <div><div class="n">${l.canje ? (esGen(l) ? esc(pieza) + ' suelta' : `<span class="cambiable" data-cambiar="${i}" title="Tocá para cambiarla por otra">${esc(l.variante.producto_nombre)}</span>`) + ' <span class="chip">cambio</span>' : l.parte ? esc(l.desc) + ' <span class="chip ok">queda en el local</span>' : l.devuelta ? esc(l.variante.producto_nombre) : `<span class="cambiable" data-cambiar="${i}" title="Tocá para cambiar el talle, el color o la prenda">${esc(l.variante.producto_nombre)}</span>`}${l.devuelta && !l.parte ? ' <span class="chip error">devuelve</span>' : ''}</div><div class="v">${l.canje ? (esGen(l) ? 'se elige al cobrar' : esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || 'único')) + ' · por la del conjunto' : l.parte ? 'entra a ' + esc(l.variante.producto_nombre) : l.devuelta ? esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || l.variante.sku || '') : `<span class="cambiable" data-cambiar="${i}">${esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || 'único')}</span>`}${l.canje ? "" : " · " + fmt.pesos(l.precioLista)}${l.descPct && l.precioManual == null ? ' −' + l.descPct + '%' : ''}${!l.devuelta && controlaStock(l.variante) && llevando(l.variante) > Math.max(+l.variante.stock || 0, 0) ? '<span class="sinstock-chip" title="El sistema dice que no hay suficiente">⚠ sin stock</span>' : ''}</div>${l.precioManual != null && !l.devuelta && !l.canje ? `<div class="promo manual">Precio cambiado a mano</div>` : ''}${l.rebaja && !l.devuelta && l.precioManual == null ? `<div class="promo">▼ ${esc(l.rebaja.nombre)} · antes ${fmt.pesos(l.precioBase)}</div>` : ''}${l.promo ? `<div class="promo">★ ${esc(l.promo.nombre)} · −${fmt.pesos(l.descPromo)}/u</div>` : ''}${(+l.variante.fallas > 0 || l.falla) && !l.devuelta && !l.canje ? `<button class="falla ${l.falla ? 'on' : ''}" data-falla="${i}" title="${l.falla ? 'Tocá para desmarcar' : esc(l.variante.falla_nota || '')}">${l.falla ? '◆ Con falla' + (l.fallaU && l.fallaU.nota ? ': ' + esc(l.fallaU.nota) : '') + (l.descFalla ? ' · ' + fmt.dec(l.descFalla) + '% off' : '') : '◆ Hay ' + fmt.num(l.variante.fallas) + ' con falla · ¿es esta?'}</button>` : ''}${puedeSinParte(l) ? `<button class="parte-btn" data-parte="${i}" title="${esc(SP.texto)}: el total baja ${fmt.pesos(SP.monto)} (se puede cambiar en el renglón)">${esc(SP.boton)} · −${fmt.pesos(SP.monto)}</button>` : ''}${puedeSinParte(l) && genCanje() ? `<button class="parte-btn" data-cambio="${i}" title="La ${esc(pieza.toLowerCase())} del conjunto queda en el local y se lleva una suelta: al cobrar se elige cuál">${esc(SP.cambio_boton || 'Cambio ' + pieza.toLowerCase())}</button>` : ''}</div>
+      <div><div class="n">${l.canje ? (esGen(l) ? esc(pieza) + ' suelta' : `<span class="cambiable" data-cambiar="${i}" title="Tocá para cambiarla por otra">${esc(l.variante.producto_nombre)}</span>`) + ' <span class="chip">cambio</span>' : l.parte ? esc(l.desc) + ' <span class="chip ok">queda en el local</span>' : l.devuelta ? esc(l.variante.producto_nombre) : `<span class="cambiable" data-cambiar="${i}" title="Tocá para cambiar el talle, el color o la prenda">${esc(l.variante.producto_nombre)}</span>`}${l.devuelta && !l.parte ? ' <span class="chip error">devuelve</span>' : ''}</div><div class="v">${l.canje ? (esGen(l) ? 'se elige al cobrar' : esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || 'único')) + ' · por la del conjunto' : l.parte ? 'entra a ' + esc(l.variante.producto_nombre) : l.devuelta ? esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || l.variante.sku || '') : `<span class="cambiable" data-cambiar="${i}">${esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || 'único')}</span>`}${l.canje ? "" : " · " + fmt.pesos(l.precioLista)}${l.descPct && l.precioManual == null ? ' −' + l.descPct + '%' : ''}${!l.devuelta && controlaStock(l.variante) && llevando(l.variante) > Math.max(+l.variante.stock || 0, 0) ? '<span class="sinstock-chip" title="El sistema dice que no hay suficiente">⚠ sin stock</span>' : ''}</div>${l.precioManual != null && !l.devuelta && !l.canje ? `<div class="promo manual">Precio cambiado a mano</div>` : ''}${l.conv ? `<div class="promo">Pagó ${fmt.pesos(l.conv.pago)} a precio ${esc(nombreLista(l.conv.de))} = ${fmt.pesos(l.precioFinal)} a precio ${esc(nombreLista(carrito.lista))}</div>` : ''}${l.mismoModelo ? `<div class="promo">↔ Mismo modelo: se cambia sin diferencia</div>` : ''}${l.rebaja && !l.devuelta && l.precioManual == null ? `<div class="promo">▼ ${esc(l.rebaja.nombre)} · antes ${fmt.pesos(l.precioBase)}</div>` : ''}${l.promo ? `<div class="promo">★ ${esc(l.promo.nombre)} · −${fmt.pesos(l.descPromo)}/u</div>` : ''}${(+l.variante.fallas > 0 || l.falla) && !l.devuelta && !l.canje ? `<button class="falla ${l.falla ? 'on' : ''}" data-falla="${i}" title="${l.falla ? 'Tocá para desmarcar' : esc(l.variante.falla_nota || '')}">${l.falla ? '◆ Con falla' + (l.fallaU && l.fallaU.nota ? ': ' + esc(l.fallaU.nota) : '') + (l.descFalla ? ' · ' + fmt.dec(l.descFalla) + '% off' : '') : '◆ Hay ' + fmt.num(l.variante.fallas) + ' con falla · ¿es esta?'}</button>` : ''}${puedeSinParte(l) ? `<button class="parte-btn" data-parte="${i}" title="${esc(SP.texto)}: el total baja ${fmt.pesos(SP.monto)} (se puede cambiar en el renglón)">${esc(SP.boton)} · −${fmt.pesos(SP.monto)}</button>` : ''}${puedeSinParte(l) && genCanje() ? `<button class="parte-btn" data-cambio="${i}" title="La ${esc(pieza.toLowerCase())} del conjunto queda en el local y se lleva una suelta: al cobrar se elige cuál">${esc(SP.cambio_boton || 'Cambio ' + pieza.toLowerCase())}</button>` : ''}</div>
       <div class="t">${l.devuelta && !l.sinTicket ? fmt.pesos(l.total) : `<input class="pu${l.precioManual != null && !l.canje ? ' manual' : ''}" data-pu="${i}" type="number" min="0" step="1" value="${l.precioFinal}" data-orig="${l.precioFinal}" title="Precio por unidad: escribí otro para cambiarlo (F2)"${APP.puede('descuentos') ? '' : ' readonly'}>${Math.abs(l.cantidad) > 1 ? `<small>${l.cantidad} u. = ${fmt.pesos(l.total)}</small>` : ''}`}</div>
       <div class="ctrl"><button data-i="${i}" data-d="-1">−</button><input data-i="${i}" data-q value="${l.cantidad}"><button data-i="${i}" data-d="1">+</button><span class="desc">desc % <input data-i="${i}" data-desc type="number" min="0" max="100" value="${l.precioManual != null ? 0 : l.descPct || 0}"${l.precioManual != null ? ' disabled title="Tiene precio a mano"' : ''}></span><button class="quitar" data-i="${i}" data-x title="Quitar">×</button></div></div>`).join('');
     $$('[data-d]', cont).forEach(b => b.onclick = () => { const l = carrito.lineas[+b.dataset.i]; l.cantidad += +b.dataset.d * (l.devuelta ? -1 : 1); if ((l.devuelta ? -l.cantidad : l.cantidad) <= 0) carrito.lineas.splice(+b.dataset.i, 1); pintar(); });
@@ -492,7 +511,7 @@ APP.ready.then(async () => {
     const l = carrito.lineas[i]; if (!l || (l.devuelta && !l.sinTicket)) return;
     if (!APP.puede('descuentos')) { toast('Cambiar el precio lo habilita administración (permiso de descuentos)', 'error'); pintar(); return; }
     const v = valor === '' ? null : r2(+valor);
-    if (l.devuelta) { l.precioFijo = v == null || !(v >= 0) ? precioLista(l.variante) : v; pintar(); return; }
+    if (l.devuelta) { l.precioFijo = v == null || !(v >= 0) ? precioLista(l.variante) : v; if (!l.parte) l.listaOrigen = carrito.lista; pintar(); return; }
     if (v == null || !(v >= 0) || v === r2(l.precioLista)) delete l.precioManual;
     else if (v !== r2(l.precioFinal) || l.precioManual != null) { l.precioManual = v; l.descPct = 0; }
     pintar();
@@ -519,11 +538,34 @@ APP.ready.then(async () => {
     const total = () => { const cc = calcular(); const recargo = pagos.reduce((s, p) => s + r2(p.monto * (p.recargo_pct || 0) / 100), 0); return { ...cc, recargo: r2(recargo), aPagar: r2(cc.total + recargo) }; };
     const m = modal(`<h2>${modoSena ? 'Dejar seña' : (c.total < 0 ? 'Devolver dinero' : 'Cobrar')} <span class="mono" id="cb-total" style="float:right"></span></h2>
       <p class="sub">${modoSena ? 'Pago a cuenta; el resto queda como saldo.' : 'Tocá un medio de pago: se completa con lo que falta. Podés combinar varios.'}</p>
+      <div id="cb-cambio"></div>
       ${window.MEDIOS ? MEDIOS.botonera(formas, usosFormas, listaDeForma) : `<div class="formas" style="margin-top:12px">${formas.map(f => `<button data-f="${f.id}">${esc(f.nombre)}</button>`).join('')}<button data-cred>Nota de crédito / gift card</button></div>`}
       <div class="pagos-lista" id="cb-pagos"></div>
       <div class="resto" id="cb-resto"></div>
       <div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si disabled>Confirmar</button></div>`, { fijo: true });
     { const caja_ = $('.modal', m); if (caja_ && window.MEDIOS) caja_.style.maxWidth = '660px'; }
+    // Cambio: lo que devuelve vale lo que pagó, en el medio con que lo pagó. La diferencia según con qué pague ahora,
+    // y si hay que devolver plata, por el mismo medio con que pagó (en la misma proporción si fueron varios).
+    const orig = !modoSena && carrito.cambio && carrito.cambio.pagos ? carrito.cambio.pagos : null;
+    const devolviendo = () => !modoSena && total().aPagar < 0;
+    const origDe = id => orig ? orig.filter(p => p.forma_pago_id === id).reduce((s, p) => s + +p.monto, 0) : 0;
+    const origTotal = orig ? orig.reduce((s, p) => s + +p.monto, 0) : 0;
+    if (!modoSena && carrito.cambio && c.lineas.some(l => l.devuelta && l.listaOrigen)) {
+      const caja_ = $('#cb-cambio', m), ver = [];
+      if (c.total < 0 && orig && orig.length) {
+        const fs = orig.filter(p => p.forma_pago_id);
+        caja_.innerHTML = `<div class="aviso-caja info"><b>Le sobra ${fmt.pesos(-c.total)}.</b> Pagó con ${orig.map(p => esc(p.nombre) + ' ' + fmt.pesos(p.monto)).join(' + ')}: si quiere la plata, va por ${fs.length > 1 ? 'los mismos medios, en la misma proporción' : 'el mismo medio'}. Si no, queda en nota de crédito.${fs.length ? ' <button type="button" class="btn chico primario" data-devolver>Devolver por ' + esc(fs.length > 1 ? 'los mismos medios' : fs[0].nombre) + '</button>' : ''}</div>`;
+      } else if (c.total > 0 && c.lineas.some(l => !l.devuelta && l.cantidad > 0)) {
+        // cuánto paga según la lista de cada medio (Contado, Débito, Lista…)
+        const ids = [...new Set(formas.map(f => (listaDeForma(f) || {}).id || carrito.lista))];
+        const antes = carrito.lista;
+        listas.filter(x => ids.includes(x.id)).forEach(x => { carrito.lista = x.id; ver.push([x, calcular().total]); });
+        carrito.lista = antes; calcular(); ver.sort((a, b) => a[1] - b[1]);
+        if (new Set(ver.map(x => x[1])).size > 1) caja_.innerHTML = `<div class="aviso-caja info"><b>Lo que devuelve vale lo que pagó, con el medio que pagó.</b> La diferencia: ${ver.map(([x, t]) => `precio ${esc(x.nombre)} <b>${fmt.pesos(t)}</b>`).join(' · ')}</div>`;
+      }
+    }
+    // las notas de crédito se recalculan si cambia la lista del ticket (una de Contado paga más a precio Lista)
+    const recalcCreditos = () => { let resto = total().aPagar; pagos.forEach(p => { if (p.credito_id) { p.monto = Math.max(0, Math.min(valorCredito(p), r2(resto))); resto = r2(resto - p.monto); } }); };
     const pintarPagos = () => {
       const t = total(); $('#cb-total', m).textContent = fmt.pesos(t.aPagar);
       const pagado = r2(pagos.reduce((s, p) => s + p.monto, 0)); const resto = r2(t.aPagar - pagado);
@@ -542,15 +584,26 @@ APP.ready.then(async () => {
       else { ok = false; r.className = 'resto falta'; r.innerHTML = `<span>Falta</span><span>${fmt.pesos(resto)}</span>`; }
       $('[data-si]', m).disabled = !ok;
     };
-    $$('[data-f]', m).forEach(b => b.onclick = () => {
+    // devolución de un cambio: solo por los medios con que pagó (administración puede elegir otro, avisando)
+    if (orig && devolviendo()) $$('[data-f]', m).forEach(b => { if (!origDe(b.dataset.f)) { b.classList.add('mp-otro'); b.style.opacity = '.4'; b.title = 'Pagó con otro medio: la plata se devuelve por el mismo'; } });
+    $$('[data-f]', m).forEach(b => b.onclick = async () => {
       const f = formas.find(x => x.id === b.dataset.f);
-      // si el medio tiene lista propia y es el primer pago, el ticket pasa a esa lista
-      const lf = listaDeForma(f); if (lf && !pagos.length && carrito.lista !== lf.id) { carrito.lista = lf.id; pintar(); }
+      if (orig && devolviendo() && !origDe(f.id)) {
+        if (!APP.puede('descuentos')) { toast('Pagó con ' + orig.map(p => p.nombre).join(' y ') + ': la plata se devuelve por el mismo medio (o queda nota de crédito)', 'error'); return; }
+        if (!(await confirmar(`Pagó con ${orig.map(p => p.nombre).join(' y ')}. ¿Devolver igual por ${f.nombre}?`, 'Devolver por ' + f.nombre))) return;
+      }
+      // si el medio tiene lista propia y es el primer pago (las notas de crédito no cuentan), el ticket pasa a esa lista.
+      // Devolviendo plata no: se devuelve a la lista con que pagó
+      const lf = listaDeForma(f); if (lf && !pagos.some(p => !p.credito_id) && carrito.lista !== lf.id && !devolviendo()) { carrito.lista = lf.id; pintar(); recalcCreditos(); }
       const t = total(); const pagado = pagos.reduce((s, p) => s + p.monto, 0);
       let monto = r2(t.aPagar - pagado); if (f.recargo_pct) monto = r2((t.total + pagos.reduce((s, p) => s + r2(p.monto * (p.recargo_pct || 0) / 100), 0) - pagado) / (1 + f.recargo_pct / 100));
       if (modoSena && !pagos.length) monto = r2(Math.round(t.aPagar / 2 / 100) * 100);
+      // devolviendo con varios medios: a cada uno, su parte de lo que pagó
+      if (t.aPagar < 0 && origDe(f.id) && origTotal > 0) monto = Math.max(monto, -r2(-t.aPagar * origDe(f.id) / origTotal) - pagos.filter(p => p.forma_pago_id === f.id).reduce((s, p) => s + p.monto, 0));
+      if (t.aPagar < 0 && monto >= 0) return;
       pagos.push({ forma_pago_id: f.id, nombre: f.nombre, tipo: f.tipo, cuotas: f.cuotas, recargo_pct: +f.recargo_pct || 0, monto: t.aPagar < 0 ? Math.min(0, monto) : Math.max(0, monto) }); pintarPagos();
     });
+    { const bd = $('[data-devolver]', m); if (bd) bd.onclick = () => { pagos.splice(0); [...new Set(orig.filter(p => p.forma_pago_id).map(p => p.forma_pago_id))].forEach(id => { const b = $(`[data-f="${id}"]`, m); if (b) b.click(); }); pintarPagos(); }; }
     $('[data-cred]', m).onclick = () => {
       const m2 = modal(`<h2>Pagar con crédito</h2><div class="campo" style="margin-top:12px"><label>Código de la nota de crédito o gift card</label><input id="cr-cod" placeholder="8 letras y números" style="text-transform:uppercase;font-family:var(--f-mono)"></div><div class="pie"><button class="btn" data-no>Volver</button><button class="btn primario" data-si>Aplicar</button></div>`);
       $('[data-no]', m2).onclick = () => m2.cerrar();
@@ -560,7 +613,8 @@ APP.ready.then(async () => {
         if (!data || data.estado !== 'vigente' || +data.saldo <= 0) { toast('Ese código no tiene saldo vigente', 'error'); return; }
         if (pagos.some(p => p.credito_id === data.id)) { toast('Ese crédito ya está aplicado', 'error'); return; }
         const t = total(); const pagado = pagos.reduce((s, p) => s + p.monto, 0);
-        pagos.push({ credito_id: data.id, nombre: `${data.tipo === 'gift_card' ? 'Gift card' : 'Nota de crédito'} ${data.codigo} (saldo ${fmt.pesos(data.saldo)})`, tipo: 'credito', monto: Math.max(0, Math.min(+data.saldo, r2(t.aPagar - pagado))) });
+        const pc = { credito_id: data.id, nombre: `${data.tipo === 'gift_card' ? 'Gift card' : 'Nota de crédito'} ${data.codigo} (saldo ${fmt.pesos(data.saldo)}${data.lista_id ? ' a precio ' + nombreLista(data.lista_id) : ''})`, tipo: 'credito', saldo: +data.saldo, listaNc: data.lista_id || null };
+        pc.monto = Math.max(0, Math.min(valorCredito(pc), r2(t.aPagar - pagado))); pagos.push(pc);
         m2.cerrar(); pintarPagos();
       };
     };
@@ -576,7 +630,7 @@ APP.ready.then(async () => {
       if (!modoSena && t.aPagar < 0) {
         // devolución con saldo a favor: nota de crédito salvo que se haya devuelto en efectivo
         const devuelto = pagosFinal.reduce((s, p) => s + p.monto, 0);
-        if (Math.abs(devuelto - t.aPagar) > 0.5) { creditos_a_emitir.push({ tipo: 'nota_credito', monto: r2(-t.aPagar - (-devuelto)), cliente_id: carrito.cliente, vence: null, nota: 'Por cambio/devolución' }); }
+        if (Math.abs(devuelto - t.aPagar) > 0.5) { creditos_a_emitir.push({ tipo: 'nota_credito', monto: r2(-t.aPagar - (-devuelto)), cliente_id: carrito.cliente, vence: null, nota: 'Por cambio/devolución', lista_id: carrito.lista }); }
       }
       const cliente = await resolverCliente();
       const payload = {
@@ -587,7 +641,9 @@ APP.ready.then(async () => {
         numero: reservado ? null : numeroRes,   // el número que se ve en el ticket desde que empezó la venta
         venta_origen_id: carrito.cambio ? carrito.cambio.id : null, origen: ($('#sel-origen') || {}).value || 'local',
         lineas: t.lineas.map(l => ({ variante_id: l.variante.id, producto_id: l.variante.producto_id, descripcion: l.desc || l.variante.producto_nombre, talle: l.variante.talle_nombre, color: l.variante.color_nombre, cantidad: l.cantidad, precio_lista: l.precioLista, precio_unit: l.precioFinal, descuento_pct: l.descPct || 0, promocion_id: l.promo ? l.promo.id : null, promocion_nombre: l.promo ? l.promo.nombre : null, total: l.total, costo_unit: +l.variante.costo || 0, componentes: l.componentes && l.componentes.length ? l.componentes : null, falla: !!l.falla, falla_id: l.fallaU ? l.fallaU.id : null, precio_manual: l.precioManual != null || undefined })),
-        pagos: pagosFinal.filter(p => p.monto !== 0).map(p => ({ forma_pago_id: p.forma_pago_id || null, credito_id: p.credito_id || null, monto: p.monto, cuotas: p.cuotas || 1, recargo_pct: p.recargo_pct || 0 })),
+        pagos: pagosFinal.filter(p => p.monto !== 0).map(p => ({ forma_pago_id: p.forma_pago_id || null, credito_id: p.credito_id || null, monto: p.monto, cuotas: p.cuotas || 1, recargo_pct: p.recargo_pct || 0,
+          // nota de crédito de otra lista: lo que se descuenta de su saldo (paga $2.500 a precio Lista, descuenta $2.000 de Contado)
+          consumo: p.credito_id && p.listaNc && p.listaNc !== carrito.lista ? (p.monto >= valorCredito(p) - 0.5 ? p.saldo : r2(p.monto * pctLista(p.listaNc) / pctLista(carrito.lista))) : undefined })),
         creditos_a_emitir
       };
       // la ventana de cobro queda abierta mientras se registra: si falla, se ve el error y se puede reintentar
@@ -694,14 +750,14 @@ APP.ready.then(async () => {
       <div>Atendió: ${esc((vendedoras.find(v => v.user_id === p.vendedora_id) || {}).nombre || '')}</div><hr>
       <table>${lineas}</table><hr>
       <table>${extra.total.descuento ? `<tr><td>Descuento ${p.descuento_pct}%</td><td class="r">−${fmt.pesos(extra.total.descuento)}</td></tr>` : ''}${extra.total.recargo ? `<tr><td>Recargo</td><td class="r">${fmt.pesos(extra.total.recargo)}</td></tr>` : ''}<tr><td><b>TOTAL</b></td><td class="r"><b>${fmt.pesos(extra.total.aPagar)}</b></td></tr>${pagos}${extra.vuelto ? `<tr><td>Vuelto</td><td class="r">${fmt.pesos(extra.vuelto)}</td></tr>` : ''}${p.estado === 'senada' ? `<tr><td><b>SEÑA · saldo</b></td><td class="r"><b>${fmt.pesos(r2(extra.total.aPagar - extra.pagos.reduce((s, x) => s + x.monto, 0)))}</b></td></tr>` : ''}</table>
-      ${(res.creditos || []).map(c => `<hr><div class="c"><b>${c.tipo === 'gift_card' ? 'GIFT CARD' : 'NOTA DE CRÉDITO'}</b><br>Código <b>${c.codigo}</b> · ${fmt.pesos(c.monto)}</div>`).join('')}
+      ${(res.creditos || []).map(c => `<hr><div class="c"><b>${c.tipo === 'gift_card' ? 'GIFT CARD' : 'NOTA DE CRÉDITO'}</b><br>Código <b>${c.codigo}</b> · ${fmt.pesos(c.monto)}${c.lista ? ' a precio ' + esc(c.lista) : ''}</div>`).join('')}
       ${p.nota ? `<hr><div>${esc(p.nota)}</div>` : ''}<hr><div class="c">Cambios con este ticket dentro de los 30 días.<br>¡Gracias por tu compra!</div>`;
     $('#impresion').innerHTML = html;
     const texto = encodeURIComponent(`${emp.nombre} · Ticket ${num}\n` + p.lineas.map(l => `${l.cantidad}× ${l.descripcion} ${[l.talle, l.color].filter(Boolean).join(' ')} ${fmt.pesos(l.total)}`).join('\n') + `\nTOTAL ${fmt.pesos(extra.total.aPagar)}` + (p.estado === 'senada' ? `\nSeña: saldo ${fmt.pesos(r2(extra.total.aPagar - extra.pagos.reduce((s, x) => s + x.monto, 0)))}` : '') + `\n¡Gracias por tu compra!`);
     const m = modal(`<h2>${res.pendiente ? 'Venta guardada (se sube al volver internet)' : '✓ Venta ' + num + ' registrada'}</h2>
       <div style="font:800 30px var(--f-titulo);letter-spacing:-.03em;margin:6px 0"><span data-monto-venta>${fmt.pesos(extra.total.aPagar)}</span> ${res.pendiente ? '' : '🎉'}</div>
       ${extra.vuelto ? `<div class="aviso-caja info">Vuelto: <b>${fmt.pesos(extra.vuelto)}</b></div>` : ''}
-      ${(res.creditos || []).map(c => `<div class="aviso-caja ok">${c.tipo === 'gift_card' ? 'Gift card' : 'Nota de crédito'} emitida · código <b class="mono">${c.codigo}</b> · ${fmt.pesos(c.monto)}</div>`).join('')}
+      ${(res.creditos || []).map(c => `<div class="aviso-caja ok">${c.tipo === 'gift_card' ? 'Gift card' : 'Nota de crédito'} emitida · código <b class="mono">${c.codigo}</b> · ${fmt.pesos(c.monto)}${c.lista ? ' a precio ' + esc(c.lista) : ''}</div>`).join('')}
       <div class="pie" style="justify-content:space-between"><div style="display:flex;gap:8px;flex-wrap:wrap">${res.id && p.estado === 'completada' && !p.reservada && !res.reservada && window.FACTURA ? '<button class="btn" data-facturar hidden>Facturar</button>' : ''}<button class="btn" data-print>Imprimir ticket</button><a class="btn" href="whatsapp://send?text=${texto}">WhatsApp</a>${res.id && !res.pendiente ? '<button class="btn" data-prueba title="Borra esta venta como si no hubiera existido">🧪 Era de prueba</button>' : ''}</div><button class="btn primario" data-ok>Nueva venta</button></div>`, { fijo: true });
     if (!res.pendiente) { fx.sonido('venta'); fx.pop($('[data-monto-venta]', m)); if (fx.brillo) fx.brillo($('.modal', m) || m); }
     $('[data-print]', m).onclick = () => window.print();
@@ -756,9 +812,10 @@ APP.ready.then(async () => {
       $('[data-si]', m).onclick = () => {
         const sel = $$('input[data-l]:checked', m).map(i => ls.find(l => String(l.id) === i.dataset.l));
         if (!sel.length) { toast('Marcá al menos una prenda', 'error'); return; }
-        carrito.cambio = { id: v.id, numero: v.numero }; carrito.lista = v.lista_id || carrito.lista;
+        const lo = listaPagada(v);   // la lista con que pagó: lo que devuelve se valora ahí
+        carrito.cambio = { id: v.id, numero: v.numero, pagos: v.pagos || [] }; carrito.lista = lo;
         sel.forEach(l => { const v2 = catalogo.find(x => x.id === l.variante_id) || { id: l.variante_id, producto_id: l.producto_id, producto_nombre: l.descripcion, talle_nombre: l.talle, color_nombre: l.color, precio: l.precio_lista, costo: l.costo_unit };
-          carrito.lineas.push({ variante: v2, cantidad: -l.cantidad, descPct: 0, devuelta: true, precioFijo: l.precio_unit }); });
+          carrito.lineas.push({ variante: v2, cantidad: -l.cantidad, descPct: 0, devuelta: true, precioFijo: l.precio_unit, listaOrigen: lo }); });
         m.cerrar(); pintar(); toast('Agregá ahora lo que se lleva, o cobrá para devolver el dinero / emitir nota de crédito'); $('#q').focus();
       };
       // una sola prenda: ya queda marcada · Espacio marca o desmarca · Enter carga
@@ -772,9 +829,21 @@ APP.ready.then(async () => {
     });
     buscar();   // al abrir: las últimas ventas
   };
-  // las líneas devueltas se valoran a lo que se pagó, no al precio de hoy
+  // las líneas devueltas se valoran a lo que se pagó (no al precio de hoy), en la lista con que se pagó: si el ticket está en otra
+  // lista, lo equivalente (valorDevuelta). Mismo modelo en otro talle o color: se cambia sin diferencia, aunque el precio haya cambiado.
   const calcularBase = calcular;
-  calcular = function () { const c = calcularBase(); c.lineas.forEach(l => { if (l.devuelta && l.precioFijo != null) { l.precioLista = l.precioFijo; l.precioUnit = l.precioFijo; l.promo = null; l.descPromo = 0; l.precioFinal = l.precioFijo; l.total = r2(l.precioFijo * l.cantidad); } });
+  calcular = function () { const c = calcularBase();
+    c.lineas.forEach(l => { l.conv = null; if (l.devuelta && l.precioFijo != null) { const val = valorDevuelta(l, carrito.lista); l.conv = val !== l.precioFijo && !l.parte ? { pago: l.precioFijo, de: l.listaOrigen } : null; l.precioLista = val; l.precioUnit = val; l.promo = null; l.descPromo = 0; l.precioFinal = val; l.total = r2(val * l.cantidad); } });
+    const pool = new Map();
+    c.lineas.forEach(l => { if (l.devuelta && !l.parte && l.precioFijo != null) { const k = l.variante.producto_id; if (!pool.has(k)) pool.set(k, []); pool.get(k).push({ val: l.precioFinal, n: -l.cantidad }); } });
+    c.lineas.forEach(l => {
+      l.mismoModelo = 0; if (l.devuelta || l.parte || l.canje || l.falla || l.precioManual != null || l.cantidad <= 0) return;
+      const p = pool.get(l.variante.producto_id); if (!p) return;
+      let n = 0, suma = 0; for (const u of p) while (u.n > 0 && n < l.cantidad) { u.n--; n++; suma += u.val; }
+      if (!n) return;
+      if (n === l.cantidad) { l.promo = null; l.descPromo = 0; }
+      l.mismoModelo = n; l.total = r2(suma + (l.cantidad - n) * l.precioFinal); l.precioFinal = r2(l.total / l.cantidad);
+    });
     let subtotal = 0, costo = 0; c.lineas.forEach(l => { subtotal += l.total; costo += (+l.variante.costo || 0) * l.cantidad; });
     c.subtotal = r2(subtotal); c.descuento = r2(subtotal * (carrito.descPct || 0) / 100); c.total = r2(c.subtotal - c.descuento); c.costo = r2(costo); return c; };
 
