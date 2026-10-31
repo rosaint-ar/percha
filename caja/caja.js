@@ -87,6 +87,7 @@ APP.ready.then(async () => {
     if (!caja) { $('#estado-caja').innerHTML = '<span class="chip error">Sin caja configurada</span>'; return; }
     const { data } = await sb.from('caja_turnos').select('*').eq('caja_id', caja.id).eq('estado', 'abierto').order('abierto', { ascending: false }).limit(1);
     turno = (data || [])[0] || null;
+    if (window.TAREAS) TAREAS.iniciar({ turno: () => turno });   // la rutina del local: aviso amable durante el día
     pintarEstado();
     if (!turno) abrirTurno();
   }
@@ -94,12 +95,13 @@ APP.ready.then(async () => {
     const cola = colaPendiente().length;
     $('#estado-caja').innerHTML = turno
       ? `<span class="punto" id="punto-red"></span><span class="chip ok">Caja abierta</span><span style="font-size:12.5px;color:var(--tinta-3)">${esc(caja.nombre)} · desde ${fmt.fechaHora(turno.abierto)}</span>
-         <a class="btn chico" href="caja.html" title="Ingresos, retiros y cierre de caja">💰 Caja</a><a class="btn chico" href="ventas.html">Ventas del día</a><button class="btn chico" id="btn-pedido" type="button" title="Una clienta pidió algo que no hay: anotalo">📝 Lo pidieron</button><button class="btn chico" id="btn-sonido" title="Prender o apagar los sonidos de la caja">${fx.sonidoActivo() ? '🔊' : '🔇'}</button>
+         <a class="btn chico" href="caja.html" title="Ingresos, retiros y cierre de caja">💰 Caja</a><a class="btn chico" href="ventas.html">Ventas del día</a><button class="btn chico" id="btn-pedido" type="button" title="Una clienta pidió algo que no hay: anotalo">📝 Lo pidieron</button><button class="btn chico" id="btn-tareas" type="button" title="Las tareas del local de hoy" hidden>✨ Tareas</button><button class="btn chico" id="btn-sonido" title="Prender o apagar los sonidos de la caja">${fx.sonidoActivo() ? '🔊' : '🔇'}</button>
          ${cola ? `<button class="btn chico suave" id="btn-sync">${cola} venta${cola > 1 ? 's' : ''} por subir</button>` : ''}`
       : `<span class="punto off"></span><span class="chip aviso">Caja cerrada</span><button class="btn chico primario" id="btn-abrir">🔓 Abrir caja</button><a class="btn chico" href="ventas.html">Ventas</a><button class="btn chico" id="btn-sonido" title="Prender o apagar los sonidos de la caja">${fx.sonidoActivo() ? '🔊' : '🔇'}</button>`;
     const b = $('#btn-abrir'); if (b) b.onclick = abrirTurno;
     const m = $('#btn-mov'); if (m) m.onclick = movimientoCaja;
     const c = $('#btn-cerrar'); if (c) c.onclick = cerrarTurno;
+    if (window.TAREAS) { TAREAS.pintarChip(); const bt = $('#btn-tareas'); if (bt) bt.onclick = TAREAS.panel; }
     const bp = $('#btn-pedido'); if (bp) bp.onclick = () => window.PEDIDO_CLIENTA && PEDIDO_CLIENTA.anotar({ texto: ($('#q') || {}).value ? $('#q').value.trim() : '' });
     const s = $('#btn-sync'); if (s) s.onclick = sincronizar;
     const so = $('#btn-sonido'); if (so) so.onclick = () => { const on = fx.alternarSonido(); so.textContent = on ? '🔊' : '🔇'; toast(on ? 'Sonidos prendidos' : 'Sonidos apagados'); };
@@ -107,7 +109,7 @@ APP.ready.then(async () => {
   }
   const fx = window.CAJAFX || { sonido() { }, telon: async () => { }, billetes: () => ({ total: () => 0 }), pop() { }, sonidoActivo: () => false, alternarSonido: () => false };
   // abrir, ingresos/retiros y cierre viven en turno.js (los usa también la pantalla Caja)
-  async function abrirTurno() { const t = await TURNO.abrir(caja); if (t) { turno = t; pintarEstado(); } }
+  async function abrirTurno() { const t = await TURNO.abrir(caja); if (t) { turno = t; pintarEstado(); if (window.TAREAS) setTimeout(() => TAREAS.momento('apertura'), 2400); } }   // después del "¡Caja abierta!": las tareas para arrancar
   function movimientoCaja() { if (turno) TURNO.movimiento(turno); }
   async function cerrarTurno() { if (turno && await TURNO.cerrar(caja, turno, { pendientes: colaPendiente().length })) { turno = null; pintarEstado(); } }
 

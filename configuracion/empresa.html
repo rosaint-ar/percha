@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Configuración · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610311518">
+<link rel="stylesheet" href="../shell/shell.css?v=202610311538">
 <style>
   .pestanas{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
   .pestanas a{font:600 13px var(--f-ui);color:var(--tinta);text-decoration:none;padding:8px 14px;border:1px solid var(--linea);background:var(--superficie-2);border-radius:10px}
@@ -77,7 +77,7 @@
 </head>
 <body data-page="configuracion" data-etq="Configuración" data-title="Empresa" data-subtitle="Datos fiscales, listas de precios, formas de pago y depósitos">
 <main class="app">
-  <div class="pestanas"><a class="on" href="empresa.html">Empresa</a><a href="atributos.html">Talles, colores y familias</a><a href="curvas.html">Curvas de talle</a><a href="listas.html">Listas de precios</a><a href="promociones.html">Promociones</a><a href="envios.html">Envíos</a><a href="canales.html">Canales de venta</a><a href="facturacion.html">Facturación</a><a href="usuarios.html">Usuarios</a></div>
+  <div class="pestanas"><a class="on" href="empresa.html">Empresa</a><a href="atributos.html">Talles, colores y familias</a><a href="curvas.html">Curvas de talle</a><a href="listas.html">Listas de precios</a><a href="promociones.html">Promociones</a><a href="envios.html">Envíos</a><a href="canales.html">Canales de venta</a><a href="facturacion.html">Facturación</a><a href="tareas.html">Tareas del local</a><a href="usuarios.html">Usuarios</a></div>
 
   <div class="card">
     <div class="card-cab"><div><h2>Datos de la empresa</h2><p class="sub">Salen en facturas, tickets y etiquetas</p></div><div class="acciones"><span class="estado-guardado" id="est-empresa">Se guarda solo</span></div></div>
@@ -131,9 +131,9 @@
   </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610311518"></script>
-<script src="../shell/shell.js?v=202610311518"></script>
-<script src="../shared/medios-pago.js?v=202610311518"></script>
+<script src="../shared/supabase.js?v=202610311538"></script>
+<script src="../shell/shell.js?v=202610311538"></script>
+<script src="../shared/medios-pago.js?v=202610311538"></script>
 <script>
 APP.ready.then(async () => {
   const { esc, $, $$, toast, mensajeError, fmt } = APP, e = APP.empresa.id;

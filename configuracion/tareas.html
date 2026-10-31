@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tareas del local · Percha</title>
+<meta name="app-root" content="../">
+<link rel="stylesheet" href="../shell/shell.css?v=202610311538">
+<style>
+  .pestanas{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
+  .pestanas a{font:600 13px var(--f-ui);color:var(--tinta);text-decoration:none;padding:8px 14px;border:1px solid var(--linea);background:var(--superficie-2);border-radius:10px}
+  .pestanas a.on{background:var(--lila);border-color:transparent;color:var(--acento)}
+  /* cada tarea: una tarjeta con sus campos; se guarda al escribir */
+  .tc-lista{display:grid;gap:10px}
+  .tc{display:grid;grid-template-columns:56px 1fr;gap:8px 12px;border:1px solid var(--linea);border-radius:14px;background:var(--superficie-2);padding:12px 14px}
+  .tc.apagada{opacity:.55}
+  .tc .emo{font-size:26px;text-align:center;width:52px;height:52px;border:1px solid var(--linea);border-radius:12px;background:var(--superficie)}
+  .tc input,.tc select{height:36px;border:1px solid var(--linea);border-radius:9px;background:var(--superficie);padding:0 10px;font:500 13.5px var(--f-ui)}
+  .tc .nom{font-weight:700;font-size:14.5px;width:100%}
+  .tc .ayu{width:100%;margin-top:6px}
+  .tc .fila2{grid-column:2;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .dias{display:flex;gap:3px}.dias button{width:30px;height:30px;border-radius:50%;border:1px solid var(--linea);background:var(--superficie);font:700 12px var(--f-ui);cursor:pointer;color:var(--tinta-3)}
+  .dias button.on{background:var(--acento);border-color:var(--acento);color:#fff}
+  .tc .acc{margin-left:auto;display:flex;gap:8px;align-items:center}
+  .grupo-t{font:700 12px var(--f-ui);color:var(--tinta-3);letter-spacing:.05em;text-transform:uppercase;margin:16px 0 8px}
+</style>
+</head>
+<body data-page="configuracion" data-etq="Configuración" data-title="Tareas del local" data-subtitle="La rutina del local (limpiar, vidriera, aire, alarma…): aparece al abrir y cerrar la caja y durante el día, como un recordatorio amable">
+<main class="app">
+  <div class="pestanas"><a href="empresa.html">Empresa</a><a href="atributos.html">Talles, colores y familias</a><a href="curvas.html">Curvas de talle</a><a href="listas.html">Listas de precios</a><a href="promociones.html">Promociones</a><a href="envios.html">Envíos</a><a href="canales.html">Canales de venta</a><a href="facturacion.html">Facturación</a><a class="on" href="tareas.html">Tareas del local</a><a href="usuarios.html">Usuarios</a></div>
+  <div class="card">
+    <div class="card-cab"><div><h2>Tareas del local</h2><p class="sub">Aparecen como un recordatorio amable, con un festejo al hacerlas. Se guarda solo al escribir.</p></div><div class="acciones"><button class="btn primario" id="btn-nueva">+ Agregar tarea</button></div></div>
+    <div id="lista"><p class="sub">Cargando…</p></div>
+  </div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../shared/supabase.js?v=202610311538"></script>
+<script src="../shell/shell.js?v=202610311538"></script>
+<script>
+APP.ready.then(async () => {
+  const { esc, $, $$, toast, confirmar, mensajeError } = APP, e = APP.empresa.id;
+  if (!APP.puede('configuracion')) { document.querySelector('main').innerHTML = '<div class="card"><p>Esta sección es solo para administración.</p></div>'; return; }
+  const MOMENTOS = [['apertura', '☀️ Al abrir la caja'], ['hora', '🕐 A una hora'], ['cada', '🔁 Cada tanto, durante el día'], ['cierre', '🌙 Al cerrar la caja']];
+  const DIAS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+  let tareas = [];
+  async function cargar() {
+    const { data, error } = await sb.from('tareas').select('*').eq('empresa_id', e).order('orden').order('hora');
+    if (error) { $('#lista').innerHTML = `<p class="sub">${esc(mensajeError(error))}</p>`; return; }
+    tareas = data || []; pintar();
+  }
+  const tarjeta = t => `<div class="tc${t.activa ? '' : ' apagada'}" data-id="${t.id}"><input class="emo" data-k="emoji" value="${esc(t.emoji)}" maxlength="4" title="Emoji">
+    <div><input class="nom" data-k="nombre" value="${esc(t.nombre)}" placeholder="Qué hay que hacer"><input class="ayu" data-k="ayuda" value="${esc(t.ayuda || '')}" placeholder="Un detalle amable (opcional): para qué sirve o cómo hacerla"></div>
+    <div class="fila2"><select data-k="momento">${MOMENTOS.map(([k, n]) => `<option value="${k}"${t.momento === k ? ' selected' : ''}>${n}</option>`).join('')}</select>
+      ${t.momento === 'hora' ? `<input type="time" data-k="hora" value="${t.hora ? t.hora.slice(0, 5) : '13:00'}">` : ''}
+      ${t.momento === 'cada' ? `<select data-k="cada_min">${[60, 90, 120, 180, 240].map(x => `<option value="${x}"${+t.cada_min === x ? ' selected' : ''}>cada ${x % 60 ? x + ' min' : x / 60 + ' h'}</option>`).join('')}</select>` : ''}
+      <span class="dias" title="Qué días (ninguno marcado = todos)">${DIAS.map((d, i) => `<button type="button" data-dia="${i + 1}" class="${(t.dias || []).includes(i + 1) ? 'on' : ''}">${d}</button>`).join('')}</span>
+      <span class="acc"><label class="switch" title="Activa"><input type="checkbox" data-k="activa" ${t.activa ? 'checked' : ''}><span></span></label><button class="btn chico" data-borrar>Eliminar</button></span></div></div>`;
+  function pintar() {
+    $('#lista').innerHTML = tareas.length ? MOMENTOS.map(([k, n]) => { const l = tareas.filter(t => t.momento === k); return l.length ? `<div class="grupo-t">${n}</div><div class="tc-lista">${l.map(tarjeta).join('')}</div>` : ''; }).join('') : '<div class="vacio">Todavía no hay tareas. Agregá la primera con <b>+ Agregar tarea</b>.</div>';
+    const guardar = async (id, cambio, redibujar) => {
+      const r = await sb.from('tareas').update(cambio).eq('id', id);
+      if (r.error) { toast(mensajeError(r.error), 'error'); return; }
+      Object.assign(tareas.find(t => t.id === id), cambio); toast('Guardado');
+      if (redibujar) pintar();
+    };
+    $$('#lista [data-k]').forEach(i => i.onchange = () => {
+      const id = i.closest('[data-id]').dataset.id, k = i.dataset.k;
+      let v = i.type === 'checkbox' ? i.checked : i.value.trim();
+      if (k === 'nombre' && !v) { toast('Ponele un nombre', 'error'); pintar(); return; }
+      if (k === 'puntos' || k === 'cada_min') v = +v; if (k === 'ayuda' && !v) v = null;
+      const cambio = { [k]: v };
+      if (k === 'momento') { if (v === 'hora') cambio.hora = '13:00'; if (v === 'cada') cambio.cada_min = 180; }
+      guardar(id, cambio, k === 'momento' || k === 'activa');
+    });
+    $$('#lista [data-dia]').forEach(b => b.onclick = () => {
+      const t = tareas.find(x => x.id === b.closest('[data-id]').dataset.id), d = +b.dataset.dia;
+      const dias = (t.dias || []).includes(d) ? t.dias.filter(x => x !== d) : [...(t.dias || []), d].sort();
+      guardar(t.id, { dias: dias.length ? dias : null }, true);
+    });
+    $$('#lista [data-borrar]').forEach(b => b.onclick = async () => {
+      const t = tareas.find(x => x.id === b.closest('[data-id]').dataset.id);
+      if (!await confirmar(`¿Eliminar "${t.nombre}"?`, 'Eliminar')) return;
+      // si ya se hizo alguna vez, se apaga (así no se pierden los puntos de nadie)
+      const { count } = await sb.from('tareas_hechas').select('id', { count: 'exact', head: true }).eq('tarea_id', t.id);
+      const r = count ? await sb.from('tareas').update({ activa: false }).eq('id', t.id) : await sb.from('tareas').delete().eq('id', t.id);
+      toast(r.error ? mensajeError(r.error) : count ? 'Quedó apagada (ya tenía puntos de alguien)' : 'Eliminada', r.error ? 'error' : ''); cargar();
+    });
+  }
+  $('#btn-nueva').onclick = async () => {
+    const d = await APP.formulario({ titulo: 'Nueva tarea', campos: [{ k: 'nombre', label: 'Qué hay que hacer', requerido: true, placeholder: 'Ej. Regar las plantas' }, { k: 'emoji', label: 'Emoji', placeholder: '🪴' },
+      { k: 'momento', label: 'Cuándo', tipo: 'select', opciones: MOMENTOS }] });
+    if (!d) return;
+    const r = await sb.from('tareas').insert(APP.conEmpresa({ nombre: d.nombre.trim(), emoji: (d.emoji || '').trim() || '✨', momento: d.momento || 'apertura', hora: d.momento === 'hora' ? '13:00' : null, cada_min: d.momento === 'cada' ? 180 : null, puntos: 10, orden: tareas.length + 1 }));
+    toast(r.error ? mensajeError(r.error) : 'Tarea agregada', r.error ? 'error' : ''); cargar();
+  };
+  cargar();
+});
+</script>
+</body>
+</html>

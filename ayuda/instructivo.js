@@ -30,6 +30,20 @@ window.INSTRUCTIVO = {
       { tipo: 'ojo', texto: 'Sin la caja abierta no se puede cobrar. Si tocaste "Después", abrila con {{🔓 Abrir caja}} arriba de todo.' }
     ] },
 
+    { id: 'tareas', grupo: 'dia', p: 'vender', titulo: 'Las tareas del local', nuevo: '2026-10-31', resumen: 'La rutina del local (luces, vidriera, piso, aire, alarma…) como un recordatorio amable.', bloques: [
+      { tipo: 'texto', texto: 'Percha te recuerda la rutina del local, sin apuro y a tu ritmo:' },
+      { tipo: 'tabla', filas: [
+        ['☀️ Al abrir la caja', 'aparece **"Para arrancar el día"** con las tareas de la mañana'],
+        ['🕐 Durante el día', 'una **tarjetita** en la esquina de abajo cuando toca algo (ej. mirar los WhatsApp, acomodar perchas): {{✓ Listo}} o {{Más tarde}} (vuelve en media hora)'],
+        ['🌙 Al cerrar la caja', 'antes de contar la plata aparece **"Antes de irte"** (aire, luces, alarma…). Nunca frena el cierre']] },
+      { tipo: 'pasos', items: ['Tocá {{✓ Listo}} en cada tarea que hiciste: sale un ✨ y un festejo cuando está todo hecho.', 'Arriba en la caja, {{Tareas 3/8}} te muestra cómo van las de hoy y te deja marcarlas cuando quieras.', 'Si marcaste una sin querer, tocá {{deshacer}}.'] },
+      { tipo: 'tip', texto: 'Las hace quien pueda: si una compañera ya la marcó, aparece con su nombre.' }
+    ] },
+    { id: 'tareas-config', grupo: 'dia', p: 'configuracion', titulo: 'Configurar las tareas del local', nuevo: '2026-10-31', resumen: '**Configuración** › {{Tareas del local}}.', bloques: [
+      { tipo: 'pasos', items: ['{{+ Agregar tarea}}: qué hay que hacer, un emoji y cuándo.', 'En cada tarea elegís **cuándo**: al abrir la caja, a una hora, cada tanto durante el día (cada 1, 2, 3 o 4 h) o al cerrar.', 'Los **días**: tocá los que corresponden (ninguno marcado = todos los días).', 'Un **detalle amable** (opcional) explica para qué sirve. Se guarda solo al escribir.'] },
+      { tipo: 'tip', texto: 'Apagá una tarea con el interruptor si no hace falta por un tiempo.' }
+    ] },
+
     // ======================= VENDER =======================
     { id: 'pantalla', grupo: 'vender', p: 'vender', titulo: 'La pantalla de venta', resumen: 'Buscador arriba, prendas en el medio, ticket a la derecha.', bloques: [
       { tipo: 'pasos', items: [

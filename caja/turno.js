@@ -65,6 +65,7 @@
   async function cerrar(caja, turno, op) {
     const { fmt, esc, $, $$, toast, modal, mensajeError } = APP;
     if (op && op.pendientes) { toast('Primero subí las ventas que quedaron sin internet (desde el Punto de venta)', 'error'); return false; }
+    if (window.TAREAS) await TAREAS.momento('cierre');   // "Antes de irte": las tareas del cierre (no frena el cierre)
     const { data: esp, error } = await sb.rpc('caja_esperado', { p_turno: turno.id });
     if (error) { toast(mensajeError(error), 'error'); return false; }
     const filas = (esp.formas || []).filter(f => f.esperado || f.ventas || f.tipo === 'efectivo');
