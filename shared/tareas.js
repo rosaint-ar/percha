@@ -20,10 +20,17 @@
     .tar-sec{font:700 12px var(--f-ui);color:var(--tinta-3);letter-spacing:.04em;margin:14px 0 -2px;text-transform:uppercase}
     .tar-mas{position:fixed;font:800 18px var(--f-titulo);color:var(--acento);pointer-events:none;z-index:99999;animation:tarSube 1.1s ease-out forwards}
     @keyframes tarSube{0%{opacity:0;transform:translateY(6px) scale(.8)}20%{opacity:1;transform:translateY(-6px) scale(1.1)}100%{opacity:0;transform:translateY(-46px) scale(1)}}
-    .tar-tarjeta{position:fixed;left:18px;bottom:18px;z-index:9000;max-width:340px;background:var(--superficie-2);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--superficie-borde);border-radius:18px;box-shadow:var(--sombra-flotante);padding:14px 16px;display:grid;grid-template-columns:40px 1fr;gap:4px 12px;animation:tarEntra .45s cubic-bezier(.2,.9,.3,1.2)}
-    .tar-tarjeta .em{font-size:30px;grid-row:span 3;align-self:center;text-align:center}.tar-tarjeta b{font:700 14.5px var(--f-ui)}.tar-tarjeta small{color:var(--tinta-3);font-size:12.5px}
-    .tar-tarjeta .bts{display:flex;gap:6px;margin-top:6px}.tar-tarjeta .bts button{border:0;border-radius:999px;padding:7px 13px;font:700 12.5px var(--f-ui);cursor:pointer}
-    .tar-tarjeta .bts .si{background:var(--acento);color:#fff}.tar-tarjeta .bts .luego{background:var(--relleno);color:var(--tinta-2)}
+    /* la tarjetita de durante el día: se despega de las tarjetas de productos con un halo de neón suave que late y un borde de color que se mueve */
+    .tar-tarjeta{position:fixed;left:18px;bottom:18px;z-index:9000;max-width:360px;background:linear-gradient(140deg,#fff 0%,#f7f1ff 55%,#fdf0f6 100%);border-radius:20px;padding:14px 16px 14px 14px;display:grid;grid-template-columns:52px 1fr;gap:3px 12px;isolation:isolate;animation:tarEntra .5s cubic-bezier(.2,.9,.3,1.2),tarHalo 2.8s ease-in-out .5s infinite}
+    .tar-tarjeta::before{content:'';position:absolute;inset:-2px;border-radius:22px;padding:2px;background:linear-gradient(120deg,var(--acento),#e58fb3,#9db4ff,var(--acento));background-size:300% 300%;animation:tarBorde 6s linear infinite;-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;z-index:-1}
+    .tar-tarjeta .em{font-size:28px;grid-row:span 4;align-self:center;width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:radial-gradient(circle,#fff 40%,rgba(var(--acento-rgb),.14));box-shadow:0 0 16px rgba(var(--acento-rgb),.35)}
+    .tar-tarjeta .tag{font:800 10.5px var(--f-ui);letter-spacing:.09em;text-transform:uppercase;color:var(--acento)}
+    .tar-tarjeta b{font:700 15px var(--f-ui);color:var(--tinta)}.tar-tarjeta small{color:var(--tinta-2);font-size:12.5px}
+    .tar-tarjeta .bts{display:flex;gap:6px;margin-top:8px}.tar-tarjeta .bts button{border:0;border-radius:999px;padding:8px 14px;font:700 12.5px var(--f-ui);cursor:pointer}
+    .tar-tarjeta .bts .si{background:linear-gradient(180deg,rgba(var(--acento-rgb),1),rgba(var(--acento-rgb),.85));color:#fff;box-shadow:0 4px 14px rgba(var(--acento-rgb),.4)}.tar-tarjeta .bts .luego{background:rgba(255,255,255,.8);color:var(--tinta-2);box-shadow:inset 0 0 0 1px var(--linea)}
+    @keyframes tarHalo{0%,100%{box-shadow:0 0 0 3px rgba(var(--acento-rgb),.10),0 0 18px rgba(var(--acento-rgb),.30),0 16px 44px rgba(21,23,28,.22)}50%{box-shadow:0 0 0 6px rgba(var(--acento-rgb),.16),0 0 36px rgba(var(--acento-rgb),.55),0 16px 44px rgba(21,23,28,.22)}}
+    @keyframes tarBorde{0%{background-position:0% 50%}100%{background-position:300% 50%}}
+    @media (prefers-reduced-motion:reduce){.tar-tarjeta,.tar-tarjeta::before{animation:none}}
     @keyframes tarEntra{from{opacity:0;transform:translateY(20px) scale(.95)}to{opacity:1;transform:none}}
     .tar-chip{display:inline-flex;align-items:center;gap:6px}.tar-chip .anillo{width:18px;height:18px;border-radius:50%;background:conic-gradient(var(--acento) calc(var(--p)*1%),var(--relleno-2) 0)}`;
   function estilos() { if (document.getElementById('tar-css')) return; const s = document.createElement('style'); s.id = 'tar-css'; s.textContent = css; document.head.appendChild(s); }
@@ -125,7 +132,7 @@
   function mostrarTarjeta(t, prueba) {
     estilos(); if (tarjeta) tarjeta.remove();
     tarjeta = document.createElement('div'); tarjeta.className = 'tar-tarjeta';
-    tarjeta.innerHTML = `<span class="em">${h(t.emoji)}</span><b>${h(t.nombre)}</b><small>${t.ayuda ? h(t.ayuda) + ' ' : ''}Cuando puedas 😊</small><div class="bts"><button class="si">✓ Listo</button><button class="luego">Más tarde</button></div>`;
+    tarjeta.innerHTML = `<span class="em">${h(t.emoji)}</span><span class="tag">✨ Recordatorio</span><b>${h(t.nombre)}</b><small>${t.ayuda ? h(t.ayuda) + ' ' : ''}Cuando puedas 😊</small><div class="bts"><button class="si">✓ Listo</button><button class="luego">Más tarde</button></div>`;
     document.body.appendChild(tarjeta);
     const cerrar = () => { if (tarjeta) { tarjeta.remove(); tarjeta = null; } };
     if (prueba) { tarjeta.querySelector('.si').onclick = ev => { brillito(ev.currentTarget); fx().sonido('ok'); setTimeout(cerrar, 500); }; tarjeta.querySelector('.luego').onclick = cerrar; return; }
