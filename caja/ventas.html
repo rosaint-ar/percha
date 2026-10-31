@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ventas · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202610311313">
+<link rel="stylesheet" href="../shell/shell.css?v=202610311330">
 <style>
   .filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
   .filtros input[type=date],.filtros select{border:1px solid var(--linea);background:var(--superficie-2);padding:8px 10px;border-radius:var(--radio-mini)}
@@ -55,10 +55,11 @@
 </main>
 <div id="impresion"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202610311313"></script>
-<script src="../shared/canales.js?v=202610311313"></script>
-<script src="../shell/shell.js?v=202610311313"></script>
-<script src="../shared/facturar.js?v=202610311313"></script>
+<script src="../shared/supabase.js?v=202610311330"></script>
+<script src="../shared/canales.js?v=202610311330"></script>
+<script src="../shell/shell.js?v=202610311330"></script>
+<script src="../shared/nota-credito.js?v=202610311330"></script>
+<script src="../shared/facturar.js?v=202610311330"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -112,6 +113,7 @@ APP.ready.then(async () => {
   }
   async function verVenta(id) {
     const [{ data: v }, { data: ls }, { data: ps }] = await Promise.all([sb.from('v_ventas').select('*').eq('id', id).single(), sb.from('venta_lineas').select('*').eq('venta_id', id).order('id'), sb.from('venta_pagos').select('*, formas_pago(nombre), creditos(codigo,tipo)').eq('venta_id', id)]);
+    const { data: ncs } = await sb.from('creditos').select('*, clientes(nombre)').eq('empresa_id', e).eq('origen_venta_id', id);
     const m = modal(`<h2>Ticket #${String(v.numero).padStart(6, '0')} ${ESTADO[v.estado]} ${canalEditable(v.id, v.origen)}</h2><p class="sub">${fmt.fechaHora(v.fecha)} · ${v.vendedora_nombre ? 'atendió ' + esc(v.vendedora_nombre) : 'sin vendedora'}${v.cliente_nombre ? ' · ' + esc(v.cliente_nombre) : ''}${v.referencia ? ' · ref. ' + esc(v.referencia) : ''}${v.nota ? ' · ' + esc(v.nota) : ''}${v.anulada_motivo ? ' · anulada: ' + esc(v.anulada_motivo) : ''}</p>
       <table class="lista detalle" style="margin-top:10px">${ls.map(l => `<tr><td>${l.cantidad}× ${esc(l.descripcion)}${l.falla ? ' <span title="Prenda con falla" style="color:#8a6400">◆</span>' : ''}<br><small>${esc([l.talle, l.color].filter(Boolean).join(' · '))}${l.promocion_nombre ? ' · ★ ' + esc(l.promocion_nombre) : ''}${l.descuento_pct ? ' · −' + l.descuento_pct + '%' : ''}</small></td><td class="num">${fmt.pesos(l.total)}</td></tr>`).join('')}
       ${+v.descuento ? `<tr><td>Descuento ${v.descuento_pct}%</td><td class="num">−${fmt.pesos(v.descuento)}</td></tr>` : ''}${+v.recargo ? `<tr><td>Recargo</td><td class="num">${fmt.pesos(v.recargo)}</td></tr>` : ''}
@@ -119,10 +121,12 @@ APP.ready.then(async () => {
       ${ps.map(p => `<tr><td><small>${esc(p.formas_pago ? p.formas_pago.nombre : (p.creditos ? (p.creditos.tipo === 'gift_card' ? 'Gift card ' : 'Nota de crédito ') + p.creditos.codigo : ''))}${p.cuotas > 1 ? ' · ' + p.cuotas + ' cuotas' : ''}</small></td><td class="num"><small>${fmt.pesos(p.monto)}</small></td></tr>`).join('')}
       ${+v.saldo ? `<tr><td><b>Saldo pendiente</b></td><td class="num" style="color:var(--aviso)"><b>${fmt.pesos(v.saldo)}</b></td></tr>` : ''}</table>
       ${v.factura_id || (v.estado === 'completada' && facturaLista) ? `<div class="aviso-caja ${v.factura_estado === 'autorizado' ? 'ok' : v.factura_estado === 'rechazado' ? 'error' : 'info'}" style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px"><span>${v.factura_estado === 'autorizado' ? 'Factura ' + esc(v.factura_numero) + (v.nc_id ? (v.nc_estado === 'autorizado' ? ' · anulada con nota de crédito' : ' · nota de crédito en cola') : '') : v.factura_estado === 'pendiente' ? 'Factura en cola: sale sola apenas ARCA responda' : v.factura_estado === 'rechazado' ? 'ARCA rechazó la factura' : 'Sin factura'}</span><span style="display:flex;gap:6px">${v.factura_estado === 'autorizado' ? `<a class="btn chico" target="_blank" href="${FACTURA.urlFactura(v.factura_id)}">Ver factura</a>${v.nc_id && v.nc_estado === 'autorizado' ? `<a class="btn chico" target="_blank" href="${FACTURA.urlFactura(v.nc_id)}">Ver nota de crédito</a>` : ''}` : v.estado === 'completada' && v.factura_estado !== 'pendiente' ? `<button class="btn chico primario" data-facturar>${v.factura_estado === 'rechazado' ? 'Volver a facturar' : 'Facturar'}</button>` : ''}</span></div>` : ''}
+      ${(ncs || []).map(c => `<div class="aviso-caja ok" style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px"><span>${c.tipo === 'gift_card' ? 'Gift card' : 'Nota de crédito'} <b class="mono">${esc(c.codigo)}</b> · ${fmt.pesos(c.monto)}${+c.saldo !== +c.monto ? ' · saldo ' + fmt.pesos(c.saldo) : ''}</span><button class="btn chico" data-nc="${c.id}">Ver e imprimir</button></div>`).join('')}
       <div class="pie" style="justify-content:space-between"><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn" data-print>Reimprimir</button>${v.estado !== 'anulada' ? `<button class="btn primario" data-editar>Editar</button><a class="btn" href="pos.html?cambio=${v.numero}">Cambio / devolución</a>` : ''}</div>
       <div style="display:flex;gap:6px">${v.origen !== 'tiendanube' && v.factura_estado !== 'autorizado' ? '<button class="btn" data-prueba title="Borra la venta como si no hubiera existido: vuelve el stock y sale de la caja">🧪 Era de prueba</button>' : ''}${v.estado !== 'anulada' ? '<button class="btn peligro" data-anular>Anular</button>' : ''}</div></div>`);
     { const ce = $('[data-canal]', m); if (ce) ce.onclick = () => cambiarCanal(v.id, v.origen, () => { m.cerrar(); cargar(); }); }
     $('[data-print]', m).onclick = () => { imprimir(v, ls, ps); window.print(); };
+    $$('[data-nc]', m).forEach(b => b.onclick = () => verCredito((ncs || []).find(c => c.id === b.dataset.nc)));
     const bf = $('[data-facturar]', m); if (bf) bf.onclick = () => { m.cerrar(); FACTURA.abrir(v, { alTerminar: cargar }); };
     const ed = $('[data-editar]', m); if (ed) ed.onclick = () => { m.cerrar(); editarVenta(v, ls, ps); };
     const pr = $('[data-prueba]', m); if (pr) pr.onclick = async () => {
@@ -221,10 +225,12 @@ APP.ready.then(async () => {
     };
   }
   function imprimir(v, ls, ps) {
-    const emp = APP.empresa;
-    $('#impresion').innerHTML = `${emp.logo_url ? `<div class="c"><img src="${esc(emp.logo_url)}" alt="" style="max-width:42mm;max-height:20mm;margin:0 auto 4px;display:block"></div>` : ''}<h2 class="c">${esc(emp.nombre)}</h2><div class="c">${esc([emp.domicilio, emp.localidad].filter(Boolean).join(' · '))}</div><hr><div>Ticket #${String(v.numero).padStart(6, '0')} · ${fmt.fechaHora(v.fecha)} (reimpresión)</div><hr>
-      <table>${ls.map(l => `<tr><td>${l.cantidad}× ${esc(l.descripcion)}<br><small>${esc([l.talle, l.color].filter(Boolean).join(' · '))}</small></td><td class="r">${fmt.pesos(l.total)}</td></tr>`).join('')}</table><hr>
-      <table><tr><td><b>TOTAL</b></td><td class="r"><b>${fmt.pesos(v.total)}</b></td></tr>${ps.map(p => `<tr><td>${esc(p.formas_pago ? p.formas_pago.nombre : 'Crédito')}</td><td class="r">${fmt.pesos(p.monto)}</td></tr>`).join('')}${+v.saldo ? `<tr><td><b>SALDO</b></td><td class="r"><b>${fmt.pesos(v.saldo)}</b></td></tr>` : ''}</table><hr><div class="c">Cambios con este ticket dentro de los 30 días.</div>`;
+    const emp = APP.empresa, cambio = v.tipo === 'cambio' || v.tipo === 'devolucion';
+    const fila = l => `<tr><td>${cambio ? Math.abs(l.cantidad) : l.cantidad}× ${esc(l.descripcion)}<br><small>${esc([l.talle, l.color].filter(Boolean).join(' · '))}</small></td><td class="r">${fmt.pesos(cambio ? Math.abs(l.total) : l.total)}</td></tr>`;
+    const grupo = (t, xs) => xs.length ? `<tr><td colspan="2"><b>${t}</b></td></tr>` + xs.map(fila).join('') : '';
+    $('#impresion').innerHTML = `${emp.logo_url ? `<div class="c"><img src="${esc(emp.logo_url)}" alt="" style="max-width:42mm;max-height:20mm;margin:0 auto 4px;display:block"></div>` : ''}<h2 class="c">${esc(emp.nombre)}</h2><div class="c">${esc([emp.domicilio, emp.localidad].filter(Boolean).join(' · '))}</div><hr><div>${cambio ? '<b>CAMBIO</b> ' : 'Ticket '}#${String(v.numero).padStart(6, '0')} · ${fmt.fechaHora(v.fecha)} (reimpresión)</div><hr>
+      <table>${cambio ? grupo('DEVUELVE', ls.filter(l => l.cantidad < 0)) + grupo('SE LLEVA', ls.filter(l => l.cantidad > 0)) : ls.map(fila).join('')}</table><hr>
+      <table><tr><td><b>${!cambio ? 'TOTAL' : +v.total > 0 ? 'DIFERENCIA A PAGAR' : +v.total < 0 ? 'A FAVOR DE LA CLIENTA' : 'SIN DIFERENCIA'}</b></td><td class="r"><b>${fmt.pesos(cambio ? Math.abs(v.total) : v.total)}</b></td></tr>${ps.map(p => `<tr><td>${esc(p.formas_pago ? p.formas_pago.nombre : 'Crédito')}</td><td class="r">${fmt.pesos(p.monto)}</td></tr>`).join('')}${+v.saldo ? `<tr><td><b>SALDO</b></td><td class="r"><b>${fmt.pesos(v.saldo)}</b></td></tr>` : ''}</table><hr><div class="c">Cambios con este ticket dentro de los 30 días.</div>`;
   }
   async function cargarSenas() {
     const { data } = await sb.from('v_ventas').select('*').eq('empresa_id', e).eq('estado', 'senada').order('fecha');
@@ -252,9 +258,33 @@ APP.ready.then(async () => {
     $$('[data-arq]', tb).forEach(b => b.onclick = () => { const t = data.find(x => x.id === b.dataset.arq);
       modal(`<h2>Arqueo · ${fmt.fechaHora(t.abierto)} → ${fmt.fechaHora(t.cerrado)}</h2><table class="lista" style="margin-top:10px"><tr><th>Medio</th><th class="num">Esperado</th><th class="num">Contado</th><th class="num">Dif.</th></tr>${t.arqueo.map(a => `<tr><td>${esc(a.nombre)}</td><td class="num">${fmt.pesos(a.esperado)}</td><td class="num">${fmt.pesos(a.declarado)}</td><td class="num" style="color:${Math.abs(a.diferencia) < 1 ? 'var(--ok)' : 'var(--error)'}">${a.diferencia > 0 ? '+' : ''}${fmt.pesos(a.diferencia)}</td></tr>`).join('')}</table>${t.notas ? `<p class="sub" style="margin-top:8px">${esc(t.notas)}</p>` : ''}<div class="pie"><button class="btn" onclick="this.closest('.modal-fondo').remove()">Cerrar</button></div>`); });
   }
+  // ================= Nota de crédito: su comprobante (shared/nota-credito.js) =================
+  let ncDatos = null;
+  async function datosNC() {
+    if (!ncDatos) { const [{ data: listas }, { data: formas }] = await Promise.all([sb.from('listas_precios').select('id,nombre,porcentaje,canal').eq('empresa_id', e).eq('activa', true), sb.from('formas_pago').select('id,nombre,tipo,lista_id,listas').eq('empresa_id', e).eq('activa', true).order('orden')]);
+      ncDatos = { listas: (listas || []).filter(l => !l.canal), formas: formas || [] }; }
+    return ncDatos;
+  }
+  async function verCredito(c) {
+    if (!c) return;
+    const d = await datosNC(), o = { empresa: APP.empresa, listas: d.listas, formas: d.formas, clienta: c.clientes ? c.clientes.nombre : null, reimpresion: true };
+    if (c.origen_venta_id) {
+      const [{ data: v }, { data: ls }] = await Promise.all([sb.from('ventas').select('numero,venta_origen_id').eq('id', c.origen_venta_id).maybeSingle(), sb.from('venta_lineas').select('descripcion,talle,color,cantidad,total').eq('venta_id', c.origen_venta_id).order('id')]);
+      if (v) { o.ticket = v.numero; if (v.venta_origen_id) { const { data: vo } = await sb.from('ventas').select('numero').eq('id', v.venta_origen_id).maybeSingle(); o.origen = vo && vo.numero; } }
+      o.devuelve = (ls || []).filter(l => l.cantidad < 0); o.lleva = (ls || []).filter(l => l.cantidad > 0);
+    }
+    const { data: usos } = await sb.from('venta_pagos').select('monto, ventas(numero,fecha)').eq('credito_id', c.id);
+    const m = modal(`<h2>${c.tipo === 'gift_card' ? 'Gift card' : 'Nota de crédito'} <span class="mono">${esc(c.codigo)}</span> <span class="chip ${c.estado === 'vigente' ? 'ok' : 'gris'}">${esc(c.estado)}</span></h2>
+      <div class="nc-vista">${NOTA_CREDITO.html(c, o)}</div>
+      ${(usos || []).length ? `<p class="sub">Usada en ${usos.map(u => u.ventas ? `el ticket #${String(u.ventas.numero).padStart(6, '0')} (${fmt.fecha(u.ventas.fecha)}): ${fmt.pesos(u.monto)}` : fmt.pesos(u.monto)).join(' · ')}</p>` : ''}
+      <div class="pie"><button class="btn" data-no>Cerrar</button><button class="btn primario" data-print>Imprimir</button></div>`);
+    $('[data-no]', m).onclick = () => m.cerrar();
+    $('[data-print]', m).onclick = () => { $('#impresion').innerHTML = NOTA_CREDITO.html(c, o); window.print(); };
+  }
   async function cargarCreditos() {
     const { data } = await sb.from('creditos').select('*, clientes(nombre)').eq('empresa_id', e).order('creado', { ascending: false }).limit(200);
-    const tb = $('#tb-creditos tbody'); tb.innerHTML = (data || []).map(c => `<tr><td class="mono">${esc(c.codigo)}</td><td>${c.tipo === 'gift_card' ? 'Gift card' : 'Nota de crédito'}</td><td>${esc(c.clientes ? c.clientes.nombre : '—')}</td><td>${fmt.fecha(c.creado)}</td><td class="num">${fmt.pesos(c.monto)}</td><td class="num num-f">${fmt.pesos(c.saldo)}</td><td><span class="chip ${c.estado === 'vigente' ? 'ok' : 'gris'}">${c.estado}</span></td></tr>`).join('') || '<tr><td colspan="7" class="vacio">No hay créditos emitidos.</td></tr>';
+    const tb = $('#tb-creditos tbody'); tb.innerHTML = (data || []).map(c => `<tr class="clic" data-c="${c.id}"><td class="mono">${esc(c.codigo)}</td><td>${c.tipo === 'gift_card' ? 'Gift card' : 'Nota de crédito'}</td><td>${esc(c.clientes ? c.clientes.nombre : '—')}</td><td>${fmt.fecha(c.creado)}</td><td class="num">${fmt.pesos(c.monto)}</td><td class="num num-f">${fmt.pesos(c.saldo)}</td><td><span class="chip ${c.estado === 'vigente' ? 'ok' : 'gris'}">${c.estado}</span></td></tr>`).join('') || '<tr><td colspan="7" class="vacio">No hay créditos emitidos.</td></tr>';
+    $$('[data-c]', tb).forEach(r => r.onclick = () => verCredito((data || []).find(c => c.id === r.dataset.c)));
   }
   ['#f-desde', '#f-hasta'].forEach(s => $(s).addEventListener('change', () => $$('#f-per button').forEach(b => b.classList.remove('on'))));
   ['#f-desde', '#f-hasta', '#f-estado', '#f-origen'].forEach(s => $(s).addEventListener('change', cargar));
