@@ -1,4 +1,4 @@
--- 109 · Pedido cancelado en Tienda Nube → la venta se anula sola en Percha, con el motivo de Tienda Nube (02/11/2026, Diego:
+-- 110 · Pedido cancelado en Tienda Nube → la venta se anula sola en Percha, con el motivo de Tienda Nube (02/11/2026, Diego:
 -- "cuando se cancela en Tienda Nube, debe cancelarse en Percha con su motivo traído desde Tienda Nube").
 -- El aviso de Tienda Nube (tn-pedidos) entra sin una persona logueada, y caja_anular_venta pedía ser miembro de la empresa:
 -- la anulación automática fallaba en silencio (nunca hubo un caso real, se vio al probarlo). Ahora la función acepta también

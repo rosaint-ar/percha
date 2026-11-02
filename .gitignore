@@ -3,3 +3,5 @@ muestra-ventas.html
 *.accdb
 *.laccdb
 node_modules/
+desktop.ini
+supabase/.temp/
