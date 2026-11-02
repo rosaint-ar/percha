@@ -164,7 +164,8 @@ Deno.serve(async (req) => {
     // aplicar: de a una variante, frenando si Tienda Nube pide esperar
     let hechos = 0, errores = 0; const errs: string[] = [];
     for (const c of cambios.slice(0, limite)) {
-      const r = await fetch(`${base}/products/${c.producto_ext}/variants/${c.variante_ext}`, { method: "PUT", headers, body: JSON.stringify({ price: c.precio, promotional_price: c.promo }) });
+      // Sin oferta va "" y no null: Tienda Nube ignora null y deja la oferta vieja (probado 02/11/2026; el Capibara Kids quedó así 432 veces).
+      const r = await fetch(`${base}/products/${c.producto_ext}/variants/${c.variante_ext}`, { method: "PUT", headers, body: JSON.stringify({ price: c.precio, promotional_price: c.promo ?? "" }) });
       if (r.status === 429) { await espera(2000); break; }
       const ok = r.ok; const err = ok ? null : `${r.status} ${(await r.text()).slice(0, 200)}`;
       await admin.from("canal_precio_envios").insert({ empresa_id: e, conexion_id: cx.id, variante_id: c.variante_id, producto_ext: c.producto_ext, variante_ext: c.variante_ext, precio_antes: c.precio_antes, precio_despues: c.precio, promo_antes: c.promo_antes, promo_despues: c.promo, user_id: userId, error: err });

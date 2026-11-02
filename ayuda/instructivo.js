@@ -201,9 +201,12 @@ window.INSTRUCTIVO = {
         ['5. {{WhatsApp}}', 'le mandás el ticket'],
         ['6. **Envíos**', 'Preparado → Enviado cuando sale con el cadete → Entregado']] }
     ] },
-    { id: 'pedidos-web', grupo: 'whatsapp', p: 'vender', titulo: 'Los pedidos de la web', nuevo: '2026-10-31', resumen: 'Entran solos: no se cargan a mano.', bloques: [
+    { id: 'pedidos-web', grupo: 'whatsapp', p: 'vender', titulo: 'Los pedidos de la web', nuevo: '2026-11-02', resumen: 'Entran solos: no se cargan a mano. Si se cancelan en Tienda Nube, se anulan solos.', bloques: [
       { tipo: 'texto', texto: 'Cuando alguien compra en la tienda online, el pedido **entra solo** a Percha **en el momento** (apenas se paga): aparece en **Ventas** (canal Web), si tiene envío en **Envíos**, y en el **cierre de caja** como "fuera de la caja". El stock se descuenta solo.' },
-      { tipo: 'ojo', texto: '**No lo cargues de nuevo en la caja**: quedaría vendido dos veces.' }
+      { tipo: 'ojo', texto: '**No lo cargues de nuevo en la caja**: quedaría vendido dos veces.' },
+      { tipo: 'texto', texto: '**Si se cancela en Tienda Nube**, también se anula **sola** en Percha: el stock vuelve y en la venta dice el **motivo** que trajo Tienda Nube (por ejemplo "Cancelado en Tienda Nube: la clienta lo canceló"). Lo mismo si se devuelve el pago. No hay que hacer nada en Percha.' },
+      { tipo: 'tip', texto: 'Un pedido de la web **sin pagar** (por ejemplo, efectivo a coordinar) no es venta todavía: solo **aparta** esas prendas en la web. Si se cancela, se liberan solas.' },
+      { tipo: 'ojo', texto: 'Para **cancelar** un pedido de la web, hacelo **en Tienda Nube** y Percha se entera sola (si lo anulás solo en Percha, en Tienda Nube sigue activo). Si querés que figure el motivo, elegilo al cancelar y anotalo en la nota del pedido.' }
     ] },
 
     // ======================= CAMBIOS =======================

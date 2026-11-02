@@ -11,6 +11,15 @@ const UA = "Percha (rosaint.ar@gmail.com)";
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-key", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
 const r2 = (n: number) => Math.round((+n || 0) * 100) / 100;
+// por qué se canceló (lo que dice Tienda Nube) → el motivo de la anulación en Percha
+const RAZON: Record<string, string> = { customer: "la clienta lo canceló", inventory: "no había stock", fraud: "posible fraude", other: "otro motivo" };
+function motivoCancel(o: any) {
+  const fecha = (s: string) => new Date(s).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  const que = o.status === "cancelled" ? "Cancelado en Tienda Nube" : o.payment_status === "refunded" ? "Pago devuelto en Tienda Nube" : "Pago anulado en Tienda Nube";
+  const razon = o.status === "cancelled" ? RAZON[o.cancel_reason] || o.cancel_reason || "" : "";
+  const nota = String(o.owner_note || "").trim();
+  return `${que}${razon ? ": " + razon : ""}${nota ? " · nota: " + nota.slice(0, 200) : ""}${o.cancelled_at ? " (" + fecha(o.cancelled_at) + ")" : ""}`;
+}
 // la entrega del pedido (medio, costo, dirección, estado y seguimiento) → campos envio_* de la venta, para la lista de Envíos
 const RANGO: Record<string, number> = { pendiente: 0, preparado: 1, enviado: 2, entregado: 3 };
 function envioDe(o: any) {
@@ -106,10 +115,17 @@ Deno.serve(async (req) => {
       const pedidoExt = String(o.id);
       const { data: ya } = await admin.from("canal_pedidos").select("*").eq("conexion_id", cx.id).eq("pedido_ext", pedidoExt).maybeSingle();
       const pagado = o.payment_status === "paid", cancelado = o.status === "cancelled" || o.payment_status === "refunded" || o.payment_status === "voided";
-      const datosPedido = { empresa_id: e, conexion_id: cx.id, pedido_ext: pedidoExt, numero_ext: String(o.number ?? ""), estado_ext: o.status, pago_ext: o.payment_status, total: +o.total || 0, fecha: o.created_at, cliente: o.customer?.name || o.contact_name || null, datos: { gateway: o.gateway_name || o.gateway, products: o.products, shipping: o.shipping_cost_customer, discount: o.discount }, actualizado: ahora };
+      const datosPedido = { empresa_id: e, conexion_id: cx.id, pedido_ext: pedidoExt, numero_ext: String(o.number ?? ""), estado_ext: o.status, pago_ext: o.payment_status, total: +o.total || 0, fecha: o.created_at, cliente: o.customer?.name || o.contact_name || null, datos: { gateway: o.gateway_name || o.gateway, products: o.products, shipping: o.shipping_cost_customer, discount: o.discount, ...(cancelado ? { cancelado: { motivo: motivoCancel(o), razon: o.cancel_reason || null, fecha: o.cancelled_at || null } } : {}) }, actualizado: ahora };
       if (ya && ya.venta_id) {
-        if (cancelado) { const { data: v } = await admin.from("ventas").select("estado").eq("id", ya.venta_id).single(); if (v && v.estado !== "anulada") { await admin.rpc("caja_anular_venta", { p_venta: ya.venta_id, p_motivo: "Pedido cancelado en Tienda Nube" }); anulados++; } }
-        await admin.from("canal_pedidos").update({ estado_ext: o.status, pago_ext: o.payment_status, actualizado: ahora }).eq("id", ya.id);
+        let problema = ya.problema;
+        if (cancelado) {
+          const { data: v } = await admin.from("ventas").select("estado").eq("id", ya.venta_id).single();
+          if (v && v.estado !== "anulada") {
+            const { error: ea } = await admin.rpc("caja_anular_venta", { p_venta: ya.venta_id, p_motivo: motivoCancel(o) });
+            if (ea) { problema = "No se pudo anular: " + ea.message; conProblema++; } else anulados++;
+          }
+        }
+        await admin.from("canal_pedidos").update({ estado_ext: o.status, pago_ext: o.payment_status, problema, actualizado: ahora, ...(cancelado ? { datos: { ...(ya.datos || {}), cancelado: datosPedido.datos.cancelado } } : {}) }).eq("id", ya.id);
         // la entrega: se completa si falta y el estado solo avanza (si en Percha ya lo marcaron más adelante, se respeta)
         if (!cancelado && o.has_shippable_products !== false) {
           const { data: vv } = await admin.from("ventas").select("envio_estado,envio_metodo").eq("id", ya.venta_id).single();
