@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ventas · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611032318">
+<link rel="stylesheet" href="../shell/shell.css?v=202611032349">
 <style>
   .filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
   .filtros input[type=date],.filtros select{border:1px solid var(--linea);background:var(--superficie-2);padding:8px 10px;border-radius:var(--radio-mini)}
@@ -55,12 +55,12 @@
 </main>
 <div id="impresion"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611032318"></script>
-<script src="../shared/canales.js?v=202611032318"></script>
-<script src="../shell/shell.js?v=202611032318"></script>
-<script src="../shared/ticket-cambio.js?v=202611032318"></script>
-<script src="../shared/nota-credito.js?v=202611032318"></script>
-<script src="../shared/facturar.js?v=202611032318"></script>
+<script src="../shared/supabase.js?v=202611032349"></script>
+<script src="../shared/canales.js?v=202611032349"></script>
+<script src="../shell/shell.js?v=202611032349"></script>
+<script src="../shared/ticket-cambio.js?v=202611032349"></script>
+<script src="../shared/nota-credito.js?v=202611032349"></script>
+<script src="../shared/facturar.js?v=202611032349"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -116,7 +116,7 @@ APP.ready.then(async () => {
     const [{ data: v }, { data: ls }, { data: ps }] = await Promise.all([sb.from('v_ventas').select('*').eq('id', id).single(), sb.from('venta_lineas').select('*').eq('venta_id', id).order('id'), sb.from('venta_pagos').select('*, formas_pago(nombre), creditos(codigo,tipo)').eq('venta_id', id)]);
     const { data: ncs } = await sb.from('creditos').select('*, clientes(nombre,telefono)').eq('empresa_id', e).eq('origen_venta_id', id);
     const m = modal(`<h2>Ticket #${String(v.numero).padStart(6, '0')} ${ESTADO[v.estado]} ${canalEditable(v.id, v.origen)}</h2><p class="sub">${fmt.fechaHora(v.fecha)} · ${v.vendedora_nombre ? 'atendió ' + esc(v.vendedora_nombre) : 'sin vendedora'}${v.cliente_nombre ? ' · ' + esc(v.cliente_nombre) : ''}${v.referencia ? ' · ref. ' + esc(v.referencia) : ''}${v.nota ? ' · ' + esc(v.nota) : ''}${v.anulada_motivo ? ' · anulada: ' + esc(v.anulada_motivo) : ''}</p>
-      <table class="lista detalle" style="margin-top:10px">${ls.map(l => `<tr><td>${l.cantidad}× ${esc(l.descripcion)}${l.falla ? ' <span title="Prenda con falla" style="color:#8a6400">◆</span>' : ''}<br><small>${esc([l.talle, l.color].filter(Boolean).join(' · '))}${l.promocion_nombre ? ' · ★ ' + esc(l.promocion_nombre) : ''}${l.descuento_pct ? ' · −' + l.descuento_pct + '%' : ''}</small></td><td class="num">${fmt.pesos(l.total)}</td></tr>`).join('')}
+      <table class="lista detalle" style="margin-top:10px">${ls.map(l => `<tr><td>${l.cantidad}× ${esc(l.descripcion)}${l.falla ? ' <span title="Prenda con falla" style="color:#8a6400">◆</span>' : ''}<br><small>${esc([l.talle, l.color].filter(Boolean).join(' · '))}${l.promocion_nombre ? ' · ★ ' + esc(l.promocion_nombre) : ''}${+l.descuento_pct ? ' · ' + fmt.pesos(l.precio_lista) + ' −' + fmt.dec(+l.descuento_pct) + '%' : ''}</small></td><td class="num">${fmt.pesos(l.total)}</td></tr>`).join('')}
       ${+v.descuento ? `<tr><td>Descuento ${v.descuento_pct}%</td><td class="num">−${fmt.pesos(v.descuento)}</td></tr>` : ''}${+v.recargo ? `<tr><td>Recargo</td><td class="num">${fmt.pesos(v.recargo)}</td></tr>` : ''}
       <tr><td><b>Total</b></td><td class="num num-f">${fmt.pesos(v.total)}</td></tr>
       ${ps.map(p => `<tr><td><small>${esc(p.formas_pago ? p.formas_pago.nombre : (p.creditos ? (p.creditos.tipo === 'gift_card' ? 'Gift card ' : 'Nota de crédito ') + p.creditos.codigo : ''))}${p.cuotas > 1 ? ' · ' + p.cuotas + ' cuotas' : ''}</small></td><td class="num"><small>${fmt.pesos(p.monto)}</small></td></tr>`).join('')}
@@ -153,7 +153,7 @@ APP.ready.then(async () => {
   const aLocal = iso => { const d = new Date(iso); const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; };
   async function editarVenta(v, ls, ps) {
     await cargarApoyo();
-    const lineas = ls.map(l => ({ id: l.id, variante_id: l.variante_id, producto_id: l.producto_id, descripcion: l.descripcion, talle: l.talle, color: l.color, cantidad: +l.cantidad, precio_lista: +l.precio_lista, precio_unit: +l.precio_unit, descuento_pct: +l.descuento_pct, costo_unit: +l.costo_unit, promocion_nombre: l.promocion_nombre }));
+    const lineas = ls.map(l => { const pl = +l.precio_lista > 0 && +l.precio_lista >= +l.precio_unit ? +l.precio_lista : +l.precio_unit; return { id: l.id, variante_id: l.variante_id, producto_id: l.producto_id, descripcion: l.descripcion, talle: l.talle, color: l.color, cantidad: +l.cantidad, precio_lista: pl, precio_unit: +l.precio_unit, descuento_pct: pl === +l.precio_lista ? +l.descuento_pct : 0, costo_unit: +l.costo_unit, promocion_nombre: l.promocion_nombre }; });
     const pagosCred = ps.filter(p => p.credito_id), pagosForma = {}, pagosRef = {};
     ps.filter(p => !p.credito_id).forEach(p => { pagosForma[p.forma_pago_id] = r2((pagosForma[p.forma_pago_id] || 0) + +p.monto); if (p.referencia) pagosRef[p.forma_pago_id] = p.referencia; });
     const formasVer = formas.slice(); ps.filter(p => p.forma_pago_id && !formas.some(f => f.id === p.forma_pago_id)).forEach(p => formasVer.push({ id: p.forma_pago_id, nombre: p.formas_pago ? p.formas_pago.nombre : 'Otro' }));
@@ -166,7 +166,7 @@ APP.ready.then(async () => {
         <div class="campo"><label>Referencia</label><input id="e-ref" value="${esc(v.referencia || '')}" placeholder="N° de pedido, remito…"></div>
         <div class="campo"><label>Nota</label><input id="e-nota" value="${esc(v.nota || '')}"></div>
       </div>
-      <table class="ed-lineas"><thead><tr><th>Prenda</th><th class="num">Cant.</th><th class="num">Precio</th><th class="num">Total</th><th></th></tr></thead><tbody id="e-lineas"></tbody></table>
+      <table class="ed-lineas"><thead><tr><th>Prenda</th><th class="num">Cant.</th><th class="num" title="Precio de la lista de la venta">Precio</th><th class="num">Desc %</th><th class="num">Total</th><th></th></tr></thead><tbody id="e-lineas"></tbody></table>
       <div class="ed-busca"><input id="e-busca" placeholder="Agregar prenda: escribí nombre o código…" autocomplete="off"><div class="ed-res" id="e-res" style="display:none"></div></div>
       <div class="ed" style="margin-top:10px"><div class="campo"><label>Descuento general ($)</label><input id="e-desc" type="number" step="1" value="${+v.descuento || 0}"></div><div class="campo"><label>Recargo ($)</label><input id="e-rec" type="number" step="1" value="${+v.recargo || 0}"></div></div>
       <div class="ed-tot"><span>Total de la venta</span><b id="e-total"></b></div>
@@ -186,9 +186,11 @@ APP.ready.then(async () => {
     }
     function pintarLineas() {
       tb.innerHTML = lineas.map((l, i) => `<tr><td>${esc(l.descripcion)}<br><small class="sub">${esc([l.talle, l.color].filter(Boolean).join(' · '))}${l.promocion_nombre ? ' · ★ ' + esc(l.promocion_nombre) : ''}${l.id ? '' : ' · nueva'}</small></td>
-        <td class="num"><input type="number" step="1" data-cant="${i}" value="${l.cantidad}"></td><td class="num"><input type="number" step="1" data-precio="${i}" value="${l.precio_unit}"></td><td class="num">${fmt.pesos(r2(l.cantidad * l.precio_unit))}</td><td><button class="quitar" data-quitar="${i}" title="Quitar">×</button></td></tr>`).join('') || '<tr><td colspan="5" class="vacio">Sin prendas. Agregá al menos una.</td></tr>';
+        <td class="num"><input type="number" step="1" data-cant="${i}" value="${l.cantidad}"></td><td class="num"><input type="number" step="1" data-precio="${i}" value="${l.precio_lista}"></td><td class="num"><input type="number" step="0.1" min="0" max="100" data-dpct="${i}" value="${+l.descuento_pct || 0}" style="width:64px"></td><td class="num">${fmt.pesos(r2(l.cantidad * l.precio_unit))}</td><td><button class="quitar" data-quitar="${i}" title="Quitar">×</button></td></tr>`).join('') || '<tr><td colspan="6" class="vacio">Sin prendas. Agregá al menos una.</td></tr>';
       $$('[data-cant]', tb).forEach(i => i.onchange = () => { lineas[+i.dataset.cant].cantidad = +i.value || 0; pintarLineas(); });
-      $$('[data-precio]', tb).forEach(i => i.onchange = () => { lineas[+i.dataset.precio].precio_unit = +i.value || 0; pintarLineas(); });
+      const cobrar = l => { l.precio_unit = r2(l.precio_lista * (1 - (+l.descuento_pct || 0) / 100)); };
+      $$('[data-precio]', tb).forEach(i => i.onchange = () => { const l = lineas[+i.dataset.precio]; l.precio_lista = +i.value || 0; cobrar(l); pintarLineas(); });
+      $$('[data-dpct]', tb).forEach(i => i.onchange = () => { const l = lineas[+i.dataset.dpct]; l.descuento_pct = Math.min(100, Math.max(0, +i.value || 0)); cobrar(l); pintarLineas(); });
       $$('[data-quitar]', tb).forEach(b => b.onclick = () => { lineas.splice(+b.dataset.quitar, 1); pintarLineas(); });
       pintarTotales();
     }
