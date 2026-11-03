@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Catálogo · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611021438">
+<link rel="stylesheet" href="../shell/shell.css?v=202611032318">
 <style>
   .filtros{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
   .filtros .buscador{flex:1 1 260px;min-width:0}
@@ -86,13 +86,14 @@
   <div class="barra-sel" id="barra-sel" hidden></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611021438"></script>
-<script src="../shell/shell.js?v=202611021438"></script>
+<script src="../shared/supabase.js?v=202611032318"></script>
+<script src="../shell/shell.js?v=202611032318"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id, PAG = 100, admin = APP.esAdmin;
   if (!admin) $$('.solo-admin').forEach(x => x.style.display = 'none');
   else $('#acciones-pagina').innerHTML = `<button class="btn" id="btn-excel">Importar / exportar</button><button class="btn" id="btn-hist">Cambios de precio</button><a class="btn primario" href="producto.html?nuevo=1">+ Nuevo producto</a>`;
+  if (APP.puede('compras')) $('#acciones-pagina').insertAdjacentHTML('afterbegin', '<a class="btn" href="../compras/compra.html" title="Llegó un remito: cargalo y entra al stock">📦 Ingresar mercadería</a>');
   const nrm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 
   const [{ data: cats }, { data: tems }, { data: mars }] = await Promise.all([

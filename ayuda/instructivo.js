@@ -14,6 +14,7 @@ window.INSTRUCTIVO = {
     { id: 'gift', titulo: 'Gift cards', icono: '🎁' },
     { id: 'caja', titulo: 'La caja', icono: '💵' },
     { id: 'consultas', titulo: 'Consultar y corregir', icono: '🔎' },
+    { id: 'compras', titulo: 'Mercadería que llega', icono: '📦' },
     { id: 'atajos', titulo: 'Atajos de teclado', icono: '⌨️' },
     { id: 'palabras', titulo: 'Palabras que vas a ver', icono: '📚' }
   ],
@@ -329,6 +330,24 @@ window.INSTRUCTIVO = {
     { id: 'pendientes', grupo: 'consultas', p: 'vender', titulo: '📌 Pendientes', resumen: 'Las prendas vendidas que quedaron sin definir el modelo.', bloques: [
       { tipo: 'texto', texto: 'Cuando una prenda de código común (ej. BOMBIS «VARIAS») se vendió sin decir qué modelo era, queda en **📌 Pendientes** (arriba de la pantalla, o en el ticket del Punto de venta).' },
       { tipo: 'pasos', items: ['Tocá **📌 Pendientes**.', 'Elegí qué modelo fue cada una (o {{+ BOMBIS «LOCAL»}} si no está en la web).'] }
+    ] },
+
+    // ======================= COMPRAS =======================
+    { id: 'compras-ingresar', grupo: 'compras', p: 'compras', titulo: 'Ingresar mercadería (llegó un remito)', nuevo: '2026-11-03', resumen: 'Se carga como viene el remito y entra sola al stock del local y de la web.', bloques: [
+      { tipo: 'pasos', items: ['Menú **Compras e ingresos** › {{📦 Ingresar mercadería}} (también está en el **Catálogo**).', 'Elegí el **proveedor** y poné el **número de remito**, la **fecha** y el **descuento %** si tiene.', 'Copiá el remito **renglón por renglón**: cómo lo llama el proveedor (ej. **MIA ROSA**), qué prenda es en Augusta y el color.', 'Poné cuántas llegaron de **cada talle** y el **costo** de cada una (el del remito, sin el descuento).', 'Mirá abajo: las **prendas** y el **total** tienen que dar igual que el remito.', 'Tocá {{📦 Ingresar al stock}} › {{Sí, ingresar al stock}}. Al final te ofrece {{🏷️ Imprimir etiquetas}}.'] },
+      { tipo: 'ejemplo', titulo: 'Un renglón del remito de Concepto', filas: [['En el remito', 'MIA · ROSA · S 3 · M 2 · XL 3 · $22.000'], ['Cómo dice el remito', '**MIA ROSA**'], ['Prenda de Augusta', '**PIJAMA «CIELO»**, color **Rosa**'], ['Cantidad por talle', 'S **3** · M **2** · XL **3**'], ['Costo c/u', '**22.000**']] },
+      { tipo: 'texto', texto: 'Al ingresar: el **stock** sube, la **web** se actualiza sola en un minuto, el **costo** de la prenda queda con el descuento del remito y se suma a la **cuenta del proveedor**.' },
+      { tipo: 'ojo', texto: '**No cargues el stock a mano en Tienda Nube.** Percha manda el stock a la web: lo que se carga solo allá se borra con la próxima venta. Todo lo que entra, entra por acá.' },
+      { tipo: 'tip', texto: 'Si llega un **color que la prenda no tiene**, elegí {{+ Color nuevo…}} en el color: se crea ahí mismo con todos sus talles. Si es una **prenda nueva**, tocá {{+ Prenda nueva en el catálogo}}, creala y al volver ya aparece.' }
+    ] },
+    { id: 'compras-nombres', grupo: 'compras', p: 'compras', titulo: 'El proveedor le dice de otra forma', nuevo: '2026-11-03', resumen: 'La primera vez elegís qué prenda es; después Percha la reconoce sola.', bloques: [
+      { tipo: 'texto', texto: 'Cada proveedor tiene sus nombres (para Concepto, **MIA** es el pijama **CIELO** y **MORA** es el **MAGNOLIA**). La primera vez escribís cómo dice el remito y elegís la prenda de Augusta. **Percha lo aprende para ese proveedor.**' },
+      { tipo: 'texto', texto: 'La próxima vez, cuando escribas **MIA ROSA**, te propone **PIJAMA «CIELO» Rosa** y queda marcado **✓ Percha ya lo conocía**. Solo ponés las cantidades.' },
+      { tipo: 'tip', texto: 'Si el remito dice el color (ej. **MORA MINI CHERRY**) y la prenda tiene ese color, Percha lo elige solo.' }
+    ] },
+    { id: 'compras-pedido', grupo: 'compras', p: 'compras', titulo: 'Lo pedido que todavía no llegó', nuevo: '2026-11-03', resumen: 'Se anota como pedido; cuando llega, un toque y entra.', bloques: [
+      { tipo: 'pasos', items: ['**Compras e ingresos** › {{📝 Anotar un pedido}}: cargalo igual que un remito y tocá {{💾 Guardar pedido}}.', 'Queda arriba de todo en **Compras e ingresos**, esperando.', 'Cuando llega, tocá {{📦 Llegó: ingresarlo}}, revisá y {{📦 Ya llegó: ingresar al stock}}.'] },
+      { tipo: 'tip', texto: '¿Llegó **solo una parte**? Cuando pregunta si llegó todo, tocá {{Llegó solo una parte}} y poné cuántas llegaron de cada una. Lo que falta queda esperando en la misma compra.' }
     ] },
 
     // ======================= ATAJOS =======================

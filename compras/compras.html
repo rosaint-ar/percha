@@ -5,35 +5,59 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Compras · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611021438">
+<link rel="stylesheet" href="../shell/shell.css?v=202611032318">
 <style>
-  .filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+  .entradas{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-bottom:14px}
+  .entrada{display:flex;gap:14px;align-items:center;border:1px solid var(--linea);border-radius:16px;padding:16px 18px;background:var(--superficie-2);text-decoration:none;color:var(--tinta);transition:border-color .15s,transform .15s}
+  .entrada:hover{border-color:var(--acento);transform:translateY(-1px)}
+  .entrada.principal{background:var(--acento);border-color:var(--acento);color:#fff}
+  .entrada .ic{font-size:30px;line-height:1}
+  .entrada b{display:block;font:800 17px var(--f-titulo);letter-spacing:-.02em}
+  .entrada small{font-size:12.5px;opacity:.85}
+  .esperando{border:1px solid var(--linea);border-left:4px solid var(--aviso,#e0a100);border-radius:12px;padding:10px 14px;margin-bottom:8px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:var(--superficie-2)}
+  .esperando div{flex:1;min-width:200px;font-size:13.5px}
+  .esperando small{color:var(--tinta-3)}
+  .filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
   .filtros select{border:1px solid var(--linea);background:var(--superficie-2);padding:8px 10px;border-radius:var(--radio-mini)}
   .barra-rec{height:5px;background:var(--relleno);border-radius:3px;margin-top:5px;overflow:hidden}.barra-rec i{display:block;height:100%;background:var(--acento)}
 </style>
 </head>
-<body data-page="compras" data-etq="Compras" data-title="Órdenes de compra" data-subtitle="Lo pedido a cada proveedor y lo que ya entró al stock">
+<body data-page="compras" data-etq="Compras" data-title="Compras" data-subtitle="La mercadería que entra al local: lo que llegó y lo que se pidió a los proveedores">
 <main class="app">
-  <div class="filtros"><select id="f-estado"><option value="">Todas</option><option value="borrador">Borradores</option><option value="pedida">Pedidas</option><option value="parcial">Recibidas en parte</option><option value="recibida">Recibidas</option><option value="anulada">Anuladas</option></select><span class="sub" id="resumen" style="margin-left:auto"></span></div>
-  <div class="card" style="padding:0"><table class="lista" id="tb"><thead><tr><th>Orden</th><th>Fecha</th><th>Proveedor</th><th>Referencia</th><th class="num">Unidades</th><th class="num">Total</th><th>Estado</th></tr></thead><tbody></tbody></table></div>
+  <div class="entradas">
+    <a class="entrada principal" href="compra.html"><span class="ic">📦</span><span><b>Ingresar mercadería</b><small>Llegó un remito: cargalo y entra al stock y a la web</small></span></a>
+    <a class="entrada" href="compra.html?pedido=1"><span class="ic">📝</span><span><b>Anotar un pedido</b><small>Le pediste algo a un proveedor y todavía no llegó</small></span></a>
+    <a class="entrada" href="proveedores.html"><span class="ic">🏭</span><span><b>Proveedores</b><small>Datos y cuenta de cada uno</small></span></a>
+  </div>
+  <div id="esperando"></div>
+  <div class="card" style="padding:0">
+    <div class="filtros" style="padding:12px 14px 0"><select id="f-estado"><option value="">Todas</option><option value="recibida">Ingresadas</option><option value="esperando">Esperando que lleguen</option><option value="parcial">Llegó una parte</option><option value="anulada">Anuladas</option></select><span class="sub" id="resumen" style="margin-left:auto"></span></div>
+    <table class="lista" id="tb"><thead><tr><th>Nº</th><th>Fecha</th><th>Proveedor</th><th>Remito</th><th class="num">Prendas</th><th class="num">Total</th><th>Estado</th></tr></thead><tbody></tbody></table>
+  </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611021438"></script>
-<script src="../shell/shell.js?v=202611021438"></script>
+<script src="../shared/supabase.js?v=202611032318"></script>
+<script src="../shell/shell.js?v=202611032318"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, mensajeError } = APP, e = APP.empresa.id;
-  if (!APP.esAdmin) { $('main').innerHTML = '<div class="card"><p>Las compras las maneja administración.</p></div>'; return; }
-  $('#acciones-pagina').innerHTML = `<a class="btn" href="proveedores.html">Proveedores</a><a class="btn primario" href="compra.html?nueva=1">+ Nueva orden</a>`;
-  const ESTADO = { borrador: '<span class="chip gris">borrador</span>', pedida: '<span class="chip">pedida</span>', parcial: '<span class="chip aviso">en parte</span>', recibida: '<span class="chip ok">recibida</span>', anulada: '<span class="chip error">anulada</span>' };
+  if (!APP.puede('compras')) { $('main').innerHTML = '<div class="card"><p>Para ver las compras hace falta el permiso <b>Compras</b> (Configuración › Usuarios).</p></div>'; return; }
+  const ESTADO = { borrador: '<span class="chip gris">pedido sin enviar</span>', pedida: '<span class="chip aviso">esperando</span>', parcial: '<span class="chip aviso">llegó una parte</span>', recibida: '<span class="chip ok">ingresada</span>', anulada: '<span class="chip error">anulada</span>' };
+  const nro = x => '#' + String(x.numero).padStart(5, '0');
   async function cargar() {
-    let c = sb.from('v_compras').select('*').eq('empresa_id', e).order('numero', { ascending: false }).limit(300);
-    if ($('#f-estado').value) c = c.eq('estado', $('#f-estado').value);
+    let c = sb.from('v_compras').select('*').eq('empresa_id', e).order('fecha', { ascending: false }).order('numero', { ascending: false }).limit(300);
+    const f = $('#f-estado').value;
+    if (f === 'esperando') c = c.in('estado', ['borrador', 'pedida']); else if (f) c = c.eq('estado', f);
     const { data, error } = await c; if (error) { toast(mensajeError(error), 'error'); return; }
-    const tb = $('#tb tbody'); tb.innerHTML = (data || []).map(x => { const pct = +x.unidades ? Math.round(100 * x.unidades_recibidas / x.unidades) : 0;
-      return `<tr class="clic" data-id="${x.id}"><td class="mono">#${String(x.numero).padStart(5, '0')}</td><td>${fmt.fecha(x.fecha)}</td><td>${esc(x.proveedor || '—')}</td><td><small>${esc(x.referencia || '')}</small></td><td class="num">${fmt.num(x.unidades_recibidas)} / ${fmt.num(x.unidades)}<div class="barra-rec"><i style="width:${pct}%"></i></div></td><td class="num num-f">${fmt.pesos(x.total)}</td><td>${ESTADO[x.estado] || x.estado}</td></tr>`; }).join('') || '<tr><td colspan="7" class="vacio">Todavía no hay órdenes de compra. Creá la primera con "+ Nueva orden".</td></tr>';
+    const tb = $('#tb tbody');
+    tb.innerHTML = (data || []).map(x => { const pct = +x.unidades ? Math.round(100 * x.unidades_recibidas / x.unidades) : 0;
+      return `<tr class="clic" data-id="${x.id}"><td class="mono">${nro(x)}</td><td>${fmt.fecha(x.fecha)}</td><td>${esc(x.proveedor || '—')}</td><td><small>${esc(x.referencia || '')}</small></td><td class="num">${x.estado === 'recibida' ? fmt.num(x.unidades) : fmt.num(x.unidades_recibidas) + ' / ' + fmt.num(x.unidades) + `<div class="barra-rec"><i style="width:${pct}%"></i></div>`}</td><td class="num num-f">${fmt.pesos(x.total)}</td><td>${ESTADO[x.estado] || x.estado}</td></tr>`; }).join('')
+      || '<tr><td colspan="7" class="vacio">Todavía no hay compras. Cuando llegue mercadería, tocá <b>📦 Ingresar mercadería</b>.</td></tr>';
     $$('tr[data-id]', tb).forEach(tr => tr.onclick = () => location.href = `compra.html?id=${tr.dataset.id}`);
-    $('#resumen').textContent = `${(data || []).length} órdenes`;
+    $('#resumen').textContent = `${(data || []).length} compras`;
+    // arriba, lo que se pidió y todavía no entró: un toque y se ingresa
+    const { data: esp } = await sb.from('v_compras').select('*').eq('empresa_id', e).in('estado', ['borrador', 'pedida', 'parcial']).order('fecha');
+    $('#esperando').innerHTML = (esp || []).map(x => `<div class="esperando"><div><b>${esc(x.proveedor || 'Sin proveedor')}</b> · pedido ${nro(x)} del ${fmt.fecha(x.fecha)}${x.entrega_estimada ? ' · llegaba el ' + fmt.fecha(x.entrega_estimada) : ''}<br><small>${fmt.num(x.unidades - x.unidades_recibidas)} prendas por llegar · ${fmt.pesos(x.total)}</small></div><a class="btn primario chico" href="compra.html?id=${x.id}">📦 Llegó: ingresarlo</a></div>`).join('');
   }
   $('#f-estado').onchange = cargar; await cargar();
 });

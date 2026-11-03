@@ -3,195 +3,374 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Orden de compra · Percha</title>
+<title>Ingresar mercadería · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611021438">
+<link rel="stylesheet" href="../shell/shell.css?v=202611032318">
 <style>
-  .dos{display:grid;grid-template-columns:1fr 340px;gap:14px;align-items:start}
-  .lineas td input{width:80px;text-align:right;font-family:var(--f-mono);border:1px solid var(--linea);border-radius:7px;padding:5px 7px}
-  .lineas td .x{border:0;background:transparent;color:var(--error);cursor:pointer;font-weight:700}
-  .lineas tr.recibida td{opacity:.7}
-  .totales div{display:flex;justify-content:space-between;padding:4px 0;font-size:13px;color:var(--tinta-2)}
-  .totales .gran{font:800 24px var(--f-titulo);letter-spacing:-.03em;color:var(--tinta);border-top:1px solid var(--linea);margin-top:6px;padding-top:8px}
-  .totales .gran span:last-child{font-family:var(--f-mono);font-weight:700}
-  .agregar{display:flex;gap:8px;align-items:center;margin-bottom:10px}
-  .agregar .buscador{flex:1;min-width:0}
-  .sugerencias{position:absolute;z-index:5;background:var(--superficie-2);border:1px solid var(--linea);border-radius:var(--radio-chico);box-shadow:var(--sombra-flotante);max-height:280px;overflow:auto;width:min(520px,90vw)}
-  .sugerencias div{padding:8px 12px;cursor:pointer;font-size:13.5px}.sugerencias div:hover{background:var(--lila)}.sugerencias small{font-family:var(--f-mono);color:var(--tinta-3)}
-  .reparto{display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:6px;margin-top:8px}
-  .reparto label{font:600 11px var(--f-mono);color:var(--tinta-3);display:block;text-align:center}
-  .reparto input{width:100%;text-align:center;font-family:var(--f-mono);border:1px solid var(--linea);border-radius:7px;padding:5px}
-  .colores{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
-  .colores label{border:1px solid var(--linea);border-radius:8px;padding:4px 8px;font:600 12px var(--f-ui);cursor:pointer}
-  .colores label:has(input:checked){background:var(--lila);border-color:transparent;color:var(--acento)}
-  .colores input{display:none}
-  .estado-cab{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-  @media (max-width:900px){.dos{grid-template-columns:1fr}}
+  /* Ingresar mercadería: se carga como viene el remito (un renglón por artículo y color, cantidades por talle) */
+  .cab-compra{display:grid;grid-template-columns:minmax(220px,1.4fr) 1fr 150px 110px;gap:12px;align-items:end}
+  .cab-compra .campo{margin:0}
+  .prov-fila{display:flex;gap:6px}.prov-fila select{flex:1;min-width:0}
+  .cab-mas{display:grid;grid-template-columns:1fr 170px;gap:12px;margin-top:10px}
+  .cab-mas .campo{margin:0}
+  .renglones{display:grid;gap:8px}
+  .rg{display:grid;grid-template-columns:170px minmax(220px,1fr) 160px auto 110px 96px 28px;gap:10px;align-items:start;border:1px solid var(--linea);border-radius:12px;padding:10px 12px;background:var(--superficie-2)}
+  .rg.cab{border:0;background:transparent;padding:0 12px;font:700 11px var(--f-ui);text-transform:uppercase;letter-spacing:.04em;color:var(--tinta-3)}
+  .rg input,.rg select{width:100%;border:1px solid var(--linea);border-radius:8px;padding:7px 9px;font:500 13.5px var(--f-ui);background:var(--superficie);color:var(--tinta)}
+  .rg input:disabled,.rg select:disabled{opacity:.6}
+  .rg .art{font-family:var(--f-mono);text-transform:uppercase}
+  .rg .prenda b{display:block;font:700 13.5px var(--f-ui);line-height:1.25}
+  .rg .prenda small{color:var(--tinta-3);font-size:11.5px}
+  .rg .prenda a{color:var(--acento);cursor:pointer;text-decoration:underline}
+  .rg .aprendio{display:inline-block;margin-top:4px;font:600 11px var(--f-ui);color:var(--acento);background:var(--lila);border-radius:999px;padding:2px 8px}
+  .talles{display:flex;gap:5px;flex-wrap:wrap}
+  .talles label{display:flex;flex-direction:column;align-items:center;gap:2px;font:700 10.5px var(--f-mono);color:var(--tinta-3)}
+  .talles input{width:46px;text-align:center;font-family:var(--f-mono);padding:6px 2px}
+  .talles input.hay{border-color:var(--acento);background:var(--lila)}
+  .talles .vacio-t{font-size:12px;color:var(--tinta-3);padding-top:16px}
+  .rg .costo{text-align:right;font-family:var(--f-mono)}
+  .rg .tot{text-align:right;font:700 13.5px var(--f-mono);padding-top:8px}
+  .rg .tot small{display:block;font:500 11px var(--f-ui);color:var(--tinta-3)}
+  .rg .x{border:0;background:transparent;color:var(--tinta-3);cursor:pointer;font-size:18px;padding-top:6px}
+  .rg .x:hover{color:var(--error)}
+  .rg.falta{border-color:var(--aviso,#e0a100)}
+  .agregar-rg{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .sugerencias{position:fixed;z-index:50;background:var(--superficie-2);border:1px solid var(--linea);border-radius:var(--radio-chico);box-shadow:var(--sombra-flotante);max-height:320px;overflow:auto;width:min(460px,92vw)}
+  .sugerencias .sg-t{padding:7px 12px 3px;font:700 10.5px var(--f-ui);text-transform:uppercase;letter-spacing:.05em;color:var(--tinta-3)}
+  .sugerencias div[data-i]{padding:8px 12px;cursor:pointer;font-size:13.5px}
+  .sugerencias div[data-i].on,.sugerencias div[data-i]:hover{background:var(--lila)}
+  .sugerencias small{font-family:var(--f-mono);color:var(--tinta-3)}
+  .resumen-compra{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;margin-top:14px;padding-top:12px;border-top:1px solid var(--linea)}
+  .resumen-compra .cifras{display:flex;gap:22px;flex-wrap:wrap}
+  .resumen-compra .cifras div{font-size:12px;color:var(--tinta-3)}
+  .resumen-compra .cifras b{display:block;font:800 20px var(--f-titulo);color:var(--tinta);letter-spacing:-.02em}
+  .resumen-compra .cifras .gran b{font-size:26px}
+  .botones{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+  .ayuda-remito{font-size:12.5px;color:var(--tinta-3);margin:2px 0 12px}
+  .listo{text-align:center;padding:6px 4px}
+  .listo .ok{font-size:44px;line-height:1}
+  @media (max-width:1150px){
+    .rg{grid-template-columns:1fr 1fr 28px;grid-template-areas:"art prenda x" "color color color" "talles talles talles" "costo tot tot"}
+    .rg.cab{display:none}
+    .rg>.c-art{grid-area:art}.rg>.c-prenda{grid-area:prenda}.rg>.c-color{grid-area:color}.rg>.c-talles{grid-area:talles}.rg>.c-costo{grid-area:costo}.rg>.tot{grid-area:tot}.rg>.x{grid-area:x}
+    .cab-compra{grid-template-columns:1fr 1fr}
+  }
+  @media (max-width:640px){.cab-compra,.cab-mas{grid-template-columns:1fr}}
 </style>
 </head>
-<body data-page="compras" data-etq="Compras" data-title="Orden de compra">
+<body data-page="compras" data-etq="Compras" data-title="Ingresar mercadería" data-subtitle="Cargá lo que dice el remito, renglón por renglón: Percha lo pasa al stock y a la web">
 <main class="app">
-  <div class="dos">
-    <div>
-      <div class="card">
-        <div class="card-cab"><div><h2>Mercadería</h2><p class="sub">Elegí la prenda, los colores y la curva: se arma una línea por talle y color.</p></div></div>
-        <div class="agregar"><div class="buscador"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" placeholder="Buscar prenda por nombre o código…" autocomplete="off"></div><a class="btn" href="../catalogo/producto.html?nuevo=1" target="_blank">+ Prenda nueva</a></div>
-        <div id="sug" class="sugerencias" style="display:none"></div>
-        <table class="lista lineas" id="tb"><thead><tr><th>Prenda</th><th>Talle · color</th><th class="num">Pedida</th><th class="num">Recibida</th><th class="num">Costo</th><th class="num">Total</th><th></th></tr></thead><tbody></tbody></table>
-      </div>
+  <div class="card">
+    <div class="cab-compra">
+      <div class="campo"><label>Proveedor</label><div class="prov-fila"><select id="proveedor"><option value="">— Elegí el proveedor —</option></select><button class="btn chico" id="btn-prov" title="Agregar un proveedor nuevo">+ Nuevo</button></div></div>
+      <div class="campo"><label>Remito o factura nº</label><input id="referencia" placeholder="Ej: 0001-00012345"></div>
+      <div class="campo"><label>Fecha</label><input id="fecha" type="date"></div>
+      <div class="campo"><label>Descuento %</label><input id="descuento" inputmode="decimal" placeholder="0"></div>
     </div>
-    <aside>
-      <div class="card">
-        <div class="card-cab"><div><h2 id="titulo">Nueva orden</h2><div class="estado-cab" id="estado"></div></div></div>
-        <div class="campo"><label>Proveedor</label><select id="proveedor"><option value="">—</option></select></div>
-        <div class="fila c2"><div class="campo"><label>Fecha</label><input id="fecha" type="date"></div><div class="campo"><label>Entrega estimada</label><input id="entrega" type="date"></div></div>
-        <div class="fila c2"><div class="campo"><label>Referencia (factura / remito)</label><input id="referencia"></div><div class="campo"><label>Depósito</label><select id="deposito"></select></div></div>
-        <div class="fila c2"><div class="campo"><label>Descuento %</label><input id="descuento" type="number" min="0" max="100" value="0"></div></div>
-        <div class="campo"><label>Nota</label><input id="nota"></div>
-        <div class="totales" id="totales"></div>
-        <div class="acciones" id="acciones" style="margin-top:14px;flex-direction:column;align-items:stretch;gap:8px"></div>
-      </div>
-    </aside>
+    <div class="cab-mas">
+      <div class="campo"><label>Nota</label><input id="nota" placeholder="Ej: seña pagada $63.750, faltó algo, etc."></div>
+      <div class="campo" id="campo-entrega"><label>Llega el (si es un pedido)</label><input id="entrega" type="date"></div>
+      <select id="deposito" hidden></select>
+    </div>
   </div>
+  <div class="card">
+    <div class="card-cab"><div><h2>Lo que dice el remito</h2><p class="ayuda-remito" id="ayuda">Un renglón por cada artículo y color, como en el remito. Escribí cómo lo llama el proveedor y elegí qué prenda es en Augusta: <b>la próxima vez Percha la reconoce sola</b>.</p></div></div>
+    <div class="renglones" id="renglones"></div>
+    <div class="agregar-rg" id="agregar"><button class="btn" id="btn-rg">+ Otro renglón</button><a class="btn suave" href="../catalogo/producto.html?nuevo=1" target="_blank" title="Se abre en otra pestaña; al volver ya aparece para elegir">+ Prenda nueva en el catálogo</a></div>
+    <div class="resumen-compra"><div class="cifras" id="cifras"></div><div class="botones" id="acciones"></div></div>
+  </div>
+  <div id="sug" class="sugerencias" style="display:none"></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611021438"></script>
-<script src="../shell/shell.js?v=202611021438"></script>
+<script src="../shared/supabase.js?v=202611032318"></script>
+<script src="../shell/shell.js?v=202611032318"></script>
+<script src="../shared/precios.js?v=202611032318"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
-  if (!APP.esAdmin) { $('main').innerHTML = '<div class="card"><p>Las compras las maneja administración.</p></div>'; return; }
-  const params = new URLSearchParams(location.search); let id = params.get('id');
+  if (!APP.puede('compras')) { $('main').innerHTML = '<div class="card"><p>Para ingresar mercadería hace falta el permiso <b>Compras</b> (Configuración › Usuarios).</p></div>'; return; }
+  const params = new URLSearchParams(location.search); let id = params.get('id'); const modoPedido = params.has('pedido');
   const r2 = n => Math.round((+n || 0) * 100) / 100;
-  let compra = null, lineas = [], productos = [], variantes = [], talles = [], colores = [], curvas = [], proveedores = [], depositos = [];
-  const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const num = t => PRECIOS.num(t);
+  const ver = n => (+n ? (+n).toLocaleString('es-AR', { maximumFractionDigits: 2 }) : '');
+  const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+  let compra = null, filas = [], productos = [], porProducto = new Map(), varPorId = new Map(), proveedores = [], aprendido = [], depositos = [];
 
+  // ---------- datos ----------
   async function paginar(q, pag = 1000) { let d = 0, t = []; while (true) { const { data, error } = await q().range(d, d + pag - 1); if (error) throw error; t = t.concat(data || []); if (!data || data.length < pag) break; d += pag; } return t; }
-  const [pr, dp, at, cv] = await Promise.all([
+  async function cargarCatalogo() {
+    const [ps, vs] = await Promise.all([
+      paginar(() => sb.from('productos').select('id,codigo,nombre,costo,precio,tiene_variantes').eq('empresa_id', e).eq('activo', true).order('nombre')),
+      paginar(() => sb.from('v_variantes').select('id,producto_id,talle,talle_nombre,talle_orden,color,color_nombre,stock,activa').eq('empresa_id', e))
+    ]);
+    productos = ps; porProducto = new Map(); varPorId = new Map();
+    vs.forEach(v => { varPorId.set(v.id, v); if (!v.activa) return; if (!porProducto.has(v.producto_id)) porProducto.set(v.producto_id, []); porProducto.get(v.producto_id).push(v); });
+  }
+  async function cargarAprendido() { const { data } = await sb.from('proveedor_articulos').select('*').eq('empresa_id', e).order('veces', { ascending: false }); aprendido = data || []; }
+  const [pr, dp] = await Promise.all([
     sb.from('proveedores').select('id,nombre').eq('empresa_id', e).eq('activo', true).order('nombre'),
     sb.from('depositos').select('*').eq('empresa_id', e).eq('activo', true).order('principal', { ascending: false }),
-    sb.from('atributos').select('*').eq('empresa_id', e).eq('activo', true).order('orden'),
-    sb.from('curvas').select('*').eq('empresa_id', e).eq('activa', true).order('nombre')
+    cargarCatalogo(), cargarAprendido()
   ]);
-  proveedores = pr.data || []; depositos = dp.data || []; talles = (at.data || []).filter(a => a.tipo === 'talle'); colores = (at.data || []).filter(a => a.tipo === 'color'); curvas = cv.data || [];
-  [productos, variantes] = await Promise.all([
-    paginar(() => sb.from('productos').select('id,codigo,nombre,costo,tiene_variantes,activo').eq('empresa_id', e).eq('activo', true).order('nombre')),
-    paginar(() => sb.from('v_variantes').select('id,producto_id,talle,talle_nombre,talle_orden,color,color_nombre,stock,costo,activa').eq('empresa_id', e).eq('activa', true))
-  ]);
-  $('#proveedor').innerHTML += proveedores.map(p => `<option value="${p.id}">${esc(p.nombre)}</option>`).join('');
+  proveedores = pr.data || []; depositos = dp.data || [];
+  const pintarProveedores = sel => { $('#proveedor').innerHTML = '<option value="">— Elegí el proveedor —</option>' + proveedores.map(p => `<option value="${p.id}">${esc(p.nombre)}</option>`).join(''); if (sel) $('#proveedor').value = sel; };
+  pintarProveedores();
   $('#deposito').innerHTML = depositos.map(d => `<option value="${d.id}">${esc(d.nombre)}</option>`).join('');
-  $('#fecha').value = new Date().toISOString().slice(0, 10);
+  if (depositos.length > 1) $('#deposito').hidden = false;
+  $('#fecha').value = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 
-  // ---------- cargar ----------
+  // al volver de crear una prenda en otra pestaña, ya aparece para elegir
+  let ultimaRecarga = Date.now();
+  window.addEventListener('focus', async () => { if (Date.now() - ultimaRecarga < 4000) return; ultimaRecarga = Date.now(); await cargarCatalogo(); pintar(); });
+
+  // ---------- ayudas de una prenda ----------
+  const prod = idp => productos.find(p => p.id === idp);
+  const tallesDe = idp => { const m = new Map(); (porProducto.get(idp) || []).forEach(v => { const k = v.talle || ''; if (!m.has(k)) m.set(k, { k, nombre: v.talle_nombre || '', orden: v.talle_orden ?? 999 }); }); return [...m.values()].sort((a, b) => a.orden - b.orden); };
+  const coloresDe = idp => { const m = new Map(); (porProducto.get(idp) || []).forEach(v => { if (v.color && !m.has(v.color)) m.set(v.color, { k: v.color, nombre: v.color_nombre }); }); return [...m.values()].sort((a, b) => a.nombre.localeCompare(b.nombre)); };
+  const varDe = (idp, color, talle) => (porProducto.get(idp) || []).find(v => (v.color || '') === (color || '') && (v.talle || '') === (talle || ''));
+  // el color que dice el remito ("MIA ROSA" → Rosa), si la prenda lo tiene
+  const colorDelTexto = (idp, txt) => { const t = ' ' + norm(txt) + ' '; return coloresDe(idp).filter(c => t.includes(' ' + norm(c.nombre) + ' ')).sort((a, b) => b.nombre.length - a.nombre.length)[0]; };
+  const aprendidoDe = txt => { const prov = $('#proveedor').value, t = norm(txt); return prov && t ? aprendido.find(a => a.proveedor_id === prov && a.texto === t) : null; };
+
+  const filaVacia = () => ({ art: '', producto_id: null, color: '', cant: {}, costo: 0, recibida: {} });
+  const unidades = f => Object.values(f.cant).reduce((s, n) => s + (+n || 0), 0);
+  const cerrada = () => compra && ['recibida', 'anulada', 'parcial'].includes(compra.estado);
+
+  // ---------- cargar una compra guardada ----------
   async function cargar() {
-    if (!id) { pintar(); return; }
+    if (!id) { filas = [filaVacia(), filaVacia(), filaVacia()]; pintarCabecera(); pintar(); return; }
     const [{ data: c }, { data: ls }] = await Promise.all([sb.from('v_compras').select('*').eq('id', id).single(), sb.from('compra_lineas').select('*').eq('compra_id', id).order('id')]);
-    if (!c) { toast('No existe la orden', 'error'); return; }
-    compra = c; lineas = (ls || []).map(l => ({ linea_id: l.id, variante_id: l.variante_id, producto_id: l.producto_id, descripcion: l.descripcion, talle: l.talle, color: l.color, pedida: +l.pedida, recibida: +l.recibida, costo_unit: +l.costo_unit }));
-    $('#proveedor').value = c.proveedor_id || ''; $('#fecha').value = c.fecha; $('#entrega').value = c.entrega_estimada || ''; $('#referencia').value = c.referencia || ''; $('#deposito').value = c.deposito_id || $('#deposito').value; $('#descuento').value = c.descuento_pct; $('#nota').value = c.nota || '';
-    $('#titulo').textContent = `Orden #${String(c.numero).padStart(5, '0')}`; document.title = $('#titulo').textContent + ' · Percha';
-    pintar();
+    if (!c) { toast('No existe esa compra', 'error'); return; }
+    compra = c;
+    $('#proveedor').value = c.proveedor_id || ''; $('#fecha').value = c.fecha; $('#entrega').value = c.entrega_estimada || ''; $('#referencia').value = c.referencia || '';
+    $('#deposito').value = c.deposito_id || $('#deposito').value; $('#descuento').value = ver(c.descuento_pct); $('#nota').value = c.nota || '';
+    // un renglón por prenda + color + nombre del proveedor, como en el remito
+    const g = new Map();
+    (ls || []).forEach(l => {
+      const v = varPorId.get(l.variante_id) || {}, k = [l.producto_id, v.color || '', l.articulo_prov || ''].join('|');
+      if (!g.has(k)) g.set(k, { art: l.articulo_prov || '', producto_id: l.producto_id, color: v.color || '', cant: {}, recibida: {}, costo: +l.costo_unit });
+      const f = g.get(k); f.cant[v.talle || ''] = (f.cant[v.talle || ''] || 0) + +l.pedida; f.recibida[v.talle || ''] = (f.recibida[v.talle || ''] || 0) + +l.recibida;
+    });
+    filas = [...g.values()]; if (!cerrada()) filas.push(filaVacia());
+    pintarCabecera(); pintar();
   }
-  const cerrada = () => compra && ['recibida', 'anulada'].includes(compra.estado);
+  function pintarCabecera() {
+    const ESTADO = { borrador: 'pedido sin enviar', pedida: 'esperando que llegue', parcial: 'llegó una parte', recibida: 'ingresada al stock', anulada: 'anulada' };
+    const t = compra ? `Compra #${String(compra.numero).padStart(5, '0')} · ${ESTADO[compra.estado] || compra.estado}` : (modoPedido ? 'Nuevo pedido a un proveedor' : 'Ingresar mercadería');
+    const h = document.querySelector('.cabecera h1, header h1, h1'); if (h) h.textContent = t; document.title = t + ' · Percha';
+    const pedido = modoPedido || (compra && ['borrador', 'pedida'].includes(compra.estado));
+    $('#campo-entrega').style.visibility = pedido ? '' : 'hidden';
+    $$('#proveedor,#referencia,#fecha,#descuento,#nota,#entrega,#btn-prov').forEach(x => x.disabled = !!cerrada());
+    $('#agregar').style.display = cerrada() ? 'none' : '';
+  }
+
+  // ---------- los renglones ----------
   function pintar() {
-    const ESTADO = { borrador: '<span class="chip gris">borrador</span>', pedida: '<span class="chip">pedida al proveedor</span>', parcial: '<span class="chip aviso">recibida en parte</span>', recibida: '<span class="chip ok">recibida</span>', anulada: '<span class="chip error">anulada</span>' };
-    $('#estado').innerHTML = compra ? ESTADO[compra.estado] + ` <small class="sub">${fmt.fecha(compra.creado)}</small>` : '<span class="chip gris">sin guardar</span>';
-    const tb = $('#tb tbody');
-    tb.innerHTML = lineas.map((l, i) => `<tr class="${l.recibida >= l.pedida && l.pedida > 0 ? 'recibida' : ''}"><td>${esc(l.descripcion)}</td><td><small>${esc([l.talle, l.color].filter(Boolean).join(' · ') || 'único')}</small></td>
-      <td class="num"><input type="number" min="${l.recibida}" value="${l.pedida}" data-i="${i}" data-k="pedida" ${cerrada() ? 'disabled' : ''}></td><td class="num">${fmt.num(l.recibida)}</td>
-      <td class="num"><input type="number" min="0" step="0.01" value="${l.costo_unit}" data-i="${i}" data-k="costo_unit" ${cerrada() ? 'disabled' : ''}></td><td class="num num-f">${fmt.pesos(l.pedida * l.costo_unit)}</td>
-      <td>${!cerrada() && !l.recibida ? `<button class="x" data-x="${i}">×</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="7" class="vacio">Sin líneas todavía. Buscá una prenda arriba.</td></tr>';
-    $$('input[data-k]', tb).forEach(inp => inp.onchange = () => { lineas[+inp.dataset.i][inp.dataset.k] = +inp.value || 0; pintar(); });
-    $$('[data-x]', tb).forEach(b => b.onclick = () => { lineas.splice(+b.dataset.x, 1); pintar(); });
-    const sub = lineas.reduce((s, l) => s + l.pedida * l.costo_unit, 0), desc = +$('#descuento').value || 0, tot = r2(sub * (1 - desc / 100));
-    const u = lineas.reduce((s, l) => s + l.pedida, 0), ur = lineas.reduce((s, l) => s + l.recibida, 0);
-    $('#totales').innerHTML = `<div><span>${fmt.num(u)} unidades · ${fmt.num(ur)} recibidas</span><span></span></div><div><span>Subtotal</span><span class="mono">${fmt.pesos(sub)}</span></div>${desc ? `<div><span>Descuento ${desc}%</span><span class="mono">−${fmt.pesos(sub - tot)}</span></div>` : ''}<div class="gran"><span>Total</span><span>${fmt.pesos(tot)}</span></div>`;
-    const a = $('#acciones'); a.innerHTML = '';
-    if (cerrada()) { a.innerHTML = `<a class="btn" href="compras.html">← Volver</a>${compra.estado === 'recibida' ? '<button class="btn suave" id="btn-etq">Etiquetas de lo recibido</button>' : ''}`; }
-    else {
-      a.innerHTML = `<button class="btn primario" id="btn-recibir" ${!id ? 'disabled title="Guardá primero"' : ''}>Recibir mercadería</button>
-        <button class="btn" id="btn-guardar">${id ? 'Guardar cambios' : 'Guardar orden'}</button>
-        ${id && compra.estado === 'borrador' ? '<button class="btn" id="btn-pedida">Marcar como pedida</button>' : ''}
-        ${compra && compra.unidades_recibidas > 0 ? '<button class="btn suave" id="btn-etq">Etiquetas de lo recibido</button>' : ''}
-        ${id ? '<button class="btn peligro" id="btn-anular">Anular orden</button>' : ''}<a class="btn" href="compras.html">← Volver</a>`;
-    }
-    const g = $('#btn-guardar'); if (g) g.onclick = () => guardar();
-    const p = $('#btn-pedida'); if (p) p.onclick = () => guardar('pedida');
-    const rb = $('#btn-recibir'); if (rb) rb.onclick = recibir;
-    const an = $('#btn-anular'); if (an) an.onclick = async () => { if (!await confirmar('¿Anular esta orden?', 'Anular')) return; const { error } = await sb.rpc('compras_anular', { p_compra: id }); if (error) { toast(mensajeError(error), 'error'); return; } toast('Orden anulada'); cargar(); };
-    const et = $('#btn-etq'); if (et) et.onclick = () => { const cola = JSON.parse(localStorage.getItem('augusta_etiquetas') || '[]'); lineas.filter(l => l.recibida > 0 && l.variante_id).forEach(l => { const ya = cola.find(c => c.variante_id === l.variante_id); if (ya) ya.cantidad = l.recibida; else cola.push({ variante_id: l.variante_id, cantidad: l.recibida }); }); localStorage.setItem('augusta_etiquetas', JSON.stringify(cola)); toast('Agregadas a la cola de etiquetas'); setTimeout(() => location.href = '../catalogo/etiquetas.html', 500); };
+    const ro = !!cerrada();
+    $('#renglones').innerHTML = `<div class="rg cab"><div>Cómo dice el remito</div><div>Prenda de Augusta</div><div>Color</div><div>Cantidad por talle</div><div style="text-align:right">Costo c/u</div><div style="text-align:right">Total</div><div></div></div>` +
+      filas.map((f, i) => {
+        const p = f.producto_id && prod(f.producto_id), ap = f.art && aprendidoDe(f.art), cols = p ? coloresDe(p.id) : [], ts = p ? tallesDe(p.id) : [];
+        const u = unidades(f), rec = Object.values(f.recibida || {}).reduce((s, n) => s + n, 0);
+        return `<div class="rg" data-f="${i}">
+          <div class="c-art"><input class="art" data-art="${i}" value="${esc(f.art)}" placeholder="Ej: MIA ROSA" autocomplete="off" ${ro ? 'disabled' : ''}></div>
+          <div class="c-prenda prenda">${p ? `<b>${esc(p.nombre)}</b><small>${esc(p.codigo)}${+p.precio ? ' · se vende a ' + fmt.pesos(p.precio) : ''}${ro ? '' : ` · <a data-cambiar="${i}">cambiar</a>`}</small>${ap && ap.producto_id === p.id ? '<br><span class="aprendio">✓ Percha ya lo conocía</span>' : ''}`
+            : `<input class="buscar" data-buscar="${i}" placeholder="Buscá la prenda: nombre o código…" autocomplete="off" ${ro ? 'disabled' : ''}>`}</div>
+          <div class="c-color">${p && cols.length ? `<select data-color="${i}" ${ro ? 'disabled' : ''}><option value="">— Elegí el color —</option>${cols.map(c => `<option value="${esc(c.k)}" ${c.k === f.color ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}<option value="+">+ Color nuevo…</option></select>`
+            : p ? `<select data-color="${i}" ${ro ? 'disabled' : ''}><option value="">Sin color</option><option value="+">+ Color nuevo…</option></select>` : ''}</div>
+          <div class="c-talles">${p ? `<div class="talles">${ts.map(t => { const v = varDe(p.id, f.color, t.k), n = f.cant[t.k] || ''; return `<label title="${v ? '' : 'Esta prenda no tiene ese talle en ese color'}"><span>${esc(t.nombre || 'Cant.')}</span><input data-cant="${i}" data-t="${esc(t.k)}" inputmode="numeric" value="${n}" class="${n ? 'hay' : ''}" ${!v || ro || (cols.length && !f.color) ? 'disabled' : ''}></label>`; }).join('')}</div>${cols.length && !f.color && !ro ? '<span class="vacio-t">Elegí el color primero</span>' : ''}` : ''}</div>
+          <div class="c-costo">${p ? `<input class="costo" data-costo="${i}" inputmode="decimal" value="${ver(f.costo)}" placeholder="0" ${ro ? 'disabled' : ''}>` : ''}</div>
+          <div class="tot">${u ? fmt.pesos(u * f.costo) + `<small>${u} u.${compra && compra.estado === 'parcial' ? ' · llegaron ' + rec : ''}</small>` : ''}</div>
+          <div>${ro ? '' : `<button class="x" data-x="${i}" title="Quitar el renglón">×</button>`}</div></div>`;
+      }).join('');
+    enganchar(); totales(); botones();
   }
-  $('#descuento').onchange = pintar;
+  function totales() {
+    const u = filas.reduce((s, f) => s + unidades(f), 0), sub = filas.reduce((s, f) => s + unidades(f) * f.costo, 0), d = num($('#descuento').value), tot = r2(sub * (1 - d / 100));
+    $('#cifras').innerHTML = `<div><b>${u}</b>prendas</div><div><b>${fmt.pesos(sub)}</b>subtotal</div>${d ? `<div><b>−${fmt.pesos(sub - tot)}</b>descuento ${ver(d)}%</div>` : ''}<div class="gran"><b>${fmt.pesos(tot)}</b>total · revisalo contra el remito</div>`;
+    filas.forEach((f, i) => { const el = $(`.rg[data-f="${i}"] .tot`); if (el && !cerrada()) { const n = unidades(f); el.innerHTML = n ? fmt.pesos(n * f.costo) + `<small>${n} u.</small>` : ''; } });
+  }
+  function enganchar() {
+    $$('[data-art]').forEach(inp => {
+      const i = +inp.dataset.art;
+      inp.oninput = () => { filas[i].art = inp.value; sugerirArt(inp, i); };
+      inp.onkeydown = ev => teclas(ev);
+      inp.onblur = () => setTimeout(() => { if (sugAbierta === inp) cerrarSug(); const a = aprendidoDe(filas[i].art); if (a && !filas[i].producto_id) usarAprendido(i, a); }, 150);
+    });
+    $$('[data-buscar]').forEach(inp => { const i = +inp.dataset.buscar; inp.oninput = () => sugerirPrenda(inp, i); inp.onkeydown = ev => teclas(ev); inp.onfocus = () => { if (inp.value) sugerirPrenda(inp, i); }; });
+    $$('[data-cambiar]').forEach(a => a.onclick = () => { const i = +a.dataset.cambiar; filas[i].producto_id = null; filas[i].color = ''; filas[i].cant = {}; pintar(); const b = $(`[data-buscar="${i}"]`); if (b) b.focus(); });
+    $$('[data-color]').forEach(s => s.onchange = async () => {
+      const i = +s.dataset.color;
+      if (s.value === '+') { s.value = filas[i].color; return colorNuevo(i); }
+      filas[i].color = s.value; const viejo = filas[i].cant; filas[i].cant = {}; Object.keys(viejo).forEach(t => { if (varDe(filas[i].producto_id, s.value, t)) filas[i].cant[t] = viejo[t]; });
+      pintar(); const c = $(`[data-cant="${i}"]:not(:disabled)`); if (c) c.focus();
+    });
+    $$('[data-cant]').forEach(inp => inp.oninput = () => { const i = +inp.dataset.cant, n = Math.max(0, Math.round(num(inp.value))); if (n) filas[i].cant[inp.dataset.t] = n; else delete filas[i].cant[inp.dataset.t]; inp.classList.toggle('hay', !!n); totales(); asegurarVacia(); });
+    $$('[data-costo]').forEach(inp => { inp.oninput = () => { filas[+inp.dataset.costo].costo = num(inp.value); totales(); }; inp.onblur = () => { inp.value = ver(filas[+inp.dataset.costo].costo); }; });
+    $$('[data-x]').forEach(b => b.onclick = () => { filas.splice(+b.dataset.x, 1); if (!filas.length) filas.push(filaVacia()); pintar(); });
+  }
+  // siempre queda un renglón libre al final
+  function asegurarVacia() { const u = filas[filas.length - 1]; if (u && (u.producto_id || u.art)) { filas.push(filaVacia()); pintarConFoco(); } }
+  function pintarConFoco() { const a = document.activeElement, sel = a && a.dataset ? Object.entries(a.dataset)[0] : null, pos = a && a.selectionStart; pintar(); if (sel) { const el = $(`[data-${sel[0]}="${sel[1]}"]${a.dataset.t != null ? `[data-t="${a.dataset.t}"]` : ''}`); if (el) { el.focus(); try { el.setSelectionRange(pos, pos); } catch (_) {} } } }
 
-  async function guardar(estado) {
-    if (!lineas.length) { toast('Agregá al menos una prenda', 'error'); return; }
-    const p = { id: id || null, empresa_id: e, proveedor_id: $('#proveedor').value || null, deposito_id: $('#deposito').value || null, fecha: $('#fecha').value, entrega_estimada: $('#entrega').value || null, referencia: $('#referencia').value.trim() || null, descuento_pct: +$('#descuento').value || 0, nota: $('#nota').value.trim() || null, estado: estado || (compra ? compra.estado : 'borrador'), lineas: lineas.map(l => ({ variante_id: l.variante_id, producto_id: l.producto_id, descripcion: l.descripcion, talle: l.talle, color: l.color, pedida: l.pedida, costo_unit: l.costo_unit })) };
-    const { data, error } = await sb.rpc('compras_guardar', { p });
+  // ---------- sugerencias (lo que Percha aprendió y el catálogo) ----------
+  let sugAbierta = null, opciones = [], marcada = 0;
+  function abrirSug(inp, html) {
+    const sug = $('#sug'), r = inp.getBoundingClientRect();
+    sug.innerHTML = html; sug.style.display = html ? 'block' : 'none'; sug.style.left = Math.min(r.left, innerWidth - sug.offsetWidth - 8) + 'px'; const abajo = innerHeight - r.bottom > Math.min(320, sug.offsetHeight + 12) || r.top < 330; sug.style.top = (abajo ? r.bottom + 4 : r.top - sug.offsetHeight - 4) + 'px'; sugAbierta = inp; marcada = 0; marcar();
+    $$('[data-i]', sug).forEach(d => d.onmousedown = ev => { ev.preventDefault(); elegirOpcion(+d.dataset.i); });
+  }
+  function cerrarSug() { $('#sug').style.display = 'none'; sugAbierta = null; opciones = []; }
+  function marcar() { $$('#sug [data-i]').forEach(d => d.classList.toggle('on', +d.dataset.i === marcada)); }
+  function teclas(ev) {
+    if (!sugAbierta || !opciones.length) return;
+    if (ev.key === 'ArrowDown') { ev.preventDefault(); marcada = Math.min(opciones.length - 1, marcada + 1); marcar(); }
+    else if (ev.key === 'ArrowUp') { ev.preventDefault(); marcada = Math.max(0, marcada - 1); marcar(); }
+    else if (ev.key === 'Enter') { ev.preventDefault(); elegirOpcion(marcada); }
+    else if (ev.key === 'Escape') cerrarSug();
+  }
+  function elegirOpcion(k) { const o = opciones[k]; cerrarSug(); if (o) o.hacer(); }
+  const buscarProductos = txt => { const pal = norm(txt).split(' ').filter(Boolean); if (!pal.length) return []; return productos.filter(p => pal.every(w => norm(p.nombre + ' ' + p.codigo).includes(w))).slice(0, 10); };
+  const lineaProd = p => `${esc(p.nombre)} <small>${esc(p.codigo)}${+p.precio ? ' · ' + fmt.pesos(p.precio) : ''}</small>`;
+  function sugerirArt(inp, i) {
+    const t = norm(inp.value), prov = $('#proveedor').value; opciones = [];
+    if (!t) { cerrarSug(); return; }
+    const conocidos = aprendido.filter(a => a.proveedor_id === prov && a.texto.includes(t)).slice(0, 6);
+    let html = '';
+    if (conocidos.length) { html += '<div class="sg-t">Ya lo cargaste antes con este proveedor</div>'; conocidos.forEach(a => { const p = prod(a.producto_id); if (!p) return; opciones.push({ hacer: () => { filas[i].art = a.texto_original || inp.value; usarAprendido(i, a); } }); html += `<div data-i="${opciones.length - 1}"><b>${esc(a.texto_original || a.texto)}</b> → ${lineaProd(p)}${a.color_id ? ' · ' + esc(colorNombre(p.id, a.color_id)) : ''}</div>`; }); }
+    const cat = buscarProductos(inp.value).slice(0, 5);
+    if (cat.length) { html += '<div class="sg-t">En el catálogo de Augusta</div>'; cat.forEach(p => { opciones.push({ hacer: () => elegirPrenda(i, p) }); html += `<div data-i="${opciones.length - 1}">${lineaProd(p)}</div>`; }); }
+    abrirSug(inp, html);
+  }
+  function sugerirPrenda(inp, i) {
+    opciones = []; const res = buscarProductos(inp.value);
+    if (!inp.value.trim()) { cerrarSug(); return; }
+    abrirSug(inp, res.length ? res.map(p => { opciones.push({ hacer: () => elegirPrenda(i, p) }); return `<div data-i="${opciones.length - 1}">${lineaProd(p)}</div>`; }).join('') : '<div class="sg-t">No está en el catálogo: creala con "+ Prenda nueva en el catálogo"</div>');
+  }
+  // el color aprendido se guarda por id; el renglón usa el código del color
+  let codColor = {};
+  async function cargarColores() { const { data } = await sb.from('atributos').select('id,codigo,nombre').eq('empresa_id', e).eq('tipo', 'color'); codColor = Object.fromEntries((data || []).map(c => [c.id, c])); }
+  await cargarColores();
+  const colorNombre = (idp, cid) => (codColor[cid] || {}).nombre || '';
+  function usarAprendido(i, a) {
+    const p = prod(a.producto_id); if (!p) return;
+    filas[i].producto_id = p.id; filas[i].color = a.color_id && codColor[a.color_id] ? codColor[a.color_id].codigo : ''; filas[i].cant = filas[i].cant || {};
+    if (!filas[i].costo) filas[i].costo = +a.costo || +p.costo || 0;
+    asegurarVaciaSinPintar(); pintar(); const c = $(`[data-cant="${i}"]:not(:disabled)`); if (c) c.focus();
+  }
+  function elegirPrenda(i, p) {
+    const f = filas[i]; f.producto_id = p.id; f.cant = {}; const cols = coloresDe(p.id);
+    const c = colorDelTexto(p.id, f.art); f.color = c ? c.k : (cols.length === 1 ? cols[0].k : '');
+    if (!f.costo) f.costo = +p.costo || 0;
+    asegurarVaciaSinPintar(); pintar();
+    const sig = f.color || !cols.length ? $(`[data-cant="${i}"]:not(:disabled)`) : $(`[data-color="${i}"]`); if (sig) sig.focus();
+  }
+  function asegurarVaciaSinPintar() { const u = filas[filas.length - 1]; if (u && (u.producto_id || u.art)) filas.push(filaVacia()); }
+  async function colorNuevo(i) {
+    const f = filas[i], p = prod(f.producto_id);
+    const d = await APP.formulario({ titulo: 'Color nuevo para ' + p.nombre, sub: 'Se agrega a la prenda con todos sus talles (si el color ya existe en Percha, se usa ese).', campos: [{ k: 'color', label: 'Color', requerido: true, placeholder: 'Ej: Cherry', valor: '' }], boton: 'Agregar color' });
+    if (!d) return;
+    const { data, error } = await sb.rpc('compras_agregar_color', { p_producto: p.id, p_color: d.color });
     if (error) { toast(mensajeError(error), 'error'); return; }
-    if (!id) { id = data.id; history.replaceState(null, '', `compra.html?id=${id}`); }
-    toast('Orden guardada'); await cargar();
+    await Promise.all([cargarCatalogo(), cargarColores()]); f.color = data; f.cant = {}; pintar(); toast('Color agregado');
+    const c = $(`[data-cant="${i}"]:not(:disabled)`); if (c) c.focus();
   }
+  document.addEventListener('click', ev => { if (sugAbierta && !ev.target.closest('.sugerencias') && ev.target !== sugAbierta) cerrarSug(); });
+  window.addEventListener('scroll', () => { if (sugAbierta) cerrarSug(); }, { passive: true });
 
-  // ---------- recibir ----------
-  function recibir() {
-    const pend = lineas.filter(l => l.pedida - l.recibida > 0);
+  // ---------- guardar / ingresar ----------
+  function armar(estado) {
+    const usadas = filas.filter(f => unidades(f) || f.producto_id);
+    const sinPrenda = filas.find(f => !f.producto_id && f.art.trim()); if (sinPrenda) throw new Error(`Falta elegir qué prenda de Augusta es "${sinPrenda.art.trim()}"`);
+    const sinColor = usadas.find(f => coloresDe(f.producto_id).length && !f.color); if (sinColor) throw new Error(`Falta el color de ${prod(sinColor.producto_id).nombre}`);
+    const sinCant = usadas.find(f => !unidades(f)); if (sinCant) throw new Error(`Poné cuántas llegaron de ${prod(sinCant.producto_id).nombre}${sinCant.art ? ' (' + sinCant.art + ')' : ''}, o quitá el renglón`);
+    const lineas = [];
+    usadas.forEach(f => { const p = prod(f.producto_id); Object.entries(f.cant).forEach(([t, n]) => { const v = varDe(p.id, f.color, t); if (!v || !n) return; lineas.push({ variante_id: v.id, producto_id: p.id, descripcion: p.nombre, talle: v.talle_nombre || null, color: v.color_nombre || null, pedida: n, costo_unit: r2(f.costo), articulo_prov: f.art.trim() || null }); }); });
+    if (!lineas.length) throw new Error('Cargá al menos una prenda');
+    if (!$('#proveedor').value) throw new Error('Elegí el proveedor (así Percha aprende sus nombres y lleva la cuenta)');
+    return { id: id || null, empresa_id: e, proveedor_id: $('#proveedor').value || null, deposito_id: $('#deposito').value || null, fecha: $('#fecha').value, entrega_estimada: $('#entrega').value || null, referencia: $('#referencia').value.trim() || null, descuento_pct: num($('#descuento').value), nota: $('#nota').value.trim() || null, estado, lineas };
+  }
+  async function guardarPedido() {
+    let p; try { p = armar(compra && compra.estado === 'pedida' ? 'pedida' : 'pedida'); } catch (er) { toast(er.message, 'error'); return null; }
+    const { data, error } = await sb.rpc('compras_guardar', { p });
+    if (error) { toast(mensajeError(error), 'error'); return null; }
+    if (!id) { id = data.id; history.replaceState(null, '', `compra.html?id=${id}`); }
+    await cargarAprendido(); toast('Pedido guardado: cuando llegue, entrá acá y tocá "Ingresar al stock"'); await cargar(); return data;
+  }
+  async function ingresar() {
+    let p; try { p = armar('pedida'); } catch (er) { toast(er.message, 'error'); return; }
+    const u = p.lineas.reduce((s, l) => s + l.pedida, 0);
+    const m = modal(`<h2>¿Llegó todo lo del remito?</h2><p class="sub">Van a entrar <b>${u} prendas</b> al stock del local y de la web.</p>
+      <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:12px"><input type="checkbox" id="i-costos" checked> Actualizar el costo de las prendas${p.descuento_pct ? ' (con el ' + ver(p.descuento_pct) + '% de descuento)' : ''}</label>
+      <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:6px"><input type="checkbox" id="i-deuda" checked> Sumar a la cuenta del proveedor (lo que se le debe)</label>
+      <div class="pie" style="flex-wrap:wrap"><button class="btn" data-no>Cancelar</button><button class="btn" data-parte>Llegó solo una parte</button><button class="btn primario" data-si>Sí, ingresar al stock</button></div>`, { fijo: true });
+    $('[data-no]', m).onclick = () => m.cerrar();
+    $('[data-parte]', m).onclick = async () => { m.cerrar(); if (await guardarPedido()) recibirParte(); };
+    $('[data-si]', m).onclick = async () => {
+      const b = $('[data-si]', m); b.disabled = true; b.textContent = 'Ingresando…';
+      const { data, error } = await sb.rpc('compras_ingresar', { p: Object.assign(p, { actualizar_costos: $('#i-costos', m).checked, asentar_deuda: $('#i-deuda', m).checked }) });
+      if (error) { toast(mensajeError(error), 'error'); b.disabled = false; b.textContent = 'Sí, ingresar al stock'; return; }
+      m.cerrar(); if (!id) { id = data.id; history.replaceState(null, '', `compra.html?id=${id}`); }
+      await Promise.all([cargarCatalogo(), cargarAprendido()]); await cargar(); listo(data);
+    };
+  }
+  function listo(data) {
+    const m = modal(`<div class="listo"><div class="ok">✓</div><h2>Entraron ${fmt.num(data.recibido)} prendas al stock</h2><p class="sub">Compra #${String(data.numero).padStart(5, '0')}. La web se actualiza sola en un minuto.</p></div>
+      <div class="pie" style="flex-wrap:wrap;justify-content:center"><button class="btn" data-otro>📦 Ingresar otro remito</button><a class="btn" href="compras.html">Ver las compras</a><button class="btn primario" data-etq>🏷️ Imprimir etiquetas</button></div>`);
+    $('[data-otro]', m).onclick = () => location.href = 'compra.html';
+    $('[data-etq]', m).onclick = () => etiquetas();
+  }
+  function etiquetas() {
+    let cola = []; try { cola = JSON.parse(localStorage.getItem('augusta_etiquetas') || '[]'); } catch (_) {}
+    filas.forEach(f => Object.entries(f.cant).forEach(([t, n]) => { const v = f.producto_id && varDe(f.producto_id, f.color, t), llego = compra && compra.estado === 'parcial' ? (f.recibida[t] || 0) : n; if (!v || !llego) return; const ya = cola.find(c => c.variante_id === v.id); if (ya) ya.cantidad = llego; else cola.push({ variante_id: v.id, cantidad: llego }); }));
+    try { localStorage.setItem('augusta_etiquetas', JSON.stringify(cola)); } catch (_) {}
+    toast('Agregadas a la cola de etiquetas'); setTimeout(() => location.href = '../catalogo/etiquetas.html', 400);
+  }
+  // llegó una parte: cuánto entró de cada talle (lo que no llegó queda esperando)
+  async function recibirParte() {
+    const { data: ls } = await sb.from('compra_lineas').select('*').eq('compra_id', id).order('id');
+    const pend = (ls || []).filter(l => l.pedida - l.recibida > 0);
     if (!pend.length) { toast('No queda nada por recibir', 'error'); return; }
-    const m = modal(`<h2>Recibir mercadería</h2><p class="sub">Confirmá cuánto entró de cada línea. Lo que no llegó queda pendiente.</p>
-      <div style="display:flex;gap:6px;margin:10px 0"><button class="btn chico" data-todo>Llegó todo</button><button class="btn chico" data-nada>Poner en cero</button></div>
-      <table class="lista">${pend.map(l => `<tr><td>${esc(l.descripcion)}<br><small>${esc([l.talle, l.color].filter(Boolean).join(' · ') || 'único')}</small></td><td class="num">${fmt.num(l.pedida - l.recibida)} pend.</td><td class="num"><input type="number" min="0" max="${l.pedida - l.recibida}" value="${l.pedida - l.recibida}" data-l="${l.linea_id}" style="width:80px;text-align:right;font-family:var(--f-mono);border:1px solid var(--linea);border-radius:7px;padding:5px 7px"></td></tr>`).join('')}</table>
-      <div class="campo" style="margin-top:12px"><label>Nota de la recepción</label><input id="r-nota" placeholder="Remito nº, faltantes, etc."></div>
-      <label style="display:flex;gap:8px;align-items:center;font-size:13px"><input type="checkbox" id="r-costos" checked> Actualizar el costo de las prendas con el de esta compra</label>
-      <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:6px"><input type="checkbox" id="r-deuda" ${$('#proveedor').value ? 'checked' : 'disabled'}> Asentar la deuda en la cuenta del proveedor</label>
-      <div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Confirmar ingreso</button></div>`, { fijo: true });
-    $('[data-todo]', m).onclick = () => $$('input[data-l]', m).forEach(i => i.value = i.max);
+    const m = modal(`<h2>¿Qué llegó?</h2><p class="sub">Poné cuántas llegaron de cada una. Lo que falta queda esperando en esta compra.</p>
+      <div style="display:flex;gap:6px;margin:10px 0"><button class="btn chico" data-todo>Llegó todo</button><button class="btn chico" data-nada>Poner todo en 0</button></div>
+      <table class="lista">${pend.map(l => `<tr><td>${esc(l.descripcion)}<br><small>${esc([l.color, l.talle].filter(Boolean).join(' · ') || 'único')}${l.articulo_prov ? ' · ' + esc(l.articulo_prov) : ''}</small></td><td class="num">faltan ${fmt.num(l.pedida - l.recibida)}</td><td class="num"><input inputmode="numeric" data-l="${l.id}" data-max="${l.pedida - l.recibida}" value="${l.pedida - l.recibida}" style="width:64px;text-align:center;font-family:var(--f-mono);border:1px solid var(--linea);border-radius:7px;padding:5px"></td></tr>`).join('')}</table>
+      <div class="campo" style="margin-top:12px"><label>Nota</label><input id="r-nota" placeholder="Ej: faltaron los XL, llegan la semana que viene"></div>
+      <label style="display:flex;gap:8px;align-items:center;font-size:13px"><input type="checkbox" id="r-costos" checked> Actualizar el costo de las prendas</label>
+      <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:6px"><input type="checkbox" id="r-deuda" ${compra && compra.proveedor_id ? 'checked' : 'disabled'}> Sumar a la cuenta del proveedor</label>
+      <div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Ingresar al stock</button></div>`, { fijo: true });
+    $('[data-todo]', m).onclick = () => $$('input[data-l]', m).forEach(i => i.value = i.dataset.max);
     $('[data-nada]', m).onclick = () => $$('input[data-l]', m).forEach(i => i.value = 0);
     $('[data-no]', m).onclick = () => m.cerrar();
     $('[data-si]', m).onclick = async () => {
+      const lineas = $$('input[data-l]', m).map(i => ({ linea_id: +i.dataset.l, cantidad: Math.min(+i.dataset.max, Math.max(0, Math.round(num(i.value)))) }));
       $('[data-si]', m).disabled = true;
-      const { data, error } = await sb.rpc('compras_recibir', { p: { empresa_id: e, compra_id: id, nota: $('#r-nota', m).value.trim() || null, actualizar_costos: $('#r-costos', m).checked, asentar_deuda: $('#r-deuda', m).checked, lineas: $$('input[data-l]', m).map(i => ({ linea_id: +i.dataset.l, cantidad: +i.value || 0 })) } });
+      const { data, error } = await sb.rpc('compras_recibir', { p: { empresa_id: e, compra_id: id, nota: $('#r-nota', m).value.trim() || null, actualizar_costos: $('#r-costos', m).checked, asentar_deuda: $('#r-deuda', m).checked, lineas } });
       if (error) { toast(mensajeError(error), 'error'); $('[data-si]', m).disabled = false; return; }
-      m.cerrar(); toast(`Ingresaron ${fmt.num(data.recibido)} unidades al stock`); await cargar();
+      m.cerrar(); await cargarCatalogo(); await cargar(); listo({ recibido: data.recibido, numero: compra.numero });
     };
   }
-
-  // ---------- agregar prendas por curva ----------
-  const q = $('#q'), sug = $('#sug');
-  q.addEventListener('input', () => {
-    const t = norm(q.value.trim()); if (!t) { sug.style.display = 'none'; return; }
-    const pal = t.split(/\s+/); const res = productos.filter(p => pal.every(w => norm(p.nombre + ' ' + p.codigo).includes(w))).slice(0, 12);
-    sug.innerHTML = res.map(p => `<div data-p="${p.id}">${esc(p.nombre)} <small>${esc(p.codigo)} · costo ${fmt.pesos(p.costo)}</small></div>`).join('') || '<div class="vacio">Nada con ese nombre</div>';
-    sug.style.display = 'block';
-    $$('[data-p]', sug).forEach(d => d.onclick = () => { sug.style.display = 'none'; q.value = ''; elegir(productos.find(p => p.id === d.dataset.p)); });
-  });
-  q.addEventListener('keydown', ev => { if (ev.key === 'Escape') sug.style.display = 'none'; if (ev.key === 'Enter') { ev.preventDefault(); const f = $('[data-p]', sug); if (f) f.click(); } });
-  document.addEventListener('click', ev => { if (!ev.target.closest('.agregar') && !ev.target.closest('.sugerencias')) sug.style.display = 'none'; });
-
-  function elegir(p) {
-    const vs = variantes.filter(v => v.producto_id === p.id);
-    if (!p.tiene_variantes || !vs.length) { agregarLinea(p, vs[0] || null, 1); return; }
-    const tallesP = [...new Map(vs.filter(v => v.talle).map(v => [v.talle, { codigo: v.talle, nombre: v.talle_nombre, orden: v.talle_orden ?? 999, id: (talles.find(t => t.codigo === v.talle) || {}).id }])).values()].sort((a, b) => a.orden - b.orden);
-    const coloresP = [...new Map(vs.filter(v => v.color).map(v => [v.color, { codigo: v.color, nombre: v.color_nombre }])).values()];
-    const m = modal(`<h2>${esc(p.nombre)}</h2><p class="sub">Elegí los colores y cuántas de cada talle (o una curva).</p>
-      <div class="campo" style="margin-top:10px"><label>Colores</label><div class="colores">${coloresP.map(c => `<label><input type="checkbox" value="${c.codigo}" checked>${esc(c.nombre)}</label>`).join('') || '<span class="sub">sin colores: se carga por talle</span>'}</div></div>
-      <div class="fila c2"><div class="campo"><label>Curva</label><select id="cur"><option value="">A mano</option>${curvas.map(c => `<option value="${c.id}">${esc(c.nombre)}</option>`).join('')}</select></div><div class="campo"><label>Costo unitario</label><input id="costo" type="number" step="0.01" value="${p.costo || 0}"></div></div>
-      <div class="campo"><label>Cantidad por talle (para cada color)</label><div class="reparto">${tallesP.map(t => `<div><label>${esc(t.nombre)}</label><input type="number" min="0" value="0" data-t="${t.codigo}"></div>`).join('') || '<span class="sub">sin talles</span>'}</div></div>
-      <div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Agregar a la orden</button></div>`);
-    $('#cur', m).onchange = () => { const c = curvas.find(x => x.id === $('#cur', m).value); $$('.reparto input', m).forEach(i => { const tid = (tallesP.find(t => t.codigo === i.dataset.t) || {}).id; const r = c ? (c.reparto || []).find(x => x.talle_id === tid) : null; i.value = r ? r.cantidad : (c ? 0 : i.value); }); };
-    $('[data-no]', m).onclick = () => m.cerrar();
-    $('[data-si]', m).onclick = () => {
-      const cols = $$('.colores input:checked', m).map(i => i.value); const costo = +$('#costo', m).value || 0; let n = 0;
-      const porTalle = Object.fromEntries($$('.reparto input', m).map(i => [i.dataset.t, +i.value || 0]));
-      vs.forEach(v => { const cant = porTalle[v.talle || ''] || 0; const colorOk = !coloresP.length || cols.includes(v.color); if (cant > 0 && colorOk) { agregarLinea(p, v, cant, costo); n++; } });
-      if (!n) { toast('Poné alguna cantidad', 'error'); return; }
-      m.cerrar(); toast(`${n} líneas agregadas`);
-    };
+  function botones() {
+    const a = $('#acciones');
+    if (compra && compra.estado === 'anulada') { a.innerHTML = '<a class="btn" href="compras.html">← Volver</a>'; return; }
+    if (compra && compra.estado === 'recibida') { a.innerHTML = '<a class="btn" href="compras.html">← Volver</a><button class="btn primario" id="b-etq">🏷️ Imprimir etiquetas</button>'; $('#b-etq').onclick = etiquetas; return; }
+    if (compra && compra.estado === 'parcial') { a.innerHTML = '<a class="btn" href="compras.html">← Volver</a><button class="btn" id="b-etq">🏷️ Etiquetas de lo que llegó</button><button class="btn primario" id="b-parte">📦 Llegó lo que faltaba</button>'; $('#b-etq').onclick = etiquetas; $('#b-parte').onclick = recibirParte; return; }
+    const pedido = modoPedido || (compra && ['borrador', 'pedida'].includes(compra.estado));
+    a.innerHTML = `${id ? '<button class="btn peligro" id="b-anular">Anular</button>' : ''}<a class="btn" href="compras.html">Volver</a>
+      ${pedido ? '<button class="btn" id="b-ingresar">📦 Ya llegó: ingresar al stock</button><button class="btn primario" id="b-pedido">💾 Guardar pedido</button>'
+        : '<button class="btn" id="b-pedido" title="Para mercadería que pediste y todavía no llegó">Todavía no llegó: guardar como pedido</button><button class="btn primario" id="b-ingresar">📦 Ingresar al stock</button>'}`;
+    $('#b-ingresar').onclick = ingresar; $('#b-pedido').onclick = guardarPedido;
+    const an = $('#b-anular'); if (an) an.onclick = async () => { if (!await confirmar('¿Anular esta compra? No entra nada al stock.', 'Anular')) return; const { error } = await sb.rpc('compras_anular', { p_compra: id }); if (error) { toast(mensajeError(error), 'error'); return; } toast('Compra anulada'); cargar(); };
   }
-  function agregarLinea(p, v, cant, costo) {
-    const ya = v && lineas.find(l => l.variante_id === v.id);
-    if (ya) { ya.pedida += cant; if (costo) ya.costo_unit = costo; }
-    else lineas.push({ variante_id: v ? v.id : null, producto_id: p.id, descripcion: p.nombre, talle: v ? v.talle_nombre : null, color: v ? v.color_nombre : null, pedida: cant, recibida: 0, costo_unit: costo != null ? costo : (+p.costo || 0) });
-    pintar();
-  }
+  $('#descuento').oninput = totales;
+  $('#descuento').onblur = () => { $('#descuento').value = ver(num($('#descuento').value)); };
+  $('#btn-rg').onclick = () => { filas.push(filaVacia()); pintar(); $(`[data-art="${filas.length - 1}"]`).focus(); };
+  $('#proveedor').onchange = () => pintar();
+  $('#btn-prov').onclick = async () => {
+    const d = await APP.formulario({ titulo: 'Proveedor nuevo', campos: [{ k: 'nombre', label: 'Nombre', requerido: true, placeholder: 'Ej: Concepto Mayorista' }, { k: 'telefono', label: 'Teléfono' }, { k: 'cuit', label: 'CUIT' }], boton: 'Agregar' });
+    if (!d) return;
+    const { data, error } = await sb.from('proveedores').insert(APP.conEmpresa({ nombre: d.nombre, telefono: d.telefono, cuit: d.cuit, activo: true })).select('id,nombre').single();
+    if (error) { toast(mensajeError(error), 'error'); return; }
+    proveedores.push(data); proveedores.sort((x, y) => x.nombre.localeCompare(y.nombre)); pintarProveedores(data.id); toast('Proveedor agregado');
+  };
   await cargar();
 });
 </script>

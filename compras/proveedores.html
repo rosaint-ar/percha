@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Proveedores · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611021438">
+<link rel="stylesheet" href="../shell/shell.css?v=202611032318">
 <style>
   .filtros{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
   td.deuda{color:var(--error);font-weight:700}
@@ -18,12 +18,12 @@
   <div class="card" style="padding:0"><table class="lista" id="tb"><thead><tr><th>Proveedor</th><th>Contacto</th><th>Última compra</th><th class="num">Saldo</th><th></th></tr></thead><tbody></tbody></table></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611021438"></script>
-<script src="../shell/shell.js?v=202611021438"></script>
+<script src="../shared/supabase.js?v=202611032318"></script>
+<script src="../shell/shell.js?v=202611032318"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
-  if (!APP.esAdmin) { $('main').innerHTML = '<div class="card"><p>Los proveedores los maneja administración.</p></div>'; return; }
+  if (!APP.puede('compras')) { $('main').innerHTML = '<div class="card"><p>Para ver los proveedores hace falta el permiso <b>Compras</b>.</p></div>'; return; }
   $('#acciones-pagina').innerHTML = `<a class="btn" href="compras.html">Órdenes de compra</a><button class="btn primario" id="btn-nuevo">+ Proveedor</button>`;
   let lista = [], formas = [];
   formas = (await sb.from('formas_pago').select('id,nombre').eq('empresa_id', e).eq('activa', true).order('orden')).data || [];

@@ -45,7 +45,8 @@
     num: n => fmtNum.format(+n || 0),
     dec: n => fmtDec.format(+n || 0),
     pct: n => (Math.round((+n || 0) * 10) / 10).toLocaleString('es-AR', { minimumFractionDigits: 1 }) + '%',
-    fecha: d => d ? new Date(d).toLocaleDateString('es-AR') : '',
+    // una fecha sola ("2026-10-27") es ese día acá, no la medianoche de Londres (si no, se ve el día anterior)
+    fecha: d => d ? new Date(/^\d{4}-\d{2}-\d{2}$/.test(d) ? d + 'T12:00:00' : d).toLocaleDateString('es-AR') : '',
     fechaHora: d => d ? new Date(d).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).replace(',', ' ·') : ''
   };
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -135,7 +136,7 @@
     { id: 'productos', label: 'Catálogo', href: 'catalogo/productos.html', icono: 'catalogo', p: 'catalogo_ver' },
     { id: 'etiquetas', label: 'Etiquetas', href: 'catalogo/etiquetas.html', icono: 'etiquetas', p: 'catalogo_editar' },
     { id: 'inventario', label: 'Inventario', href: 'catalogo/inventario.html', icono: 'conteo', p: 'catalogo_ver' },
-    { id: 'compras', label: 'Compras', href: 'compras/compras.html', icono: 'compras', p: 'compras' },
+    { id: 'compras', label: 'Compras e ingresos', href: 'compras/compras.html', icono: 'compras', p: 'compras' },
     { grupo: 'Análisis', p: 'inicio' },
     { id: 'informes', label: 'Informes', href: '#', icono: 'informes', prox: true, p: 'inicio' },
     { grupo: 'Sistema', p: ['conexiones', 'configuracion'] },
