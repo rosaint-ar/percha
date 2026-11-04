@@ -401,6 +401,7 @@ APP.ready.then(async () => {
     // en qué canales vale (null = todos) y en qué listas
     if (p.canales && p.canales.length && !p.canales.includes(origenVenta())) return false;
     if (p.listas && p.listas.length && !p.listas.includes(carrito.lista)) return false;
+    const lp = (pctx.listas || []).find(x => x.id === carrito.lista); if (lp && lp.toma_promos === false) return false;   // lista sin promociones (Mayorista)
     if (p.alcance === 'familias') return (p.familia_ids || []).includes((productos[v.producto_id] || {}).categoria_id);
     if (p.alcance === 'productos') return (p.producto_ids || []).includes(v.producto_id);
     return (productos[v.producto_id] || {}).tipo === 'prenda';

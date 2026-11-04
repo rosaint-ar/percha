@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Listas de precios · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611040008">
+<link rel="stylesheet" href="../shell/shell.css?v=202611040014">
 <style>
   .pestanas{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
   .pestanas a{font:600 13px var(--f-ui);color:var(--tinta);text-decoration:none;padding:8px 14px;border:1px solid var(--linea);background:var(--superficie-2);border-radius:10px}
@@ -62,9 +62,9 @@
   </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611040008"></script>
-<script src="../shared/precios.js?v=202611040008"></script>
-<script src="../shell/shell.js?v=202611040008"></script>
+<script src="../shared/supabase.js?v=202611040014"></script>
+<script src="../shared/precios.js?v=202611040014"></script>
+<script src="../shell/shell.js?v=202611040014"></script>
 <script>
 APP.ready.then(async () => {
   const { esc, $, $$, toast, modal, confirmar, mensajeError, fmt } = APP, e = APP.empresa.id;
@@ -95,7 +95,8 @@ APP.ready.then(async () => {
         <div class="lp-grid">
           <div class="campo"><label>Precio</label>${l.predeterminada ? '<p style="margin:6px 0 0;font-size:13.5px">El que tiene cada prenda en su ficha.</p><p class="ejemplo">Es el que va a la web y desde el que se calculan las demás listas.</p>' : reglaControles(l.porcentaje, 'r') + `<p class="ejemplo">${ejemplo(l)}</p>`}</div>
           <div class="campo"><label>Redondeo</label><select data-red>${PRECIOS.REDONDEOS.map(([k, t]) => `<option value="${k}" ${(l.redondeo || '10+') === k ? 'selected' : ''}>${t}</option>`).join('')}</select>${l.predeterminada ? '<p class="ejemplo">Para las rebajas en %.</p>' : ''}</div>
-          <div class="campo"><label>Rebajas</label>${l.predeterminada ? '<p style="margin:6px 0 0;font-size:13.5px">Siempre las toma.</p>' : `<div class="fila-sw"><label class="switch"><input type="checkbox" data-reb ${l.toma_rebajas !== false ? 'checked' : ''}><span></span></label> ${l.toma_rebajas !== false ? 'Parte del precio rebajado' : 'Parte siempre del precio sin rebaja'}</div>`}</div>
+          <div><div class="campo"><label>Rebajas</label>${l.predeterminada ? '<p style="margin:6px 0 0;font-size:13.5px">Siempre las toma.</p>' : `<div class="fila-sw"><label class="switch"><input type="checkbox" data-reb ${l.toma_rebajas !== false ? 'checked' : ''}><span></span></label> ${l.toma_rebajas !== false ? 'Parte del precio rebajado' : 'Parte siempre del precio sin rebaja'}</div>`}</div>
+          <div class="campo" style="margin-top:12px"><label>Promociones</label>${l.predeterminada ? '<p style="margin:6px 0 0;font-size:13.5px">Siempre las toma.</p>' : `<div class="fila-sw"><label class="switch"><input type="checkbox" data-promos ${l.toma_promos !== false ? 'checked' : ''}><span></span></label> ${l.toma_promos !== false ? 'Toma las promociones (packs, N×M, % off)' : 'Sin promociones'}</div>`}</div></div>
         </div>
         ${l.predeterminada ? '' : `<div class="excep"><h4>EXCEPCIONES${ex.length ? '' : ' · ninguna: todas las prendas siguen la regla de arriba'}</h4>
           ${ex.map(x => { const p = x.producto_id ? prods.find(y => y.id === x.producto_id) : null, c = x.categoria_id ? (cats || []).find(y => y.id === x.categoria_id) : null;
@@ -111,6 +112,7 @@ APP.ready.then(async () => {
       if (s) { const guardar = () => { const pct = leerRegla(card, 'r'); if (pct == null) { toast('Poné un número: cuánto % menos o más que la base', 'error'); return; } if (pct !== +l.porcentaje) guardarLista(l.id, { porcentaje: pct }, `${l.nombre}: ${reglaTxt(pct)}`); };
         s.onchange = () => { n.disabled = s.value === 'igual'; if (s.value !== 'igual' && !n.value) { n.focus(); return; } guardar(); }; n.onchange = guardar; }
       $('[data-red]', card).onchange = ev => guardarLista(l.id, { redondeo: ev.target.value }, 'Redondeo guardado');
+      const pm = $('[data-promos]', card); if (pm) pm.onchange = () => guardarLista(l.id, { toma_promos: pm.checked }, pm.checked ? `${l.nombre} toma las promociones` : `${l.nombre}: sin promociones`);
       const rb = $('[data-reb]', card); if (rb) rb.onchange = () => guardarLista(l.id, { toma_rebajas: rb.checked }, rb.checked ? `${l.nombre} parte del precio rebajado` : `${l.nombre} parte siempre del precio sin rebaja`);
       const mover = async d => { const otro = ls[idx + d]; if (!otro) return; const a = +l.orden || idx, b = +otro.orden || idx + d;
         await sb.from('listas_precios').update({ orden: a === b ? idx + d : b }).eq('id', l.id); await sb.from('listas_precios').update({ orden: a === b ? idx : a }).eq('id', otro.id); recargar(); };
