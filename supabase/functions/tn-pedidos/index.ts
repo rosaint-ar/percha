@@ -89,7 +89,8 @@ Deno.serve(async (req) => {
     // todas las variantes del canal (PostgREST corta en 1000: se pagina)
     let items: any[] = []; for (let d = 0; ; d += 1000) { const { data } = await admin.from("canal_items").select("variante_ext,variante_id,producto_ext").eq("conexion_id", cx.id).range(d, d + 999); items = items.concat(data || []); if (!data || data.length < 1000) break; }
     const porExt = new Map(items.map((i: any) => [i.variante_ext, i]));
-    const { data: formas } = await admin.from("formas_pago").select("id,nombre,tipo").eq("empresa_id", e).eq("activa", true);
+    // todas, también las apagadas (se apagan para que no salgan en la caja, pero los pedidos de la web las siguen usando)
+    const { data: formas } = await admin.from("formas_pago").select("id,nombre,tipo,activa").eq("empresa_id", e);
     const { data: listas } = await admin.from("listas_precios").select("id,predeterminada").eq("empresa_id", e).eq("activa", true);
     const listaBase = (listas || []).find((l: any) => l.predeterminada)?.id || (listas || [])[0]?.id || null;
     // cada medio de pago del canal tiene su forma de pago propia en Percha: "Tienda Nube · Pago Nube", "Tienda Nube · Transferencia bancaria"…
@@ -97,6 +98,7 @@ Deno.serve(async (req) => {
       const nombre = `Tienda Nube · ${(gateway || "Otro").trim()}`;
       let f = (formas || []).find((x: any) => x.nombre.toLowerCase() === nombre.toLowerCase());
       if (!f) { const ins = await admin.from("formas_pago").insert({ empresa_id: e, nombre, tipo: "online", orden: 60 }).select().single(); f = ins.data; (formas || []).push(f); }
+      if (!f) throw new Error(`No se pudo crear la forma de pago "${nombre}"`);
       return f.id;
     };
     let nuevos = 0, anulados = 0, conProblema = 0;
@@ -111,6 +113,7 @@ Deno.serve(async (req) => {
       resumen.push({ conexion: cx.id, desde, pedidos: vista }); continue;
     }
     for (const o of pedidos) {
+      try {
       if (body.solo_pedido && String(o.number) !== String(body.solo_pedido)) continue;   // importar uno solo (pruebas / reintentos)
       const pedidoExt = String(o.id);
       const { data: ya } = await admin.from("canal_pedidos").select("*").eq("conexion_id", cx.id).eq("pedido_ext", pedidoExt).maybeSingle();
@@ -183,7 +186,7 @@ Deno.serve(async (req) => {
       // el descuento del canal (p.ej. 20% por transferencia) se guarda como porcentaje sobre las prendas, con su motivo en la nota
       const descPct = prendas > 0 && descuento > 0 ? Math.round(10000 * descuento / prendas) / 100 : 0;
       const motivoDesc = descuento > 0 ? ` · descuento ${descPct}%${/transfer/i.test(o.gateway_name || o.gateway || "") ? " por transferencia" : ""}` : "";
-      const payload = { empresa_id: e, offline_id: crypto.randomUUID(), tipo: "venta", estado: "completada", caja_id: null, turno_id: null, cliente_id: null, vendedora_id: null, lista_id: listaBase,
+      const payload = { empresa_id: e, offline_id: crypto.randomUUID(), tipo: "venta", estado: "completada", fecha: o.paid_at || o.created_at, caja_id: null, turno_id: null, cliente_id: null, vendedora_id: null, lista_id: listaBase,
         descuento_pct: descPct, descuento, recargo: ajuste, nota: `Tienda Nube #${o.number}${motivoDesc}` + (o.note ? " · " + o.note : ""), origen: "tiendanube", referencia: String(o.number ?? o.id),
         lineas, pagos: [{ forma_pago_id: await formaPara(o.gateway_name || o.gateway), credito_id: null, monto: r2(total + ajuste), cuotas: +o.payment_details?.installments || 1, recargo_pct: 0, referencia: o.gateway_name || null }], creditos_a_emitir: [] };
       // clienta
@@ -204,6 +207,11 @@ Deno.serve(async (req) => {
       }
       if (o.has_shippable_products !== false) { const en = envioDe(o); if (en.envio_costo == null) en.envio_costo = envio || null; await admin.from("ventas").update({ ...en, envio_actualizado: ahora }).eq("id", venta.id); }
       await admin.from("canal_pedidos").upsert({ ...datosPedido, venta_id: venta.id, problema: problemas.length ? problemas.join(" · ") : null }, { onConflict: "conexion_id,pedido_ext" });
+      } catch (err) {
+        // un pedido con un problema no frena a los demás: queda anotado en el pedido y se reintenta en la próxima vuelta
+        conProblema++;
+        await admin.from("canal_pedidos").upsert({ empresa_id: e, conexion_id: cx.id, pedido_ext: String(o.id), numero_ext: String(o.number ?? ""), estado_ext: o.status, pago_ext: o.payment_status, total: +o.total || 0, fecha: o.created_at, cliente: o.customer?.name || o.contact_name || null, problema: "No se pudo cargar: " + String((err as Error)?.message || err).slice(0, 300), actualizado: ahora }, { onConflict: "conexion_id,pedido_ext" });
+      }
     }
     if (!body.solo_pedido && !body.desde) await admin.from("conexiones").update({ ultima_sync_pedidos: ahora }).eq("id", cx.id);
     await admin.from("conexiones").update({ pedidos_hasta: null }).eq("id", cx.id);
