@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Producto · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611040014">
+<link rel="stylesheet" href="../shell/shell.css?v=202611040023">
 <style>
   .dos{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
   .dos>.card{min-width:0;overflow-x:auto}
@@ -136,6 +136,7 @@
         <div class="campo"><label>Código de barras</label><input name="ean" placeholder="Solo si no tiene variantes"><span class="ayuda" id="ayuda-ean"></span></div>
         <div class="campo"><label>Variantes</label><select name="tiene_variantes"><option value="false">No, es un artículo único</option><option value="true">Sí, por talle y color</option></select></div>
         <div class="campo"><label>Estado</label><select name="activo"><option value="true">Activo</option><option value="false">Inactivo</option></select></div>
+        <div class="campo"><label>En la web</label><select name="publicar_web"><option value="true">Sí: se sube sola a Tienda Nube (oculta)</option><option value="false">No: solo en el local</option></select><span class="ayuda" id="web-estado"></span></div>
         <div class="campo"><label>Genérico</label><select name="es_generico" title="Se vende rápido como «varias» y al cobrar el POS pregunta qué modelos se lleva"><option value="false">No</option><option value="true">Sí: al cobrar pregunta el modelo</option></select></div>
       </div>
       <div class="campo"><label>Descripción</label><textarea name="descripcion" rows="2"></textarea></div>
@@ -162,10 +163,10 @@
   </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611040014"></script>
-<script src="../shared/precios.js?v=202611040014"></script>
-<script src="../shared/prenda.js?v=202611040014"></script>
-<script src="../shell/shell.js?v=202611040014"></script>
+<script src="../shared/supabase.js?v=202611040023"></script>
+<script src="../shared/precios.js?v=202611040023"></script>
+<script src="../shared/prenda.js?v=202611040023"></script>
+<script src="../shell/shell.js?v=202611040023"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$ , toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -203,7 +204,7 @@ APP.ready.then(async () => {
   // ---------- carga ----------
   async function cargar() {
     if (!id) { // nuevo
-      $('h1').innerHTML = 'Nuevo <em>producto</em>'; form.tiene_variantes.value = 'true'; form.activo.value = 'true';
+      $('h1').innerHTML = 'Nuevo <em>producto</em>'; form.tiene_variantes.value = 'true'; form.activo.value = 'true'; form.publicar_web.value = 'true';
       $('#card-matriz').style.display = 'none'; $('#tb-mov').parentElement.style.display = 'none'; $('#card-fotos').style.display = 'none';
       pintarPrecios(); pintarAcciones(); pintarMargen(); return;
     }
@@ -218,7 +219,7 @@ APP.ready.then(async () => {
     $('h1').innerHTML = `${esc(producto.nombre)}`;
     document.title = producto.nombre + ' · ' + APP.empresa.nombre;
     ['codigo', 'nombre', 'tipo', 'categoria_id', 'proveedor_id', 'temporada_id', 'marca_id', 'costo', 'precio', 'ean', 'descripcion'].forEach(k => form[k].value = producto[k] ?? '');
-    form.tiene_variantes.value = String(producto.tiene_variantes); form.activo.value = String(producto.activo); form.es_generico.value = String(!!producto.es_generico);
+    form.tiene_variantes.value = String(producto.tiene_variantes); form.activo.value = String(producto.activo); form.publicar_web.value = String(producto.publicar_web !== false); estadoWeb(); form.es_generico.value = String(!!producto.es_generico);
     $('#stock-total').value = fmt.num(variantes.reduce((s, x) => s + (+x.stock || 0), 0));
     $('#ayuda-ean').textContent = producto.tiene_variantes ? 'Con variantes, el código de barras va en cada talle y color.' : '';
     pintarPrecios(); pintarAcciones(); pintarMargen(); pintarFotos(); pintarHistorial(); cargarPctx();
@@ -245,7 +246,7 @@ APP.ready.then(async () => {
       codigo: form.codigo.value.trim(), nombre: form.nombre.value.trim(), tipo: form.tipo.value,
       categoria_id: form.categoria_id.value || null, proveedor_id: form.proveedor_id.value || null, temporada_id: form.temporada_id.value || null, marca_id: form.marca_id.value || null,
       costo: PRECIOS.num(form.costo.value), precio: PRECIOS.num(form.precio.value), ean: form.ean.value.trim() || null,
-      tiene_variantes: form.tiene_variantes.value === 'true', activo: form.activo.value === 'true', es_generico: form.es_generico.value === 'true', descripcion: form.descripcion.value.trim() || null
+      tiene_variantes: form.tiene_variantes.value === 'true', activo: form.activo.value === 'true', publicar_web: form.publicar_web.value === 'true', es_generico: form.es_generico.value === 'true', descripcion: form.descripcion.value.trim() || null
     };
     if (d.tipo === 'kit') { d.tiene_variantes = false; form.tiene_variantes.value = 'false'; }
     return d;
@@ -422,6 +423,25 @@ APP.ready.then(async () => {
   const precioDe = lista => calc(lista).precio;
   const reglaTxt = (l, c) => (l.canal ? '<b>web</b> · ' : '') + reglaTxt0(l, c);
   const reglaTxt0 = (l, c) => c.fijo ? 'precio especial: no sigue al de Lista' : l.predeterminada ? 'precio de la prenda' : (c.pct === 100 ? 'igual a Lista' : (c.pct < 100 ? '−' + fmt.dec(100 - c.pct) : '+' + fmt.dec(c.pct - 100)) + '% sobre Lista') + (c.pct !== +l.porcentaje ? ' <span class="chip" title="Excepción para esta familia o producto">excepción</span>' : '') + (l.toma_rebajas === false ? ' · sin rebajas' : '');
+  // ---------- en la web: si está, si está oculta, o si se está subiendo ----------
+  async function estadoWeb() {
+    const el = $('#web-estado'); if (!el || !id) return;
+    if (form.publicar_web.value !== 'true') { el.textContent = 'No se sube a Tienda Nube.'; return; }
+    const ids = variantes.map(v => v.id);
+    const [{ data: ci }, { data: cola }] = await Promise.all([
+      ids.length ? sb.from('canal_items').select('producto_ext,publicado,variante_id').in('variante_id', ids) : Promise.resolve({ data: [] }),
+      sb.from('canal_publicar').select('estado,error,actualizado,detalle').eq('producto_id', id).order('id', { ascending: false }).limit(1)]);
+    const c = (cola || [])[0], pubs = new Set((ci || []).map(x => x.producto_ext)), visibles = new Set((ci || []).filter(x => x.publicado).map(x => x.producto_ext));
+    const faltan = variantes.filter(v => v.activa !== false && !(ci || []).some(x => x.variante_id === v.id)).length;
+    let t = '';
+    if (c && c.estado === 'pendiente') t = '⏳ Se sube a Tienda Nube en unos minutos (oculta).';
+    else if (c && c.estado === 'error') t = '⚠ No se pudo subir: ' + (c.error || '') + ' · se reintenta solo.';
+    else if (pubs.size) t = (visibles.size ? '✓ En Tienda Nube: ' + (visibles.size === pubs.size ? 'visible' : visibles.size + ' de ' + pubs.size + ' publicaciones visibles') : '✓ En Tienda Nube, oculta: cargale fotos y mostrala desde allá.') + (faltan ? ` · ${faltan} sin publicar` : '');
+    else t = 'Todavía no está en Tienda Nube.';
+    el.textContent = t;
+  }
+  form.publicar_web.addEventListener('change', () => setTimeout(estadoWeb, 1500));
+
   // ---------- oferta ----------
   async function cargarOfertas() {
     ofertas = { promos: {}, actual: null }; if (!id) return;

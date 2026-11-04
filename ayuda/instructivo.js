@@ -359,6 +359,14 @@ window.INSTRUCTIVO = {
       { tipo: 'ojo', texto: 'No uses **Precio especial** para una oferta: ese cambia el precio de **una sola lista** y no se ve tachado. Y no cambies precios en Tienda Nube: todo se hace en Percha.' }
     ] },
 
+    { id: 'prenda-a-la-web', grupo: 'compras', p: 'catalogo_editar', titulo: 'Prenda nueva o color nuevo: va sola a la web', nuevo: '2026-11-04', resumen: 'Se crea en Percha y aparece en Tienda Nube OCULTA, para cargarle las fotos.', bloques: [
+      { tipo: 'pasos', items: ['Creá la prenda en Percha (o agregale el color nuevo, también desde una compra).', 'En unos minutos aparece en **Tienda Nube, oculta**, con sus talles y colores, el precio y el stock.', 'En Tienda Nube cargale las **fotos**, la descripción y la categoría, y **mostrala** desde allá.', 'Las fotos vuelven solas a Percha, cada una con su color.'] },
+      { tipo: 'tabla', filas: [['Prenda nueva', 'una publicación nueva, oculta'], ['Color nuevo', 'oculto: en la publicación de la prenda, o en una publicación nueva si la prenda tiene una por color'], ['Talle nuevo de un color que ya está', 'se suma a esa publicación (ya tiene fotos)']] },
+      { tipo: 'texto', texto: 'En la ficha de la prenda, **En la web** dice en qué anda: "se sube en unos minutos", "oculta: cargale fotos" o "visible".' },
+      { tipo: 'tip', texto: 'Si una prenda es **solo del local**, en la ficha poné **En la web: No**. Las prendas que ya estaban solo en el local no se suben solas.' },
+      { tipo: 'ojo', texto: 'En Tienda Nube solo se cargan **fotos, textos y categorías** y se muestra u oculta. **Stock y precios se manejan en Percha.**' }
+    ] },
+
     // ======================= ATAJOS =======================
     { id: 'teclado', grupo: 'atajos', p: 'vender', titulo: 'Atajos de teclado', resumen: 'Para vender rápido combinando mouse y teclado.', bloques: [
       { tipo: 'tabla', filas: [
