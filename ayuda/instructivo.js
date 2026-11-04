@@ -350,10 +350,11 @@ window.INSTRUCTIVO = {
       { tipo: 'tip', texto: '¿Llegó **solo una parte**? Cuando pregunta si llegó todo, tocá {{Llegó solo una parte}} y poné cuántas llegaron de cada una. Lo que falta queda esperando en la misma compra.' }
     ] },
 
-    { id: 'precio-oferta', grupo: 'compras', p: 'catalogo_editar', titulo: 'Precio de lista y precio de oferta', nuevo: '2026-11-03', resumen: 'Una prenda en oferta: el de lista tachado, en el local y en la web.', bloques: [
-      { tipo: 'pasos', items: ['Abrí la prenda en el **Catálogo**.', 'En **Precios por lista**, el de **Lista** es el precio regular (ej. **$75.000**).', 'Tocá {{▼ Poner precio de oferta}}, escribí a cuánto se vende (ej. **59.990**) y {{Guardar}}.'] },
-      { tipo: 'texto', texto: 'Listo: en la **caja** y en la **web** se ve el de Lista **tachado** y el de oferta. **Contado** y **Débito** parten del precio de oferta. La web se actualiza sola en unos minutos.' },
-      { tipo: 'tip', texto: 'Para cambiarla o sacarla: {{Cambiar oferta}} › nuevo precio, o {{Quitar oferta}} (vuelve al de Lista).' },
+    { id: 'precio-oferta', grupo: 'compras', p: 'catalogo_editar', titulo: 'Precio de lista y oferta', nuevo: '2026-11-03', resumen: 'Una prenda en oferta: el de lista tachado, en el local, en la web o en los dos.', bloques: [
+      { tipo: 'pasos', items: ['Abrí la prenda en el **Catálogo**.', 'En **Precios por lista**, el de **Lista** es el precio regular (ej. **$75.000**).', 'Tocá {{▼ Poner oferta}} y escribí a cuánto se vende (ej. **59.990**).', 'Elegí **dónde vale**: {{En los dos}}, {{Solo en el local}} o {{Solo en la web}}, y tocá {{Guardar}}.'] },
+      { tipo: 'tabla', filas: [['En los dos', 'en la caja y en la web se ve el de Lista tachado'], ['Solo en el local', 'en la caja (local, WhatsApp y otras ventas de Percha); la web sigue al de Lista'], ['Solo en la web', 'en Tienda Nube; la caja sigue al de Lista']] },
+      { tipo: 'texto', texto: '**Contado** y **Débito** parten del precio de oferta. La web se actualiza sola en unos minutos.' },
+      { tipo: 'tip', texto: 'Para cambiarla o sacarla: {{Cambiar oferta}} › nuevo precio o dónde vale, o {{Quitar oferta}} (vuelve al de Lista).' },
       { tipo: 'ojo', texto: 'No uses **Precio especial** para una oferta: ese cambia el precio de **una sola lista** y no se ve tachado. Y no cambies precios en Tienda Nube: todo se hace en Percha.' }
     ] },
 

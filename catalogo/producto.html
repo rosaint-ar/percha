@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Producto · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611040002">
+<link rel="stylesheet" href="../shell/shell.css?v=202611040008">
 <style>
   .dos{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
   .dos>.card{min-width:0;overflow-x:auto}
@@ -74,6 +74,7 @@
   .hist-precios .hp em{font-style:normal;color:var(--tinta-3);margin-left:auto;font-size:11.5px}
   .ficha-producto>.card+.card{margin-top:14px}
   .oferta-prod{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:0 0 10px;padding:9px 12px;border-radius:10px;background:var(--lila);color:var(--acento);font-size:13px}
+  .of-donde{display:flex;gap:6px;flex-wrap:wrap}.of-donde button{border:1px solid var(--linea);background:var(--superficie-2);border-radius:999px;padding:7px 13px;font:600 12.5px var(--f-ui);cursor:pointer;color:var(--tinta-2)}.of-donde button.on{background:var(--acento);border-color:var(--acento);color:#fff}
   .oferta-prod.sin{background:transparent;border:1px dashed var(--linea);color:var(--tinta-3)}
 </style>
 </head>
@@ -161,10 +162,10 @@
   </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611040002"></script>
-<script src="../shared/precios.js?v=202611040002"></script>
-<script src="../shared/prenda.js?v=202611040002"></script>
-<script src="../shell/shell.js?v=202611040002"></script>
+<script src="../shared/supabase.js?v=202611040008"></script>
+<script src="../shared/precios.js?v=202611040008"></script>
+<script src="../shared/prenda.js?v=202611040008"></script>
+<script src="../shell/shell.js?v=202611040008"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$ , toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -403,7 +404,14 @@ APP.ready.then(async () => {
   // ---------- precios ----------
   // reglas de las listas y rebajas (shared/precios.js): se cargan una vez y al fijar/quitar un precio
   let pctx = null;
-  const cargarPctx = async () => { try { pctx = await PRECIOS.cargar(sb, e); } catch (_) { pctx = null; } pintarPrecios(); };
+  // Oferta de la prenda (el de Lista tachado). Dónde vale: en los dos, solo en el local o solo en la web. Cada "dónde" es una
+  // promoción tipo rebaja propia (se crea sola la primera vez); tn-precios manda a Tienda Nube las que valen en la web.
+  const DONDE = [
+    { k: 'ambos', nombre: 'Ofertas · local y web', txt: 'en el local y en la web', boton: 'En los dos' },
+    { k: 'local', nombre: 'Ofertas · solo local', txt: 'solo en el local', boton: 'Solo en el local' },
+    { k: 'web', nombre: 'Ofertas · solo web', txt: 'solo en la web', boton: 'Solo en la web' }];
+  let ofertas = { promos: {}, actual: null };   // promos: k → promoción · actual: { k, id del renglón, precio }
+  const cargarPctx = async () => { try { pctx = await PRECIOS.cargar(sb, e); } catch (_) { pctx = null; } try { await cargarOfertas(); } catch (_) { } pintarPrecios(); };
   function calc(lista) {
     const base = PRECIOS.num(form.precio.value) || (producto && +producto.precio) || 0;
     const v = { id: '', producto_id: id || '', precio: base };
@@ -414,39 +422,58 @@ APP.ready.then(async () => {
   const precioDe = lista => calc(lista).precio;
   const reglaTxt = (l, c) => (l.canal ? '<b>web</b> · ' : '') + reglaTxt0(l, c);
   const reglaTxt0 = (l, c) => c.fijo ? 'precio especial: no sigue al de Lista' : l.predeterminada ? 'precio de la prenda' : (c.pct === 100 ? 'igual a Lista' : (c.pct < 100 ? '−' + fmt.dec(100 - c.pct) : '+' + fmt.dec(c.pct - 100)) + '% sobre Lista') + (c.pct !== +l.porcentaje ? ' <span class="chip" title="Excepción para esta familia o producto">excepción</span>' : '') + (l.toma_rebajas === false ? ' · sin rebajas' : '');
-  // ---------- precio de oferta ----------
-  // la oferta de una prenda vive en la promoción "Ofertas de la web" (vale en el local y en la web, con el de Lista tachado);
-  // tn-precios la manda sola a Tienda Nube como precio promocional
-  const OFERTA = 'Ofertas de la web';
+  // ---------- oferta ----------
+  async function cargarOfertas() {
+    ofertas = { promos: {}, actual: null }; if (!id) return;
+    const { data: ps } = await sb.from('promociones').select('id,nombre').eq('empresa_id', e).eq('tipo', 'rebaja').in('nombre', DONDE.map(d => d.nombre));
+    (ps || []).forEach(p => { const d = DONDE.find(x => x.nombre === p.nombre); if (d && !ofertas.promos[d.k]) ofertas.promos[d.k] = p; });
+    const ids = Object.values(ofertas.promos).map(p => p.id); if (!ids.length) return;
+    const { data: rs } = await sb.from('rebaja_precios').select('id,promocion_id,precio').in('promocion_id', ids).eq('producto_id', id).is('variante_id', null);
+    const r = (rs || [])[0]; if (r) ofertas.actual = { k: Object.keys(ofertas.promos).find(k => ofertas.promos[k].id === r.promocion_id), id: r.id, precio: +r.precio };
+  }
+  // los canales del "local": todos los de Percha menos la web
+  const canalesLocales = async () => { let ks = []; try { const { data } = await sb.from('venta_canales').select('clave').eq('empresa_id', e); ks = (data || []).map(c => c.clave).filter(k => k && k !== 'tiendanube'); } catch (_) { } return [...new Set(['local', 'whatsapp', 'online', ...ks])]; };
   function pintarOferta(cb) {
-    const r = cb && cb.rebaja, el = $('#rebaja-prod'), puede = APP.esAdmin && id;
-    el.innerHTML = r ? `<div class="oferta-prod"><span>▼ <b>${esc(r.nombre)}</b>: ${fmt.pesos(cb.base)} → <b>${fmt.pesos(r.precio)}</b>${r.hasta ? ' hasta el ' + fmt.fecha(r.hasta) : ''}. Se ve tachado en el local y en la web; Contado y Débito parten de este precio.</span>${puede ? '<button class="btn chico" type="button" id="btn-oferta">Cambiar oferta</button>' : ''}</div>`
-      : puede ? '<div class="oferta-prod sin"><span>Sin precio de oferta: se vende al de Lista.</span><button class="btn chico" type="button" id="btn-oferta">▼ Poner precio de oferta</button></div>' : '';
-    const b = $('#btn-oferta'); if (b) b.onclick = () => editarOferta(cb);
+    const el = $('#rebaja-prod'), puede = APP.esAdmin && id, a = ofertas.actual, base = cb ? cb.base : 0;
+    const otra = cb && cb.rebaja && !Object.values(ofertas.promos).some(p => p.id === cb.rebaja.id) ? cb.rebaja : null;   // de otra promoción (un evento, etc.)
+    const boton = t => puede ? `<button class="btn chico" type="button" id="btn-oferta">${t}</button>` : '';
+    if (a) { const d = DONDE.find(x => x.k === a.k) || DONDE[0];
+      el.innerHTML = `<div class="oferta-prod"><span>▼ <b>Oferta ${esc(d.txt)}</b>: ${fmt.pesos(base)} → <b>${fmt.pesos(a.precio)}</b>. El de Lista se ve tachado${a.k === 'web' ? '' : '; Contado y Débito parten de este precio'}.</span>${boton('Cambiar oferta')}</div>`; }
+    else if (otra) el.innerHTML = `<div class="oferta-prod"><span>▼ <b>${esc(otra.nombre)}</b>: ${fmt.pesos(base)} → <b>${fmt.pesos(otra.precio)}</b>${otra.hasta ? ' hasta el ' + fmt.fecha(otra.hasta) : ''}. Se cambia en <a href="../configuracion/promociones.html">Promociones</a>.</span>${boton('▼ Poner oferta')}</div>`;
+    else el.innerHTML = puede ? `<div class="oferta-prod sin"><span>Sin oferta: se vende al precio de Lista.</span>${boton('▼ Poner oferta')}</div>` : '';
+    const bt = $('#btn-oferta'); if (bt) bt.onclick = () => editarOferta(cb);
   }
   async function editarOferta(cb) {
-    if (cb.rebaja && cb.rebaja.nombre !== OFERTA) { if (await confirmar(`Esta oferta es de la promoción "${cb.rebaja.nombre}". Se cambia en Configuración › Promociones. ¿Ir ahora?`, 'Ir a Promociones')) location.href = '../configuracion/promociones.html'; return; }
-    let { data: promo } = await sb.from('promociones').select('id').eq('empresa_id', e).eq('tipo', 'rebaja').eq('nombre', OFERTA).limit(1).maybeSingle();
-    const { data: ya } = promo ? await sb.from('rebaja_precios').select('id,precio').eq('promocion_id', promo.id).eq('producto_id', id).is('variante_id', null).maybeSingle() : { data: null };
-    const m = modal(`<h2>Precio de oferta</h2><p class="sub">${esc(producto.nombre)} · precio de Lista ${fmt.pesos(cb.base)}</p>
-      <div class="campo" style="margin-top:12px"><label>Se vende a</label><input id="of-precio" inputmode="decimal" value="${ya ? fmt.num(ya.precio) : ''}" placeholder="Ej: 59.990" autocomplete="off"></div>
-      <p class="sub" style="font-size:12.5px">El de Lista queda <s>tachado</s>, en el local y en la web (la web se actualiza sola en unos minutos). Contado y Débito parten de este precio.</p>
-      <div class="pie">${ya ? '<button class="btn peligro" data-quitar style="margin-right:auto">Quitar oferta</button>' : ''}<button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Guardar</button></div>`, { fijo: true });
+    const a = ofertas.actual; let donde = a ? a.k : 'ambos';
+    const AYUDA = { ambos: 'En la caja y en la web se ve el de Lista <s>tachado</s>. Contado y Débito parten de este precio.', local: 'Solo en la caja (local, WhatsApp y las otras ventas de Percha). En la web sigue al precio de Lista.', web: 'Solo en Tienda Nube (se actualiza sola en unos minutos). En la caja sigue al precio de Lista.' };
+    const m = modal(`<h2>Oferta</h2><p class="sub">${esc(producto.nombre)} · precio de Lista ${fmt.pesos(cb.base)}</p>
+      <div class="campo" style="margin-top:12px"><label>Se vende a</label><input id="of-precio" inputmode="decimal" value="${a ? fmt.num(a.precio) : ''}" placeholder="Ej: 59.990" autocomplete="off"></div>
+      <div class="campo"><label>Dónde vale</label><div class="of-donde">${DONDE.map(d => `<button type="button" data-d="${d.k}" class="${d.k === donde ? 'on' : ''}">${d.boton}</button>`).join('')}</div></div>
+      <p class="sub" id="of-ayuda" style="font-size:12.5px"></p>
+      <div class="pie">${a ? '<button class="btn peligro" data-quitar style="margin-right:auto">Quitar oferta</button>' : ''}<button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Guardar</button></div>`, { fijo: true });
+    const ayuda = () => { $('#of-ayuda', m).innerHTML = AYUDA[donde]; }; ayuda();
+    $$('[data-d]', m).forEach(b => b.onclick = () => { donde = b.dataset.d; $$('[data-d]', m).forEach(x => x.classList.toggle('on', x === b)); ayuda(); });
     const inp = $('#of-precio', m); inp.focus(); inp.select();
     inp.onkeydown = ev => { if (ev.key === 'Enter') $('[data-si]', m).click(); };
     $('[data-no]', m).onclick = () => m.cerrar();
-    const q = $('[data-quitar]', m); if (q) q.onclick = async () => { const { error } = await sb.from('rebaja_precios').delete().eq('id', ya.id); if (error) { toast(mensajeError(error), 'error'); return; } m.cerrar(); toast('Oferta quitada: vuelve al precio de Lista'); await cargarPctx(); };
+    const todas = () => Object.values(ofertas.promos).map(p => p.id);
+    const q = $('[data-quitar]', m); if (q) q.onclick = async () => { const { error } = await sb.from('rebaja_precios').delete().in('promocion_id', todas()).eq('producto_id', id).is('variante_id', null); if (error) { toast(mensajeError(error), 'error'); return; } m.cerrar(); toast('Oferta quitada: vuelve al precio de Lista'); await cargarPctx(); };
     $('[data-si]', m).onclick = async () => {
       const precio = PRECIOS.num(inp.value);
       if (!(precio > 0)) { toast('Poné el precio de oferta', 'error'); inp.focus(); return; }
       if (precio >= cb.base) { toast('La oferta tiene que ser menor que el precio de Lista (' + fmt.pesos(cb.base) + ')', 'error'); inp.focus(); return; }
+      let promo = ofertas.promos[donde];
       if (!promo) {
-        const r = await sb.from('promociones').insert(APP.conEmpresa({ nombre: OFERTA, tipo: 'rebaja', canal: 'ambos', alcance: 'productos', valor: 0, n: 0, m: 0, activa: true, dias_semana: [1, 2, 3, 4, 5, 6, 7], familia_ids: [], producto_ids: [], formas_pago: [] })).select('id').single();
-        if (r.error) { toast(mensajeError(r.error), 'error'); return; } promo = r.data;
+        const d = DONDE.find(x => x.k === donde), canales = donde === 'ambos' ? null : donde === 'web' ? ['tiendanube'] : await canalesLocales();
+        const r = await sb.from('promociones').insert(APP.conEmpresa({ nombre: d.nombre, tipo: 'rebaja', canal: 'ambos', canales, alcance: 'productos', valor: 0, n: 0, m: 0, activa: true, dias_semana: [1, 2, 3, 4, 5, 6, 7], familia_ids: [], producto_ids: [], formas_pago: [] })).select('id,nombre').single();
+        if (r.error) { toast(mensajeError(r.error), 'error'); return; } promo = r.data; ofertas.promos[donde] = promo;
       }
-      const r = ya ? await sb.from('rebaja_precios').update({ precio }).eq('id', ya.id) : await sb.from('rebaja_precios').insert(APP.conEmpresa({ promocion_id: promo.id, producto_id: id, variante_id: null, precio }));
+      // una sola oferta por prenda: si estaba en otro "dónde", se saca de ahí
+      const otras = todas().filter(x => x !== promo.id);
+      if (otras.length) { const r0 = await sb.from('rebaja_precios').delete().in('promocion_id', otras).eq('producto_id', id).is('variante_id', null); if (r0.error) { toast(mensajeError(r0.error), 'error'); return; } }
+      const r = a && a.k === donde ? await sb.from('rebaja_precios').update({ precio }).eq('id', a.id) : await sb.from('rebaja_precios').insert(APP.conEmpresa({ promocion_id: promo.id, producto_id: id, variante_id: null, precio }));
       if (r.error) { toast(mensajeError(r.error), 'error'); return; }
-      m.cerrar(); toast('Precio de oferta guardado: ' + fmt.pesos(precio)); await cargarPctx();
+      m.cerrar(); toast(`Oferta guardada: ${fmt.pesos(precio)} ${DONDE.find(x => x.k === donde).txt}`); await cargarPctx();
     };
   }
   function pintarPrecios() {
