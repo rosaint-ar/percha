@@ -25,6 +25,60 @@ const MEDIDAS = { weight: "0.010", width: "4.00", height: "4.00", depth: "4.00" 
 const esColor = (a: string) => ["color", "colores", "estampa"].includes(norm(a));
 const esTalle = (a: string) => ["talle", "talles", "talla", "tamano", "medida"].includes(norm(a));
 
+// ---------- la cuenta de precios (copia de tn-precios / shared/precios.js: si se cambia una, cambiar las otras) ----------
+const r2 = (x: number) => Math.round(x * 100) / 100;
+function redondear(x: number, modo: string) {
+  const arriba = /\+$/.test(modo || ""), m = String(modo || "no").replace("+", "");
+  let paso = 0, resta = 0;
+  if (["10", "100", "500", "1000"].includes(m)) paso = +m; else if (m === "990") { paso = 1000; resta = 10; } else if (m === "900") { paso = 1000; resta = 100; } else return Math.max(0, r2(x));
+  const f = arriba ? (v: number) => Math.ceil(r2(v)) : Math.round;
+  if (x < paso - resta) return Math.max(0, f(x));
+  return Math.max(0, f((x + resta) / paso) * paso - resta);
+}
+const hoyAR = () => new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10);
+function vigente(p: any, canal: string) {
+  const f = hoyAR(), dow = ((new Date(f + "T12:00").getDay() + 6) % 7) + 1;
+  if (p.desde && f < p.desde) return false; if (p.hasta && f > p.hasta) return false;
+  if (p.dias_semana && p.dias_semana.length && !p.dias_semana.includes(dow)) return false;
+  if (p.canales && p.canales.length && !p.canales.includes(canal)) return false;
+  return true;
+}
+function armar(d: any) {
+  const excep = new Map<string, number>(), fijos = new Map<string, number>();
+  for (const x of d.excep) excep.set(x.lista_id + "|" + (x.producto_id ? "p" + x.producto_id : "c" + x.categoria_id), +x.porcentaje);
+  for (const x of d.fijos) fijos.set(x.lista_id + "|" + x.producto_id + "|" + (x.variante_id || ""), +x.precio);
+  const rebajas = d.rebajas.map((p: any) => ({ p, precios: new Map<string, number>() }));
+  const porId = new Map(rebajas.map((r: any) => [r.p.id, r]));
+  for (const x of d.rp) { const r: any = porId.get(x.promocion_id); if (r) r.precios.set(x.producto_id + "|" + (x.variante_id || ""), +x.precio); }
+  const base = d.listas.find((l: any) => l.predeterminada && !l.canal) || d.listas.find((l: any) => !l.canal) || { redondeo: "10+" };
+  return { listas: d.listas, excep, fijos, rebajas, base };
+}
+function rebajaDe(v: any, ctx: any, op: any) {
+  const base = +v.precio || 0; let mejor: any = null;
+  for (const { p, precios } of ctx.rebajas) {
+    if (!vigente(p, op.canal)) continue;
+    let pr = precios.get(v.producto_id + "|" + v.id); if (pr == null) pr = precios.get(v.producto_id + "|");
+    if (pr == null && +p.valor > 0) {
+      const alcanza = p.alcance === "familias" ? (p.familia_ids || []).includes(op.categoria_id) : p.alcance === "productos" ? (p.producto_ids || []).includes(v.producto_id) : (op.tipo || "prenda") === "prenda";
+      if (alcanza) pr = redondear(base * (1 - +p.valor / 100), ctx.base.redondeo || "10+");
+    }
+    if (pr != null && pr < base && (!mejor || pr < mejor.precio)) mejor = { id: p.id, nombre: p.nombre, precio: pr };
+  }
+  return mejor;
+}
+function calcular(v: any, lista: any, ctx: any, op: any) {
+  const base = +v.precio || 0;
+  let fijo = ctx.fijos.get(lista.id + "|" + v.producto_id + "|" + v.id); if (fijo == null) fijo = ctx.fijos.get(lista.id + "|" + v.producto_id + "|");
+  if (fijo != null) return { precio: fijo, rebaja: null };
+  const rebaja = lista.toma_rebajas !== false && !op.sinRebajas ? rebajaDe(v, ctx, op) : null;
+  const punto = rebaja ? rebaja.precio : base;
+  let pct = ctx.excep.get(lista.id + "|p" + v.producto_id);
+  if (pct == null && op.categoria_id) pct = ctx.excep.get(lista.id + "|c" + op.categoria_id);
+  if (pct == null) pct = +lista.porcentaje || 100;
+  return { precio: pct === 100 ? punto : redondear(punto * pct / 100, lista.redondeo || "10+"), rebaja };
+}
+
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   const admin = createClient(SB_URL, SERVICE);
@@ -64,6 +118,19 @@ Deno.serve(async (req) => {
       throw new Error("Tienda Nube: demasiados pedidos seguidos");
     };
     const e = cx.empresa_id, res: any = { conexion: cx.id, publicados: [], fotos: null };
+    let ctxPrecios: any = null, listaTN: any = null;
+    const pagT = async (q: () => any) => { let todo: any[] = []; for (let d = 0; ; d += 1000) { const { data } = await q().range(d, d + 999); todo = todo.concat(data || []); if (!data || data.length < 1000) break; } return todo; };
+    const cargarPrecios = async () => {
+      if (ctxPrecios) return;
+      const [listas, excep, fijos, rebajas, rp] = await Promise.all([
+        pagT(() => admin.from("listas_precios").select("*").eq("empresa_id", e).eq("activa", true).order("orden")),
+        pagT(() => admin.from("lista_excepciones").select("lista_id,categoria_id,producto_id,porcentaje").eq("empresa_id", e)),
+        pagT(() => admin.from("precios").select("lista_id,producto_id,variante_id,precio").eq("empresa_id", e)),
+        pagT(() => admin.from("promociones").select("*").eq("empresa_id", e).eq("activa", true).eq("tipo", "rebaja")),
+        pagT(() => admin.from("rebaja_precios").select("promocion_id,producto_id,variante_id,precio").eq("empresa_id", e))]);
+      ctxPrecios = armar({ listas, excep, fijos, rebajas, rp });
+      listaTN = listas.find((l: any) => l.canal === "tiendanube") || ctxPrecios.base;
+    };
 
     // ================= 1) publicar lo nuevo =================
     let cola: any[] = [];
@@ -87,10 +154,10 @@ Deno.serve(async (req) => {
     }
 
     async function publicarProducto(q: any) {
-      const { data: p } = await admin.from("productos").select("id,codigo,nombre,precio,tipo,activo,es_generico,publicar_web").eq("id", q.producto_id).single();
+      const { data: p } = await admin.from("productos").select("id,codigo,nombre,precio,tipo,activo,es_generico,publicar_web,categoria_id").eq("id", q.producto_id).single();
       if (!p) return { omitido: "el producto no existe" };
       if (!p.activo || p.es_generico || !p.publicar_web || !["prenda", "varios"].includes(p.tipo)) return { omitido: "no va a la web (inactivo, genérico, kit o marcado solo local)" };
-      const { data: vs } = await admin.from("v_variantes").select("id,talle,talle_nombre,talle_orden,color,color_nombre,precio,stock_web,activa").eq("producto_id", p.id).eq("activa", true);
+      const { data: vs } = await admin.from("v_variantes").select("id,producto_id,talle,talle_nombre,talle_orden,color,color_nombre,precio,stock_web,activa").eq("producto_id", p.id).eq("activa", true);
       const variantes = (vs || []).sort((a: any, b: any) => String(a.color_nombre || "").localeCompare(String(b.color_nombre || "")) || (a.talle_orden ?? 999) - (b.talle_orden ?? 999));
       if (!variantes.length) return { omitido: "no tiene variantes activas" };
       const { data: cruces } = await admin.from("canal_items").select("variante_id,producto_ext,variante_ext").eq("conexion_id", cx.id).in("variante_id", variantes.map((v: any) => v.id));
@@ -98,10 +165,15 @@ Deno.serve(async (req) => {
       let nuevas = variantes.filter((v: any) => !cruzadas.has(v.id));
       if (Array.isArray(q.variantes) && q.variantes.length) nuevas = nuevas.filter((v: any) => q.variantes.includes(v.id));   // solo las que se crearon (no las que alguien dejó afuera de la web a propósito)
       if (!nuevas.length) return { omitido: "ya está todo en la web" };
-      const precioDe = (v: any) => (+v.precio || +p.precio || 0).toFixed(2);
+      // el precio de la lista de la web y su oferta (la misma cuenta que tn-precios: la web sale con su precio tachado)
+      await cargarPrecios();
+      const op = { canal: "tiendanube", categoria_id: p.categoria_id, tipo: p.tipo };
+      const precioN = (v: any) => calcular({ ...v, precio: +v.precio || +p.precio || 0 }, listaTN, ctxPrecios, { ...op, sinRebajas: true }).precio;
+      const promoN = (v: any) => { const c = calcular({ ...v, precio: +v.precio || +p.precio || 0 }, listaTN, ctxPrecios, op); return c.rebaja && c.precio < precioN(v) ? c.precio : null; };
+      const precioDe = (v: any) => (+precioN(v) || 0).toFixed(2);
       const variante = (v: any, attrs: string[], visible: boolean) => ({
         values: attrs.map((a) => ({ es: esColor(a) ? v.color_nombre : esTalle(a) ? v.talle_nombre : "" })),
-        price: precioDe(v), stock: Math.max(0, Math.floor(+v.stock_web || 0)), sku: p.codigo, mpn: p.codigo, ...MEDIDAS, ...(visible ? {} : { visible: false }) });
+        price: precioDe(v), ...(promoN(v) ? { promotional_price: (+promoN(v)).toFixed(2) } : {}), stock: Math.max(0, Math.floor(+v.stock_web || 0)), sku: p.codigo, mpn: p.codigo, ...MEDIDAS, ...(visible ? {} : { visible: false }) });
       const attrsPara = (vs2: any[]) => [...(vs2.some((v) => v.color) ? ["Color"] : []), ...(vs2.some((v) => v.talle) ? ["Talle"] : [])];
       const avisos: string[] = [], creadas: any[] = [], publicaciones: any[] = [];
       // guardar el cruce de lo que se creó (stock y precios siguen solos desde acá)
@@ -109,7 +181,7 @@ Deno.serve(async (req) => {
         creadas.push({ variante: [v.color_nombre, v.talle_nombre].filter(Boolean).join(" ") || "única", publicacion: String(prodTN.id), variante_ext: String(varTN.id), visible: varTN.visible !== false });
         if (simular) return;
         await admin.from("canal_items").upsert({ empresa_id: e, conexion_id: cx.id, producto_ext: String(prodTN.id), variante_ext: String(varTN.id), nombre: es(prodTN.name), valores: (varTN.values || []).map(es).join(" / "),
-          sku: p.codigo, mpn: p.codigo, talle_canal: v.talle_nombre || null, color_canal: v.color_nombre || null, precio: +precioDe(v), stock: Math.max(0, Math.floor(+v.stock_web || 0)),
+          sku: p.codigo, mpn: p.codigo, talle_canal: v.talle_nombre || null, color_canal: v.color_nombre || null, precio: +precioDe(v), precio_promo: promoN(v), stock: Math.max(0, Math.floor(+v.stock_web || 0)),
           publicado: prodTN.published !== false, variante_id: v.id, cruce: "manual", actualizado: new Date().toISOString() }, { onConflict: "conexion_id,variante_ext" });
       };
       const emparejar = (varsTN: any[], attrs: string[], v: any) => varsTN.find((x: any) => attrs.every((a, i) => norm(es((x.values || [])[i])) === norm(esColor(a) ? v.color_nombre : esTalle(a) ? v.talle_nombre : "")));
