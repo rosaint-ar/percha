@@ -367,6 +367,12 @@ window.INSTRUCTIVO = {
       { tipo: 'ojo', texto: 'En Tienda Nube solo se cargan **fotos, textos y categorías** y se muestra u oculta. **Stock y precios se manejan en Percha.**' }
     ] },
 
+    { id: 'canje', grupo: 'consultas', p: 'ventas_todas', titulo: 'Canje con una influencer', nuevo: '2026-11-05', resumen: 'Prendas sin cargo que salen del stock pero no cuentan como venta.', bloques: [
+      { tipo: 'pasos', items: ['**Ventas** › pestaña {{Canjes}} › {{🤝 Nuevo canje}}.', 'Poné la **fecha**, la **clienta** (si es nueva, con teléfono) y buscá las **prendas** que se lleva.', 'Si se le mandó: elegí la **entrega** (cadete, correo), lo que **pagó el local** por el envío y la dirección.', 'Tocá {{Registrar canje}} y, si querés, imprimí el **remito de canje**.'] },
+      { tipo: 'texto', texto: 'Las prendas **salen del stock** (y de la web), pero el canje **no cuenta como venta**: no aparece en el Inicio, ni en las métricas, ni en el cierre de caja, y no se factura.' },
+      { tipo: 'tip', texto: 'En {{Canjes}} se ve cuántos canjes hubo, cuántas prendas, cuánto valen a precio de lista y **cuánto le costaron al local** (prendas + envíos).' }
+    ] },
+
     // ======================= ATAJOS =======================
     { id: 'teclado', grupo: 'atajos', p: 'vender', titulo: 'Atajos de teclado', resumen: 'Para vender rápido combinando mouse y teclado.', bloques: [
       { tipo: 'tabla', filas: [

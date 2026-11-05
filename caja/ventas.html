@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ventas · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611040023">
+<link rel="stylesheet" href="../shell/shell.css?v=202611052318">
 <style>
   .filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
   .filtros input[type=date],.filtros select{border:1px solid var(--linea);background:var(--superficie-2);padding:8px 10px;border-radius:var(--radio-mini)}
@@ -42,7 +42,7 @@
 </head>
 <body data-page="ventas" data-etq="Caja" data-title="Ventas" data-subtitle="Tickets, señas, cambios y cierres de caja">
 <main class="app">
-  <div class="pestanas"><button class="on" data-t="ventas">Ventas</button><button data-t="senas">Señas pendientes</button><button data-t="cierres">Cierres de caja</button><button data-t="creditos">Créditos y gift cards</button><a class="aviso-revisar" id="n-revisar" href="../catalogo/inventario.html#stock" style="display:none"></a></div>
+  <div class="pestanas"><button class="on" data-t="ventas">Ventas</button><button data-t="senas">Señas pendientes</button><button data-t="cierres">Cierres de caja</button><button data-t="creditos">Créditos y gift cards</button><button data-t="canjes">Canjes</button><a class="aviso-revisar" id="n-revisar" href="../catalogo/inventario.html#stock" style="display:none"></a></div>
   <section id="t-ventas">
     <div class="filtros"><span class="periodos" id="f-per"><button type="button" data-per="hoy">Hoy</button><button type="button" data-per="mes" class="on">Este mes</button><button type="button" data-per="pasado">Mes pasado</button></span><input type="date" id="f-desde"><span class="sub">a</span><input type="date" id="f-hasta"><select id="f-estado"><option value="">Todas</option><option value="completada">Completadas</option><option value="senada">Señadas</option><option value="anulada">Anuladas</option></select><select id="f-origen"><option value="">Local y online</option><option value="local">Solo local</option><option value="online">Solo online (Tienda Nube, WhatsApp…)</option><option value="tiendanube">Tienda Nube</option><option value="whatsapp">WhatsApp</option><option value="factusol">FactuSOL</option></select><span class="sub" id="resumen" style="margin-left:auto"></span></div>
     <div class="sub" id="fs-estado" style="display:none;margin:-6px 0 12px;align-items:center;gap:10px"></div>
@@ -52,15 +52,20 @@
   <section id="t-senas" style="display:none"><div class="card" style="padding:0"><table class="lista" id="tb-senas"><thead><tr><th>Ticket</th><th>Fecha</th><th>Clienta</th><th class="num">Total</th><th class="num">Pagado</th><th class="num">Saldo</th><th></th></tr></thead><tbody></tbody></table></div></section>
   <section id="t-cierres" style="display:none"><div class="card" style="padding:0"><table class="lista" id="tb-cierres"><thead><tr><th>Caja</th><th>Abierta</th><th>Cerrada</th><th class="num">Ventas</th><th class="num">Diferencia</th><th></th></tr></thead><tbody></tbody></table></div></section>
   <section id="t-creditos" style="display:none"><div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button class="btn primario" id="btn-gift" hidden>🎁 Cargar gift card</button></div><div class="card" style="padding:0"><table class="lista" id="tb-creditos"><thead><tr><th>Código</th><th>Tipo</th><th>Clienta</th><th>Emitido</th><th class="num">Monto</th><th class="num">Saldo</th><th>Estado</th></tr></thead><tbody></tbody></table></div></section>
+  <section id="t-canjes" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap"><p class="sub" style="margin:0">Prendas entregadas sin cargo (influencers): salen del stock, pero <b>no cuentan como venta</b> en Inicio, métricas ni cierres.</p><button class="btn primario" id="btn-canje">🤝 Nuevo canje</button></div>
+    <section class="tiles" id="tiles-canjes"></section>
+    <div class="card" style="padding:0"><table class="lista" id="tb-canjes"><thead><tr><th>Nº</th><th>Fecha</th><th>Clienta</th><th>Prendas</th><th class="num">Valor de lista</th><th class="num">Costo prendas</th><th class="num">Envío</th><th class="num">Costo total</th><th></th></tr></thead><tbody></tbody></table></div>
+  </section>
 </main>
 <div id="impresion"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611040023"></script>
-<script src="../shared/canales.js?v=202611040023"></script>
-<script src="../shell/shell.js?v=202611040023"></script>
-<script src="../shared/ticket-cambio.js?v=202611040023"></script>
-<script src="../shared/nota-credito.js?v=202611040023"></script>
-<script src="../shared/facturar.js?v=202611040023"></script>
+<script src="../shared/supabase.js?v=202611052318"></script>
+<script src="../shared/canales.js?v=202611052318"></script>
+<script src="../shell/shell.js?v=202611052318"></script>
+<script src="../shared/ticket-cambio.js?v=202611052318"></script>
+<script src="../shared/nota-credito.js?v=202611052318"></script>
+<script src="../shared/facturar.js?v=202611052318"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -71,7 +76,7 @@ APP.ready.then(async () => {
   ponerPeriodo('mes');
   $$('#f-per button').forEach(b => b.onclick = () => { ponerPeriodo(b.dataset.per); cargar(); });
   const ESTADO = { completada: '<span class="chip ok">completada</span>', senada: '<span class="chip aviso">señada</span>', anulada: '<span class="chip error">anulada</span>' };
-  const TIPO = { venta: '', cambio: ' <span class="chip">cambio</span>', devolucion: ' <span class="chip">devolución</span>' };
+  const TIPO = { venta: '', cambio: ' <span class="chip">cambio</span>', devolucion: ' <span class="chip">devolución</span>', canje: ' <span class="chip">🤝 canje</span>' };
   const ORIGEN = { local: 'Local', whatsapp: 'WhatsApp', tiendanube: 'Tienda Nube', mercadolibre: 'Mercado Libre', online: 'Online', factusol: 'FactuSOL' };
   // canales (etiquetas): Configuración › Canales de venta; se cambian tocando la etiqueta
   const CANL = await CANALES.cargar(e);
@@ -90,7 +95,7 @@ APP.ready.then(async () => {
     const [v, c, f] = await Promise.all([sb.from('v_vendedoras').select('*').eq('empresa_id', e).order('nombre'), sb.from('clientes').select('id,nombre').eq('empresa_id', e).order('nombre').limit(2000), sb.from('formas_pago').select('*').eq('empresa_id', e).eq('activa', true).order('orden')]);
     vendedoras = v.data || []; clientes = c.data || []; formas = f.data || [];
   }
-  $$('.pestanas button').forEach(b => b.onclick = () => { $$('.pestanas button').forEach(x => x.classList.toggle('on', x === b)); ['ventas', 'senas', 'cierres', 'creditos'].forEach(t => $('#t-' + t).style.display = t === b.dataset.t ? '' : 'none'); ({ ventas: cargar, senas: cargarSenas, cierres: cargarCierres, creditos: cargarCreditos })[b.dataset.t](); });
+  $$('.pestanas button').forEach(b => b.onclick = () => { $$('.pestanas button').forEach(x => x.classList.toggle('on', x === b)); ['ventas', 'senas', 'cierres', 'creditos', 'canjes'].forEach(t => $('#t-' + t).style.display = t === b.dataset.t ? '' : 'none'); ({ ventas: cargar, senas: cargarSenas, cierres: cargarCierres, creditos: cargarCreditos, canjes: cargarCanjes })[b.dataset.t](); });
 
   let facturaLista = false;
   async function cargar() {
@@ -99,14 +104,14 @@ APP.ready.then(async () => {
     if ($('#f-estado').value) c = c.eq('estado', $('#f-estado').value);
     const fo = $('#f-origen').value; if (fo === 'online') c = c.in('origen', ONLINE); else if (fo) c = c.eq('origen', fo);
     const { data, error } = await c; if (error) { toast(mensajeError(error), 'error'); return; }
-    const v = data || [], ok = v.filter(x => x.estado === 'completada');
+    const v = data || [], ok = v.filter(x => x.estado === 'completada' && x.tipo !== 'canje');   // un canje no es una venta
     const nLocal = ok.filter(x => !ONLINE.includes(x.origen)).length, nOnline = ok.length - nLocal;
     const total = ok.reduce((s, x) => s + +x.total, 0), costo = ok.reduce((s, x) => s + +x.costo, 0);
     $('#tiles').innerHTML = `<div class="tile"><div class="t">Ventas</div><div class="n">${ok.length}</div><div class="d">${nLocal} local · ${nOnline} online${v.some(x => x.estado === 'anulada') ? ' · ' + v.filter(x => x.estado === 'anulada').length + ' anuladas' : ''}${v.some(x => x.estado === 'senada') ? ' · ' + v.filter(x => x.estado === 'senada').length + ' señadas' : ''}</div></div>
       <div class="tile destacada"><div class="t">Vendido</div><div class="n">${fmt.pesos(total)}</div><div class="d">ticket promedio ${fmt.pesos(ok.length ? total / ok.length : 0)}</div></div>
       <div class="tile"><div class="t">Prendas</div><div class="n">${fmt.num(ok.reduce((s, x) => s + +x.lineas, 0))}</div><div class="d">líneas vendidas</div></div>
       ${APP.puede('costos') ? `<div class="tile"><div class="t">Margen bruto</div><div class="n">${total ? fmt.pct(100 * (total - costo) / total) : '—'}</div><div class="d">${fmt.pesos(total - costo)} de ganancia</div></div>` : ''}`;
-    const tb = $('#tb tbody'); tb.innerHTML = v.map(x => `<tr class="clic" data-id="${x.id}"><td class="mono">#${String(x.numero).padStart(6, '0')}${TIPO[x.tipo] || ''}</td><td>${fmt.fechaHora(x.fecha)}</td><td>${canalEditable(x.id, x.origen)}</td><td>${esc(x.cliente_nombre || '—')}</td><td>${esc(x.vendedora_nombre || '—')}</td><td><small>${esc(x.pagos || '')}</small></td><td class="num num-f">${fmt.pesos(x.total)}</td><td>${ESTADO[x.estado] || x.estado}</td><td>${FACTURA.chip(x) || (x.estado === 'completada' && facturaLista ? `<button class="btn chico" data-fact="${x.id}">Facturar</button>` : '')}</td><td><button class="btn chico" data-ver="${x.id}">Ver</button></td></tr>`).join('') || '<tr><td colspan="10" class="vacio">Sin ventas en ese período.</td></tr>';
+    const tb = $('#tb tbody'); tb.innerHTML = v.map(x => `<tr class="clic" data-id="${x.id}"><td class="mono">#${String(x.numero).padStart(6, '0')}${TIPO[x.tipo] || ''}</td><td>${fmt.fechaHora(x.fecha)}</td><td>${canalEditable(x.id, x.origen)}</td><td>${esc(x.cliente_nombre || '—')}</td><td>${esc(x.vendedora_nombre || '—')}</td><td><small>${esc(x.pagos || '')}</small></td><td class="num num-f">${fmt.pesos(x.total)}</td><td>${ESTADO[x.estado] || x.estado}</td><td>${FACTURA.chip(x) || (x.estado === 'completada' && x.tipo !== 'canje' && facturaLista ? `<button class="btn chico" data-fact="${x.id}">Facturar</button>` : '')}</td><td><button class="btn chico" data-ver="${x.id}">Ver</button></td></tr>`).join('') || '<tr><td colspan="10" class="vacio">Sin ventas en ese período.</td></tr>';
     $$('[data-ver]', tb).forEach(b => b.onclick = () => verVenta(b.dataset.ver));
     $$('[data-canal]', tb).forEach(b => b.onclick = ev => { ev.stopPropagation(); const x = v.find(y => y.id === b.dataset.canal); cambiarCanal(x.id, x.origen, cargar); });
     $$('[data-fact]', tb).forEach(b => b.onclick = ev => { ev.stopPropagation(); FACTURA.abrir(v.find(x => x.id === b.dataset.fact), { alTerminar: cargar }); });
@@ -115,15 +120,15 @@ APP.ready.then(async () => {
   async function verVenta(id) {
     const [{ data: v }, { data: ls }, { data: ps }] = await Promise.all([sb.from('v_ventas').select('*').eq('id', id).single(), sb.from('venta_lineas').select('*').eq('venta_id', id).order('id'), sb.from('venta_pagos').select('*, formas_pago(nombre), creditos(codigo,tipo)').eq('venta_id', id)]);
     const { data: ncs } = await sb.from('creditos').select('*, clientes(nombre,telefono)').eq('empresa_id', e).eq('origen_venta_id', id);
-    const m = modal(`<h2>Ticket #${String(v.numero).padStart(6, '0')} ${ESTADO[v.estado]} ${canalEditable(v.id, v.origen)}</h2><p class="sub">${fmt.fechaHora(v.fecha)} · ${v.vendedora_nombre ? 'atendió ' + esc(v.vendedora_nombre) : 'sin vendedora'}${v.cliente_nombre ? ' · ' + esc(v.cliente_nombre) : ''}${v.referencia ? ' · ref. ' + esc(v.referencia) : ''}${v.nota ? ' · ' + esc(v.nota) : ''}${v.anulada_motivo ? ' · anulada: ' + esc(v.anulada_motivo) : ''}</p>
+    const m = modal(`<h2>Ticket #${String(v.numero).padStart(6, '0')} ${ESTADO[v.estado]}${TIPO[v.tipo] || ''} ${canalEditable(v.id, v.origen)}</h2><p class="sub">${fmt.fechaHora(v.fecha)} · ${v.vendedora_nombre ? 'atendió ' + esc(v.vendedora_nombre) : 'sin vendedora'}${v.cliente_nombre ? ' · ' + esc(v.cliente_nombre) : ''}${v.referencia ? ' · ref. ' + esc(v.referencia) : ''}${v.nota ? ' · ' + esc(v.nota) : ''}${v.anulada_motivo ? ' · anulada: ' + esc(v.anulada_motivo) : ''}</p>
       <table class="lista detalle" style="margin-top:10px">${ls.map(l => `<tr><td>${l.cantidad}× ${esc(l.descripcion)}${l.falla ? ' <span title="Prenda con falla" style="color:#8a6400">◆</span>' : ''}<br><small>${esc([l.talle, l.color].filter(Boolean).join(' · '))}${l.promocion_nombre ? ' · ★ ' + esc(l.promocion_nombre) : ''}${+l.descuento_pct ? ' · ' + fmt.pesos(l.precio_lista) + ' −' + fmt.dec(+l.descuento_pct) + '%' : ''}</small></td><td class="num">${fmt.pesos(l.total)}</td></tr>`).join('')}
       ${+v.descuento ? `<tr><td>Descuento ${v.descuento_pct}%</td><td class="num">−${fmt.pesos(v.descuento)}</td></tr>` : ''}${+v.recargo ? `<tr><td>Recargo</td><td class="num">${fmt.pesos(v.recargo)}</td></tr>` : ''}
       <tr><td><b>Total</b></td><td class="num num-f">${fmt.pesos(v.total)}</td></tr>
       ${ps.map(p => `<tr><td><small>${esc(p.formas_pago ? p.formas_pago.nombre : (p.creditos ? (p.creditos.tipo === 'gift_card' ? 'Gift card ' : 'Nota de crédito ') + p.creditos.codigo : ''))}${p.cuotas > 1 ? ' · ' + p.cuotas + ' cuotas' : ''}</small></td><td class="num"><small>${fmt.pesos(p.monto)}</small></td></tr>`).join('')}
       ${+v.saldo ? `<tr><td><b>Saldo pendiente</b></td><td class="num" style="color:var(--aviso)"><b>${fmt.pesos(v.saldo)}</b></td></tr>` : ''}</table>
-      ${v.factura_id || (v.estado === 'completada' && facturaLista) ? `<div class="aviso-caja ${v.factura_estado === 'autorizado' ? 'ok' : v.factura_estado === 'rechazado' ? 'error' : 'info'}" style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px"><span>${v.factura_estado === 'autorizado' ? 'Factura ' + esc(v.factura_numero) + (v.nc_id ? (v.nc_estado === 'autorizado' ? ' · anulada con nota de crédito' : ' · nota de crédito en cola') : '') : v.factura_estado === 'pendiente' ? 'Factura en cola: sale sola apenas ARCA responda' : v.factura_estado === 'rechazado' ? 'ARCA rechazó la factura' : 'Sin factura'}</span><span style="display:flex;gap:6px">${v.factura_estado === 'autorizado' ? `<a class="btn chico" target="_blank" href="${FACTURA.urlFactura(v.factura_id)}">Ver factura</a>${v.nc_id && v.nc_estado === 'autorizado' ? `<a class="btn chico" target="_blank" href="${FACTURA.urlFactura(v.nc_id)}">Ver nota de crédito</a>` : ''}` : v.estado === 'completada' && v.factura_estado !== 'pendiente' ? `<button class="btn chico primario" data-facturar>${v.factura_estado === 'rechazado' ? 'Volver a facturar' : 'Facturar'}</button>` : ''}</span></div>` : ''}
+      ${v.factura_id || (v.estado === 'completada' && v.tipo !== 'canje' && facturaLista) ? `<div class="aviso-caja ${v.factura_estado === 'autorizado' ? 'ok' : v.factura_estado === 'rechazado' ? 'error' : 'info'}" style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px"><span>${v.factura_estado === 'autorizado' ? 'Factura ' + esc(v.factura_numero) + (v.nc_id ? (v.nc_estado === 'autorizado' ? ' · anulada con nota de crédito' : ' · nota de crédito en cola') : '') : v.factura_estado === 'pendiente' ? 'Factura en cola: sale sola apenas ARCA responda' : v.factura_estado === 'rechazado' ? 'ARCA rechazó la factura' : 'Sin factura'}</span><span style="display:flex;gap:6px">${v.factura_estado === 'autorizado' ? `<a class="btn chico" target="_blank" href="${FACTURA.urlFactura(v.factura_id)}">Ver factura</a>${v.nc_id && v.nc_estado === 'autorizado' ? `<a class="btn chico" target="_blank" href="${FACTURA.urlFactura(v.nc_id)}">Ver nota de crédito</a>` : ''}` : v.estado === 'completada' && v.factura_estado !== 'pendiente' ? `<button class="btn chico primario" data-facturar>${v.factura_estado === 'rechazado' ? 'Volver a facturar' : 'Facturar'}</button>` : ''}</span></div>` : ''}
       ${(ncs || []).map(c => `<div class="aviso-caja ok" style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px"><span>${c.tipo === 'gift_card' ? 'Gift card' : 'Nota de crédito'} <b class="mono">${esc(c.codigo)}</b> · ${fmt.pesos(c.monto)}${+c.saldo !== +c.monto ? ' · saldo ' + fmt.pesos(c.saldo) : ''}</span><button class="btn chico" data-nc="${c.id}">Ver e imprimir</button></div>`).join('')}
-      <div class="pie" style="justify-content:space-between"><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn" data-print>Reimprimir</button>${v.estado === 'senada' ? '<button class="btn" data-comp>🎟️ Comprobante de seña</button>' : ''}${v.estado !== 'anulada' && TICKET_CAMBIO.prendas(ls).length ? '<button class="btn" data-regalo title="Para regalo: el número de ticket y las prendas, sin precios">🎁 Ticket de cambio</button>' : ''}${v.estado !== 'anulada' ? `<button class="btn primario" data-editar>Editar</button><a class="btn" href="pos.html?cambio=${v.numero}">Cambio / devolución</a>` : ''}</div>
+      <div class="pie" style="justify-content:space-between"><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn" data-print>${v.tipo === 'canje' ? '🖨️ Remito de canje' : 'Reimprimir'}</button>${v.estado === 'senada' ? '<button class="btn" data-comp>🎟️ Comprobante de seña</button>' : ''}${v.estado !== 'anulada' && TICKET_CAMBIO.prendas(ls).length ? '<button class="btn" data-regalo title="Para regalo: el número de ticket y las prendas, sin precios">🎁 Ticket de cambio</button>' : ''}${v.estado !== 'anulada' && v.tipo !== 'canje' ? `<button class="btn primario" data-editar>Editar</button><a class="btn" href="pos.html?cambio=${v.numero}">Cambio / devolución</a>` : ''}</div>
       <div style="display:flex;gap:6px">${v.origen !== 'tiendanube' && v.factura_estado !== 'autorizado' ? '<button class="btn" data-prueba title="Borra la venta como si no hubiera existido: vuelve el stock y sale de la caja">🧪 Era de prueba</button>' : ''}${v.estado !== 'anulada' ? '<button class="btn peligro" data-anular>Anular</button>' : ''}</div></div>`);
     { const ce = $('[data-canal]', m); if (ce) ce.onclick = () => cambiarCanal(v.id, v.origen, () => { m.cerrar(); cargar(); }); }
     $('[data-print]', m).onclick = () => { imprimir(v, ls, ps); window.print(); };
@@ -231,12 +236,110 @@ APP.ready.then(async () => {
   }
   function imprimir(v, ls, ps) {
     const emp = APP.empresa, cambio = v.tipo === 'cambio' || v.tipo === 'devolucion';
+    if (v.tipo === 'canje') {
+      $('#impresion').innerHTML = `${emp.logo_url ? `<div class="c"><img src="${esc(emp.logo_url)}" alt="" style="max-width:42mm;max-height:20mm;margin:0 auto 4px;display:block"></div>` : ''}<h2 class="c">${esc(emp.nombre)}</h2><div class="c">${esc([emp.domicilio, emp.localidad].filter(Boolean).join(' · '))}</div><hr>
+        <div class="c"><b>REMITO DE CANJE</b></div><div>Nº ${String(v.numero).padStart(6, '0')} · ${fmt.fechaHora(v.fecha)}</div>${v.cliente_nombre ? `<div>Para: <b>${esc(v.cliente_nombre)}</b></div>` : ''}${v.envio_direccion ? `<div>${esc(v.envio_direccion)}</div>` : ''}<hr>
+        <table>${ls.filter(l => l.variante_id).map(l => `<tr><td>${+l.cantidad}× ${esc(l.descripcion)}<br><small>${esc([l.talle, l.color].filter(Boolean).join(' · '))}</small></td></tr>`).join('')}</table><hr>
+        <div class="c">Entrega sin cargo por canje. <b>No es una venta</b> ni tiene valor comercial.</div><br><br><div>Recibí conforme: ____________________</div>`;
+      return;
+    }
     const fila = l => `<tr><td>${cambio ? Math.abs(l.cantidad) : l.cantidad}× ${esc(l.descripcion)}<br><small>${esc([l.talle, l.color].filter(Boolean).join(' · '))}</small></td><td class="r">${fmt.pesos(cambio ? Math.abs(l.total) : l.total)}</td></tr>`;
     const grupo = (t, xs) => xs.length ? `<tr><td colspan="2"><b>${t}</b></td></tr>` + xs.map(fila).join('') : '';
     $('#impresion').innerHTML = `${emp.logo_url ? `<div class="c"><img src="${esc(emp.logo_url)}" alt="" style="max-width:42mm;max-height:20mm;margin:0 auto 4px;display:block"></div>` : ''}<h2 class="c">${esc(emp.nombre)}</h2><div class="c">${esc([emp.domicilio, emp.localidad].filter(Boolean).join(' · '))}</div><hr><div>${cambio ? '<b>CAMBIO</b> ' : 'Ticket '}#${String(v.numero).padStart(6, '0')} · ${fmt.fechaHora(v.fecha)} (reimpresión)</div><hr>
       <table>${cambio ? grupo('DEVUELVE', ls.filter(l => l.cantidad < 0)) + grupo('SE LLEVA', ls.filter(l => l.cantidad > 0)) : ls.map(fila).join('')}</table><hr>
       <table><tr><td><b>${!cambio ? 'TOTAL' : +v.total > 0 ? 'DIFERENCIA A PAGAR' : +v.total < 0 ? 'A FAVOR DE LA CLIENTA' : 'SIN DIFERENCIA'}</b></td><td class="r"><b>${fmt.pesos(cambio ? Math.abs(v.total) : v.total)}</b></td></tr>${ps.map(p => `<tr><td>${esc(p.formas_pago ? p.formas_pago.nombre : 'Crédito')}</td><td class="r">${fmt.pesos(p.monto)}</td></tr>`).join('')}${+v.saldo ? `<tr><td><b>SALDO</b></td><td class="r"><b>${fmt.pesos(v.saldo)}</b></td></tr>` : ''}</table><hr><div class="c">Cambios con este ticket dentro de los 30 días.</div>`;
   }
+  // ---------- Canjes: entregas sin cargo (influencers) que no cuentan como venta; quedan para estadística ----------
+  const numAR = t => +String(t || '').replace(/[$\s.]/g, '').replace(',', '.') || 0;
+  const mesAR = iso => new Date(new Date(iso).getTime() - 3 * 3600e3).toISOString().slice(0, 7);
+  async function cargarCanjes() {
+    const { data, error } = await sb.from('v_canjes').select('*').eq('empresa_id', e).neq('estado', 'anulada').order('fecha', { ascending: false }).limit(500);
+    if (error) { toast(mensajeError(error), 'error'); return; }
+    const xs = data || [], mes = hoy.slice(0, 7), dm = xs.filter(x => mesAR(x.fecha) === mes), suma = (a, k) => a.reduce((t, x) => t + +x[k], 0);
+    const costos = APP.puede('costos');
+    $('#tiles-canjes').innerHTML = `<div class="tile"><div class="t">Canjes</div><div class="n">${xs.length}</div><div class="d">${dm.length} este mes · ${new Set(xs.map(x => x.cliente_id)).size} clientas</div></div>
+      <div class="tile"><div class="t">Prendas entregadas</div><div class="n">${fmt.num(suma(xs, 'prendas'))}</div><div class="d">${fmt.num(suma(dm, 'prendas'))} este mes</div></div>
+      <div class="tile"><div class="t">Valor de lista</div><div class="n">${fmt.pesos(suma(xs, 'valor'))}</div><div class="d">lo que valdrían vendidas</div></div>
+      ${costos ? `<div class="tile destacada"><div class="t">Costo de los canjes</div><div class="n">${fmt.pesos(suma(xs, 'costo_total'))}</div><div class="d">prendas ${fmt.pesos(suma(xs, 'costo_mercaderia'))} + envíos ${fmt.pesos(suma(xs, 'envio_costo'))}</div></div>` : ''}`;
+    const tb = $('#tb-canjes tbody');
+    tb.innerHTML = xs.map(x => `<tr class="clic" data-id="${x.id}"><td class="mono">#${String(x.numero).padStart(6, '0')}</td><td>${fmt.fechaHora(x.fecha)}</td><td>${esc(x.cliente_nombre || '—')}</td><td><small>${esc(x.detalle || '')}</small></td><td class="num">${fmt.pesos(x.valor)}</td><td class="num">${costos ? fmt.pesos(x.costo_mercaderia) : '—'}</td><td class="num">${+x.envio_costo ? fmt.pesos(x.envio_costo) : '—'}</td><td class="num num-f">${costos ? fmt.pesos(x.costo_total) : '—'}</td><td><button class="btn chico" data-remito="${x.id}">🖨️ Remito</button></td></tr>`).join('')
+      || '<tr><td colspan="9" class="vacio">Todavía no hay canjes. Tocá <b>🤝 Nuevo canje</b> para cargar el primero.</td></tr>';
+    $$('tr[data-id]', tb).forEach(tr => tr.onclick = ev => { if (!ev.target.closest('[data-remito]')) verVenta(tr.dataset.id); });
+    $$('[data-remito]', tb).forEach(b => b.onclick = () => remitoCanje(b.dataset.remito));
+  }
+  async function remitoCanje(id) {
+    const [{ data: v }, { data: ls }] = await Promise.all([sb.from('v_ventas').select('*').eq('id', id).single(), sb.from('venta_lineas').select('*').eq('venta_id', id).order('id')]);
+    if (!v) return; imprimir(v, ls || [], []); window.print();
+  }
+  async function nuevoCanje() {
+    const [{ data: cls }, { data: mets }, { data: lp }] = await Promise.all([
+      sb.from('clientes').select('id,nombre,telefono,direccion').eq('empresa_id', e).order('nombre').limit(3000),
+      sb.from('envio_metodos').select('*').eq('empresa_id', e).eq('activo', true).order('orden'),
+      sb.from('listas_precios').select('id').eq('empresa_id', e).eq('predeterminada', true).limit(1)]);
+    const lineas = [];
+    const m = modal(`<h2>🤝 Nuevo canje</h2><p class="sub">Prendas que se entregan <b>sin cargo</b> (por ejemplo, a una influencer). Salen del stock y de la web, pero <b>no cuentan como venta</b>. Queda el costo para la estadística.</p>
+      <div class="ed">
+        <div class="campo"><label>Fecha y hora</label><input id="c-fecha" type="datetime-local" value="${aLocal(new Date().toISOString())}"></div>
+        <div class="campo"><label>Clienta</label><input id="c-cli" list="c-dl" placeholder="Nombre y apellido" autocomplete="off"><datalist id="c-dl">${(cls || []).map(c => `<option value="${esc(c.nombre)}">`).join('')}</datalist></div>
+        <div class="campo"><label>Teléfono</label><input id="c-tel" inputmode="tel"></div>
+        <div class="campo"><label>Nota</label><input id="c-nota" placeholder="Ej: posteo en Instagram"></div>
+      </div>
+      <table class="ed-lineas"><thead><tr><th>Prenda</th><th class="num">Cant.</th><th class="num">Valor de lista</th><th></th></tr></thead><tbody id="c-lineas"></tbody></table>
+      <div class="ed-busca"><input id="c-busca" placeholder="Agregar prenda: escribí nombre o código…" autocomplete="off"><div class="ed-res" id="c-res" style="display:none"></div></div>
+      <div class="ed" style="margin-top:10px">
+        <div class="campo"><label>Entrega</label><select id="c-met"><option value="">Se la llevó del local</option>${(mets || []).filter(x => x.tipo !== 'retiro').map(x => `<option value="${x.id}">${esc(x.nombre)}</option>`).join('')}</select></div>
+        <div class="campo"><label>Lo que pagó el local por el envío</label><input id="c-costo" inputmode="decimal" placeholder="0"></div>
+        <div class="campo"><label>Dirección</label><input id="c-dir"></div>
+        <div class="campo"><label>Estado de la entrega</label><label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:8px"><input type="checkbox" id="c-entregado" checked style="width:auto;margin:0"> Ya se entregó</label></div>
+      </div>
+      <div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Registrar canje</button></div>`);
+    $('.modal', m).style.maxWidth = '760px';
+    // clienta conocida: trae su teléfono y dirección
+    $('#c-cli', m).onchange = () => { const c = (cls || []).find(x => x.nombre.trim().toLowerCase() === $('#c-cli', m).value.trim().toLowerCase()); if (c) { if (!$('#c-tel', m).value) $('#c-tel', m).value = c.telefono || ''; if (!$('#c-dir', m).value) $('#c-dir', m).value = c.direccion || ''; } };
+    const tb = $('#c-lineas', m);
+    const pintar = () => {
+      tb.innerHTML = lineas.map((l, i) => `<tr><td>${esc(l.descripcion)}<br><small class="sub">${esc([l.color, l.talle].filter(Boolean).join(' · '))} · stock ${fmt.num(l.stock)}</small></td><td class="num"><input type="number" min="1" step="1" data-cant="${i}" value="${l.cantidad}"></td><td class="num">${fmt.pesos(l.precio * l.cantidad)}</td><td><button class="quitar" data-quitar="${i}" title="Quitar">×</button></td></tr>`).join('') || '<tr><td colspan="4" class="vacio">Buscá las prendas que se lleva.</td></tr>';
+      $$('[data-cant]', tb).forEach(i => i.onchange = () => { lineas[+i.dataset.cant].cantidad = Math.max(1, Math.round(+i.value || 1)); pintar(); });
+      $$('[data-quitar]', tb).forEach(b => b.onclick = () => { lineas.splice(+b.dataset.quitar, 1); pintar(); });
+    };
+    pintar();
+    let pedido = 0;
+    $('#c-busca', m).oninput = async ev => {
+      const q = ev.target.value.trim(), res = $('#c-res', m); if (q.length < 2) { res.style.display = 'none'; return; }
+      const mio = ++pedido, qq = q.replace(/[%,()]/g, '');
+      const { data } = await sb.from('v_variantes').select('id,producto_id,producto_codigo,producto_nombre,producto_tipo,talle_nombre,color_nombre,precio,costo,stock').eq('empresa_id', e).eq('activa', true).or(`producto_nombre.ilike.%${qq}%,producto_codigo.ilike.${qq}%,sku.ilike.${qq}%`).order('producto_nombre').order('talle_orden').limit(40);
+      if (mio !== pedido) return;
+      res.innerHTML = (data || []).map(x => `<button data-add="${x.id}"><span>${esc(x.producto_nombre)} <small>${esc([x.color_nombre, x.talle_nombre].filter(Boolean).join(' · '))}</small></span><small>${fmt.pesos(x.precio)} · stock ${fmt.num(x.stock)}</small></button>`).join('') || '<button disabled>Nada con ese nombre</button>';
+      res.style.display = '';
+      $$('[data-add]', res).forEach(b => b.onclick = () => { const x = data.find(y => y.id === b.dataset.add); const ya = lineas.find(l => l.variante_id === x.id);
+        if (ya) ya.cantidad++; else lineas.push({ variante_id: x.id, producto_id: x.producto_id, descripcion: x.producto_nombre, talle: x.talle_nombre, color: x.color_nombre, cantidad: 1, precio: +x.precio || 0, costo: +x.costo || 0, stock: +x.stock || 0 });
+        ev.target.value = ''; res.style.display = 'none'; pintar(); });
+    };
+    $('[data-no]', m).onclick = () => m.cerrar();
+    $('[data-si]', m).onclick = async () => {
+      const b = $('[data-si]', m);
+      try {
+        const nom = $('#c-cli', m).value.trim(); if (!nom) throw new Error('Poné el nombre de la clienta');
+        if (!lineas.length) throw new Error('Agregá al menos una prenda');
+        b.disabled = true;
+        const tel = $('#c-tel', m).value.trim(), dir = $('#c-dir', m).value.trim();
+        let cli = (cls || []).find(c => c.nombre.trim().toLowerCase() === nom.toLowerCase());
+        if (!cli) { const r = await sb.from('clientes').insert({ empresa_id: e, nombre: nom, telefono: tel || null, direccion: dir || null, notas: 'Influencer (canje)' }).select('id,nombre').single(); if (r.error) throw new Error(mensajeError(r.error)); cli = r.data; }
+        const met = (mets || []).find(x => x.id === $('#c-met', m).value), costoEnv = numAR($('#c-costo', m).value);
+        const p = { empresa_id: e, offline_id: crypto.randomUUID(), tipo: 'canje', estado: 'completada', fecha: new Date($('#c-fecha', m).value).toISOString(), caja_id: null, turno_id: null,
+          cliente_id: cli.id, vendedora_id: APP.user.id, lista_id: (lp || [])[0]?.id || null, descuento_pct: 0, descuento: 0, recargo: 0, origen: 'local',
+          nota: ['Canje', $('#c-nota', m).value.trim()].filter(Boolean).join(' · '),
+          envio: met ? { metodo_id: met.id, metodo: met.nombre, costo: costoEnv, direccion: dir || null, contacto: [cli.nombre, tel].filter(Boolean).join(' · ') } : null,
+          lineas: lineas.map(l => ({ variante_id: l.variante_id, producto_id: l.producto_id, descripcion: l.descripcion, talle: l.talle, color: l.color, cantidad: l.cantidad, precio_lista: l.precio, precio_unit: 0, descuento_pct: 100, total: 0, costo_unit: l.costo })),
+          pagos: [], creditos_a_emitir: [] };
+        const { data, error } = await sb.rpc('caja_registrar_venta', { p }); if (error) throw new Error(mensajeError(error));
+        if (met && $('#c-entregado', m).checked) await sb.rpc('venta_envio_guardar', { p: { venta_id: data.id, estado: 'entregado' } });
+        m.cerrar(); toast(`🤝 Canje #${String(data.numero).padStart(6, '0')} registrado`); if (window.empujarStock) empujarStock(e); await cargarCanjes();
+        if (await confirmar('¿Imprimir el remito de canje?', 'Imprimir')) remitoCanje(data.id);
+      } catch (err) { toast(err.message, 'error'); b.disabled = false; }
+    };
+  }
+  $('#btn-canje').onclick = nuevoCanje;
   async function cargarSenas() {
     const { data } = await sb.from('v_ventas').select('*').eq('empresa_id', e).eq('estado', 'senada').order('fecha');
     const tb = $('#tb-senas tbody'); tb.innerHTML = (data || []).map(x => `<tr><td class="mono">#${String(x.numero).padStart(6, '0')}</td><td>${fmt.fechaHora(x.fecha)}</td><td>${esc(x.cliente_nombre || '—')}</td><td class="num">${fmt.pesos(x.total)}</td><td class="num">${fmt.pesos(x.pagado)}</td><td class="num num-f">${fmt.pesos(x.saldo)}</td><td><a class="btn chico primario" href="pos.html?sena=${x.numero}">Retirar en la caja</a> <button class="btn chico" data-comp="${x.id}">🎟️ Comprobante</button> <button class="btn chico" data-ver="${x.id}">Ver</button></td></tr>`).join('') || '<tr><td colspan="7" class="vacio">No hay señas pendientes.</td></tr>';
