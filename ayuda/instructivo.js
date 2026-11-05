@@ -132,14 +132,13 @@ window.INSTRUCTIVO = {
       { tipo: 'ojo', texto: 'Si pasaron **más de 15 días**, lo que falta se cobra **al precio de hoy**. La caja lo calcula sola y te avisa con ⏰ cuánto era y cuánto es ahora.' },
       { tipo: 'tip', texto: 'También desde **Ventas** › {{Señas}} › {{Retirar en la caja}}: te lleva al Punto de venta con la seña lista.' }
     ] },
-    { id: 'ticket-regalo', grupo: 'vender', p: 'vender', titulo: 'Ticket de cambio para regalo', nuevo: '2026-10-31', resumen: 'Un ticket sin precios para que quien recibe el regalo lo pueda cambiar.', bloques: [
+    { id: 'ticket-regalo', grupo: 'vender', p: 'vender', titulo: 'Ticket de cambio para regalo', nuevo: '2026-11-05', resumen: 'Un toque y sale el ticket sin precios para que quien recibe el regalo lo pueda cambiar.', bloques: [
       { tipo: 'pasos', items: [
-        'Después de cobrar, tocá {{🎁 Ticket de cambio}}.',
-        'Dejá marcadas las prendas que van de regalo.',
-        'Si son regalos para **personas distintas**, marcá **"Un ticket por cada prenda"**.',
-        'Tocá {{Imprimir}}: sale con el **número de ticket**, las prendas y **hasta cuándo se puede cambiar**, sin precios.'] },
-      { tipo: 'tip', texto: 'Si en {{Más…}} escribís **"regalo"** en la nota, el botón {{🎁 Ticket de cambio}} aparece resaltado.' },
-      { tipo: 'tip', texto: '¿Se olvidaron de pedirlo? En **Ventas** abrí la venta y tocá {{🎁 Ticket de cambio}}.' }
+        'Después de cobrar, tocá {{🎁 Ticket de regalo}}.',
+        'Se imprime **de una**: el **número de ticket**, las prendas y **hasta cuándo se puede cambiar**, sin precios.'] },
+      { tipo: 'tip', texto: 'Si son regalos para **personas distintas** o solo algunas prendas son regalo, tocá {{Elegir prendas…}}: marcás cuáles y si sale **un ticket por cada prenda**.' },
+      { tipo: 'tip', texto: 'Si en {{Más…}} escribís **"regalo"** en la nota, el botón {{🎁 Ticket de regalo}} aparece resaltado.' },
+      { tipo: 'tip', texto: '¿Se olvidaron de pedirlo? En **Ventas** abrí la venta y tocá {{🎁 Ticket de regalo}}.' }
     ] },
     { id: 'prueba', grupo: 'vender', p: 'vender', titulo: 'Si te equivocaste en una venta', resumen: 'Se corrige, se anula o, si fue de prueba, se borra.', bloques: [
       { tipo: 'tabla', filas: [

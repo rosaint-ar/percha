@@ -1,6 +1,6 @@
 /* Percha · Ticket de cambio (para regalo): el número de la venta y las prendas, SIN precios, con hasta cuándo se puede cambiar.
    Quien recibe el regalo lo trae, se busca la venta por ese número y el cambio sigue la regla de siempre (vale lo que se pagó).
-   Al tocarlo se eligen qué prendas van de regalo y si sale un ticket por prenda (regalos para personas distintas).
+   "🎁 Ticket de regalo" lo imprime de una con todas las prendas; "Elegir prendas…" deja elegir cuáles y uno por prenda.
    Lo usan la caja (después de cobrar) y Ventas (al abrir un ticket). */
 (function () {
   const h = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -42,5 +42,13 @@
       setTimeout(() => { dest.innerHTML = antes; }, 1000);   // el ticket de la venta vuelve a quedar listo para imprimir
     };
   }
-  window.TICKET_CAMBIO = { html, elegir, prendas };
+  // de una: todas las prendas de la venta en un ticket, sin preguntar (el botón de la caja y de Ventas)
+  function imprimir(o) {
+    const ls = prendas(o.lineas); if (!ls.length) { APP.toast('Esta venta no tiene prendas para regalo', 'error'); return; }
+    const dest = document.getElementById('impresion'), antes = dest.innerHTML;
+    dest.innerHTML = html(Object.assign({}, o, { lineas: ls }), false);
+    window.print();
+    setTimeout(() => { dest.innerHTML = antes; }, 1000);   // el ticket de la venta vuelve a quedar listo para imprimir
+  }
+  window.TICKET_CAMBIO = { html, elegir, imprimir, prendas };
 })();
