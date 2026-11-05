@@ -5,3 +5,5 @@ muestra-ventas.html
 node_modules/
 desktop.ini
 supabase/.temp/
+.contexto-claude/
+SEGUIR-EN-OTRA-PC.md
