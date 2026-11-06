@@ -19,7 +19,7 @@
       <div class="c tc-chico">Ticket</div><div class="tc-num">${h(o.numero)}</div><div class="c tc-chico">compra del ${dd(f)}</div><hr>
       <table>${ls.map(l => `<tr><td>${Math.abs(l.cantidad)}× ${h(l.descripcion)}<br><small>${h([l.talle, l.color].filter(Boolean).join(' · '))}</small></td></tr>`).join('')}</table>
       <div class="tc-vale">Se puede cambiar hasta el ${dd(hasta)}</div>
-      <div class="c tc-chico">Presentá este ticket en el local.<br>Es un regalo: no muestra precios.</div></div>`;
+      <div class="c tc-chico">Presentá este ticket en el local.</div></div>`;
   }
   function html(o, porPrenda) { estilos(); return porPrenda ? o.lineas.map(l => uno(o, [l])).join('<div class="tc"><div class="tc-corte">✂</div></div>') : uno(o, o.lineas); }
   // solo prendas (sin el envío ni lo devuelto)
