@@ -3,6 +3,22 @@
    Carga: shell.css, supabase-js (CDN), shared/supabase.js y después este archivo. */
 (function () {
   const ROOT = (document.querySelector('meta[name="app-root"]') || {}).content || './';
+
+  // ---------- siempre la última versión ----------
+  // El navegador guarda las páginas hasta 10 minutos: después de publicar un arreglo, un equipo podía seguir con la versión vieja.
+  // Al abrir cada pantalla se mira version.json (lo escribe herramientas/versionar.js al publicar); si hay una más nueva que la de
+  // este archivo, se vuelve a pedir la página sin caché y se recarga. Una sola vez por versión (sin bucles); sin internet, sigue igual.
+  (function () {
+    const yo = ((document.currentScript && document.currentScript.src.match(/[?&]v=(\d+)/)) || [])[1];
+    if (!yo || !window.fetch) return;
+    fetch(ROOT + 'version.json?t=' + Date.now(), { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(async j => {
+      if (!j || !j.v || j.v <= yo) return;
+      const k = 'percha_actualizada_' + j.v;
+      try { if (sessionStorage.getItem(k)) return; sessionStorage.setItem(k, '1'); } catch (_) { return; }
+      try { await fetch(location.href, { cache: 'reload' }); } catch (_) { }
+      location.reload();
+    }).catch(() => { });
+  })();
   const body = document.body;
   const SISTEMA = 'Percha';
 

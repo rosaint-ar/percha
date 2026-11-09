@@ -12,4 +12,6 @@ const recorrer = d => fs.readdirSync(d, { withFileTypes: true }).forEach(x => {
   if (t !== s) { fs.writeFileSync(p, t); archivos++; }
 });
 recorrer(raiz);
+// la versión publicada: cada pantalla la compara con la suya y, si quedó vieja en el navegador, se recarga sola (shell.js)
+fs.writeFileSync(path.join(raiz, 'version.json'), JSON.stringify({ v: sello }));
 console.log(`sello ${sello}: ${n} referencias en ${archivos} páginas`);
