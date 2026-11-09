@@ -5,107 +5,186 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Etiquetas · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611091449">
+<link rel="stylesheet" href="../shell/shell.css?v=202611091500">
 <style>
-  .cola td input{width:76px;text-align:right}
+  .cola td input[type=number]{width:76px;text-align:right}
+  .cola td.chk,.cola th.chk{width:34px;text-align:center}
+  .cola input[type=checkbox]{width:18px;height:18px;cursor:pointer;accent-color:var(--acento)}
+  .cola tr.apagada td:not(.chk){opacity:.45}
   .opciones{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px}
   .opciones .campo{margin:0;min-width:120px}
-  /* Vista previa en pantalla */
-  #hoja{display:flex;flex-wrap:wrap;gap:6px;background:var(--grilla);padding:10px}
-  .etiqueta{background:#fff;color:#000;overflow:hidden;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:1mm 1.5mm;box-sizing:border-box;font-family:var(--f-ui),Arial,sans-serif;text-align:center;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .opciones .campo.chico{min-width:96px;max-width:110px}
+  .ajuste{border-top:1px dashed var(--linea);padding-top:12px}
+  .ajuste .sub{flex-basis:100%;margin:0 0 -4px}
+  /* Vista previa en pantalla: cada hoja con su borde punteado (el borde no se imprime) */
+  #hoja{display:flex;flex-wrap:wrap;gap:8px;background:var(--grilla);padding:10px}
+  #hoja .pagina{outline:1px dashed #b9b2c9}
+  .pagina{position:relative;overflow:hidden;background:#fff}
+  .pagina .etiqueta{position:absolute;left:0;top:0}
+  .etiqueta{background:#fff;color:#000;overflow:hidden;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:1.5mm 2mm;box-sizing:border-box;font-family:var(--f-ui),Arial,sans-serif;text-align:center;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .etiqueta .nom{font-weight:600;line-height:1.1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:100%}
-  .etiqueta .var{font-size:.85em;line-height:1.1}
-  .etiqueta .pre{font-family:var(--f-mono);font-weight:600;line-height:1.1}
-  .etiqueta svg{max-width:100%;max-height:56%;width:auto;height:auto;display:block;flex:0 1 auto;min-height:0}   /* que el número de abajo no se corte */
-  /* Impresión: solo las etiquetas. Se copian a #zona-impresion (hija directa del body) y se esconde todo lo demás:
-     antes se escondían las tarjetas, y la vista previa está adentro de una → la hoja salía en blanco. */
+  .etiqueta .var{font-size:.85em;line-height:1.15}
+  .etiqueta .pre{font-family:var(--f-mono);font-weight:700;line-height:1.1}
+  .etiqueta .tach{text-decoration:line-through;font-weight:400;font-size:.8em;opacity:.75;margin-right:.3em}
+  .etiqueta svg{max-width:100%;max-height:52%;width:auto;height:auto;display:block;flex:0 1 auto;min-height:0}   /* que el número de abajo no se corte */
+  .etiqueta.prueba{border:.3mm solid #000;justify-content:space-between}
+  .etiqueta.prueba .cruz{font:700 9pt Arial}
+  /* Impresión: solo las hojas. Se copian a #zona-impresion (hija directa del body) y se esconde todo lo demás
+     (antes se escondían las tarjetas, y la vista previa está adentro de una → la hoja salía en blanco). */
   #zona-impresion{display:none}
   @media print{
     html,body{margin:0!important;padding:0!important;background:#fff!important}
     body>*:not(#zona-impresion){display:none!important}
     #zona-impresion{display:block!important}
-    #zona-impresion .etiqueta{margin:0;border:0;page-break-after:always;break-after:page}
-    #zona-impresion .etiqueta:last-child{page-break-after:auto;break-after:auto}
+    #zona-impresion .pagina{page-break-after:always;break-after:page}
+    #zona-impresion .pagina:last-child{page-break-after:auto;break-after:auto}
   }
 </style>
 </head>
 <body data-page="etiquetas" data-etq="Catálogo" data-title="Etiquetas" data-subtitle="Códigos de barras para la impresora Brother">
 <main class="app">
   <div class="card" id="tabla-cola">
-    <div class="card-cab"><div><h2>Para imprimir</h2><p class="sub">Lo que fuiste agregando desde las fichas. Podés cambiar cantidades.</p></div>
-      <div class="acciones"><button class="btn" id="btn-vaciar">Vaciar</button><button class="btn primario" id="btn-imprimir">Imprimir</button></div></div>
+    <div class="card-cab"><div><h2>Para imprimir</h2><p class="sub">Tildá las que querés imprimir y ajustá la cantidad.</p></div>
+      <div class="acciones"><button class="btn" id="btn-vaciar">Vaciar</button><button class="btn" id="btn-prueba" title="Una sola etiqueta con un marco, para ver si sale centrada">🎯 Imprimir prueba</button><button class="btn primario" id="btn-imprimir">Imprimir</button></div></div>
     <div class="opciones">
-      <div class="campo"><label>Ancho (mm)</label><input id="o-ancho" type="number" min="20" max="120"></div>
-      <div class="campo"><label>Alto (mm)</label><input id="o-alto" type="number" min="10" max="120"></div>
-      <div class="campo"><label>Mostrar precio</label><select id="o-precio"><option value="si">Sí, precio de lista</option><option value="no">No</option></select></div>
-      <div class="campo"><label>Mostrar nombre</label><select id="o-nombre"><option value="si">Sí</option><option value="no">No</option></select></div>
+      <div class="campo chico"><label>Ancho (mm)</label><input id="o-ancho" type="number" min="20" max="120" step="0.5"></div>
+      <div class="campo chico"><label>Alto (mm)</label><input id="o-alto" type="number" min="10" max="160" step="0.5"></div>
+      <div class="campo"><label>Precio</label><select id="o-precio">
+        <option value="lista">Precio de lista</option>
+        <option value="oferta">Con la oferta (lista tachado)</option>
+        <option value="final">Solo el precio final</option>
+        <option value="no">Sin precio</option></select></div>
+      <div class="campo"><label>Nombre</label><select id="o-nombre"><option value="si">Sí</option><option value="no">No</option></select></div>
+    </div>
+    <div class="opciones ajuste">
+      <p class="sub">Si sale corrida o cortada: primero poné la <b>medida real</b> de la etiqueta; después corregí con estos valores e imprimí una prueba.</p>
+      <div class="campo chico"><label>Correr → (mm)</label><input id="o-dx" type="number" step="0.5" title="Positivo: a la derecha · negativo: a la izquierda"></div>
+      <div class="campo chico"><label>Correr ↓ (mm)</label><input id="o-dy" type="number" step="0.5" title="Positivo: para abajo · negativo: para arriba"></div>
+      <div class="campo"><label>Girar</label><select id="o-girar"><option value="no">No</option><option value="si">Sí, 90°</option></select></div>
       <button class="btn" id="btn-guardar-opciones">Guardar como predeterminado</button>
     </div>
-    <table class="lista cola" id="cola"><tr><th>Producto</th><th>Variante</th><th>Código</th><th class="num">Cantidad</th><th></th></tr></table>
+    <table class="lista cola" id="cola"></table>
   </div>
-  <div class="card" style="margin-top:14px"><div class="card-cab"><div><h2>Vista previa</h2><p class="sub">Así salen. En el diálogo de impresión elegí la Brother y el tamaño de etiqueta que coincida.</p></div></div>
+  <div class="card" style="margin-top:14px"><div class="card-cab"><div><h2>Vista previa</h2><p class="sub" id="sub-previa">Así salen. En la ventana de impresión: la Brother, el tamaño de la etiqueta, márgenes «Ninguno» y escala 100.</p></div></div>
     <div id="hoja"></div></div>
 </main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611091449"></script>
-<script src="../shell/shell.js?v=202611091449"></script>
+<script src="../shared/supabase.js?v=202611091500"></script>
+<script src="../shared/precios.js?v=202611091500"></script>
+<script src="../shell/shell.js?v=202611091500"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, confirmar } = APP, e = APP.empresa.id;
-  const cfg = Object.assign({ ancho_mm: 62, alto_mm: 29, precio: 'si', nombre: 'si' }, (APP.empresa.config || {}).etiquetas || {});
+  const cfg = Object.assign({ ancho_mm: 62, alto_mm: 29, precio: 'lista', nombre: 'si', dx_mm: 0, dy_mm: 0, girar: 'no' }, (APP.empresa.config || {}).etiquetas || {});
+  if (cfg.precio === 'si') cfg.precio = 'lista';   // cómo se guardaba antes
   $('#o-ancho').value = cfg.ancho_mm; $('#o-alto').value = cfg.alto_mm; $('#o-precio').value = cfg.precio; $('#o-nombre').value = cfg.nombre;
-  let cola = JSON.parse(localStorage.getItem('augusta_etiquetas') || '[]'), info = {};
-  const guardarCola = () => localStorage.setItem('augusta_etiquetas', JSON.stringify(cola));
+  $('#o-dx').value = cfg.dx_mm || 0; $('#o-dy').value = cfg.dy_mm || 0; $('#o-girar').value = cfg.girar || 'no';
+  let cola = []; try { cola = JSON.parse(localStorage.getItem('augusta_etiquetas') || '[]'); } catch (_) { }
+  let info = {}, prods = {}, pctx = null;
+  const guardarCola = () => { try { localStorage.setItem('augusta_etiquetas', JSON.stringify(cola)); } catch (_) { } };
+  const marcada = c => c.sel !== false;   // por defecto, todo lo agregado va tildado
 
   async function cargarInfo() {
     const ids = cola.map(c => c.variante_id); if (!ids.length) { info = {}; return; }
     const { data } = await sb.from('v_variantes').select('*').in('id', ids);
     info = Object.fromEntries((data || []).map(v => [v.id, v]));
     cola = cola.filter(c => info[c.variante_id]); guardarCola();
+    const pids = [...new Set(Object.values(info).map(v => v.producto_id))];
+    const { data: ps } = await sb.from('productos').select('id,categoria_id,tipo').in('id', pids);
+    prods = Object.fromEntries((ps || []).map(p => [p.id, p]));
   }
+  // los mismos precios que cobra la caja (shared/precios.js): la lista del local con sus ofertas
+  const precioDe = v => {
+    const p = prods[v.producto_id] || {}, op = { canal: 'local', categoria_id: p.categoria_id, tipo: p.tipo || v.producto_tipo };
+    if (!pctx) return { lista: +v.precio, final: +v.precio };
+    const lista = PRECIOS.calcular(v, pctx.base.id, pctx, { ...op, sinRebajas: true }).precio, final = PRECIOS.calcular(v, pctx.base.id, pctx, op).precio;
+    return { lista, final };
+  };
   function eanValido(s) { if (!/^\d{13}$/.test(s)) return false; const d = s.split('').map(Number); const sum = d.slice(0, 12).reduce((a, n, i) => a + n * (i % 2 ? 3 : 1), 0); return (10 - sum % 10) % 10 === d[12]; }
 
   function pintarCola() {
-    const tb = $('#cola'); tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());
-    if (!cola.length) { tb.insertAdjacentHTML('beforeend', '<tr><td colspan="5" class="vacio">No hay nada para imprimir. Desde la ficha de un producto, tocá un talle y color y elegí "Agregar a etiquetas".</td></tr>'); }
-    cola.forEach((c, i) => { const v = info[c.variante_id];
-      tb.insertAdjacentHTML('beforeend', `<tr><td>${esc(v.producto_nombre)}</td><td>${esc([v.talle_nombre, v.color_nombre].filter(Boolean).join(' · ') || 'único')}</td><td>${v.ean ? esc(v.ean) : '<span class="chip aviso">sin código: usa el SKU</span>'}</td><td class="num"><input type="number" min="0" value="${c.cantidad}" data-i="${i}"></td><td><button class="btn chico" data-quitar="${i}">Quitar</button></td></tr>`); });
+    const tb = $('#cola');
+    const todas = cola.length && cola.every(marcada), alguna = cola.some(marcada);
+    tb.innerHTML = `<tr><th class="chk"><input type="checkbox" id="chk-todas" title="Tildar o destildar todas" ${todas ? 'checked' : ''}></th><th>Producto</th><th>Talle · color</th><th>Código</th><th class="num">Precio</th><th class="num">Cantidad</th><th></th></tr>`;
+    if (!cola.length) tb.insertAdjacentHTML('beforeend', '<tr><td colspan="7" class="vacio">No hay nada para imprimir. Desde la ficha de un producto, tocá «Etiquetas de todo el stock» o un talle y color.</td></tr>');
+    cola.forEach((c, i) => { const v = info[c.variante_id], pr = precioDe(v);
+      tb.insertAdjacentHTML('beforeend', `<tr class="${marcada(c) ? '' : 'apagada'}"><td class="chk"><input type="checkbox" data-sel="${i}" ${marcada(c) ? 'checked' : ''}></td><td>${esc(v.producto_nombre)}</td><td>${esc([v.talle_nombre, v.color_nombre].filter(Boolean).join(' · ') || 'único')}</td><td>${v.ean ? esc(v.ean) : `<small class="mono">${esc(v.sku || v.producto_codigo)}</small>`}</td>
+        <td class="num">${pr.final < pr.lista ? `<s style="color:var(--tinta-3)">${fmt.pesos(pr.lista)}</s> ${fmt.pesos(pr.final)}` : fmt.pesos(pr.lista)}</td><td class="num"><input type="number" min="0" value="${c.cantidad}" data-i="${i}"></td><td><button class="btn chico" data-quitar="${i}">Quitar</button></td></tr>`); });
+    const ct = $('#chk-todas'); if (ct) { ct.indeterminate = !todas && alguna; ct.onchange = () => { cola.forEach(c => c.sel = ct.checked); guardarCola(); pintarCola(); pintarHoja(); }; }
+    $$('input[data-sel]', tb).forEach(x => x.onchange = () => { cola[+x.dataset.sel].sel = x.checked; guardarCola(); pintarCola(); pintarHoja(); });
     $$('input[data-i]', tb).forEach(inp => inp.onchange = () => { cola[+inp.dataset.i].cantidad = Math.max(0, +inp.value || 0); guardarCola(); pintarHoja(); });
     $$('[data-quitar]', tb).forEach(b => b.onclick = () => { cola.splice(+b.dataset.quitar, 1); guardarCola(); pintarCola(); pintarHoja(); });
   }
-  function pintarHoja() {
-    const w = +$('#o-ancho').value || 62, h = +$('#o-alto').value || 29, conPrecio = $('#o-precio').value === 'si', conNombre = $('#o-nombre').value === 'si';
+  // medidas: la etiqueta (w × h) y la hoja que recibe la impresora (si se gira, h × w)
+  const medidas = () => { const w = +$('#o-ancho').value || 62, h = +$('#o-alto').value || 29, girar = $('#o-girar').value === 'si';
+    return { w, h, girar, pw: girar ? h : w, ph: girar ? w : h, dx: +$('#o-dx').value || 0, dy: +$('#o-dy').value || 0 }; };
+  function aplicarCss() {
+    const m = medidas();
     let css = document.getElementById('css-etq'); if (!css) { css = document.createElement('style'); css.id = 'css-etq'; document.head.appendChild(css); }
-    css.textContent = `@page{size:${w}mm ${h}mm;margin:0}.etiqueta{width:${w}mm;height:${(h - 0.4).toFixed(1)}mm;font-size:${Math.max(7, Math.min(11, h / 3.2))}pt}`;
+    // la hoja apenas más chica que la etiqueta: si se pasa por redondeo, la impresora agrega una hoja en blanco
+    const rot = m.girar ? ` translate(${m.pw}mm,0) rotate(90deg)` : '';
+    css.textContent = `@page{size:${m.pw}mm ${m.ph}mm;margin:0}
+      .pagina{width:${m.pw}mm;height:${(m.ph - 0.4).toFixed(1)}mm}
+      .etiqueta{width:${m.w}mm;height:${(m.h - (m.girar ? 0 : 0.4)).toFixed(1)}mm;font-size:${Math.max(7, Math.min(12, m.h / 3.2)).toFixed(1)}pt;transform-origin:0 0;transform:translate(${m.dx}mm,${m.dy}mm)${rot}}`;
+    $('#sub-previa').textContent = `Así salen (hoja de ${fmt.dec ? fmt.dec(m.pw) : m.pw} × ${fmt.dec ? fmt.dec(m.ph) : m.ph} mm). En la ventana de impresión: la Brother, ese tamaño de papel, márgenes «Ninguno» y escala 100.`;
+    return m;
+  }
+  function etiquetaHtml(v, ops) {
+    const pr = precioDe(v);
+    let precio = '';
+    if (ops.precio === 'lista') precio = `<span class="pre">${fmt.pesos(pr.lista)}</span>`;
+    else if (ops.precio === 'final') precio = `<span class="pre">${fmt.pesos(pr.final)}</span>`;
+    else if (ops.precio === 'oferta') precio = pr.final < pr.lista ? `<span class="pre"><span class="tach">${fmt.pesos(pr.lista)}</span>${fmt.pesos(pr.final)}</span>` : `<span class="pre">${fmt.pesos(pr.lista)}</span>`;
+    const variante = [v.talle_nombre, v.color_nombre].filter(Boolean).join(' · ');
+    return `${ops.nombre ? `<div class="nom">${esc(v.producto_nombre)}</div>` : ''}<div class="var">${esc(variante)}${variante && precio ? ' · ' : ''}${precio}</div><svg class="cb"></svg>`;
+  }
+  function dibujarCodigo(el, v, h) {
+    const codigo = v.ean || v.sku || v.producto_codigo, formato = eanValido(codigo) ? 'EAN13' : 'CODE128';
+    try { JsBarcode(el.querySelector('svg'), codigo, { format: formato, width: 1.4, height: Math.max(18, h * 1.6), fontSize: 11, margin: 0, marginBottom: 4, font: 'Arial', displayValue: true }); }
+    catch (err) { el.querySelector('svg').outerHTML = `<div style="font-size:9pt">${esc(codigo)}</div>`; }
+  }
+  function pintarHoja() {
+    const m = aplicarCss(), ops = { precio: $('#o-precio').value, nombre: $('#o-nombre').value === 'si' };
     const hoja = $('#hoja'); hoja.innerHTML = '';
     let n = 0;
-    cola.forEach(c => { const v = info[c.variante_id]; if (!v) return;
-      const codigo = v.ean || v.sku || v.producto_codigo, formato = eanValido(codigo) ? 'EAN13' : 'CODE128';
+    cola.filter(marcada).forEach(c => { const v = info[c.variante_id]; if (!v) return;
       for (let k = 0; k < c.cantidad && n < 600; k++, n++) {
-        const el = document.createElement('div'); el.className = 'etiqueta';
-        el.innerHTML = `${conNombre ? `<div class="nom">${esc(v.producto_nombre)}</div>` : ''}<div class="var">${esc([v.talle_nombre, v.color_nombre].filter(Boolean).join(' · '))}${conPrecio ? ` · <span class="pre">${fmt.pesos(v.precio)}</span>` : ''}</div><svg class="cb"></svg>`;
-        hoja.appendChild(el);
-        try { JsBarcode(el.querySelector('svg'), codigo, { format: formato, width: 1.4, height: Math.max(18, h * 1.6), fontSize: 11, margin: 0, marginBottom: 4, font: "Arial", displayValue: true }); }
-        catch (err) { el.querySelector('svg').outerHTML = `<div style="font-size:9pt">${esc(codigo)}</div>`; }
+        const pg = document.createElement('div'); pg.className = 'pagina';
+        pg.innerHTML = `<div class="etiqueta">${etiquetaHtml(v, ops)}</div>`;
+        hoja.appendChild(pg); dibujarCodigo(pg, v, m.h);
       }
     });
+    if (!n) hoja.innerHTML = '<p class="sub" style="padding:8px">No hay etiquetas tildadas.</p>';
     if (n >= 600) toast('Vista previa limitada a 600 etiquetas', 'error');
+    $('#btn-imprimir').textContent = n ? `Imprimir ${fmt.num(n)}` : 'Imprimir';
   }
-  ['#o-ancho', '#o-alto', '#o-precio', '#o-nombre'].forEach(s => $(s).addEventListener('change', pintarHoja));
+  ['#o-ancho', '#o-alto', '#o-precio', '#o-nombre', '#o-dx', '#o-dy', '#o-girar'].forEach(s => $(s).addEventListener('change', pintarHoja));
   $('#btn-guardar-opciones').onclick = async () => {
     if (!APP.esAdmin) { toast('Solo administración puede cambiar el predeterminado', 'error'); return; }
-    const config = Object.assign({}, APP.empresa.config || {}, { etiquetas: { ancho_mm: +$('#o-ancho').value, alto_mm: +$('#o-alto').value, precio: $('#o-precio').value, nombre: $('#o-nombre').value, impresora: 'Brother' } });
-    const r = await sb.from('empresas').update({ config }).eq('id', e); toast(r.error ? APP.mensajeError(r.error) : 'Guardado', r.error ? 'error' : '');
+    const etiquetas = { ancho_mm: +$('#o-ancho').value, alto_mm: +$('#o-alto').value, precio: $('#o-precio').value, nombre: $('#o-nombre').value,
+      dx_mm: +$('#o-dx').value || 0, dy_mm: +$('#o-dy').value || 0, girar: $('#o-girar').value, impresora: 'Brother TD-4000' };
+    const config = Object.assign({}, APP.empresa.config || {}, { etiquetas });
+    const r = await sb.from('empresas').update({ config }).eq('id', e);
+    if (!r.error) APP.empresa.config = config;
+    toast(r.error ? APP.mensajeError(r.error) : 'Guardado: así salen en todas las compus', r.error ? 'error' : '');
   };
-  $('#btn-vaciar').onclick = async () => { if (await confirmar('¿Vaciar la cola de etiquetas?', 'Vaciar')) { cola = []; guardarCola(); pintarCola(); pintarHoja(); } };
-  $('#btn-imprimir').onclick = () => {
-    if (!cola.length || !$('#hoja .etiqueta')) { toast('No hay etiquetas', 'error'); return; }
+  $('#btn-vaciar').onclick = async () => { if (await confirmar('¿Vaciar la lista de etiquetas?', 'Vaciar')) { cola = []; guardarCola(); pintarCola(); pintarHoja(); } };
+  function imprimir(html) {
     let z = document.getElementById('zona-impresion'); if (!z) { z = document.createElement('div'); z.id = 'zona-impresion'; document.body.appendChild(z); }
-    z.innerHTML = $('#hoja').innerHTML;   // las mismas etiquetas de la vista previa (los códigos ya dibujados)
-    window.print();
+    z.innerHTML = html; window.print();
+  }
+  $('#btn-imprimir').onclick = () => {
+    if (!$('#hoja .pagina')) { toast('No hay etiquetas tildadas', 'error'); return; }
+    imprimir($('#hoja').innerHTML);   // las mismas de la vista previa (los códigos ya dibujados)
+  };
+  // prueba: una etiqueta con marco y el centro marcado, para ver si cae derecha en el papel
+  $('#btn-prueba').onclick = () => {
+    const m = aplicarCss();
+    imprimir(`<div class="pagina"><div class="etiqueta prueba"><span class="cruz">▲ arriba · ${fmt.num(m.w)} × ${fmt.num(m.h)} mm</span><span class="cruz">✛</span><span class="cruz">el marco tiene que verse entero</span></div></div>`);
   };
   window.addEventListener('afterprint', () => { const z = document.getElementById('zona-impresion'); if (z) z.innerHTML = ''; });
+  try { pctx = await PRECIOS.cargar(sb, e); } catch (_) { pctx = null; }
   await cargarInfo(); pintarCola(); pintarHoja();
 });
 </script>
