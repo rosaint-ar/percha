@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Etiquetas · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611091500">
+<link rel="stylesheet" href="../shell/shell.css?v=202611091504">
 <style>
   .cola td input[type=number]{width:76px;text-align:right}
   .cola td.chk,.cola th.chk{width:34px;text-align:center}
@@ -27,8 +27,14 @@
   .etiqueta .pre{font-family:var(--f-mono);font-weight:700;line-height:1.1}
   .etiqueta .tach{text-decoration:line-through;font-weight:400;font-size:.8em;opacity:.75;margin-right:.3em}
   .etiqueta svg{max-width:100%;max-height:52%;width:auto;height:auto;display:block;flex:0 1 auto;min-height:0}   /* que el número de abajo no se corte */
-  .etiqueta.prueba{border:.3mm solid #000;justify-content:space-between}
-  .etiqueta.prueba .cruz{font:700 9pt Arial}
+  .etiqueta.prueba{border:.3mm solid #000;justify-content:center;padding:0}
+  .etiqueta.prueba .cruz{font:700 6.5pt Arial;line-height:1.2;position:relative;z-index:1;background:#fff;padding:0 1mm}
+  /* regla de la prueba: rayitas cada 1 mm, más largas cada 5 y número cada 10. El primer número que se ve a la izquierda = los mm que se cortan */
+  .regla-x{position:absolute;left:0;top:0;right:0;height:100%}
+  .regla-x i{position:absolute;top:0;width:.25mm;background:#000;height:1.5mm}
+  .regla-x i.m5{height:3mm}.regla-x i.m10{height:4.5mm}
+  .regla-x b{position:absolute;top:4.6mm;font:700 6.5pt Arial;transform:translateX(-50%)}
+  .regla-x.abajo i{top:auto;bottom:0}.regla-x.abajo b{top:auto;bottom:4.6mm}
   /* Impresión: solo las hojas. Se copian a #zona-impresion (hija directa del body) y se esconde todo lo demás
      (antes se escondían las tarjetas, y la vista previa está adentro de una → la hoja salía en blanco). */
   #zona-impresion{display:none}
@@ -70,9 +76,9 @@
 </main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611091500"></script>
-<script src="../shared/precios.js?v=202611091500"></script>
-<script src="../shell/shell.js?v=202611091500"></script>
+<script src="../shared/supabase.js?v=202611091504"></script>
+<script src="../shared/precios.js?v=202611091504"></script>
+<script src="../shell/shell.js?v=202611091504"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, confirmar } = APP, e = APP.empresa.id;
@@ -125,8 +131,8 @@ APP.ready.then(async () => {
     // la hoja apenas más chica que la etiqueta: si se pasa por redondeo, la impresora agrega una hoja en blanco
     const rot = m.girar ? ` translate(${m.pw}mm,0) rotate(90deg)` : '';
     css.textContent = `@page{size:${m.pw}mm ${m.ph}mm;margin:0}
-      .pagina{width:${m.pw}mm;height:${(m.ph - 0.4).toFixed(1)}mm}
-      .etiqueta{width:${m.w}mm;height:${(m.h - (m.girar ? 0 : 0.4)).toFixed(1)}mm;font-size:${Math.max(7, Math.min(12, m.h / 3.2)).toFixed(1)}pt;transform-origin:0 0;transform:translate(${m.dx}mm,${m.dy}mm)${rot}}`;
+      .pagina{width:${m.pw}mm;height:${(m.ph - 0.4).toFixed(1)}mm;transform:translate(${m.dx}mm,${m.dy}mm)}
+      .etiqueta{width:${m.w}mm;height:${(m.h - (m.girar ? 0 : 0.4)).toFixed(1)}mm;font-size:${Math.max(7, Math.min(12, m.h / 3.2)).toFixed(1)}pt;transform-origin:0 0;${rot ? 'transform:' + rot : ''}}`;
     $('#sub-previa').textContent = `Así salen (hoja de ${fmt.dec ? fmt.dec(m.pw) : m.pw} × ${fmt.dec ? fmt.dec(m.ph) : m.ph} mm). En la ventana de impresión: la Brother, ese tamaño de papel, márgenes «Ninguno» y escala 100.`;
     return m;
   }
@@ -181,7 +187,8 @@ APP.ready.then(async () => {
   // prueba: una etiqueta con marco y el centro marcado, para ver si cae derecha en el papel
   $('#btn-prueba').onclick = () => {
     const m = aplicarCss();
-    imprimir(`<div class="pagina"><div class="etiqueta prueba"><span class="cruz">▲ arriba · ${fmt.num(m.w)} × ${fmt.num(m.h)} mm</span><span class="cruz">✛</span><span class="cruz">el marco tiene que verse entero</span></div></div>`);
+    const regla = cl => { let r = ''; for (let x = 0; x <= m.w; x++) r += `<i class="${x % 10 === 0 ? 'm10' : x % 5 === 0 ? 'm5' : ''}" style="left:${x}mm"></i>${x % 10 === 0 && x > 0 && x < m.w ? `<b style="left:${x}mm">${x}</b>` : ''}`; return `<div class="regla-x ${cl}">${r}</div>`; };
+    imprimir(`<div class="pagina"><div class="etiqueta prueba">${regla('')}${regla('abajo')}<span class="cruz">PRUEBA ${fmt.num(m.w)}×${fmt.num(m.h)} ✛</span></div></div>`);
   };
   window.addEventListener('afterprint', () => { const z = document.getElementById('zona-impresion'); if (z) z.innerHTML = ''; });
   try { pctx = await PRECIOS.cargar(sb, e); } catch (_) { pctx = null; }
