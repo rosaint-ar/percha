@@ -358,6 +358,14 @@ window.INSTRUCTIVO = {
       { tipo: 'ojo', texto: 'No uses **Precio especial** para una oferta: ese cambia el precio de **una sola lista** y no se ve tachado. Y no cambies precios en Tienda Nube: todo se hace en Percha.' }
     ] },
 
+    { id: 'etiquetas-imprimir', grupo: 'compras', p: 'catalogo_ver', titulo: 'Imprimir etiquetas con código de barras', nuevo: '2026-11-09', resumen: 'Desde la ficha o el remito se juntan las etiquetas; en Etiquetas se imprimen en la Brother, una por etiqueta.', bloques: [
+      { tipo: 'pasos', items: [
+        'En la ficha de la prenda tocá {{Etiquetas de todo el stock}} (o, al ingresar un remito, {{🏷️ Imprimir etiquetas}}). Te lleva a **Catálogo › Etiquetas**.',
+        'Revisá las cantidades y tocá {{Imprimir}}.',
+        'La **primera vez** en esa compu, en la ventana de impresión: **Impresora** Brother TD-4000 · en **Más opciones**: **Tamaño del papel** = el de la etiqueta, **Márgenes** = Ninguno, **Escala** = 100, y destildá **Encabezados y pies de página**. Chrome lo recuerda para las próximas.'] },
+      { tipo: 'tip', texto: 'El **Ancho** y **Alto** de la pantalla tienen que ser la medida real de la etiqueta del rollo. Administración lo deja fijo con {{Guardar como predeterminado}}.' },
+      { tipo: 'tip', texto: 'En la caja, escaneás la etiqueta y la prenda entra sola al ticket.' }
+    ] },
     { id: 'web-conectar', grupo: 'compras', p: 'configuracion', titulo: 'Publicaciones de la web sin conectar y stock a decidir', nuevo: '2026-11-06', resumen: 'Si algo de la web no está conectado a su prenda, o se conectó con otro stock, el Inicio avisa y vos decidís.', bloques: [
       { tipo: 'pasos', items: [
         'En el **Inicio**, en «Para mirar», aparece **🔌 Publicaciones de la web sin conectar** cuando hay algo publicado en Tienda Nube que Percha no controla (por ejemplo, una publicación creada a mano en Tienda Nube).',

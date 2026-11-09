@@ -5,22 +5,27 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Etiquetas · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611091443">
+<link rel="stylesheet" href="../shell/shell.css?v=202611091449">
 <style>
   .cola td input{width:76px;text-align:right}
   .opciones{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px}
   .opciones .campo{margin:0;min-width:120px}
   /* Vista previa en pantalla */
   #hoja{display:flex;flex-wrap:wrap;gap:6px;background:var(--grilla);padding:10px}
-  .etiqueta{background:#fff;color:#000;overflow:hidden;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:1mm 1.5mm;box-sizing:border-box;font-family:var(--f-ui),Arial,sans-serif;text-align:center;page-break-after:always;break-after:page}
+  .etiqueta{background:#fff;color:#000;overflow:hidden;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:1mm 1.5mm;box-sizing:border-box;font-family:var(--f-ui),Arial,sans-serif;text-align:center;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .etiqueta .nom{font-weight:600;line-height:1.1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:100%}
   .etiqueta .var{font-size:.85em;line-height:1.1}
   .etiqueta .pre{font-family:var(--f-mono);font-weight:600;line-height:1.1}
-  .etiqueta svg{max-width:100%;height:auto;display:block}
+  .etiqueta svg{max-width:100%;max-height:56%;width:auto;height:auto;display:block;flex:0 1 auto;min-height:0}   /* que el número de abajo no se corte */
+  /* Impresión: solo las etiquetas. Se copian a #zona-impresion (hija directa del body) y se esconde todo lo demás:
+     antes se escondían las tarjetas, y la vista previa está adentro de una → la hoja salía en blanco. */
+  #zona-impresion{display:none}
   @media print{
-    body{background:#fff}main.app{padding:0}.card,.opciones,.cab-pagina,h2,.sub,#tabla-cola{display:none!important}
-    #hoja{display:block;background:none;padding:0;gap:0}
-    .etiqueta{margin:0;border:0}
+    html,body{margin:0!important;padding:0!important;background:#fff!important}
+    body>*:not(#zona-impresion){display:none!important}
+    #zona-impresion{display:block!important}
+    #zona-impresion .etiqueta{margin:0;border:0;page-break-after:always;break-after:page}
+    #zona-impresion .etiqueta:last-child{page-break-after:auto;break-after:auto}
   }
 </style>
 </head>
@@ -43,8 +48,8 @@
 </main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611091443"></script>
-<script src="../shell/shell.js?v=202611091443"></script>
+<script src="../shared/supabase.js?v=202611091449"></script>
+<script src="../shell/shell.js?v=202611091449"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, confirmar } = APP, e = APP.empresa.id;
@@ -72,7 +77,7 @@ APP.ready.then(async () => {
   function pintarHoja() {
     const w = +$('#o-ancho').value || 62, h = +$('#o-alto').value || 29, conPrecio = $('#o-precio').value === 'si', conNombre = $('#o-nombre').value === 'si';
     let css = document.getElementById('css-etq'); if (!css) { css = document.createElement('style'); css.id = 'css-etq'; document.head.appendChild(css); }
-    css.textContent = `@page{size:${w}mm ${h}mm;margin:0}.etiqueta{width:${w}mm;height:${h}mm;font-size:${Math.max(7, Math.min(11, h / 3.2))}pt}`;
+    css.textContent = `@page{size:${w}mm ${h}mm;margin:0}.etiqueta{width:${w}mm;height:${(h - 0.4).toFixed(1)}mm;font-size:${Math.max(7, Math.min(11, h / 3.2))}pt}`;
     const hoja = $('#hoja'); hoja.innerHTML = '';
     let n = 0;
     cola.forEach(c => { const v = info[c.variante_id]; if (!v) return;
@@ -81,7 +86,7 @@ APP.ready.then(async () => {
         const el = document.createElement('div'); el.className = 'etiqueta';
         el.innerHTML = `${conNombre ? `<div class="nom">${esc(v.producto_nombre)}</div>` : ''}<div class="var">${esc([v.talle_nombre, v.color_nombre].filter(Boolean).join(' · '))}${conPrecio ? ` · <span class="pre">${fmt.pesos(v.precio)}</span>` : ''}</div><svg class="cb"></svg>`;
         hoja.appendChild(el);
-        try { JsBarcode(el.querySelector('svg'), codigo, { format: formato, width: 1.4, height: Math.max(18, h * 1.6), fontSize: 11, margin: 0, displayValue: true }); }
+        try { JsBarcode(el.querySelector('svg'), codigo, { format: formato, width: 1.4, height: Math.max(18, h * 1.6), fontSize: 11, margin: 0, marginBottom: 4, font: "Arial", displayValue: true }); }
         catch (err) { el.querySelector('svg').outerHTML = `<div style="font-size:9pt">${esc(codigo)}</div>`; }
       }
     });
@@ -94,7 +99,13 @@ APP.ready.then(async () => {
     const r = await sb.from('empresas').update({ config }).eq('id', e); toast(r.error ? APP.mensajeError(r.error) : 'Guardado', r.error ? 'error' : '');
   };
   $('#btn-vaciar').onclick = async () => { if (await confirmar('¿Vaciar la cola de etiquetas?', 'Vaciar')) { cola = []; guardarCola(); pintarCola(); pintarHoja(); } };
-  $('#btn-imprimir').onclick = () => { if (!cola.length) { toast('No hay etiquetas', 'error'); return; } window.print(); };
+  $('#btn-imprimir').onclick = () => {
+    if (!cola.length || !$('#hoja .etiqueta')) { toast('No hay etiquetas', 'error'); return; }
+    let z = document.getElementById('zona-impresion'); if (!z) { z = document.createElement('div'); z.id = 'zona-impresion'; document.body.appendChild(z); }
+    z.innerHTML = $('#hoja').innerHTML;   // las mismas etiquetas de la vista previa (los códigos ya dibujados)
+    window.print();
+  };
+  window.addEventListener('afterprint', () => { const z = document.getElementById('zona-impresion'); if (z) z.innerHTML = ''; });
   await cargarInfo(); pintarCola(); pintarHoja();
 });
 </script>
