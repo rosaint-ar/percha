@@ -358,6 +358,14 @@ window.INSTRUCTIVO = {
       { tipo: 'ojo', texto: 'No uses **Precio especial** para una oferta: ese cambia el precio de **una sola lista** y no se ve tachado. Y no cambies precios en Tienda Nube: todo se hace en Percha.' }
     ] },
 
+    { id: 'web-conectar', grupo: 'compras', p: 'configuracion', titulo: 'Publicaciones de la web sin conectar y stock a decidir', nuevo: '2026-11-06', resumen: 'Si algo de la web no está conectado a su prenda, o se conectó con otro stock, el Inicio avisa y vos decidís.', bloques: [
+      { tipo: 'pasos', items: [
+        'En el **Inicio**, en «Para mirar», aparece **🔌 Publicaciones de la web sin conectar** cuando hay algo publicado en Tienda Nube que Percha no controla (por ejemplo, una publicación creada a mano en Tienda Nube).',
+        'Tocalo: abre **Cruce de productos › Sin cruzar**. En cada una tocá {{Cruzar}} y elegí la prenda del local.',
+        'Si al conectar el stock **no coincide**, Percha pregunta **¿Cuál stock vale?**: {{Vale Tienda Nube}} pone en el local lo que dice la web; {{Vale el local}} manda a la web lo del local.'] },
+      { tipo: 'tip', texto: 'Mientras no elijas, Percha **no le manda nada a la web** de esa prenda. Lo pendiente queda en **⚖️ Stock a decidir con la web** (Inicio) y en la pestaña **A decidir** del Cruce.' },
+      { tipo: 'tip', texto: 'Lo que se crea en Percha va a la web ya conectado y con el mismo stock: no hay que hacer nada.' }
+    ] },
     { id: 'prenda-a-la-web', grupo: 'compras', p: 'catalogo_editar', titulo: 'Prenda nueva o color nuevo: va sola a la web', nuevo: '2026-11-04', resumen: 'Se crea en Percha y aparece en Tienda Nube OCULTA, para cargarle las fotos.', bloques: [
       { tipo: 'pasos', items: ['Creá la prenda en Percha (o agregale el color nuevo, también desde una compra).', 'En unos minutos aparece en **Tienda Nube, oculta**, con sus talles y colores, el precio y el stock.', 'En Tienda Nube cargale las **fotos**, la descripción y la categoría, y **mostrala** desde allá.', 'Las fotos vuelven solas a Percha, cada una con su color.'] },
       { tipo: 'tabla', filas: [['Prenda nueva', 'una publicación nueva, oculta'], ['Color nuevo', 'oculto: en la publicación de la prenda, o en una publicación nueva si la prenda tiene una por color'], ['Talle nuevo de un color que ya está', 'se suma a esa publicación (ya tiene fotos)']] },

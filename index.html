@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Inicio · Percha</title>
 <meta name="app-root" content="./">
-<link rel="stylesheet" href="shell/shell.css?v=202611060001">
+<link rel="stylesheet" href="shell/shell.css?v=202611091436">
 <style>
   /* Inicio: saludo + clima, números del mes, ventas de 30 días, canales, lo más vendido y lo que hay que mirar */
   :root{--serie-local:var(--acento);--serie-online:#2A9D8F}
@@ -117,9 +117,9 @@
 </main>
 <div class="tip-graf" id="tip"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="shared/supabase.js?v=202611060001"></script>
-<script src="shared/canales.js?v=202611060001"></script>
-<script src="shell/shell.js?v=202611060001"></script>
+<script src="shared/supabase.js?v=202611091436"></script>
+<script src="shared/canales.js?v=202611091436"></script>
+<script src="shell/shell.js?v=202611091436"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$ } = APP, e = APP.empresa.id;
@@ -212,6 +212,12 @@ APP.ready.then(async () => {
   const items = [];
   items.push(t.por_despachar ? ['caja/envios.html', '📦', 'aviso', 'Envíos por despachar', 'Pedidos pendientes o preparados', t.por_despachar] : ['caja/envios.html', '📦', 'ok', 'Envíos al día', 'No hay pedidos esperando', '✓']);
   if (r.productos_sin_stock) items.push(['catalogo/productos.html', '🫙', 'aviso', 'Prendas sin stock', `De ${fmt.num(r.productos_activos)} activas`, fmt.num(r.productos_sin_stock)]);
+  // la web: publicaciones visibles sin conectar a Percha y conexiones nuevas con stock distinto (sql/117)
+  if (APP.esAdmin) {
+    const { data: cav } = await sb.rpc('canal_avisos', { e: APP.empresa.id }); const w = cav || {};
+    if (+w.a_decidir) items.push([`conexiones/cruce.html?c=${w.conexion}&f=a_decidir`, '⚖️', 'aviso', 'Stock a decidir con la web', 'Se conectaron con stock distinto: elegí cuál vale', fmt.num(w.a_decidir)]);
+    if (+w.sin_conectar) items.push([`conexiones/cruce.html?c=${w.conexion}&f=sin_cruzar`, '🔌', 'aviso', 'Publicaciones de la web sin conectar', +w.sin_conectar_con_stock ? `${fmt.num(w.sin_conectar_con_stock)} con stock: Percha no las controla` : 'Visibles en la web y sin su prenda en Percha', fmt.num(w.sin_conectar)]);
+  }
   items.push(['catalogo/inventario.html', '👚', '', 'Prendas en el local', puede('costos') ? `Valen ${fmt.pesos(r.valor_costo)} a costo` : 'Unidades en stock', fmt.num(r.unidades)]);
   $('#mirar').innerHTML = items.map(([href, ic, cl, ti, sub, n]) => `<a href="${href}"><span class="ic ${cl}">${ic}</span><span class="tx"><b>${ti}</b><small>${sub}</small></span><span class="num">${n}</span></a>`).join('');
 
