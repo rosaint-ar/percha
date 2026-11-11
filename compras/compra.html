@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ingresar mercadería · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611111456">
+<link rel="stylesheet" href="../shell/shell.css?v=202611111509">
 <style>
   /* Ingresar mercadería: se carga como viene el remito (un renglón por artículo y color, cantidades por talle) */
   .cab-compra{display:grid;grid-template-columns:minmax(220px,1.4fr) 1fr 150px 110px;gap:12px;align-items:end}
@@ -21,6 +21,15 @@
   .rg .art{font-family:var(--f-mono);text-transform:uppercase}
   .rg .prenda b{display:block;font:700 13.5px var(--f-ui);line-height:1.25}
   .rg .prenda small{color:var(--tinta-3);font-size:11.5px}
+  .rg .gen-aviso{display:inline-block;margin-top:4px;background:var(--aviso-fondo,#fff4d6);color:var(--tinta);border-radius:6px;padding:2px 7px;font-size:11.5px;font-weight:600;cursor:pointer}
+  .dg-res{border:1px solid var(--linea);border-radius:10px;max-height:190px;overflow:auto;margin-top:6px}
+  .dg-res div{padding:7px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--linea)}.dg-res div:hover{background:var(--lila)}
+  .dg-res small{color:var(--tinta-3);font-family:var(--f-mono)}
+  .dg-bloque{border:1px solid var(--linea);border-radius:10px;padding:8px 10px;margin-top:8px;display:grid;grid-template-columns:minmax(160px,1fr) 140px auto 26px;gap:8px;align-items:center}
+  .dg-bloque b{font-size:13px}.dg-bloque select,.dg-bloque input{border:1px solid var(--linea);border-radius:8px;padding:6px 8px;font:500 13px var(--f-ui);background:var(--superficie)}
+  .dg-talles{display:flex;gap:6px;flex-wrap:wrap}.dg-talles label{display:flex;flex-direction:column;align-items:center;font-size:10.5px;color:var(--tinta-3)}.dg-talles input{width:46px;text-align:center}
+  .dg-cuenta{font:700 14px var(--f-ui)}.dg-cuenta.ok{color:var(--ok)}.dg-cuenta.falta{color:var(--aviso,#b7791f)}
+  @media (max-width:640px){.dg-bloque{grid-template-columns:1fr}}
   .rg .prenda a{color:var(--acento);cursor:pointer;text-decoration:underline}
   .rg .aprendio{display:inline-block;margin-top:4px;font:600 11px var(--f-ui);color:var(--acento);background:var(--lila);border-radius:999px;padding:2px 8px}
   .talles{display:flex;gap:5px;flex-wrap:wrap}
@@ -82,9 +91,9 @@
   <div id="sug" class="sugerencias" style="display:none"></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611111456"></script>
-<script src="../shell/shell.js?v=202611111456"></script>
-<script src="../shared/precios.js?v=202611111456"></script>
+<script src="../shared/supabase.js?v=202611111509"></script>
+<script src="../shell/shell.js?v=202611111509"></script>
+<script src="../shared/precios.js?v=202611111509"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -100,7 +109,7 @@ APP.ready.then(async () => {
   async function paginar(q, pag = 1000) { let d = 0, t = []; while (true) { const { data, error } = await q().range(d, d + pag - 1); if (error) throw error; t = t.concat(data || []); if (!data || data.length < pag) break; d += pag; } return t; }
   async function cargarCatalogo() {
     const [ps, vs] = await Promise.all([
-      paginar(() => sb.from('productos').select('id,codigo,nombre,costo,precio,tiene_variantes').eq('empresa_id', e).eq('activo', true).order('nombre')),
+      paginar(() => sb.from('productos').select('id,codigo,nombre,costo,precio,tiene_variantes,categoria_id,tipo,es_generico,generico_filtro').eq('empresa_id', e).eq('activo', true).order('nombre')),
       paginar(() => sb.from('v_variantes').select('id,producto_id,talle,talle_nombre,talle_orden,color,color_nombre,stock,activa').eq('empresa_id', e))
     ]);
     productos = ps; porProducto = new Map(); varPorId = new Map();
@@ -175,7 +184,7 @@ APP.ready.then(async () => {
         const u = unidades(f), rec = Object.values(f.recibida || {}).reduce((s, n) => s + n, 0);
         return `<div class="rg" data-f="${i}">
           <div class="c-art"><input class="art" data-art="${i}" value="${esc(f.art)}" placeholder="Ej: MIA ROSA" autocomplete="off" ${ro ? 'disabled' : ''}></div>
-          <div class="c-prenda prenda">${p ? `<b>${esc(p.nombre)}</b><small>${esc(p.codigo)}${+p.precio ? ' · se vende a ' + fmt.pesos(p.precio) : ''}${ro ? '' : ` · <a data-cambiar="${i}">cambiar</a>`}</small>${ap && ap.producto_id === p.id ? '<br><span class="aprendio">✓ Percha ya lo conocía</span>' : ''}`
+          <div class="c-prenda prenda">${p ? `<b>${esc(p.nombre)}</b><small>${esc(p.codigo)}${+p.precio ? ' · se vende a ' + fmt.pesos(p.precio) : ''}${ro ? '' : ` · <a data-cambiar="${i}">cambiar</a>`}</small>${p.es_generico && !ro ? `<br><span class="gen-aviso" data-desglosar="${i}">${f.sinIdentificar ? '⚠️ quedan sin identificar · ' : ''}🔎 Identificar los modelos</span>` : ''}${ap && ap.producto_id === p.id ? '<br><span class="aprendio">✓ Percha ya lo conocía</span>' : ''}`
             : `<input class="buscar" data-buscar="${i}" placeholder="Buscá la prenda: nombre o código…" autocomplete="off" ${ro ? 'disabled' : ''}>`}</div>
           <div class="c-color">${p && cols.length ? `<select data-color="${i}" ${ro ? 'disabled' : ''}><option value="">— Elegí el color —</option>${cols.map(c => `<option value="${esc(c.k)}" ${c.k === f.color ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}<option value="+">+ Color nuevo…</option></select>`
             : p ? `<select data-color="${i}" ${ro ? 'disabled' : ''}><option value="">Sin color</option><option value="+">+ Color nuevo…</option></select>` : ''}</div>
@@ -192,6 +201,7 @@ APP.ready.then(async () => {
     filas.forEach((f, i) => { const el = $(`.rg[data-f="${i}"] .tot`); if (el && !cerrada()) { const n = unidades(f); el.innerHTML = n ? fmt.pesos(n * f.costo) + `<small>${n} u.</small>` : ''; } });
   }
   function enganchar() {
+    $$('[data-desglosar]').forEach(b => b.onclick = () => desglosar(+b.dataset.desglosar));
     $$('[data-art]').forEach(inp => {
       const i = +inp.dataset.art;
       inp.oninput = () => { filas[i].art = inp.value; sugerirArt(inp, i); };
@@ -257,14 +267,68 @@ APP.ready.then(async () => {
     const p = prod(a.producto_id); if (!p) return;
     filas[i].producto_id = p.id; filas[i].color = a.color_id && codColor[a.color_id] ? codColor[a.color_id].codigo : ''; filas[i].cant = filas[i].cant || {};
     if (!filas[i].costo) filas[i].costo = +a.costo || +p.costo || 0;
-    asegurarVaciaSinPintar(); pintar(); const c = $(`[data-cant="${i}"]:not(:disabled)`); if (c) c.focus();
+    asegurarVaciaSinPintar(); pintar(); if (p.es_generico) return desglosar(i); const c = $(`[data-cant="${i}"]:not(:disabled)`); if (c) c.focus();
   }
   function elegirPrenda(i, p) {
     const f = filas[i]; f.producto_id = p.id; f.cant = {}; const cols = coloresDe(p.id);
     const c = colorDelTexto(p.id, f.art); f.color = c ? c.k : (cols.length === 1 ? cols[0].k : '');
     if (!f.costo) f.costo = +p.costo || 0;
     asegurarVaciaSinPintar(); pintar();
+    if (p.es_generico) return desglosar(i);
     const sig = f.color || !cols.length ? $(`[data-cant="${i}"]:not(:disabled)`) : $(`[data-color="${i}"]`); if (sig) sig.focus();
+  }
+  // ---------- identificar los modelos de un genérico (BOMBIS «VARIAS»): como en la caja, pero para lo que entra ----------
+  let desglose = null;   // la ventana abierta: para sumarle una prenda recién creada
+  const filtroGen = g => { const fl = g.generico_filtro || {}, cat = fl.categoria_id || g.categoria_id, inc = (fl.incluye || []).filter(w => w.trim()), exc = (fl.excluye || []).filter(w => w.trim());
+    return p => !p.es_generico && p.tipo !== 'kit' && (!cat || p.categoria_id === cat) && inc.every(w => p.nombre.toUpperCase().includes(w.trim().toUpperCase())) && !exc.some(w => p.nombre.toUpperCase().includes(w.trim().toUpperCase())); };
+  function desglosar(i) {
+    const f0 = filas[i], g = prod(f0.producto_id); if (!g) return;
+    const cumple = filtroGen(g), cat = (g.generico_filtro || {}).categoria_id || g.categoria_id;
+    let total = unidades(f0) || '', costo = f0.costo || +g.costo || 0, bloques = [], q = '';
+    const m = modal('<div id="dg"></div>', { fijo: true }); $('.modal', m).style.maxWidth = '860px';
+    const ident = () => bloques.reduce((s, b) => s + Object.values(b.cant).reduce((a, n) => a + (+n || 0), 0), 0);
+    const agregar = (pid) => { const cols = coloresDe(pid), c = colorDelTexto(pid, f0.art); bloques.push({ producto_id: pid, color: c ? c.k : (cols.length === 1 ? cols[0].k : ''), cant: {} }); q = ''; pintarDg(); };
+    desglose = { agregar: pid => { if (prod(pid)) agregar(pid); } };
+    function pintarDg() {
+      const n = ident(), t = +total || 0, res = q.trim() ? productos.filter(cumple).filter(p => norm(p.nombre + ' ' + p.codigo).includes(norm(q))).slice(0, 12) : [];
+      $('#dg', m).innerHTML = `<h2>¿Qué modelos son? <small style="font-weight:500;color:var(--tinta-3)">${esc(g.nombre)}${f0.art ? ' · «' + esc(f0.art) + '»' : ''}</small></h2>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-top:8px">
+          <div class="campo" style="margin:0"><label>¿Cuántas vinieron?</label><input id="dg-total" inputmode="numeric" value="${total}" style="width:110px"></div>
+          <div class="campo" style="margin:0"><label>Costo c/u</label><input id="dg-costo" inputmode="decimal" value="${ver(costo)}" style="width:110px"></div>
+          <div class="dg-cuenta ${t && n === t ? 'ok' : 'falta'}" style="margin-left:auto">${t ? (n === t ? '✓ Están todas identificadas' : n < t ? 'Faltan identificar ' + (t - n) + ' de ' + t : 'Hay ' + (n - t) + ' de más') : n + ' identificadas'}</div>
+        </div>
+        <div class="campo" style="margin:12px 0 0"><label>Buscá el modelo (de ${esc((g.generico_filtro || {}).categoria_id || g.categoria_id ? 'la familia' : 'el catálogo')})</label><input id="dg-q" placeholder="Ej: CATHERINE, ANTONIA…" value="${esc(q)}" autocomplete="off"></div>
+        ${res.length ? `<div class="dg-res">${res.map(p => `<div data-add="${p.id}">${esc(p.nombre)} <small>${esc(p.codigo)}</small></div>`).join('')}</div>` : (q.trim() ? '<p class="sub" style="margin-top:6px">No está: creala con «+ Modelo nuevo».</p>' : '')}
+        <div style="margin-top:6px"><button class="btn chico suave" id="dg-nueva">+ Modelo nuevo</button></div>
+        ${bloques.map((b, k) => { const p = prod(b.producto_id), cols = coloresDe(p.id), ts = tallesDe(p.id);
+          return `<div class="dg-bloque"><div><b>${esc(p.nombre)}</b><br><small style="color:var(--tinta-3)">${esc(p.codigo)}</small> · <a data-otro="${k}" style="font-size:12px;cursor:pointer">+ otro color</a></div>
+            <div>${cols.length ? `<select data-bc="${k}"><option value="">— Color —</option>${cols.map(c => `<option value="${esc(c.k)}" ${c.k === b.color ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}</select>` : '<small style="color:var(--tinta-3)">sin color</small>'}</div>
+            <div class="dg-talles">${ts.map(t => { const v = varDe(p.id, b.color, t.k); return `<label><span>${esc(t.nombre || 'Cant.')}</span><input data-bt="${k}" data-t="${esc(t.k)}" inputmode="numeric" value="${b.cant[t.k] || ''}" ${!v || (cols.length && !b.color) ? 'disabled' : ''}></label>`; }).join('')}</div>
+            <button class="x" data-bx="${k}" title="Quitar">×</button></div>`; }).join('')}
+        <div class="pie" style="flex-wrap:wrap"><button class="btn" data-no>Cancelar</button>${t && n < t && n > 0 ? `<button class="btn" data-dejar>Dejar ${t - n} sin identificar</button>` : ''}<button class="btn primario" data-si ${n ? '' : 'disabled'}>Listo</button></div>`;
+      const qi = $('#dg-q', m); qi.oninput = () => { q = qi.value; const pos = qi.selectionStart; pintarDg(); const q2 = $('#dg-q', m); q2.focus(); q2.setSelectionRange(pos, pos); };
+      $('#dg-total', m).onchange = ev => { total = Math.max(0, Math.round(num(ev.target.value))) || ''; pintarDg(); };
+      $('#dg-costo', m).onchange = ev => { costo = num(ev.target.value); };
+      $$('[data-add]', m).forEach(d => d.onclick = () => agregar(d.dataset.add));
+      $$('[data-otro]', m).forEach(a => a.onclick = () => agregar(bloques[+a.dataset.otro].producto_id));
+      $$('[data-bc]', m).forEach(sel => sel.onchange = () => { const b = bloques[+sel.dataset.bc]; b.color = sel.value; b.cant = {}; pintarDg(); });
+      $$('[data-bt]', m).forEach(inp => inp.onchange = () => { const b = bloques[+inp.dataset.bt]; b.cant[inp.dataset.t] = Math.max(0, Math.round(num(inp.value))) || 0; pintarDg(); });
+      $$('[data-bx]', m).forEach(x => x.onclick = () => { bloques.splice(+x.dataset.bx, 1); pintarDg(); });
+      $('#dg-nueva', m).onclick = () => { const prov = $('#proveedor').value; window.open(`../catalogo/producto.html?nuevo=1&desde=compra${cat ? '&familia=' + cat : ''}${prov ? '&proveedor=' + prov : ''}`, '_blank'); };
+      $('[data-no]', m).onclick = () => { desglose = null; m.cerrar(); };
+      const terminar = dejar => {
+        const sinColor = bloques.find(b => coloresDe(b.producto_id).length && !b.color); if (sinColor) { toast('Falta el color de ' + prod(sinColor.producto_id).nombre, 'error'); return; }
+        const nuevas = bloques.filter(b => Object.values(b.cant).some(x => +x)).map(b => ({ art: f0.art, producto_id: b.producto_id, color: b.color, cant: b.cant, costo, recibida: {} }));
+        if (!nuevas.length) { toast('Cargá cuántas de cada modelo', 'error'); return; }
+        const resto = dejar ? (+total || 0) - ident() : 0;
+        if (resto > 0) { const tk = Object.keys(f0.cant)[0] || ''; nuevas.push({ art: f0.art, producto_id: g.id, color: '', cant: { [tk]: resto }, costo, recibida: {}, sinIdentificar: true }); }
+        filas.splice(i, 1, ...nuevas); asegurarVaciaSinPintar(); desglose = null; m.cerrar(); pintar();
+        toast(`${nuevas.length - (resto > 0 ? 1 : 0)} modelos identificados${resto > 0 ? ' · ' + resto + ' quedan como ' + g.nombre : ''}`);
+      };
+      $('[data-si]', m).onclick = () => { const t2 = +total || 0, n2 = ident(); if (t2 && n2 !== t2) { toast(n2 < t2 ? `Faltan identificar ${t2 - n2}: buscalas o tocá «Dejar sin identificar»` : `Identificaste ${n2 - t2} de más`, 'error'); return; } terminar(false); };
+      const dj = $('[data-dejar]', m); if (dj) dj.onclick = () => terminar(true);
+    }
+    pintarDg(); setTimeout(() => { const q1 = $('#dg-q', m); if (q1) q1.focus(); }, 50);
   }
   function asegurarVaciaSinPintar() { const u = filas[filas.length - 1]; if (u && (u.producto_id || u.art)) filas.push(filaVacia()); }
   async function colorNuevo(i) {
@@ -284,6 +348,7 @@ APP.ready.then(async () => {
     const usadas = filas.filter(f => unidades(f) || f.producto_id);
     const sinPrenda = filas.find(f => !f.producto_id && f.art.trim()); if (sinPrenda) throw new Error(`Falta elegir qué prenda de Augusta es "${sinPrenda.art.trim()}"`);
     const sinColor = usadas.find(f => coloresDe(f.producto_id).length && !f.color); if (sinColor) throw new Error(`Falta el color de ${prod(sinColor.producto_id).nombre}`);
+    const gen = usadas.find(f => (prod(f.producto_id) || {}).es_generico && !f.sinIdentificar); if (gen) { setTimeout(() => desglosar(filas.indexOf(gen)), 50); throw new Error(`Identificá qué modelos son las ${prod(gen.producto_id).nombre}`); }
     const sinCant = usadas.find(f => !unidades(f)); if (sinCant) throw new Error(`Poné cuántas llegaron de ${prod(sinCant.producto_id).nombre}${sinCant.art ? ' (' + sinCant.art + ')' : ''}, o quitá el renglón`);
     const lineas = [];
     usadas.forEach(f => { const p = prod(f.producto_id); Object.entries(f.cant).forEach(([t, n]) => { const v = varDe(p.id, f.color, t); if (!v || !n) return; lineas.push({ variante_id: v.id, producto_id: p.id, descripcion: p.nombre, talle: v.talle_nombre || null, color: v.color_nombre || null, pedida: n, costo_unit: r2(f.costo), articulo_prov: f.art.trim() || null }); }); });
@@ -422,6 +487,7 @@ APP.ready.then(async () => {
     if (ev.origin !== location.origin || !ev.data || ev.data.percha !== 'prenda-nueva' || !ev.data.producto_id) return;
     await cargarCatalogo(); ultimaRecarga = Date.now();
     const p = prod(ev.data.producto_id); if (!p) return;
+    if (desglose) { desglose.agregar(p.id); toast(`${p.nombre} agregada: cargá cuántas llegaron`); return; }
     let i = filas.findIndex(x => x.art && !x.producto_id);
     if (i < 0) { i = filas.findIndex(x => !x.art && !x.producto_id); if (i < 0) { filas.push(filaVacia()); i = filas.length - 1; } }
     elegirPrenda(i, p); toast(`${p.nombre} agregada al remito`);

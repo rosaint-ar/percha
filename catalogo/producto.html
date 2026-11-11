@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Producto · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611111456">
+<link rel="stylesheet" href="../shell/shell.css?v=202611111509">
 <style>
   .dos{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
   .dos>.card{min-width:0;overflow-x:auto}
@@ -81,7 +81,7 @@
 <body data-page="productos" data-etq="Catálogo" data-title="Producto">
 <main class="app ficha-producto">
   <div class="card" id="card-generico" style="display:none">
-    <div class="card-cab"><div><h2>Qué incluye este genérico</h2><p class="sub">Se vende rápido como «varias» y al cobrar el POS pregunta el modelo. Acá se define entre qué prendas elegir.</p></div></div>
+    <div class="card-cab"><div><h2>Qué modelos incluye este código general</h2><p class="sub">En la caja y en los remitos, al usarlo, Percha pregunta qué modelos son y ofrece estos. Las prendas nuevas de la familia entran solas. Todos los códigos generales: <a href="generales.html">Catálogo › Códigos generales</a>.</p></div></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
       <div class="campo" style="margin:0;min-width:150px"><label>Familia</label><select id="gf-cat"><option value="">Todas</option></select></div>
       <div class="campo" style="margin:0;min-width:150px"><label>Que contenga (coma)</label><input id="gf-inc" placeholder="MEDIAS"></div>
@@ -141,7 +141,7 @@
         <div class="campo"><label>Variantes</label><select name="tiene_variantes"><option value="false">No, es un artículo único</option><option value="true">Sí, por talle y color</option></select></div>
         <div class="campo"><label>Estado</label><select name="activo"><option value="true">Activo</option><option value="false">Inactivo</option></select></div>
         <div class="campo"><label>En la web</label><select name="publicar_web"><option value="true">Sí: se sube sola a Tienda Nube (oculta)</option><option value="false">No: solo en el local</option></select><span class="ayuda" id="web-estado"></span></div>
-        <div class="campo"><label>Genérico</label><select name="es_generico" title="Se vende rápido como «varias» y al cobrar el POS pregunta qué modelos se lleva"><option value="false">No</option><option value="true">Sí: al cobrar pregunta el modelo</option></select></div>
+        <div class="campo"><label>Código general</label><select name="es_generico" title="Para lo que tiene muchos modelos (ej. BOMBIS «VARIAS»): en la caja y en los remitos pregunta qué modelos son. Todos en Catálogo › Códigos generales"><option value="false">No</option><option value="true">Sí: en la caja y en los remitos pregunta qué modelos son</option></select></div>
       </div>
       <div class="campo"><label>Descripción</label><textarea name="descripcion" rows="2"></textarea></div>
     </form>
@@ -167,10 +167,10 @@
   </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611111456"></script>
-<script src="../shared/precios.js?v=202611111456"></script>
-<script src="../shared/prenda.js?v=202611111456"></script>
-<script src="../shell/shell.js?v=202611111456"></script>
+<script src="../shared/supabase.js?v=202611111509"></script>
+<script src="../shared/precios.js?v=202611111509"></script>
+<script src="../shared/prenda.js?v=202611111509"></script>
+<script src="../shell/shell.js?v=202611111509"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$ , toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -287,6 +287,7 @@ APP.ready.then(async () => {
   function prepararNueva() {
     $('#fila-nueva').style.display = '';
     const fam = params.get('familia'), prov = params.get('proveedor');
+    if (params.get('generico')) { form.es_generico.value = 'true'; form.tiene_variantes.value = 'false'; form.publicar_web.value = 'false'; $('h1').innerHTML = 'Nuevo <em>código general</em>'; }
     if (fam && form.categoria_id.querySelector(`option[value="${fam}"]`)) form.categoria_id.value = fam;
     if (prov && form.proveedor_id.querySelector(`option[value="${prov}"]`)) form.proveedor_id.value = prov;
     form.categoria_id.addEventListener('change', sugerirFamilia);
@@ -334,6 +335,7 @@ APP.ready.then(async () => {
     id = r.data.id;
     // artículo único o kit: su variante "sin talle ni color" para que el stock (o el disponible) tenga dónde colgar
     if (!d.tiene_variantes || d.tipo === 'kit') await sb.from('variantes').insert(APP.conEmpresa({ producto_id: id, sku: d.codigo, ean: d.ean }));
+    if (d.es_generico && d.categoria_id) await sb.from('productos').update({ generico_filtro: { categoria_id: d.categoria_id, incluye: [], excluye: ['PACK'] } }).eq('id', id);   // por defecto: los modelos de su familia
     history.replaceState(null, '', `producto.html?id=${id}`);
     toast('Producto creado'); $('#card-matriz').style.display = ''; $('#tb-mov').parentElement.style.display = ''; $('#card-fotos').style.display = ''; $('#fila-nueva').style.display = 'none';
     await cargar();

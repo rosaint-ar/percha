@@ -358,6 +358,15 @@ window.INSTRUCTIVO = {
       { tipo: 'tip', texto: 'Solo se mueve **la diferencia**: si cargaste 3 y eran 2, sale 1 del stock (y de la web). En el historial de la prenda queda como «Corrección de la compra».' },
       { tipo: 'tip', texto: 'Si el remito entero no correspondía, en la corrección tocá {{Anular el remito}}: sale del stock todo lo que había entrado y se descuenta de la cuenta del proveedor.' }
     ] },
+    { id: 'codigos-generales', grupo: 'compras', p: 'catalogo_ver', titulo: 'Códigos generales (BOMBIS «VARIAS», MEDIAS VARIAS)', nuevo: '2026-11-11', resumen: 'Sirven para lo que tiene muchos modelos: se usa el código general y Percha pregunta qué modelos son, en la caja y en los remitos.', bloques: [
+      { tipo: 'pasos', items: [
+        'Están todos en **Catálogo › Códigos generales**: ahí ves qué modelos incluye cada uno y cuántas unidades quedaron sin identificar.',
+        '**En un remito**: elegí el código general (ej. BOMBIS «VARIAS») y se abre **¿Qué modelos son?**. Poné cuántas vinieron, buscá cada modelo, elegí el color y cargá los talles. Si un modelo no existe, tocá {{+ Modelo nuevo}}: se crea y vuelve solo a la ventana.',
+        'Cuando estén todas, tocá {{Listo}}: quedan los renglones de cada modelo. Si no sabés alguna, {{Dejar sin identificar}}.',
+        '**En la caja**: se cobra con el código general y, antes de cerrar la venta, Percha pregunta qué modelo se llevó.'] },
+      { tipo: 'tip', texto: 'Las prendas **nuevas** de la familia entran solas en su código general: no hay que tocar nada. Para cambiar qué incluye (otra familia, o palabras que tiene que tener o no el nombre), administración toca {{Cambiar qué incluye}}.' },
+      { tipo: 'tip', texto: 'Para crear otro código general (ej. para pantuflas): {{+ Nuevo código general}} en esa pantalla, elegí la familia y listo.' }
+    ] },
     { id: 'compras-nombres', grupo: 'compras', p: 'compras', titulo: 'El proveedor le dice de otra forma', nuevo: '2026-11-03', resumen: 'La primera vez elegís qué prenda es; después Percha la reconoce sola.', bloques: [
       { tipo: 'texto', texto: 'Cada proveedor tiene sus nombres (para Concepto, **MIA** es el pijama **CIELO** y **MORA** es el **MAGNOLIA**). La primera vez escribís cómo dice el remito y elegís la prenda de Augusta. **Percha lo aprende para ese proveedor.**' },
       { tipo: 'texto', texto: 'La próxima vez, cuando escribas **MIA ROSA**, te propone **PIJAMA «CIELO» Rosa** y queda marcado **✓ Percha ya lo conocía**. Solo ponés las cantidades.' },

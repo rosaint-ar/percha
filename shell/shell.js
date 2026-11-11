@@ -152,6 +152,7 @@
     { id: 'productos', label: 'Catálogo', href: 'catalogo/productos.html', icono: 'catalogo', p: 'catalogo_ver' },
     { id: 'etiquetas', label: 'Etiquetas', href: 'catalogo/etiquetas.html', icono: 'etiquetas', p: 'catalogo_ver' },
     { id: 'inventario', label: 'Inventario', href: 'catalogo/inventario.html', icono: 'conteo', p: 'catalogo_ver' },
+    { id: 'generales', label: 'Códigos generales', href: 'catalogo/generales.html', icono: 'catalogo', p: 'catalogo_ver' },
     { id: 'compras', label: 'Compras e ingresos', href: 'compras/compras.html', icono: 'compras', p: 'compras' },
     { grupo: 'Análisis', p: 'inicio' },
     { id: 'informes', label: 'Informes', href: '#', icono: 'informes', prox: true, p: 'inicio' },
@@ -162,7 +163,7 @@
     { id: 'instructivo', label: 'Instructivo', href: 'ayuda/instructivo.html', icono: 'ayuda', p: 'instructivo' }
   ];
   // qué permiso pide cada pantalla (data-page del body); la primera permitida es adonde se manda a quien no puede
-  const PERMISO_PAGINA = { instructivo: 'instructivo', pedidos: ['vender', 'compras'], inicio: 'inicio', pos: 'vender', caja: 'vender', ventas: ['ventas_todas', 'ventas_propias'], envios: 'vender', productos: 'catalogo_ver', catalogo: 'catalogo_ver', etiquetas: 'catalogo_ver', inventario: 'catalogo_ver', conteo: 'catalogo_editar', compras: 'compras', conexiones: 'conexiones', configuracion: 'configuracion' };
+  const PERMISO_PAGINA = { instructivo: 'instructivo', pedidos: ['vender', 'compras'], inicio: 'inicio', pos: 'vender', caja: 'vender', ventas: ['ventas_todas', 'ventas_propias'], envios: 'vender', productos: 'catalogo_ver', catalogo: 'catalogo_ver', etiquetas: 'catalogo_ver', inventario: 'catalogo_ver', generales: 'catalogo_ver', conteo: 'catalogo_editar', compras: 'compras', conexiones: 'conexiones', configuracion: 'configuracion' };
   const permite = p => !p || [].concat(p).some(k => APP.puede(k));
   function pintarLateral() {
     const pagina = body.dataset.page, esAdmin = APP.esAdmin;
