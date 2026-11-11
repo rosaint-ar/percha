@@ -8,6 +8,8 @@
 //   (sin pagar, o pagado pero todavía no importado), sus unidades se restan de lo que se manda; si no, el envío
 //   le devolvería a la web la unidad que ya descontó. Cuando el pedido entra a Percha, Percha ya lo descontó y no se resta más.
 // body.solo_productos = ["500123", …]: empuja solo esos productos (y sus kits), aunque la conexión tenga el empuje apagado.
+// Conexión nueva con stock distinto (canal_items.stock_a_decidir): no se manda nada de esa prenda hasta que administración
+//   decida en «Cruce de productos › A decidir» si vale la web o Percha (sql/117). Si mientras tanto quedan iguales, se destraba sola.
 // body.simular = true: no escribe nada; compara con el stock que tiene hoy la web. Con body.todo = true revisa todo lo cruzado.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 const SB_URL = Deno.env.get("SUPABASE_URL")!, ANON = Deno.env.get("SUPABASE_ANON_KEY")!, SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, CRON_KEY = Deno.env.get("CRON_KEY") || "";
@@ -126,7 +128,7 @@ Deno.serve(async (req) => {
     }
 
     const items: any[] = [];   // de a tandas: una lista larga de ids no entra en la dirección de la consulta
-    for (let i = 0; i < variantes.length; i += 300) items.push(...await pag(() => admin.from("canal_items").select("id,variante_id,producto_ext,variante_ext,stock,talle_canal,color_canal,publicado").eq("conexion_id", cx.id).in("variante_id", variantes.slice(i, i + 300))));
+    for (let i = 0; i < variantes.length; i += 300) items.push(...await pag(() => admin.from("canal_items").select("id,variante_id,producto_ext,variante_ext,stock,talle_canal,color_canal,publicado,stock_a_decidir").eq("conexion_id", cx.id).in("variante_id", variantes.slice(i, i + 300))));
     const stocks: any[] = [];
     for (let i = 0; i < variantes.length; i += 300) { const { data } = await admin.from("v_variantes").select("id,producto_id,producto_tipo,sku,stock,fallas,producto_nombre,talle_nombre,color_nombre").in("id", variantes.slice(i, i + 300)); stocks.push(...(data || [])); }
     const infoVar = new Map(stocks.map((s: any) => [s.id, s]));
@@ -202,6 +204,17 @@ Deno.serve(async (req) => {
       const oculto = (d: any) => !cx.incluir_ocultos && (simular && body.todo ? visible.get(String(d.variante_ext)) === false : d.publicado === false);
       const ocultos = todos.filter(oculto);
       if (ocultos.length === todos.length) { if (simular) sinTocar.push({ producto: v.producto_nombre, por: "oculto en la web" }); else await admin.from("canal_cola").update({ estado: "hecho", hecho: new Date().toISOString(), error: "oculto en la web: no se manda" }).eq("conexion_id", cx.id).eq("variante_id", vid).eq("estado", "pendiente"); continue; }
+      // conexión nueva con stock distinto: se espera la decisión (si ya coinciden, se destraba sola)
+      const aDecidir = todos.filter((d: any) => d.stock_a_decidir && !oculto(d));
+      if (aDecidir.length) {
+        const webTot = todos.filter((d: any) => !oculto(d) && webDe(d) != null).reduce((a: number, d: any) => a + (+(webDe(d) ?? 0) || 0), 0), perTot = stockPara(aDecidir[0]);   // la web puede repartirla en varias publicaciones: el total
+        if (webTot === perTot) { if (!simular) await admin.from("canal_items").update({ stock_a_decidir: false }).in("id", aDecidir.map((d: any) => d.id)); aDecidir.forEach((d: any) => d.stock_a_decidir = false); }
+        else {
+          if (simular) sinTocar.push({ producto: v.producto_nombre, por: `a decidir: web ${webTot}, Percha ${perTot}` });
+          else await admin.from("canal_cola").update({ estado: "hecho", hecho: new Date().toISOString(), error: `a decidir: web ${webTot}, Percha ${perTot}` }).eq("conexion_id", cx.id).eq("variante_id", vid).eq("estado", "pendiente");
+          continue;
+        }
+      }
       // las publicaciones sin límite de stock (gift cards, cajas sorpresa) no se tocan
       let destinos = todos.filter((d: any) => !oculto(d) && webDe(d) !== null);
       if (!destinos.length) { if (simular) sinTocar.push({ producto: v.producto_nombre, por: "sin límite de stock en la web" }); else await admin.from("canal_cola").update({ estado: "hecho", hecho: new Date().toISOString(), error: "sin límite en la web: no se manda" }).eq("conexion_id", cx.id).eq("variante_id", vid).eq("estado", "pendiente"); continue; }
