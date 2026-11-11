@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ingresar mercadería · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611111509">
+<link rel="stylesheet" href="../shell/shell.css?v=202611112140">
 <style>
   /* Ingresar mercadería: se carga como viene el remito (un renglón por artículo y color, cantidades por talle) */
   .cab-compra{display:grid;grid-template-columns:minmax(220px,1.4fr) 1fr 150px 110px;gap:12px;align-items:end}
@@ -91,9 +91,9 @@
   <div id="sug" class="sugerencias" style="display:none"></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611111509"></script>
-<script src="../shell/shell.js?v=202611111509"></script>
-<script src="../shared/precios.js?v=202611111509"></script>
+<script src="../shared/supabase.js?v=202611112140"></script>
+<script src="../shell/shell.js?v=202611112140"></script>
+<script src="../shared/precios.js?v=202611112140"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -287,6 +287,15 @@ APP.ready.then(async () => {
     let total = unidades(f0) || '', costo = f0.costo || +g.costo || 0, bloques = [], q = '';
     const m = modal('<div id="dg"></div>', { fijo: true }); $('.modal', m).style.maxWidth = '860px';
     const ident = () => bloques.reduce((s, b) => s + Object.values(b.cant).reduce((a, n) => a + (+n || 0), 0), 0);
+    // un color o estampa que la prenda todavía no tiene: se crea ahí mismo, con todos sus talles (el mismo camino que el renglón del remito)
+    const colorNuevoBloque = async k => {
+      const b = bloques[k], p = prod(b.producto_id);
+      const d = await APP.formulario({ titulo: 'Color nuevo para ' + p.nombre, sub: 'Se agrega a la prenda con todos sus talles (si el color o estampa ya existe en Percha, se usa ese).', campos: [{ k: 'color', label: 'Color o estampa', requerido: true, placeholder: 'Ej: Cherry, Animal print', valor: '' }], boton: 'Agregar' });
+      if (!d) return;
+      const { data, error } = await sb.rpc('compras_agregar_color', { p_producto: p.id, p_color: d.color });
+      if (error) { toast(mensajeError(error), 'error'); return; }
+      await Promise.all([cargarCatalogo(), cargarColores()]); b.color = data; b.cant = {}; pintarDg(); toast('Color agregado');
+    };
     const agregar = (pid) => { const cols = coloresDe(pid), c = colorDelTexto(pid, f0.art); bloques.push({ producto_id: pid, color: c ? c.k : (cols.length === 1 ? cols[0].k : ''), cant: {} }); q = ''; pintarDg(); };
     desglose = { agregar: pid => { if (prod(pid)) agregar(pid); } };
     function pintarDg() {
@@ -302,7 +311,7 @@ APP.ready.then(async () => {
         <div style="margin-top:6px"><button class="btn chico suave" id="dg-nueva">+ Modelo nuevo</button></div>
         ${bloques.map((b, k) => { const p = prod(b.producto_id), cols = coloresDe(p.id), ts = tallesDe(p.id);
           return `<div class="dg-bloque"><div><b>${esc(p.nombre)}</b><br><small style="color:var(--tinta-3)">${esc(p.codigo)}</small> · <a data-otro="${k}" style="font-size:12px;cursor:pointer">+ otro color</a></div>
-            <div>${cols.length ? `<select data-bc="${k}"><option value="">— Color —</option>${cols.map(c => `<option value="${esc(c.k)}" ${c.k === b.color ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}</select>` : '<small style="color:var(--tinta-3)">sin color</small>'}</div>
+            <div>${cols.length ? `<select data-bc="${k}"><option value="">— Color —</option>${cols.map(c => `<option value="${esc(c.k)}" ${c.k === b.color ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}<option value="+">+ Color o estampa nuevo…</option></select>` : `<small style="color:var(--tinta-3)">sin color</small> · <a data-bcn="${k}" style="font-size:12px;cursor:pointer">+ color o estampa</a>`}</div>
             <div class="dg-talles">${ts.map(t => { const v = varDe(p.id, b.color, t.k); return `<label><span>${esc(t.nombre || 'Cant.')}</span><input data-bt="${k}" data-t="${esc(t.k)}" inputmode="numeric" value="${b.cant[t.k] || ''}" ${!v || (cols.length && !b.color) ? 'disabled' : ''}></label>`; }).join('')}</div>
             <button class="x" data-bx="${k}" title="Quitar">×</button></div>`; }).join('')}
         <div class="pie" style="flex-wrap:wrap"><button class="btn" data-no>Cancelar</button>${t && n < t && n > 0 ? `<button class="btn" data-dejar>Dejar ${t - n} sin identificar</button>` : ''}<button class="btn primario" data-si ${n ? '' : 'disabled'}>Listo</button></div>`;
@@ -311,7 +320,8 @@ APP.ready.then(async () => {
       $('#dg-costo', m).onchange = ev => { costo = num(ev.target.value); };
       $$('[data-add]', m).forEach(d => d.onclick = () => agregar(d.dataset.add));
       $$('[data-otro]', m).forEach(a => a.onclick = () => agregar(bloques[+a.dataset.otro].producto_id));
-      $$('[data-bc]', m).forEach(sel => sel.onchange = () => { const b = bloques[+sel.dataset.bc]; b.color = sel.value; b.cant = {}; pintarDg(); });
+      $$('[data-bc]', m).forEach(sel => sel.onchange = () => { const b = bloques[+sel.dataset.bc]; if (sel.value === '+') { sel.value = b.color; return colorNuevoBloque(+sel.dataset.bc); } b.color = sel.value; b.cant = {}; pintarDg(); });
+      $$('[data-bcn]', m).forEach(a => a.onclick = () => colorNuevoBloque(+a.dataset.bcn));
       $$('[data-bt]', m).forEach(inp => inp.onchange = () => { const b = bloques[+inp.dataset.bt]; b.cant[inp.dataset.t] = Math.max(0, Math.round(num(inp.value))) || 0; pintarDg(); });
       $$('[data-bx]', m).forEach(x => x.onclick = () => { bloques.splice(+x.dataset.bx, 1); pintarDg(); });
       $('#dg-nueva', m).onclick = () => { const prov = $('#proveedor').value; window.open(`../catalogo/producto.html?nuevo=1&desde=compra${cat ? '&familia=' + cat : ''}${prov ? '&proveedor=' + prov : ''}`, '_blank'); };

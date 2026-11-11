@@ -337,7 +337,7 @@ window.INSTRUCTIVO = {
       { tipo: 'ejemplo', titulo: 'Un renglón del remito de Concepto', filas: [['En el remito', 'MIA · ROSA · S 3 · M 2 · XL 3 · $22.000'], ['Cómo dice el remito', '**MIA ROSA**'], ['Prenda de Augusta', '**PIJAMA «CIELO»**, color **Rosa**'], ['Cantidad por talle', 'S **3** · M **2** · XL **3**'], ['Costo c/u', '**22.000**']] },
       { tipo: 'texto', texto: 'Al ingresar: el **stock** sube, la **web** se actualiza sola en un minuto, el **costo** de la prenda queda con el descuento del remito y se suma a la **cuenta del proveedor**.' },
       { tipo: 'ojo', texto: '**No cargues el stock a mano en Tienda Nube.** Percha manda el stock a la web: lo que se carga solo allá se borra con la próxima venta. Todo lo que entra, entra por acá.' },
-      { tipo: 'tip', texto: 'Si llega un **color que la prenda no tiene**, elegí {{+ Color nuevo…}} en el color: se crea ahí mismo con todos sus talles. Si es una **prenda nueva**, tocá {{+ Prenda nueva en el catálogo}}, creala y al volver ya aparece.' }
+      { tipo: 'tip', texto: 'Si llega un **color o estampa que la prenda no tiene**, elegí {{+ Color nuevo…}} en el color (también en la ventana **¿Qué modelos son?**: {{+ Color o estampa nuevo…}}): se crea ahí mismo con todos sus talles. Si es una **prenda nueva**, tocá {{+ Prenda nueva en el catálogo}}, creala y al volver ya aparece.' }
     ] },
     { id: 'prenda-nueva', grupo: 'compras', p: 'catalogo_editar', titulo: 'Cargar una prenda nueva (por ejemplo, bombachas que entraron)', nuevo: '2026-11-11', resumen: 'Elegís la familia y el código, el precio y los talles se completan solos. Queda para vender, en la web (oculta) y dentro de «BOMBIS VARIAS».', bloques: [
       { tipo: 'pasos', items: [
@@ -345,7 +345,7 @@ window.INSTRUCTIVO = {
         'Elegí la **Familia** (por ejemplo BOMBACHAS): el **código** sale solo (el que sigue en la familia) y el **precio** también (el que más se usa en esa familia).',
         'Si es parecida a otra (misma tela o estilo), escribila en **Parecida a**: copia familia, precio, costo, proveedor y talles.',
         'Poné el **nombre** como el resto (ej. LESS «NOMBRE» ALGODÓN) y tocá {{Crear producto}}.',
-        'Se abre sola la ventana de **talles y colores**: los talles ya vienen marcados; elegí los colores y tocá {{Crear}}.',
+        'Se abre sola la ventana de **talles y colores**: los talles ya vienen marcados; elegí los colores y tocá {{Crear}}. Si un color o estampa **no está en la lista**, escribilo en el buscador y tocá {{+ Crear como color o estampa nuevo}}: queda creado y elegido.',
         'Si venías del remito, la prenda ya aparece en el renglón: cargá las cantidades por talle y listo.'] },
       { tipo: 'tip', texto: 'Al crearla ya se puede vender suelta o con **BOMBIS «VARIAS»** (el código general: al cobrar se elige el modelo), y se sube sola a la web **oculta** para ponerle fotos.' },
       { tipo: 'tip', texto: 'No hace falta inventar el código: Percha saltea los que ya existen o que usa alguna publicación vieja de la web.' }

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Producto · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611111509">
+<link rel="stylesheet" href="../shell/shell.css?v=202611112140">
 <style>
   .dos{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
   .dos>.card{min-width:0;overflow-x:auto}
@@ -167,10 +167,10 @@
   </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611111509"></script>
-<script src="../shared/precios.js?v=202611111509"></script>
-<script src="../shared/prenda.js?v=202611111509"></script>
-<script src="../shell/shell.js?v=202611111509"></script>
+<script src="../shared/supabase.js?v=202611112140"></script>
+<script src="../shared/precios.js?v=202611112140"></script>
+<script src="../shared/prenda.js?v=202611112140"></script>
+<script src="../shell/shell.js?v=202611112140"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$ , toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -673,11 +673,35 @@ APP.ready.then(async () => {
         <div class="av-elegidos">${[...selC].map(id => colores.find(c => c.id === id)).filter(Boolean).map(c => `<button type="button" class="av-col on" data-c="${c.id}"><i style="background:${esc(c.hex || '#E6DEF0')}"></i>${esc(c.nombre)} ✕</button>`).join('')}</div>
         <input class="av-busca" id="av-busca" placeholder="Buscar color o estampa…" value="${esc(busca)}" autocomplete="off">
         <div class="av-grupos">${nombresG.map(g => `<details ${q || nombresG.length < 4 ? 'open' : ''}><summary>${esc(g)} <small>${grupos[g].length}</small></summary><div class="av-chips">${grupos[g].sort((a, b) => a.nombre.localeCompare(b.nombre)).map(c => `<button type="button" class="av-col${selC.has(c.id) ? ' on' : ''}" data-c="${c.id}"><i style="background:${esc(c.hex || '#E6DEF0')}"></i>${esc(c.nombre)}</button>`).join('')}</div></details>`).join('') || '<p class="sub">Nada con ese nombre.</p>'}</div>
+        <div style="margin-top:8px"><button type="button" class="btn chico suave" id="av-nuevo">+ ${busca.trim() && !colores.some(c => nrm(c.nombre) === q.trim()) ? 'Crear «' + esc(busca.trim()) + '» como color o estampa nuevo' : 'Color o estampa nuevo'}</button></div>
         <div class="pie" style="justify-content:space-between;align-items:center"><span class="av-resumen">${combos.length ? '<b>' + combos.length + '</b> combinaciones nuevas' : 'No hay combinaciones nuevas'}</span><div style="display:flex;gap:8px"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si ${combos.length ? '' : 'disabled'}>Crear ${combos.length || ''}</button></div></div>`;
       $$('[data-esc]', m).forEach(b => b.onclick = () => { escActiva = b.dataset.esc; pintar(); });
       $$('[data-t]', m).forEach(b => b.onclick = () => { selT.has(b.dataset.t) ? selT.delete(b.dataset.t) : selT.add(b.dataset.t); pintar(); });
       const todos = $('[data-todos]', m); if (todos) todos.onclick = () => { const all = tEsc.every(t => selT.has(t.id)); tEsc.forEach(t => all ? selT.delete(t.id) : selT.add(t.id)); pintar(); };
       $$('[data-c]', m).forEach(b => b.onclick = () => { selC.has(b.dataset.c) ? selC.delete(b.dataset.c) : selC.add(b.dataset.c); const y = $('.av-grupos', m).scrollTop; pintar(); $('.av-grupos', m).scrollTop = y; });
+      // color o estampa que todavía no existe en Percha: se crea y queda elegido (y disponible para todas las prendas)
+      $('#av-nuevo', m).onclick = async () => {
+        const fams = [...new Set(GRUPOS.concat(colores.map(c => c.grupo).filter(Boolean)))], pre = busca.trim();
+        const d = await APP.formulario({ titulo: 'Color o estampa nuevo', sub: 'Queda disponible para todas las prendas.', boton: 'Crear',
+          campos: [{ k: 'nombre', label: 'Nombre', requerido: true, valor: pre, placeholder: 'Ej. Cherry, Animal print' },
+            { k: 'grupo', label: 'Familia de color', tipo: 'select', opciones: fams.map(g => [g, g]), valor: /print|estamp|flor|animal|lunar|rayad|cuadr/i.test(pre) ? 'Estampados' : 'Otros' },
+            { k: 'hex', label: 'Color de referencia', tipo: 'color', valor: '#E6DEF0' }] });
+        if (!d) return;
+        const nom = d.nombre.trim().replace(/\s+/g, ' '), ya = colores.find(c => nrm(c.nombre) === nrm(nom));
+        if (ya) { selC.add(ya.id); busca = ''; pintar(); toast('Ese color ya existía: quedó elegido'); return; }
+        const { data: todos, error: e1 } = await sb.from('atributos').select('id,codigo,nombre,activo').eq('empresa_id', e).eq('tipo', 'color');
+        if (e1) { toast(mensajeError(e1), 'error'); return; }
+        const dormido = (todos || []).find(c => nrm(c.nombre) === nrm(nom));
+        let r;
+        if (dormido) r = await sb.from('atributos').update({ activo: true, grupo: d.grupo, hex: d.hex }).eq('id', dormido.id).select().single();   // existía dado de baja: se reactiva
+        else {
+          const usados = new Set((todos || []).map(c => c.codigo)), base = nrm(nom).replace(/[^a-z0-9]/g, '').slice(0, 3).toUpperCase() || 'COL';
+          let cod = base, n = 2; while (usados.has(cod)) cod = base + n++;
+          r = await sb.from('atributos').insert(APP.conEmpresa({ tipo: 'color', codigo: cod, nombre: nom, grupo: d.grupo, hex: d.hex, activo: true, orden: 999 })).select().single();
+        }
+        if (r.error) { toast(mensajeError(r.error), 'error'); return; }
+        colores.push(r.data); selC.add(r.data.id); busca = ''; pintar(); toast('«' + nom + '» creado y elegido');
+      };
       const ib = $('#av-busca', m); ib.oninput = () => { busca = ib.value; const pos = ib.selectionStart; pintar(); const i2 = $('#av-busca', m); i2.focus(); i2.setSelectionRange(pos, pos); };
       $('[data-no]', m).onclick = () => m.cerrar();
       $('[data-si]', m).onclick = async () => {
