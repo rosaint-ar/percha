@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ingresar mercadería · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611111437">
+<link rel="stylesheet" href="../shell/shell.css?v=202611111456">
 <style>
   /* Ingresar mercadería: se carga como viene el remito (un renglón por artículo y color, cantidades por talle) */
   .cab-compra{display:grid;grid-template-columns:minmax(220px,1.4fr) 1fr 150px 110px;gap:12px;align-items:end}
@@ -82,9 +82,9 @@
   <div id="sug" class="sugerencias" style="display:none"></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611111437"></script>
-<script src="../shell/shell.js?v=202611111437"></script>
-<script src="../shared/precios.js?v=202611111437"></script>
+<script src="../shared/supabase.js?v=202611111456"></script>
+<script src="../shell/shell.js?v=202611111456"></script>
+<script src="../shared/precios.js?v=202611111456"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -134,7 +134,9 @@ APP.ready.then(async () => {
 
   const filaVacia = () => ({ art: '', producto_id: null, color: '', cant: {}, costo: 0, recibida: {} });
   const unidades = f => Object.values(f.cant).reduce((s, n) => s + (+n || 0), 0);
-  const cerrada = () => compra && ['recibida', 'anulada', 'parcial'].includes(compra.estado);
+  // corregir un remito ya ingresado: se vuelve a editar y, al guardar, Percha ajusta stock, costo y cuenta del proveedor (sql/119)
+  let corrigiendo = false, original = new Map();
+  const cerrada = () => compra && !corrigiendo && ['recibida', 'anulada', 'parcial'].includes(compra.estado);
 
   // ---------- cargar una compra guardada ----------
   async function cargar() {
@@ -348,10 +350,58 @@ APP.ready.then(async () => {
       m.cerrar(); await cargarCatalogo(); await cargar(); listo({ recibido: data.recibido, numero: compra.numero });
     };
   }
+  async function empezarCorreccion() {
+    const { data: ls } = await sb.from('compra_lineas').select('variante_id,producto_id,recibida,costo_unit').eq('compra_id', id);
+    original = new Map(); (ls || []).forEach(l => { if (!l.variante_id) return; const o = original.get(l.variante_id) || { cant: 0, costo: +l.costo_unit, producto_id: l.producto_id }; o.cant += +l.recibida; original.set(l.variante_id, o); });
+    corrigiendo = true; filas.push(filaVacia()); pintarCabecera(); pintar(); botones();
+    toast('Corregí lo que haga falta (cantidades, prendas, costos, proveedor) y tocá «Guardar corrección»');
+  }
+  // antes de guardar se muestra cómo queda: qué entra y qué sale del stock, qué costo cambia y cómo queda la cuenta del proveedor
+  async function guardarCorreccion(anularTodo) {
+    let p;
+    if (anularTodo) p = { id, empresa_id: e, proveedor_id: compra.proveedor_id, referencia: compra.referencia, fecha: compra.fecha, descuento_pct: +compra.descuento_pct || 0, lineas: [] };
+    else { try { p = armar('pedida'); } catch (er) { toast(er.message, 'error'); return; } }
+    const nuevo = new Map(); p.lineas.forEach(l => { const o = nuevo.get(l.variante_id) || { cant: 0, costo: +l.costo_unit, producto_id: l.producto_id }; o.cant += +l.pedida; nuevo.set(l.variante_id, o); });
+    const nombreVar = vid => { const v = varPorId.get(vid) || {}, pr = prod(v.producto_id) || {}; return (pr.nombre || 'Prenda') + (v.talle_nombre || v.color_nombre ? ' · ' + [v.talle_nombre, v.color_nombre].filter(Boolean).join(' ') : ''); };
+    const difs = [...new Set([...original.keys(), ...nuevo.keys()])].map(vid => ({ vid, d: ((nuevo.get(vid) || {}).cant || 0) - ((original.get(vid) || {}).cant || 0) })).filter(x => x.d);
+    const costos = []; const vistos = new Set();
+    nuevo.forEach(n => { if (vistos.has(n.producto_id)) return; vistos.add(n.producto_id); const viejo = [...original.values()].find(o => o.producto_id === n.producto_id);
+      if (!viejo || +viejo.costo !== +n.costo) costos.push({ nombre: (prod(n.producto_id) || {}).nombre, antes: viejo ? viejo.costo : null, ahora: n.costo }); });
+    const total = Math.round([...nuevo.values()].reduce((s, n) => s + n.cant * n.costo, 0) * (1 - (+p.descuento_pct || 0) / 100) * 100) / 100, antes = +compra.total || 0;
+    if (!difs.length && !costos.length && total === antes && p.proveedor_id === compra.proveedor_id && (p.referencia || '') === (compra.referencia || '')) { toast('No cambiaste nada'); return; }
+    const provNom = idp => (proveedores.find(x => x.id === idp) || {}).nombre || 'el proveedor';
+    const m = modal(`<h2>${anularTodo ? '¿Anular el remito?' : '¿Guardar la corrección?'}</h2>
+      ${difs.length ? `<p class="sub" style="margin-top:8px"><b>Stock</b> (solo la diferencia):</p><ul style="margin:4px 0 0 18px;font-size:13.5px;line-height:1.6">${difs.map(x => `<li><b style="color:${x.d > 0 ? 'var(--ok)' : 'var(--error)'}">${x.d > 0 ? '+' : ''}${fmt.num(x.d)}</b> ${esc(nombreVar(x.vid))}</li>`).join('')}</ul>` : '<p class="sub">El stock no cambia.</p>'}
+      ${costos.length && !anularTodo ? `<p class="sub" style="margin-top:10px"><b>Costo</b>:</p><ul style="margin:4px 0 0 18px;font-size:13.5px;line-height:1.6">${costos.map(c => `<li>${esc(c.nombre || '')}: ${c.antes == null ? 'nuevo en el remito' : fmt.pesos(c.antes)} → <b>${fmt.pesos(c.ahora)}</b></li>`).join('')}</ul>` : ''}
+      <p class="sub" style="margin-top:10px"><b>Total del remito</b>: ${fmt.pesos(antes)} → <b>${fmt.pesos(total)}</b>${p.proveedor_id !== compra.proveedor_id ? ` · pasa de ${esc(provNom(compra.proveedor_id))} a ${esc(provNom(p.proveedor_id))}` : (total !== antes ? ` · la cuenta de ${esc(provNom(p.proveedor_id))} ${total > antes ? 'sube' : 'baja'} ${fmt.pesos(Math.abs(total - antes))}` : '')}</p>
+      <div class="campo" style="margin-top:12px"><label>¿Qué pasó? <small style="font-weight:400;color:var(--tinta-3)">(queda anotado)</small></label><input id="c-motivo" placeholder="Ej: cargué 3 JUSTINA 105 y eran 2"></div>
+      <div class="pie"><button class="btn" data-no>Volver</button><button class="btn ${anularTodo ? 'peligro' : 'primario'}" data-si>${anularTodo ? 'Sí, anular' : 'Sí, guardar'}</button></div>`, { fijo: true });
+    $('[data-no]', m).onclick = () => m.cerrar();
+    $('[data-si]', m).onclick = async () => {
+      const b = $('[data-si]', m); b.disabled = true;
+      const { data, error } = await sb.rpc('compras_corregir', { p: Object.assign(p, { motivo: $('#c-motivo', m).value.trim() || null }) });
+      if (error) { toast(mensajeError(error), 'error'); b.disabled = false; return; }
+      m.cerrar(); corrigiendo = false;
+      await Promise.all([cargarCatalogo(), cargarAprendido()]); await cargar(); botones();
+      toast(data.estado === 'anulada' ? 'Remito anulado: todo salió del stock' : `Corrección guardada · ${data.cambios} cambios de stock${data.costos ? ' · ' + data.costos + ' costos' : ''}`);
+    };
+  }
   function botones() {
     const a = $('#acciones');
     if (compra && compra.estado === 'anulada') { a.innerHTML = '<a class="btn" href="compras.html">← Volver</a>'; return; }
-    if (compra && compra.estado === 'recibida') { a.innerHTML = '<a class="btn" href="compras.html">← Volver</a><button class="btn primario" id="b-etq">🏷️ Imprimir etiquetas</button>'; $('#b-etq').onclick = etiquetas; return; }
+    if (compra && compra.estado === 'recibida' && corrigiendo) {
+      a.innerHTML = '<button class="btn peligro" id="b-anular-todo" title="Saca del stock todo lo que entró con este remito">Anular el remito</button><button class="btn" id="b-cancelar">Cancelar</button><button class="btn primario" id="b-guardar-corr">💾 Guardar corrección</button>';
+      $('#b-cancelar').onclick = async () => { corrigiendo = false; await cargar(); botones(); };
+      $('#b-guardar-corr').onclick = () => guardarCorreccion(false);
+      $('#b-anular-todo').onclick = () => guardarCorreccion(true);
+      return;
+    }
+    if (compra && compra.estado === 'recibida') {
+      a.innerHTML = `<a class="btn" href="compras.html">← Volver</a>${APP.puede('compras') ? '<button class="btn" id="b-corregir" title="¿Te equivocaste al cargarlo? Corregilo: el stock se ajusta solo">✏️ Corregir remito</button>' : ''}<button class="btn primario" id="b-etq">🏷️ Imprimir etiquetas</button>`;
+      $('#b-etq').onclick = etiquetas;
+      const bc = $('#b-corregir'); if (bc) bc.onclick = empezarCorreccion;
+      return;
+    }
     if (compra && compra.estado === 'parcial') { a.innerHTML = '<a class="btn" href="compras.html">← Volver</a><button class="btn" id="b-etq">🏷️ Etiquetas de lo que llegó</button><button class="btn primario" id="b-parte">📦 Llegó lo que faltaba</button>'; $('#b-etq').onclick = etiquetas; $('#b-parte').onclick = recibirParte; return; }
     const pedido = modoPedido || (compra && ['borrador', 'pedida'].includes(compra.estado));
     a.innerHTML = `${id ? '<button class="btn peligro" id="b-anular">Anular</button>' : ''}<a class="btn" href="compras.html">Volver</a>

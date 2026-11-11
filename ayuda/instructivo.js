@@ -350,6 +350,14 @@ window.INSTRUCTIVO = {
       { tipo: 'tip', texto: 'Al crearla ya se puede vender suelta o con **BOMBIS «VARIAS»** (el código general: al cobrar se elige el modelo), y se sube sola a la web **oculta** para ponerle fotos.' },
       { tipo: 'tip', texto: 'No hace falta inventar el código: Percha saltea los que ya existen o que usa alguna publicación vieja de la web.' }
     ] },
+    { id: 'compras-corregir', grupo: 'compras', p: 'compras', titulo: 'Me equivoqué al cargar un remito', nuevo: '2026-11-11', resumen: 'Se corrige el remito y Percha ajusta solo el stock, el costo y la cuenta del proveedor.', bloques: [
+      { tipo: 'pasos', items: [
+        'En **Compras e ingresos** abrí el remito y tocá {{✏️ Corregir remito}}.',
+        'Cambiá lo que esté mal: cantidades por talle, la prenda o el color, el costo, el proveedor o el número de remito. Podés agregar o quitar renglones.',
+        'Tocá {{💾 Guardar corrección}}: antes de guardar te muestra **qué entra y qué sale del stock**, qué costo cambia y cómo queda la cuenta del proveedor. Escribí qué pasó y confirmá.'] },
+      { tipo: 'tip', texto: 'Solo se mueve **la diferencia**: si cargaste 3 y eran 2, sale 1 del stock (y de la web). En el historial de la prenda queda como «Corrección de la compra».' },
+      { tipo: 'tip', texto: 'Si el remito entero no correspondía, en la corrección tocá {{Anular el remito}}: sale del stock todo lo que había entrado y se descuenta de la cuenta del proveedor.' }
+    ] },
     { id: 'compras-nombres', grupo: 'compras', p: 'compras', titulo: 'El proveedor le dice de otra forma', nuevo: '2026-11-03', resumen: 'La primera vez elegís qué prenda es; después Percha la reconoce sola.', bloques: [
       { tipo: 'texto', texto: 'Cada proveedor tiene sus nombres (para Concepto, **MIA** es el pijama **CIELO** y **MORA** es el **MAGNOLIA**). La primera vez escribís cómo dice el remito y elegís la prenda de Augusta. **Percha lo aprende para ese proveedor.**' },
       { tipo: 'texto', texto: 'La próxima vez, cuando escribas **MIA ROSA**, te propone **PIJAMA «CIELO» Rosa** y queda marcado **✓ Percha ya lo conocía**. Solo ponés las cantidades.' },
