@@ -5,48 +5,63 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Códigos generales · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611112140">
+<link rel="stylesheet" href="../shell/shell.css?v=202611112343">
 <style>
   .explica{background:var(--lila,#f3eefb);border-radius:14px;padding:14px 16px;font-size:13.5px;line-height:1.55;margin-bottom:14px}
   .explica b{font-weight:700}
-  .gen{border:1px solid var(--linea);border-radius:14px;padding:14px 16px;margin-bottom:12px;background:var(--superficie-2)}
+  .gen{border:1px solid var(--linea);border-radius:14px;padding:14px 16px;margin-bottom:14px;background:var(--superficie-2)}
+  .gen.foco{border-color:var(--acento);box-shadow:0 0 0 3px var(--lila)}
   .gen-cab{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}
   .gen-cab h3{margin:0;font:800 17px var(--f-titulo);letter-spacing:-.02em}
   .gen-cab .cod{font-family:var(--f-mono);color:var(--tinta-3);font-size:12.5px}
   .gen-cab .acc{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
-  .gen-datos{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-top:10px}
-  .gen-datos div{background:var(--superficie);border:1px solid var(--linea);border-radius:10px;padding:8px 10px;font-size:13px}
-  .gen-datos small{display:block;color:var(--tinta-3);font-size:11px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px}
-  .gen-datos b{font-size:15px}
-  .gen-edit{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-top:12px;border-top:1px dashed var(--linea);padding-top:12px}
+  .gen-regla{margin-top:8px;font-size:13.5px;line-height:1.5}
+  .gen-regla small{color:var(--tinta-3)}
+  .gen-edit{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-top:10px;border:1px dashed var(--linea);border-radius:10px;padding:10px}
   .gen-edit .campo{margin:0;min-width:160px}
-  .modelos{margin-top:10px;max-height:260px;overflow:auto;border:1px solid var(--linea);border-radius:10px;font-size:13px}
-  .modelos a{display:flex;justify-content:space-between;padding:6px 10px;border-bottom:1px solid var(--linea);color:var(--tinta);text-decoration:none}
-  .modelos a:hover{background:var(--lila)}
+  .gen-cols{display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-top:12px}
+  @media (max-width:760px){.gen-cols{grid-template-columns:1fr}}
+  .caja-m{border:1px solid var(--linea);border-radius:12px;background:var(--superficie);overflow:hidden}
+  .caja-m .tit{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--linea);font:700 12px var(--f-ui);text-transform:uppercase;letter-spacing:.04em;color:var(--tinta-3)}
+  .caja-m .tit input{margin-left:auto;text-transform:none;letter-spacing:0;font:500 13px var(--f-ui);border:1px solid var(--linea);border-radius:8px;padding:5px 8px;width:min(220px,50%);background:var(--superficie-2);color:var(--tinta)}
+  .modelos{max-height:340px;overflow:auto;font-size:13px}
+  .modelos .m{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--linea)}
+  .modelos .m:last-child{border-bottom:0}
+  .modelos .m a{color:var(--tinta);text-decoration:none;flex:1;min-width:0}
+  .modelos .m a:hover{text-decoration:underline}
   .modelos small{font-family:var(--f-mono);color:var(--tinta-3)}
+  .modelos .chip-mano{font:600 10.5px var(--f-ui);background:var(--lila);color:var(--acento);border-radius:999px;padding:1px 7px}
+  .modelos button{border:1px solid var(--linea);background:var(--superficie-2);border-radius:8px;padding:3px 9px;font:600 12px var(--f-ui);cursor:pointer;color:var(--tinta)}
+  .modelos button.sacar:hover{border-color:var(--error);color:var(--error)}
+  .modelos .vacio{padding:10px;color:var(--tinta-3)}
+  .sumar-res{max-height:220px;overflow:auto}
+  .dato{font-size:13px;padding:8px 10px;border-bottom:1px solid var(--linea)}
+  .dato:last-child{border-bottom:0}
+  .dato small{display:block;color:var(--tinta-3);font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+  .dato b{font-size:15px}
 </style>
 </head>
-<body data-page="generales" data-etq="Catálogo" data-title="Códigos generales" data-subtitle="Los códigos que se usan para vender o ingresar rápido algo con muchos modelos (ej. BOMBIS «VARIAS»)">
+<body data-page="generales" data-etq="Catálogo" data-title="Códigos generales" data-subtitle="Los códigos para vender o ingresar rápido algo con muchos modelos (ej. BOMBIS «VARIAS»)">
 <main class="app">
   <div class="explica">
-    Un <b>código general</b> sirve para lo que tiene muchos modelos parecidos, como las bombachas o las medias.
-    En la <b>caja</b> se cobra rápido con ese código y, antes de cerrar la venta, Percha pregunta <b>qué modelos son</b>.
-    En un <b>remito</b> pasa lo mismo: al elegirlo, se abre «¿Qué modelos son?» para identificarlos (y si alguno no existe, se crea ahí).
-    Acá definís <b>qué modelos incluye</b> cada uno: una familia, y si hace falta, palabras que tienen que estar o no en el nombre.
-    <br>Las prendas nuevas de esa familia <b>entran solas</b>: no hay que tocar nada.
+    Un <b>código general</b> (ej. <b>BOMBIS «VARIAS»</b>) sirve para cobrar o ingresar rápido algo que tiene muchos modelos.
+    En la <b>caja</b> y en los <b>remitos</b>, al usarlo, Percha pregunta <b>qué modelos son</b> y ofrece los de su lista.
+    <br>La lista se arma sola: entran <b>todas las prendas de la familia</b>, y las nuevas que crees entran al instante. Si alguna no va, tocá <b>Sacar</b>. Si falta una de otra familia, usá <b>+ Sumar un modelo</b>.
+    <br><b>Para cargar una bombacha nueva no se crea un código general</b>: se crea la prenda (Catálogo › + Nuevo producto, o desde el remito) y entra sola acá.
   </div>
-  <div id="lista"></div>
+  <div id="lista"><p class="sub">Cargando…</p></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611112140"></script>
-<script src="../shell/shell.js?v=202611112140"></script>
+<script src="../shared/supabase.js?v=202611112343"></script>
+<script src="../shell/shell.js?v=202611112343"></script>
 <script>
 APP.ready.then(async () => {
-  const { fmt, esc, $, $$, toast, mensajeError } = APP, e = APP.empresa.id;
-  const puedeEditar = APP.puede('catalogo_editar');
-  if (puedeEditar) $('#acciones-pagina').innerHTML = '<a class="btn primario" href="producto.html?nuevo=1&generico=1">+ Nuevo código general</a>';
+  const { fmt, esc, $, $$, toast, confirmar, mensajeError } = APP, e = APP.empresa.id;
+  const puedeEditar = APP.puede('catalogo_editar'), params = new URLSearchParams(location.search);
+  if (puedeEditar) $('#acciones-pagina').innerHTML = '<a class="btn" href="producto.html?nuevo=1&generico=1" title="Solo para otro grupo grande, como MEDIAS VARIAS o PANTUFLAS VARIAS">+ Otro código general</a>';
   const paginar = async q => { let d = 0, t = []; while (true) { const { data, error } = await q().range(d, d + 999); if (error) throw error; t = t.concat(data || []); if (!data || data.length < 1000) break; d += 1000; } return t; };
-  let productos = [], familias = [], stockGen = {};
+  const nrm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  let productos = [], familias = [], stockGen = {}, busca = {};
   async function cargar() {
     const [ps, { data: cs }] = await Promise.all([
       paginar(() => sb.from('productos').select('id,codigo,nombre,precio,categoria_id,tipo,es_generico,generico_filtro,generico_local_id,activo').eq('empresa_id', e).eq('activo', true).order('nombre')),
@@ -56,55 +71,96 @@ APP.ready.then(async () => {
     stockGen = {};
     if (gids.length) { const { data: vs } = await sb.from('v_variantes').select('producto_id,stock').in('producto_id', gids); (vs || []).forEach(v => stockGen[v.producto_id] = (stockGen[v.producto_id] || 0) + (+v.stock || 0)); }
   }
-  // el mismo criterio que la caja y el remito: familia + palabras que tiene que tener / no tener el nombre
-  const filtroDe = g => g.generico_filtro || { categoria_id: g.categoria_id };
-  const cumple = f => p => !p.es_generico && p.tipo !== 'kit' && (!f.categoria_id || p.categoria_id === f.categoria_id)
-    && (f.incluye || []).filter(w => w.trim()).every(w => p.nombre.toUpperCase().includes(w.trim().toUpperCase()))
-    && !(f.excluye || []).filter(w => w.trim()).some(w => p.nombre.toUpperCase().includes(w.trim().toUpperCase()));
+  // el filtro guardado, con la familia del código general si no tiene otra (el mismo criterio que usan la caja y el remito: APP.encajaGenerico)
+  const filtroDe = g => Object.assign({ incluye: [], excluye: [], quitar: [], sumar: [] }, g.generico_filtro || {}, { categoria_id: (g.generico_filtro || {}).categoria_id || g.categoria_id || null });
+  const sinExcepciones = f => Object.assign({}, f, { quitar: [], sumar: [] });
+  const modelosDe = g => productos.filter(p => p.id !== g.id && APP.encajaGenerico(filtroDe(g), p));
   const famNom = id => (familias.find(c => c.id === id) || {}).nombre || 'todas las familias';
-  const lista = arr => (arr || []).filter(w => w.trim()).map(w => '«' + esc(w.trim()) + '»').join(', ');
+  const lista = arr => (arr || []).filter(w => String(w).trim()).map(w => '«' + esc(String(w).trim()) + '»').join(', ');
+  const prod = id => productos.find(p => p.id === id);
+
+  async function guardar(g, nf, aviso) {
+    const r = await sb.from('productos').update({ generico_filtro: nf }).eq('id', g.id);
+    if (r.error) { toast(mensajeError(r.error), 'error'); return false; }
+    g.generico_filtro = nf; if (aviso) toast(aviso); pintar(); return true;
+  }
+
   function pintar() {
     const gens = productos.filter(p => p.es_generico);
     $('#lista').innerHTML = gens.map(g => {
-      const f = filtroDe(g), mods = productos.filter(cumple(f)), local = productos.find(p => p.id === g.generico_local_id);
-      return `<div class="gen" data-g="${g.id}">
+      const f = filtroDe(g), mods = modelosDe(g), local = prod(g.generico_local_id), q = nrm(busca[g.id] || '');
+      const porRegla = new Set(productos.filter(p => p.id !== g.id && APP.encajaGenerico(sinExcepciones(f), p)).map(p => p.id));
+      const vis = q ? mods.filter(p => nrm(p.nombre + ' ' + p.codigo).includes(q)) : mods;
+      const sacados = (f.quitar || []).map(prod).filter(Boolean);
+      return `<div class="gen${params.get('g') === g.id ? ' foco' : ''}" data-g="${g.id}" id="g-${g.id}">
         <div class="gen-cab"><div><h3>${esc(g.nombre)}</h3><span class="cod">${esc(g.codigo)} · ${fmt.pesos(g.precio)}</span></div>
-          <div class="acc"><button class="btn chico" data-ver="${g.id}">Ver los ${fmt.num(mods.length)} modelos</button>${puedeEditar ? `<button class="btn chico" data-edit="${g.id}">Cambiar qué incluye</button>` : ''}<a class="btn chico" href="producto.html?id=${g.id}">Ficha</a></div></div>
-        <div class="gen-datos">
-          <div><small>Incluye</small><b>${fmt.num(mods.length)} modelos</b> de ${esc(famNom(f.categoria_id))}${(f.incluye || []).some(w => w.trim()) ? `<br>que digan ${lista(f.incluye)}` : ''}${(f.excluye || []).some(w => w.trim()) ? `<br>menos los que dicen ${lista(f.excluye)}` : ''}</div>
-          <div><small>Sin identificar</small><b>${fmt.num(stockGen[g.id] || 0)}</b> unidades cargadas con este código, sin saber el modelo</div>
-          <div><small>Lo que no tiene modelo</small>${local ? `se suma a <b>${esc(local.nombre)}</b>` : 'no se completa con nada'}</div>
-        </div>
-        <div class="slot"></div></div>`;
+          <div class="acc">${puedeEditar ? `<button class="btn chico" data-edit>Cambiar la regla</button>` : ''}<a class="btn chico" href="producto.html?id=${g.id}">Ficha</a>${puedeEditar ? `<button class="btn chico" data-comun title="Si se creó como código general por error y en realidad es una prenda">No es código general</button><button class="btn chico peligro" data-borrar>Eliminar</button>` : ''}</div></div>
+        <div class="gen-regla">Entran <b>todas las prendas de ${esc(famNom(f.categoria_id))}</b>${(f.incluye || []).some(w => String(w).trim()) ? ` que digan ${lista(f.incluye)}` : ''}${(f.excluye || []).some(w => String(w).trim()) ? `, menos las que dicen ${lista(f.excluye)}` : ''}.
+          <small>Las nuevas entran solas.</small></div>
+        <div class="slot"></div>
+        <div class="gen-cols">
+          <div class="caja-m"><div class="tit">Incluye ${fmt.num(mods.length)} modelos<input data-busca placeholder="Buscar en la lista…" value="${esc(busca[g.id] || '')}"></div>
+            <div class="modelos">${vis.map(p => `<div class="m"><a href="producto.html?id=${p.id}">${esc(p.nombre)} <small>${esc(p.codigo)}</small></a>${porRegla.has(p.id) ? '' : '<span class="chip-mano">sumado a mano</span>'}${puedeEditar ? `<button class="sacar" data-sacar="${p.id}" title="Que no aparezca en este código general">Sacar</button>` : ''}</div>`).join('') || `<div class="vacio">${q ? 'Ninguno con ese nombre.' : 'Ninguno: revisá la regla.'}</div>`}</div></div>
+          <div>
+            <div class="caja-m"><div class="dato"><small>Sin identificar</small><b>${fmt.num(stockGen[g.id] || 0)}</b> unidades cargadas con este código, sin saber el modelo</div>
+              <div class="dato"><small>Lo que no tiene modelo</small>${local ? `se suma a <b>${esc(local.nombre)}</b>` : 'no se completa con nada'}</div></div>
+            ${puedeEditar ? `<div class="caja-m" style="margin-top:10px"><div class="tit">+ Sumar un modelo</div><div style="padding:8px 10px"><input data-sumq placeholder="Nombre o código…" style="width:100%;border:1px solid var(--linea);border-radius:8px;padding:6px 9px;background:var(--superficie-2);color:var(--tinta)"></div><div class="modelos sumar-res" data-sumres></div></div>` : ''}
+            ${sacados.length ? `<div class="caja-m" style="margin-top:10px"><div class="tit">Sacados a mano (${sacados.length})</div><div class="modelos">${sacados.map(p => `<div class="m"><a href="producto.html?id=${p.id}">${esc(p.nombre)} <small>${esc(p.codigo)}</small></a>${puedeEditar ? `<button data-volver="${p.id}">Volver a sumar</button>` : ''}</div>`).join('')}</div></div>` : ''}
+          </div>
+        </div></div>`;
     }).join('') || '<div class="card"><p>No hay códigos generales todavía.</p></div>';
-    $$('[data-ver]').forEach(b => b.onclick = () => {
-      const g = productos.find(p => p.id === b.dataset.ver), slot = b.closest('.gen').querySelector('.slot');
-      if (slot.dataset.que === 'ver') { slot.innerHTML = ''; slot.dataset.que = ''; return; }
-      const mods = productos.filter(cumple(filtroDe(g)));
-      slot.dataset.que = 'ver';
-      slot.innerHTML = `<div class="modelos">${mods.map(p => `<a href="producto.html?id=${p.id}"><span>${esc(p.nombre)}</span><small>${esc(p.codigo)}</small></a>`).join('') || '<p class="sub" style="padding:8px">Ninguno: revisá la familia y las palabras.</p>'}</div>`;
-    });
-    $$('[data-edit]').forEach(b => b.onclick = () => {
-      const g = productos.find(p => p.id === b.dataset.edit), f = filtroDe(g), slot = b.closest('.gen').querySelector('.slot');
-      slot.dataset.que = 'edit';
-      slot.innerHTML = `<div class="gen-edit">
-        <div class="campo"><label>Familia</label><select data-cat><option value="">Todas</option>${familias.map(c => `<option value="${c.id}" ${c.id === f.categoria_id ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}</select></div>
-        <div class="campo"><label>Que el nombre diga (separá con coma)</label><input data-inc value="${esc((f.incluye || []).join(', '))}" placeholder="Ej: MEDIAS"></div>
-        <div class="campo"><label>Menos los que digan</label><input data-exc value="${esc((f.excluye || []).join(', '))}" placeholder="Ej: PACK, REGALO"></div>
-        <span class="sub" data-cuenta></span>
-        <button class="btn" data-cancel>Cancelar</button><button class="btn primario" data-save>Guardar</button></div>`;
-      const leer = () => ({ categoria_id: $('[data-cat]', slot).value || null, incluye: $('[data-inc]', slot).value.split(',').map(x => x.trim()).filter(Boolean), excluye: $('[data-exc]', slot).value.split(',').map(x => x.trim()).filter(Boolean) });
-      const contar = () => { $('[data-cuenta]', slot).textContent = `→ ${fmt.num(productos.filter(cumple(leer())).length)} modelos`; };
-      $$('select,input', slot).forEach(x => x.oninput = contar); contar();
-      $('[data-cancel]', slot).onclick = () => { slot.innerHTML = ''; slot.dataset.que = ''; };
-      $('[data-save]', slot).onclick = async () => {
-        const nf = leer(); const r = await sb.from('productos').update({ generico_filtro: nf }).eq('id', g.id);
+
+    $$('.gen').forEach(card => {
+      const g = prod(card.dataset.g), slot = $('.slot', card);
+      const bq = $('[data-busca]', card); bq.oninput = () => { busca[g.id] = bq.value; const pos = bq.selectionStart; pintar(); const b2 = $(`#g-${g.id} [data-busca]`); b2.focus(); b2.setSelectionRange(pos, pos); };
+      $$('[data-sacar]', card).forEach(b => b.onclick = () => { const f = filtroDe(g), pid = b.dataset.sacar, p = prod(pid);
+        guardar(g, Object.assign({}, g.generico_filtro || {}, { quitar: [...new Set([...(f.quitar || []), pid])], sumar: (f.sumar || []).filter(x => x !== pid) }), `Saqué ${p ? p.nombre : 'el modelo'} de ${g.nombre}`); });
+      $$('[data-volver]', card).forEach(b => b.onclick = () => { const f = filtroDe(g), pid = b.dataset.volver, sinRegla = !APP.encajaGenerico(sinExcepciones(f), prod(pid));
+        guardar(g, Object.assign({}, g.generico_filtro || {}, { quitar: (f.quitar || []).filter(x => x !== pid), sumar: sinRegla ? [...new Set([...(f.sumar || []), pid])] : (f.sumar || []) }), 'Vuelve a estar en la lista'); });
+      const sq = $('[data-sumq]', card);
+      if (sq) sq.oninput = () => {
+        const ws = nrm(sq.value).split(/\s+/).filter(Boolean), dentro = new Set(modelosDe(g).map(p => p.id));
+        const res = ws.length ? productos.filter(p => p.id !== g.id && !p.es_generico && p.tipo !== 'kit' && !dentro.has(p.id) && ws.every(w => nrm(p.nombre + ' ' + p.codigo).includes(w))).slice(0, 12) : [];
+        $('[data-sumres]', card).innerHTML = res.map(p => `<div class="m"><span style="flex:1">${esc(p.nombre)} <small>${esc(p.codigo)}</small></span><button data-sumar="${p.id}">Sumar</button></div>`).join('') || (ws.length ? '<div class="vacio">No hay otra con eso (o ya está en la lista).</div>' : '');
+        $$('[data-sumar]', card).forEach(b => b.onclick = () => { const f = filtroDe(g), pid = b.dataset.sumar, p = prod(pid);
+          guardar(g, Object.assign({}, g.generico_filtro || {}, { sumar: [...new Set([...(f.sumar || []), pid])], quitar: (f.quitar || []).filter(x => x !== pid) }), `Sumé ${p.nombre} a ${g.nombre}`); });
+      };
+      const be = $('[data-edit]', card); if (be) be.onclick = () => {
+        if (slot.innerHTML) { slot.innerHTML = ''; return; }
+        const f = filtroDe(g);
+        slot.innerHTML = `<div class="gen-edit">
+          <div class="campo"><label>Familia</label><select data-cat><option value="">Todas</option>${familias.map(c => `<option value="${c.id}" ${c.id === f.categoria_id ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}</select></div>
+          <div class="campo"><label>Solo las que digan (opcional)</label><input data-inc value="${esc((f.incluye || []).join(', '))}" placeholder="Ej: MEDIAS"></div>
+          <div class="campo"><label>Menos las que digan</label><input data-exc value="${esc((f.excluye || []).join(', '))}" placeholder="Ej: PACK, REGALO"></div>
+          <div class="campo"><label>Lo que no tiene modelo se suma a</label><select data-local><option value="">— nada —</option>${productos.filter(p => !p.es_generico && p.categoria_id === f.categoria_id).map(p => `<option value="${p.id}" ${p.id === g.generico_local_id ? 'selected' : ''}>${esc(p.nombre)}</option>`).join('')}</select></div>
+          <span class="sub" data-cuenta></span>
+          <button class="btn" data-cancel>Cancelar</button><button class="btn primario" data-save>Guardar</button></div>`;
+        const leer = () => Object.assign({}, g.generico_filtro || {}, { categoria_id: $('[data-cat]', slot).value || null, incluye: $('[data-inc]', slot).value.split(',').map(x => x.trim()).filter(Boolean), excluye: $('[data-exc]', slot).value.split(',').map(x => x.trim()).filter(Boolean) });
+        const contar = () => { $('[data-cuenta]', slot).textContent = `→ ${fmt.num(productos.filter(p => p.id !== g.id && APP.encajaGenerico(leer(), p)).length)} modelos`; };
+        $$('select,input', slot).forEach(x => x.oninput = contar); contar();
+        $('[data-cancel]', slot).onclick = () => { slot.innerHTML = ''; };
+        $('[data-save]', slot).onclick = async () => {
+          const loc = $('[data-local]', slot).value || null;
+          if (loc !== (g.generico_local_id || null)) { const r = await sb.from('productos').update({ generico_local_id: loc }).eq('id', g.id); if (r.error) { toast(mensajeError(r.error), 'error'); return; } g.generico_local_id = loc; }
+          await guardar(g, leer(), 'Guardado: la caja y los remitos ya ofrecen esos modelos');
+        };
+      };
+      const bc = $('[data-comun]', card); if (bc) bc.onclick = async () => {
+        if (!await confirmar(`¿«${g.nombre}» es una prenda común y no un código general? Deja de preguntar «qué modelos son» y pasa a ser un modelo más de su familia.`, 'Sí, es una prenda')) return;
+        const r = await sb.from('productos').update({ es_generico: false, generico_filtro: null, generico_local_id: null }).eq('id', g.id);
         if (r.error) { toast(mensajeError(r.error), 'error'); return; }
-        g.generico_filtro = nf; toast('Guardado: la caja y los remitos ya ofrecen esos modelos'); pintar();
+        toast(`${g.nombre} ahora es una prenda común`); await cargar(); pintar();
+      };
+      const bb = $('[data-borrar]', card); if (bb) bb.onclick = async () => {
+        const st = stockGen[g.id] || 0;
+        if (st > 0) { toast(`Tiene ${fmt.num(st)} unidades cargadas: primero identificalas o pasalas a otra prenda (Conteo)`, 'error'); return; }
+        const r = await APP.eliminar('productos', g.id, { nombre: g.nombre, campoActivo: 'activo' });
+        if (r) { await cargar(); pintar(); }
       };
     });
   }
   await cargar(); pintar();
+  const foco = params.get('g') && document.getElementById('g-' + params.get('g')); if (foco) foco.scrollIntoView({ block: 'start' });
 });
 </script>
 </body>

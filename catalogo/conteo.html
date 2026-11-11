@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pasar de bolsa a modelo · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611112140">
+<link rel="stylesheet" href="../shell/shell.css?v=202611112343">
 <style>
   .origen{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center}
   .origen select{border:1px solid var(--linea);background:var(--superficie-2);border-radius:10px;padding:10px 12px;font-size:14px;width:100%}
@@ -52,8 +52,8 @@
   <div class="card" id="card-hoy" style="display:none"><div class="card-cab"><h2>Contado en esta sesión</h2><span class="sub" id="hoy-total"></span></div><table class="lista hoy" id="tb-hoy"></table></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611112140"></script>
-<script src="../shell/shell.js?v=202611112140"></script>
+<script src="../shared/supabase.js?v=202611112343"></script>
+<script src="../shell/shell.js?v=202611112343"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, mensajeError } = APP, e = APP.empresa.id;
@@ -92,7 +92,7 @@ APP.ready.then(async () => {
     if (bolsa && familia === 'todo') { const c = (productos[bolsa.producto_id] || {}).categoria_id; if (c && cuenta[c]) { familia = c; pintarFamilias(); } }
   }
   // ¿el modelo es de esta bolsa? (misma familia, con las palabras que incluye y sin las que excluye)
-  const encaja = (f, pid, nombre) => { const n = String(nombre || '').toUpperCase(); return (!f.categoria_id || (productos[pid] || {}).categoria_id === f.categoria_id) && (f.incluye || []).every(w => !w.trim() || n.includes(w.trim().toUpperCase())) && !(f.excluye || []).some(w => w.trim() && n.includes(w.trim().toUpperCase())); };
+  const encaja = (f, pid, nombre) => APP.encajaGenerico(f, Object.assign({}, productos[pid] || {}, { id: pid, nombre }));   // mismo criterio en todo Percha (shell.js)
   const sumaStock = vars => vars.reduce((s, v) => s + (+v.stock || 0), 0);
   function pintarGrilla() {
     const palabras = norm($('#q').value.trim()).split(/\s+/).filter(Boolean);

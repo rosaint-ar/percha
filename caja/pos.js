@@ -110,7 +110,7 @@ APP.ready.then(async () => {
   const ponerMult = (m, n) => $$('[data-mult] button', m).forEach(b => b.classList.toggle('on', +b.dataset.m === n));
   const activarMult = m => $$('[data-mult] button', m).forEach(b => b.onclick = () => ponerMult(m, +b.dataset.m));
   const cumpleFiltro = (f, nombre) => { const n = (nombre || '').toUpperCase(); return (f.incluye || []).every(w => !w.trim() || n.includes(w.trim().toUpperCase())) && !(f.excluye || []).some(w => w.trim() && n.includes(w.trim().toUpperCase())); };
-  const filtroDe = f => (p2, vars) => !(C.productos[p2] || {}).es_generico && (C.productos[p2] || {}).tipo !== 'kit' && (!f.categoria_id || (C.productos[p2] || {}).categoria_id === f.categoria_id) && cumpleFiltro(f, vars[0].producto_nombre);
+  const filtroDe = f => (p2, vars) => APP.encajaGenerico(f, Object.assign({}, C.productos[p2] || {}, { id: p2, nombre: vars[0].producto_nombre }));   // mismo criterio en todo Percha (shell.js)
   const filtroGenerico = gen => { if (gen.generico_filtro) return filtroDe(gen.generico_filtro); const cat = gen.categoria_id, primera = (((porProducto.get(gen.id) || [{}])[0].producto_nombre || '').split(' ')[0] || '').toUpperCase();
     const porPrefijo = primera && [...porProducto.entries()].some(([p2, vars]) => p2 !== gen.id && (C.productos[p2] || {}).categoria_id === cat && !(C.productos[p2] || {}).es_generico && vars[0].producto_nombre.toUpperCase().startsWith(primera + ' '));
     return (p2, vars) => !(C.productos[p2] || {}).es_generico && (C.productos[p2] || {}).tipo !== 'kit' && (C.productos[p2] || {}).categoria_id === cat && (!porPrefijo || vars[0].producto_nombre.toUpperCase().startsWith(primera + ' ')); };

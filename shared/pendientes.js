@@ -123,7 +123,7 @@
     const nrm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
     // sugeridos: lo que encaja con el genérico (su filtro o su familia), con stock primero
     const f = x.generico_filtro || {}, famId = f.categoria_id || x.categoria_id;
-    const encaja = v => (!famId || v.categoria_id === famId) && (f.incluye || []).every(w => !w.trim() || v.producto_nombre.toUpperCase().includes(w.trim().toUpperCase())) && !(f.excluye || []).some(w => w.trim() && v.producto_nombre.toUpperCase().includes(w.trim().toUpperCase()));
+    const fGen = Object.assign({}, f, { categoria_id: famId }), encaja = v => APP.encajaGenerico(fGen, { id: v.producto_id, nombre: v.producto_nombre, categoria_id: v.categoria_id });   // mismo criterio en todo Percha (shell.js)
     const q = $('#df-q', m); q.disabled = false; q.placeholder = 'Modelo, color o talle (ej. fru cel)'; q.focus();
     // las que solo se venden en el local (BOMBIS «LOCAL»): completan sin elegir modelo
     const gl = (productosP.get(x.desde_producto_id) || {}).generico_local_id, vloc = gl && cat.find(v => v.producto_id === gl);

@@ -35,7 +35,9 @@ Deno.serve(async (req) => {
   // ---- catálogo de Percha para cruzar ----
   const e = cx.empresa_id;
   const pag = async (tabla: string, sel: string, filtro: (q: any) => any) => { let desde = 0, todo: any[] = []; while (true) { const { data, error } = await filtro(admin.from(tabla).select(sel)).range(desde, desde + 999); if (error) throw error; todo = todo.concat(data || []); if (!data || data.length < 1000) break; desde += 1000; } return todo; };
-  const productos = await pag("productos", "id,codigo,nombre,tiene_variantes", (q: any) => q.eq("empresa_id", e));
+  const productos = await pag("productos", "id,codigo,nombre,tiene_variantes,es_generico,activo", (q: any) => q.eq("empresa_id", e));
+  // los modelos por nombre: para no cruzar con un código general (BOMBIS «VARIAS», MEDIAS VARIAS) lo que ya existe como modelo
+  const porNombre = new Map(productos.filter((p: any) => !p.es_generico && p.activo).map((p: any) => [norm(p.nombre), p]));
   const variantes = await pag("variantes", "id,producto_id,sku,ean,talle_id,color_id", (q: any) => q.eq("empresa_id", e).eq("activa", true));
   const atributos = await pag("atributos", "id,tipo,codigo,nombre", (q: any) => q.eq("empresa_id", e));
   const porCodigo = new Map(productos.map((p: any) => [norm(p.codigo), p]));
@@ -80,6 +82,9 @@ Deno.serve(async (req) => {
         let variante_id: string | null = null, cruce = "ninguno";
         const codigoV = norm(v.sku || v.mpn || "");
         let prodV = porCodigo.get(codigoV) || prodPercha;
+        // el SKU es el de un código general (Emi carga muchos modelos con el mismo código): si el modelo existe en Percha
+        // con el mismo nombre, se cruza con el modelo; si no, queda en el código general (y al venderse pide elegir el modelo)
+        if (prodV && prodV.es_generico) prodV = porNombre.get(norm(es(p.name))) || prodV;
         if (prodV && esCombo(es(p.name)) !== esCombo(nombresProd.get(prodV.id) || "")) prodV = null;
         if (v.barcode && porEan.has(norm(v.barcode))) { variante_id = porEan.get(norm(v.barcode)).id; cruce = "barcode"; }
         else if (prodV) {

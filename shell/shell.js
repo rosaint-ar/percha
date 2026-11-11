@@ -320,6 +320,20 @@
   };
 
   // 3) Eliminar: si el registro ya se usó (tiene ventas, stock, etc.) no se puede borrar, entonces se desactiva.
+  // Códigos generales (BOMBIS «VARIAS»…): ¿este producto es uno de sus modelos? UN solo criterio para la caja, los remitos,
+  // el conteo, los pendientes y Catálogo › Códigos generales. Regla: familia + palabras que tiene / no tiene el nombre,
+  // más las excepciones a mano (quitar = sacado aunque cumpla; sumar = incluido aunque no cumpla).
+  // p = { id, nombre, categoria_id, es_generico, tipo }
+  APP.encajaGenerico = (f, p) => {
+    f = f || {}; if (!p || p.es_generico || p.tipo === 'kit') return false;
+    if ((f.quitar || []).includes(p.id)) return false;
+    if ((f.sumar || []).includes(p.id)) return true;
+    const n = String(p.nombre || '').toUpperCase();
+    return (!f.categoria_id || p.categoria_id === f.categoria_id)
+      && (f.incluye || []).every(w => !String(w).trim() || n.includes(String(w).trim().toUpperCase()))
+      && !(f.excluye || []).some(w => String(w).trim() && n.includes(String(w).trim().toUpperCase()));
+  };
+
   APP.eliminar = async (tabla, id, { nombre, campoActivo = 'activa' } = {}) => {
     if (!await confirmar(`¿Eliminar ${nombre ? '"' + nombre + '"' : 'este registro'}? Si ya se usó, queda desactivado para no perder el historial.`, 'Eliminar')) return null;
     const r = await sb.from(tabla).delete().eq('id', id);

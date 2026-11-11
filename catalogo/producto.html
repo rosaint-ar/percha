@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Producto · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611112140">
+<link rel="stylesheet" href="../shell/shell.css?v=202611112343">
 <style>
   .dos{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
   .dos>.card{min-width:0;overflow-x:auto}
@@ -76,18 +76,18 @@
   .oferta-prod{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:0 0 10px;padding:9px 12px;border-radius:10px;background:var(--lila);color:var(--acento);font-size:13px}
   .of-donde{display:flex;gap:6px;flex-wrap:wrap}.of-donde button{border:1px solid var(--linea);background:var(--superficie-2);border-radius:999px;padding:7px 13px;font:600 12.5px var(--f-ui);cursor:pointer;color:var(--tinta-2)}.of-donde button.on{background:var(--acento);border-color:var(--acento);color:#fff}
   .oferta-prod.sin{background:transparent;border:1px dashed var(--linea);color:var(--tinta-3)}
+  .sug-par{position:absolute;left:0;right:0;top:100%;z-index:40;margin-top:4px;background:var(--superficie);border:1px solid var(--linea);border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.14);max-height:340px;overflow:auto}
+  .sug-par[hidden]{display:none!important}
+  .sug-par>div{display:flex;justify-content:space-between;gap:10px;padding:8px 12px;cursor:pointer;font-size:13.5px;border-bottom:1px solid var(--linea)}
+  .sug-par>div.on,.sug-par>div:hover{background:var(--lila)}
+  .sug-par small{font-family:var(--f-mono);color:var(--tinta-3);white-space:nowrap}
 </style>
 </head>
 <body data-page="productos" data-etq="Catálogo" data-title="Producto">
 <main class="app ficha-producto">
   <div class="card" id="card-generico" style="display:none">
     <div class="card-cab"><div><h2>Qué modelos incluye este código general</h2><p class="sub">En la caja y en los remitos, al usarlo, Percha pregunta qué modelos son y ofrece estos. Las prendas nuevas de la familia entran solas. Todos los códigos generales: <a href="generales.html">Catálogo › Códigos generales</a>.</p></div></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
-      <div class="campo" style="margin:0;min-width:150px"><label>Familia</label><select id="gf-cat"><option value="">Todas</option></select></div>
-      <div class="campo" style="margin:0;min-width:150px"><label>Que contenga (coma)</label><input id="gf-inc" placeholder="MEDIAS"></div>
-      <div class="campo" style="margin:0;min-width:170px"><label>Que NO contenga (coma)</label><input id="gf-exc" placeholder="PACK, RED"></div>
-      <button class="btn primario" id="gf-guardar" type="button">Guardar filtro</button><span class="sub" id="gf-cuenta"></span>
-    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><span id="gf-resumen" class="sub"></span><a class="btn primario" id="gf-ir" href="generales.html">Ver los modelos · sacar o sumar</a></div>
     <div class="campo" style="margin:12px 0 0;max-width:420px"><label>Lo que no está en la web se completa con</label><select id="gf-local"><option value="">— nada —</option></select>
       <span class="ayuda">Un artículo del local sin modelos (ej. BOMBIS «LOCAL»): al cobrar aparece un botón para sumarlo sin elegir talle ni color.</span></div>
   </div>
@@ -116,7 +116,7 @@
     <div class="card-cab"><div><h2>Ficha</h2></div><div class="acciones" id="acc-ficha"></div></div>
     <form id="form" autocomplete="off">
       <div class="fila c4" id="fila-nueva" style="display:none">
-        <div class="campo" style="grid-column:span 2"><label>Parecida a <small style="font-weight:400;color:var(--tinta-3)">(opcional: copia familia, precio, costo, proveedor y talles)</small></label><input id="parecida" list="dl-parecida" placeholder="Buscá una prenda parecida…" autocomplete="off"><datalist id="dl-parecida"></datalist></div>
+        <div class="campo" style="grid-column:span 2;position:relative"><label>Parecida a <small style="font-weight:400;color:var(--tinta-3)">(opcional: copia familia, precio, costo, proveedor y talles, y te da el código que sigue)</small></label><input id="parecida" placeholder="Escribí el nombre o el código de una parecida (ej. pia, catherine)…" autocomplete="off"><div class="sug-par" id="sug-par" hidden></div></div>
         <div class="campo" style="grid-column:span 2;align-self:end"><div class="ayuda" id="nuevo-ayuda" style="line-height:1.45">Elegí la <b>familia</b>: el código y el precio se completan solos.</div></div>
       </div>
       <div class="fila c4">
@@ -167,10 +167,10 @@
   </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611112140"></script>
-<script src="../shared/precios.js?v=202611112140"></script>
-<script src="../shared/prenda.js?v=202611112140"></script>
-<script src="../shell/shell.js?v=202611112140"></script>
+<script src="../shared/supabase.js?v=202611112343"></script>
+<script src="../shared/precios.js?v=202611112343"></script>
+<script src="../shared/prenda.js?v=202611112343"></script>
+<script src="../shell/shell.js?v=202611112343"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$ , toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -265,16 +265,14 @@ APP.ready.then(async () => {
     const cuenta = {}; (ps || []).forEach(p => { if (+p.precio > 0) cuenta[p.precio] = (cuenta[p.precio] || 0) + 1; });
     const habitual = Object.entries(cuenta).sort((a, b) => b[1] - a[1])[0];
     if (habitual && (!form.precio.value.trim() || form.precio.value === autoPre)) { form.precio.value = fmt.num(+habitual[0]); autoPre = form.precio.value; pintarMargen(); pintarPrecios(); }
-    $('#dl-parecida').innerHTML = (ps || []).map(p => `<option value="${esc(p.nombre)} · ${esc(p.codigo)}">`).join('');
     // ¿se vende también como genérico? (BOMBIS «VARIAS», MEDIAS VARIAS…): los que filtran por esta familia
     const gen = (gens || []).filter(g => ((g.generico_filtro || {}).categoria_id || g.categoria_id) === cat.id);
     $('#nuevo-ayuda').innerHTML = `Código <b>${esc(form.codigo.value || '—')}</b> (el que sigue en ${esc(cat.nombre)})${habitual ? ` · precio habitual <b>${fmt.pesos(+habitual[0])}</b>` : ''}`
       + (gen.length ? `<br>✓ Al crearla, ya se puede vender con <b>${gen.map(g => esc(g.nombre)).join('</b> o <b>')}</b>.` : '')
       + (form.publicar_web.value === 'true' ? '<br>✓ Va sola a la web, <b>oculta</b>, para que le pongas fotos.' : '');
   }
-  async function usarParecida() {
-    const v = $('#parecida').value, cod = (v.split(' · ').pop() || '').trim(); if (!cod) return;
-    const { data: p } = await sb.from('productos').select('*').eq('empresa_id', e).eq('codigo', cod).maybeSingle(); if (!p) return;
+  async function usarParecida(pid) {
+    const { data: p } = await sb.from('productos').select('*').eq('id', pid).maybeSingle(); if (!p) return;
     ['categoria_id', 'proveedor_id', 'temporada_id', 'marca_id'].forEach(k => { if (p[k] && form[k].querySelector(`option[value="${p[k]}"]`)) form[k].value = p[k]; });
     if (+p.precio) { form.precio.value = fmt.num(+p.precio); autoPre = form.precio.value; }
     if (+p.costo) form.costo.value = fmt.num(+p.costo);
@@ -284,6 +282,30 @@ APP.ready.then(async () => {
     pintarMargen(); pintarPrecios(); await sugerirFamilia();
     toast(`Copié lo de ${p.nombre}: poné el nombre nuevo y creala`);
   }
+  // todo el catálogo una sola vez (≈1.000 prendas): el filtro es instantáneo, letra por letra
+  const nrmB = x => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  function buscadorParecida() {
+    const ip = $('#parecida'), sp = $('#sug-par'); let todos = null, res = [], sel = -1;
+    (async () => { let d = 0, t = []; while (true) { const { data, error } = await sb.from('productos').select('id,nombre,codigo,categoria_id,tipo,es_generico').eq('empresa_id', e).eq('activo', true).order('nombre').range(d, d + 999); if (error || !data) break; t = t.concat(data); if (data.length < 1000) break; d += 1000; }
+      todos = t.filter(p => !p.es_generico && ['prenda', 'kit', 'varios'].includes(p.tipo)).map(p => Object.assign(p, { _b: nrmB(p.nombre + ' ' + p.codigo) })); if (document.activeElement === ip && ip.value.trim()) pintar(); })();
+    const famNom = cid => (familias.find(c => c.id === cid) || {}).nombre || '';
+    const elegir = p => { ip.value = p.nombre + ' · ' + p.codigo; sp.hidden = true; usarParecida(p.id); };
+    function pintar() {
+      const ws = nrmB(ip.value).split(/\s+/).filter(Boolean); if (!ws.length) { sp.hidden = true; return; }
+      if (!todos) { sp.innerHTML = '<p class="sub" style="padding:8px 12px;margin:0">Buscando…</p>'; sp.hidden = false; return; }
+      const cat = form.categoria_id.value;
+      res = todos.filter(p => ws.every(w => p._b.includes(w))).sort((a, b) => (b.categoria_id === cat) - (a.categoria_id === cat) || a.nombre.localeCompare(b.nombre)).slice(0, 15); sel = res.length ? 0 : -1;
+      sp.innerHTML = res.map((p, i) => `<div data-i="${i}" class="${i === sel ? 'on' : ''}"><span>${esc(p.nombre)}</span><small>${esc(p.codigo)} · ${esc(famNom(p.categoria_id))}</small></div>`).join('') || '<p class="sub" style="padding:8px 12px;margin:0">No encontré ninguna con eso.</p>';
+      sp.hidden = false; $$('[data-i]', sp).forEach(d => d.onmousedown = ev => { ev.preventDefault(); elegir(res[+d.dataset.i]); });
+    }
+    ip.addEventListener('input', pintar); ip.addEventListener('focus', pintar); ip.addEventListener('blur', () => setTimeout(() => { sp.hidden = true; }, 150));
+    ip.addEventListener('keydown', ev => {
+      if (sp.hidden || !res.length) return;
+      if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') { ev.preventDefault(); sel = (sel + (ev.key === 'ArrowDown' ? 1 : -1) + res.length) % res.length; $$('[data-i]', sp).forEach((d, i) => d.classList.toggle('on', i === sel)); $$('[data-i]', sp)[sel].scrollIntoView({ block: 'nearest' }); }
+      else if (ev.key === 'Enter') { ev.preventDefault(); if (sel >= 0) elegir(res[sel]); }
+      else if (ev.key === 'Escape') sp.hidden = true;
+    });
+  }
   function prepararNueva() {
     $('#fila-nueva').style.display = '';
     const fam = params.get('familia'), prov = params.get('proveedor');
@@ -292,8 +314,9 @@ APP.ready.then(async () => {
     if (prov && form.proveedor_id.querySelector(`option[value="${prov}"]`)) form.proveedor_id.value = prov;
     form.categoria_id.addEventListener('change', sugerirFamilia);
     form.publicar_web.addEventListener('change', sugerirFamilia);
-    $('#parecida').addEventListener('change', usarParecida);
-    sugerirFamilia(); form.nombre.focus();
+    buscadorParecida();
+    form.codigo.placeholder = 'Se completa al elegir la familia';
+    sugerirFamilia(); $('#parecida').focus();
   }
   // si la abrieron desde el remito, se le avisa para que la agregue sola al renglón
   function avisarRemito() {
@@ -747,15 +770,13 @@ APP.ready.then(async () => {
   const partir = s => s.split(',').map(x => x.trim()).filter(Boolean);
   async function llenarFiltros() {
     const cats = $$('select[name=categoria_id] option').map(o => `<option value="${o.value}">${esc(o.textContent)}</option>`).join('');
-    $('#kf-cat').innerHTML = '<option value="">Todas</option>' + cats; $('#gf-cat').innerHTML = '<option value="">Todas</option>' + cats;
+    $('#kf-cat').innerHTML = '<option value="">Todas</option>' + cats;
     const { data: gens } = await sb.from('productos').select('id,nombre').eq('empresa_id', e).eq('es_generico', true).order('nombre');
     $('#kf-def').innerHTML = '<option value="">—</option>' + (gens || []).map(g => `<option value="${g.id}">${esc(g.nombre)}</option>`).join('');
   }
   const filtroKit = () => ({ categoria_id: $('#kf-cat').value || null, incluye: partir($('#kf-inc').value), excluye: partir($('#kf-exc').value), defecto_producto_id: $('#kf-def').value || null });
-  const filtroGen = () => ({ categoria_id: $('#gf-cat').value || null, incluye: partir($('#gf-inc').value), excluye: partir($('#gf-exc').value) });
   let tc; const contar = async (f, destino) => { clearTimeout(tc); tc = setTimeout(async () => { const { data } = await sb.rpc('filtro_cuenta', { e, f }); $(destino).textContent = `${fmt.num(data || 0)} productos coinciden`; }, 300); };
   ['#kf-cat', '#kf-inc', '#kf-exc'].forEach(s => $(s).addEventListener('input', () => contar(filtroKit(), '#kf-cuenta')));
-  ['#gf-cat', '#gf-inc', '#gf-exc'].forEach(s => $(s).addEventListener('input', () => contar(filtroGen(), '#gf-cuenta')));
   $('#kf-agregar').onclick = async () => {
     const f = filtroKit(); if (!f.categoria_id && !f.incluye.length) { toast('Elegí una familia o escribí qué tiene que contener', 'error'); return; }
     const r = await sb.from('producto_componentes').insert(APP.conEmpresa({ producto_id: id, filtro: f, cantidad: Math.max(1, +$('#kf-cant').value || 1) }));
@@ -763,17 +784,17 @@ APP.ready.then(async () => {
   };
   function pintarGenerico() {
     const es = form.es_generico.value === 'true'; $('#card-generico').style.display = es ? '' : 'none'; if (!es) return;
-    const f = (producto && producto.generico_filtro) || {}; $('#gf-cat').value = f.categoria_id || (producto && producto.categoria_id) || ''; $('#gf-inc').value = (f.incluye || []).join(', '); $('#gf-exc').value = (f.excluye || []).join(', ');
-    contar(filtroGen(), '#gf-cuenta');
+    const f = (producto && producto.generico_filtro) || {}, fam = familias.find(c => c.id === (f.categoria_id || (producto && producto.categoria_id)));
+    $('#gf-resumen').innerHTML = id ? `Ofrece los modelos de <b>${esc(fam ? fam.nombre : 'todas las familias')}</b>${(f.quitar || []).length ? ` (menos ${f.quitar.length} sacados a mano)` : ''}${(f.sumar || []).length ? ` + ${f.sumar.length} sumados a mano` : ''}. Las prendas nuevas de la familia entran solas.` : 'Guardalo y después elegís qué modelos incluye.';
+    $('#gf-ir').href = 'generales.html' + (id ? '?g=' + id : '');
     // con qué artículo del local se completa (misma familia, que no sea genérico)
-    sb.from('productos').select('id,nombre,codigo').eq('empresa_id', e).eq('activo', true).eq('es_generico', false).eq('categoria_id', (producto && producto.categoria_id) || $('#gf-cat').value || '00000000-0000-0000-0000-000000000000').order('nombre').then(({ data }) => {
+    sb.from('productos').select('id,nombre,codigo').eq('empresa_id', e).eq('activo', true).eq('es_generico', false).eq('categoria_id', (producto && ((producto.generico_filtro || {}).categoria_id || producto.categoria_id)) || '00000000-0000-0000-0000-000000000000').order('nombre').then(({ data }) => {
       $('#gf-local').innerHTML = '<option value="">— nada —</option>' + (data || []).map(p => `<option value="${p.id}">${esc(p.nombre)} · ${esc(p.codigo)}</option>`).join('');
       $('#gf-local').value = (producto && producto.generico_local_id) || '';
     });
   }
   $('#gf-local').onchange = async () => { if (!id) { toast('Guardá el producto primero', 'error'); return; } const v = $('#gf-local').value || null; const r = await sb.from('productos').update({ generico_local_id: v }).eq('id', id); if (!r.error && producto) producto.generico_local_id = v; toast(r.error ? mensajeError(r.error) : 'Guardado', r.error ? 'error' : ''); };
   form.es_generico.addEventListener('change', pintarGenerico);
-  $('#gf-guardar').onclick = async () => { if (!id) { toast('Guardá el producto primero', 'error'); return; } const r = await sb.from('productos').update({ generico_filtro: filtroGen() }).eq('id', id); toast(r.error ? mensajeError(r.error) : 'Filtro del genérico guardado', r.error ? 'error' : ''); };
   // kit nuevo: se avisa que primero hay que guardar
   form.tipo.addEventListener('change', () => { if (form.tipo.value === 'kit' && !id) { $('#card-kit').style.display = ''; $('#card-matriz').style.display = 'none'; $('#tb-kit').querySelectorAll('tr').forEach((x, i) => i && x.remove()); $('#tb-kit').insertAdjacentHTML('beforeend', '<tr><td colspan="6" class="vacio">Guardá el producto (arriba) y acá cargás lo que lleva: prendas exactas, "cualquier talle · color" o un filtro.</td></tr>'); } });
   llenarFiltros();

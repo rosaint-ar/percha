@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ingresar mercadería · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611112140">
+<link rel="stylesheet" href="../shell/shell.css?v=202611112343">
 <style>
   /* Ingresar mercadería: se carga como viene el remito (un renglón por artículo y color, cantidades por talle) */
   .cab-compra{display:grid;grid-template-columns:minmax(220px,1.4fr) 1fr 150px 110px;gap:12px;align-items:end}
@@ -91,9 +91,9 @@
   <div id="sug" class="sugerencias" style="display:none"></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611112140"></script>
-<script src="../shell/shell.js?v=202611112140"></script>
-<script src="../shared/precios.js?v=202611112140"></script>
+<script src="../shared/supabase.js?v=202611112343"></script>
+<script src="../shell/shell.js?v=202611112343"></script>
+<script src="../shared/precios.js?v=202611112343"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -279,8 +279,7 @@ APP.ready.then(async () => {
   }
   // ---------- identificar los modelos de un genérico (BOMBIS «VARIAS»): como en la caja, pero para lo que entra ----------
   let desglose = null;   // la ventana abierta: para sumarle una prenda recién creada
-  const filtroGen = g => { const fl = g.generico_filtro || {}, cat = fl.categoria_id || g.categoria_id, inc = (fl.incluye || []).filter(w => w.trim()), exc = (fl.excluye || []).filter(w => w.trim());
-    return p => !p.es_generico && p.tipo !== 'kit' && (!cat || p.categoria_id === cat) && inc.every(w => p.nombre.toUpperCase().includes(w.trim().toUpperCase())) && !exc.some(w => p.nombre.toUpperCase().includes(w.trim().toUpperCase())); };
+  const filtroGen = g => { const fl = Object.assign({}, g.generico_filtro || {}, { categoria_id: (g.generico_filtro || {}).categoria_id || g.categoria_id }); return p => APP.encajaGenerico(fl, p); };   // mismo criterio en todo Percha (shell.js)
   function desglosar(i) {
     const f0 = filas[i], g = prod(f0.producto_id); if (!g) return;
     const cumple = filtroGen(g), cat = (g.generico_filtro || {}).categoria_id || g.categoria_id;

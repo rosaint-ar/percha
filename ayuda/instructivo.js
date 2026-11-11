@@ -343,7 +343,7 @@ window.INSTRUCTIVO = {
       { tipo: 'pasos', items: [
         'Desde el remito tocá {{+ Prenda nueva}} (o en **Catálogo** › {{+ Nuevo producto}}). Se abre en otra pestaña.',
         'Elegí la **Familia** (por ejemplo BOMBACHAS): el **código** sale solo (el que sigue en la familia) y el **precio** también (el que más se usa en esa familia).',
-        'Si es parecida a otra (misma tela o estilo), escribila en **Parecida a**: copia familia, precio, costo, proveedor y talles.',
+        'Si es parecida a otra (misma tela o estilo), escribí parte del nombre o el código en **Parecida a** y elegila de la lista (con las flechas y Enter, o tocándola): copia familia, precio, costo, proveedor y talles, y pone el **código que sigue** en esa familia.',
         'Poné el **nombre** como el resto (ej. LESS «NOMBRE» ALGODÓN) y tocá {{Crear producto}}.',
         'Se abre sola la ventana de **talles y colores**: los talles ya vienen marcados; elegí los colores y tocá {{Crear}}. Si un color o estampa **no está en la lista**, escribilo en el buscador y tocá {{+ Crear como color o estampa nuevo}}: queda creado y elegido.',
         'Si venías del remito, la prenda ya aparece en el renglón: cargá las cantidades por talle y listo.'] },
@@ -360,12 +360,13 @@ window.INSTRUCTIVO = {
     ] },
     { id: 'codigos-generales', grupo: 'compras', p: 'catalogo_ver', titulo: 'Códigos generales (BOMBIS «VARIAS», MEDIAS VARIAS)', nuevo: '2026-11-11', resumen: 'Sirven para lo que tiene muchos modelos: se usa el código general y Percha pregunta qué modelos son, en la caja y en los remitos.', bloques: [
       { tipo: 'pasos', items: [
-        'Están todos en **Catálogo › Códigos generales**: ahí ves qué modelos incluye cada uno y cuántas unidades quedaron sin identificar.',
+        'Están todos en **Catálogo › Códigos generales**. Cada uno muestra **la lista de modelos que incluye** (con buscador) y cuántas unidades quedaron sin identificar.',
+        'Si un modelo **no va**, tocá {{Sacar}} al lado: deja de ofrecerse en la caja y en los remitos (queda en «Sacados a mano», con {{Volver a sumar}}). Si **falta** uno de otra familia, buscalo en {{+ Sumar un modelo}}.',
         '**En un remito**: elegí el código general (ej. BOMBIS «VARIAS») y se abre **¿Qué modelos son?**. Poné cuántas vinieron, buscá cada modelo, elegí el color y cargá los talles. Si un modelo no existe, tocá {{+ Modelo nuevo}}: se crea y vuelve solo a la ventana.',
         'Cuando estén todas, tocá {{Listo}}: quedan los renglones de cada modelo. Si no sabés alguna, {{Dejar sin identificar}}.',
         '**En la caja**: se cobra con el código general y, antes de cerrar la venta, Percha pregunta qué modelo se llevó.'] },
-      { tipo: 'tip', texto: 'Las prendas **nuevas** de la familia entran solas en su código general: no hay que tocar nada. Para cambiar qué incluye (otra familia, o palabras que tiene que tener o no el nombre), administración toca {{Cambiar qué incluye}}.' },
-      { tipo: 'tip', texto: 'Para crear otro código general (ej. para pantuflas): {{+ Nuevo código general}} en esa pantalla, elegí la familia y listo.' }
+      { tipo: 'tip', texto: 'Las prendas **nuevas** de la familia entran solas en la lista: no hay que tocar nada. **Para cargar una bombacha nueva NO se crea un código general**: se crea la prenda (Catálogo › {{+ Nuevo producto}} o desde el remito) y aparece sola en BOMBIS «VARIAS».' },
+      { tipo: 'tip', texto: 'Si se creó uno **por error**: si en realidad es una prenda, tocá {{No es código general}} (pasa a ser un modelo más); si no sirve, {{Eliminar}}. Para otro grupo grande (ej. pantuflas): {{+ Otro código general}}. Para cambiar la familia o las palabras: {{Cambiar la regla}}.' }
     ] },
     { id: 'compras-nombres', grupo: 'compras', p: 'compras', titulo: 'El proveedor le dice de otra forma', nuevo: '2026-11-03', resumen: 'La primera vez elegís qué prenda es; después Percha la reconoce sola.', bloques: [
       { tipo: 'texto', texto: 'Cada proveedor tiene sus nombres (para Concepto, **MIA** es el pijama **CIELO** y **MORA** es el **MAGNOLIA**). La primera vez escribís cómo dice el remito y elegís la prenda de Augusta. **Percha lo aprende para ese proveedor.**' },
