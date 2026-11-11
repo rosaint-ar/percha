@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ingresar mercadería · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611091504">
+<link rel="stylesheet" href="../shell/shell.css?v=202611111437">
 <style>
   /* Ingresar mercadería: se carga como viene el remito (un renglón por artículo y color, cantidades por talle) */
   .cab-compra{display:grid;grid-template-columns:minmax(220px,1.4fr) 1fr 150px 110px;gap:12px;align-items:end}
@@ -76,15 +76,15 @@
   <div class="card">
     <div class="card-cab"><div><h2>Lo que dice el remito</h2><p class="ayuda-remito" id="ayuda">Un renglón por cada artículo y color, como en el remito. Escribí cómo lo llama el proveedor y elegí qué prenda es en Augusta: <b>la próxima vez Percha la reconoce sola</b>.</p></div></div>
     <div class="renglones" id="renglones"></div>
-    <div class="agregar-rg" id="agregar"><button class="btn" id="btn-rg">+ Otro renglón</button><a class="btn suave" href="../catalogo/producto.html?nuevo=1" target="_blank" title="Se abre en otra pestaña; al volver ya aparece para elegir">+ Prenda nueva en el catálogo</a></div>
+    <div class="agregar-rg" id="agregar"><button class="btn" id="btn-rg">+ Otro renglón</button><button class="btn suave" id="btn-prenda-nueva" type="button" title="Se abre en otra pestaña: código, precio y talles se completan solos; al crearla vuelve sola a este remito">+ Prenda nueva</button></div>
     <div class="resumen-compra"><div class="cifras" id="cifras"></div><div class="botones" id="acciones"></div></div>
   </div>
   <div id="sug" class="sugerencias" style="display:none"></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611091504"></script>
-<script src="../shell/shell.js?v=202611091504"></script>
-<script src="../shared/precios.js?v=202611091504"></script>
+<script src="../shared/supabase.js?v=202611111437"></script>
+<script src="../shell/shell.js?v=202611111437"></script>
+<script src="../shared/precios.js?v=202611111437"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -244,7 +244,7 @@ APP.ready.then(async () => {
   function sugerirPrenda(inp, i) {
     opciones = []; const res = buscarProductos(inp.value);
     if (!inp.value.trim()) { cerrarSug(); return; }
-    abrirSug(inp, res.length ? res.map(p => { opciones.push({ hacer: () => elegirPrenda(i, p) }); return `<div data-i="${opciones.length - 1}">${lineaProd(p)}</div>`; }).join('') : '<div class="sg-t">No está en el catálogo: creala con "+ Prenda nueva en el catálogo"</div>');
+    abrirSug(inp, res.length ? res.map(p => { opciones.push({ hacer: () => elegirPrenda(i, p) }); return `<div data-i="${opciones.length - 1}">${lineaProd(p)}</div>`; }).join('') : '<div class="sg-t">No está en el catálogo: creala con «+ Prenda nueva» (abajo)</div>');
   }
   // el color aprendido se guarda por id; el renglón usa el código del color
   let codColor = {};
@@ -362,6 +362,20 @@ APP.ready.then(async () => {
   }
   $('#descuento').oninput = totales;
   $('#descuento').onblur = () => { $('#descuento').value = ver(num($('#descuento').value)); };
+  // prenda nueva: se crea en otra pestaña (con el proveedor del remito) y, al terminar, entra sola en el renglón que esperaba
+  // (el primero con un artículo escrito y sin prenda; si no hay, uno nuevo)
+  $('#btn-prenda-nueva').onclick = () => {
+    const prov = $('#proveedor').value;
+    window.open(`../catalogo/producto.html?nuevo=1&desde=compra${prov ? '&proveedor=' + prov : ''}`, '_blank');
+  };
+  window.addEventListener('message', async ev => {
+    if (ev.origin !== location.origin || !ev.data || ev.data.percha !== 'prenda-nueva' || !ev.data.producto_id) return;
+    await cargarCatalogo(); ultimaRecarga = Date.now();
+    const p = prod(ev.data.producto_id); if (!p) return;
+    let i = filas.findIndex(x => x.art && !x.producto_id);
+    if (i < 0) { i = filas.findIndex(x => !x.art && !x.producto_id); if (i < 0) { filas.push(filaVacia()); i = filas.length - 1; } }
+    elegirPrenda(i, p); toast(`${p.nombre} agregada al remito`);
+  });
   $('#btn-rg').onclick = () => { filas.push(filaVacia()); pintar(); $(`[data-art="${filas.length - 1}"]`).focus(); };
   $('#proveedor').onchange = () => pintar();
   $('#btn-prov').onclick = async () => {

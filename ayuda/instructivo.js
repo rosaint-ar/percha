@@ -339,6 +339,17 @@ window.INSTRUCTIVO = {
       { tipo: 'ojo', texto: '**No cargues el stock a mano en Tienda Nube.** Percha manda el stock a la web: lo que se carga solo allá se borra con la próxima venta. Todo lo que entra, entra por acá.' },
       { tipo: 'tip', texto: 'Si llega un **color que la prenda no tiene**, elegí {{+ Color nuevo…}} en el color: se crea ahí mismo con todos sus talles. Si es una **prenda nueva**, tocá {{+ Prenda nueva en el catálogo}}, creala y al volver ya aparece.' }
     ] },
+    { id: 'prenda-nueva', grupo: 'compras', p: 'catalogo_editar', titulo: 'Cargar una prenda nueva (por ejemplo, bombachas que entraron)', nuevo: '2026-11-11', resumen: 'Elegís la familia y el código, el precio y los talles se completan solos. Queda para vender, en la web (oculta) y dentro de «BOMBIS VARIAS».', bloques: [
+      { tipo: 'pasos', items: [
+        'Desde el remito tocá {{+ Prenda nueva}} (o en **Catálogo** › {{+ Nuevo producto}}). Se abre en otra pestaña.',
+        'Elegí la **Familia** (por ejemplo BOMBACHAS): el **código** sale solo (el que sigue en la familia) y el **precio** también (el que más se usa en esa familia).',
+        'Si es parecida a otra (misma tela o estilo), escribila en **Parecida a**: copia familia, precio, costo, proveedor y talles.',
+        'Poné el **nombre** como el resto (ej. LESS «NOMBRE» ALGODÓN) y tocá {{Crear producto}}.',
+        'Se abre sola la ventana de **talles y colores**: los talles ya vienen marcados; elegí los colores y tocá {{Crear}}.',
+        'Si venías del remito, la prenda ya aparece en el renglón: cargá las cantidades por talle y listo.'] },
+      { tipo: 'tip', texto: 'Al crearla ya se puede vender suelta o con **BOMBIS «VARIAS»** (el código general: al cobrar se elige el modelo), y se sube sola a la web **oculta** para ponerle fotos.' },
+      { tipo: 'tip', texto: 'No hace falta inventar el código: Percha saltea los que ya existen o que usa alguna publicación vieja de la web.' }
+    ] },
     { id: 'compras-nombres', grupo: 'compras', p: 'compras', titulo: 'El proveedor le dice de otra forma', nuevo: '2026-11-03', resumen: 'La primera vez elegís qué prenda es; después Percha la reconoce sola.', bloques: [
       { tipo: 'texto', texto: 'Cada proveedor tiene sus nombres (para Concepto, **MIA** es el pijama **CIELO** y **MORA** es el **MAGNOLIA**). La primera vez escribís cómo dice el remito y elegís la prenda de Augusta. **Percha lo aprende para ese proveedor.**' },
       { tipo: 'texto', texto: 'La próxima vez, cuando escribas **MIA ROSA**, te propone **PIJAMA «CIELO» Rosa** y queda marcado **✓ Percha ya lo conocía**. Solo ponés las cantidades.' },

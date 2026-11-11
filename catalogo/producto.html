@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Producto · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611091504">
+<link rel="stylesheet" href="../shell/shell.css?v=202611111437">
 <style>
   .dos{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
   .dos>.card{min-width:0;overflow-x:auto}
@@ -115,6 +115,10 @@
   <div class="card" id="ficha">
     <div class="card-cab"><div><h2>Ficha</h2></div><div class="acciones" id="acc-ficha"></div></div>
     <form id="form" autocomplete="off">
+      <div class="fila c4" id="fila-nueva" style="display:none">
+        <div class="campo" style="grid-column:span 2"><label>Parecida a <small style="font-weight:400;color:var(--tinta-3)">(opcional: copia familia, precio, costo, proveedor y talles)</small></label><input id="parecida" list="dl-parecida" placeholder="Buscá una prenda parecida…" autocomplete="off"><datalist id="dl-parecida"></datalist></div>
+        <div class="campo" style="grid-column:span 2;align-self:end"><div class="ayuda" id="nuevo-ayuda" style="line-height:1.45">Elegí la <b>familia</b>: el código y el precio se completan solos.</div></div>
+      </div>
       <div class="fila c4">
         <div class="campo"><label>Código</label><input name="codigo" required></div>
         <div class="campo" style="grid-column:span 2"><label>Nombre</label><input name="nombre" required></div>
@@ -163,10 +167,10 @@
   </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611091504"></script>
-<script src="../shared/precios.js?v=202611091504"></script>
-<script src="../shared/prenda.js?v=202611091504"></script>
-<script src="../shell/shell.js?v=202611091504"></script>
+<script src="../shared/supabase.js?v=202611111437"></script>
+<script src="../shared/precios.js?v=202611111437"></script>
+<script src="../shared/prenda.js?v=202611111437"></script>
+<script src="../shell/shell.js?v=202611111437"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$ , toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -177,7 +181,7 @@ APP.ready.then(async () => {
 
   // ---------- catálogos de apoyo ----------
   const [c1, c2, c3, c4, c5, c6, c7] = await Promise.all([
-    sb.from('categorias').select('id,nombre').eq('empresa_id', e).eq('activa', true).order('nombre'),
+    sb.from('categorias').select('id,nombre,codigo').eq('empresa_id', e).eq('activa', true).order('nombre'),
     sb.from('proveedores').select('id,nombre').eq('empresa_id', e).eq('activo', true).order('nombre'),
     sb.from('listas_precios').select('*').eq('empresa_id', e).eq('activa', true).order('orden'),
     sb.from('depositos').select('*').eq('empresa_id', e).eq('activo', true).order('principal', { ascending: false }),
@@ -206,7 +210,7 @@ APP.ready.then(async () => {
     if (!id) { // nuevo
       $('h1').innerHTML = 'Nuevo <em>producto</em>'; form.tiene_variantes.value = 'true'; form.activo.value = 'true'; form.publicar_web.value = 'true';
       $('#card-matriz').style.display = 'none'; $('#tb-mov').parentElement.style.display = 'none'; $('#card-fotos').style.display = 'none';
-      pintarPrecios(); pintarAcciones(); pintarMargen(); return;
+      pintarPrecios(); pintarAcciones(); pintarMargen(); prepararNueva(); return;
     }
     const [p, v, pr] = await Promise.all([
       sb.from('productos').select('*').eq('id', id).single(),
@@ -228,6 +232,75 @@ APP.ready.then(async () => {
     else { $('#card-matriz').style.display = ''; $('#card-kit').style.display = 'none'; pintarMatriz(); }
     pintarMovimientos(mv.data || []);
     const ean = params.get('ean'); if (ean) { const vv = variantes.find(x => x.ean === ean); if (vv) abrirVariante(vv); }
+  }
+
+  // ---------- prenda nueva: código, precio y talles se completan solos (sirve para cualquier tienda) ----------
+  // Código: el que sigue en la familia (prefijo de la familia + número), salteando los que ya usa algún producto o alguna
+  // publicación de la web (si no, la sincronización la cruzaría sola con una publicación vieja). Precio: el más usado en la familia.
+  let presetT = null, autoCod = '', autoPre = '';
+  const familias = c1.data || [];
+  async function codigoSugerido(cat) {
+    const pre = cat && cat.codigo;
+    if (!pre || !/^\d+$/.test(pre)) { const { data } = await sb.rpc('proximo_codigo', { e, p_base: 'P' }); return data || ''; }
+    const [{ data: ps }, { data: ci }] = await Promise.all([
+      sb.from('productos').select('codigo,tipo,es_generico').eq('empresa_id', e).like('codigo', pre + '%').limit(5000),
+      sb.from('canal_items').select('sku,mpn').eq('empresa_id', e).or(`sku.like.${pre}%,mpn.like.${pre}%`).limit(10000)]);
+    const largo = 6, usados = new Set((ps || []).map(p => p.codigo));
+    (ci || []).forEach(x => { if (x.sku) usados.add(String(x.sku).split('-')[0]); if (x.mpn) usados.add(String(x.mpn)); });
+    const nums = (ps || []).filter(p => p.tipo === 'prenda' && !p.es_generico && new RegExp('^\\d{' + largo + '}$').test(p.codigo)).map(p => +p.codigo);
+    const piso = +(pre + '0'.repeat(largo - pre.length)), techo = +(String(+pre + 1) + '0'.repeat(largo - pre.length));
+    let n = Math.max(piso, ...nums) + 1;
+    while (usados.has(String(n)) && n < techo) n++;
+    return n < techo ? String(n) : '';
+  }
+  async function sugerirFamilia() {
+    if (id) return;
+    const cat = familias.find(c => c.id === form.categoria_id.value);
+    if (!cat) { $('#nuevo-ayuda').innerHTML = 'Elegí la <b>familia</b>: el código y el precio se completan solos.'; return; }
+    const [cod, { data: ps }, { data: gens }] = await Promise.all([
+      codigoSugerido(cat),
+      sb.from('productos').select('id,nombre,codigo,precio').eq('empresa_id', e).eq('categoria_id', cat.id).eq('activo', true).eq('es_generico', false).eq('tipo', 'prenda').order('nombre').limit(2000),
+      sb.from('productos').select('nombre,codigo,generico_filtro,categoria_id').eq('empresa_id', e).eq('activo', true).eq('es_generico', true)]);
+    if (!form.codigo.value.trim() || form.codigo.value === autoCod) { form.codigo.value = cod; autoCod = cod; }
+    const cuenta = {}; (ps || []).forEach(p => { if (+p.precio > 0) cuenta[p.precio] = (cuenta[p.precio] || 0) + 1; });
+    const habitual = Object.entries(cuenta).sort((a, b) => b[1] - a[1])[0];
+    if (habitual && (!form.precio.value.trim() || form.precio.value === autoPre)) { form.precio.value = fmt.num(+habitual[0]); autoPre = form.precio.value; pintarMargen(); pintarPrecios(); }
+    $('#dl-parecida').innerHTML = (ps || []).map(p => `<option value="${esc(p.nombre)} · ${esc(p.codigo)}">`).join('');
+    // ¿se vende también como genérico? (BOMBIS «VARIAS», MEDIAS VARIAS…): los que filtran por esta familia
+    const gen = (gens || []).filter(g => ((g.generico_filtro || {}).categoria_id || g.categoria_id) === cat.id);
+    $('#nuevo-ayuda').innerHTML = `Código <b>${esc(form.codigo.value || '—')}</b> (el que sigue en ${esc(cat.nombre)})${habitual ? ` · precio habitual <b>${fmt.pesos(+habitual[0])}</b>` : ''}`
+      + (gen.length ? `<br>✓ Al crearla, ya se puede vender con <b>${gen.map(g => esc(g.nombre)).join('</b> o <b>')}</b>.` : '')
+      + (form.publicar_web.value === 'true' ? '<br>✓ Va sola a la web, <b>oculta</b>, para que le pongas fotos.' : '');
+  }
+  async function usarParecida() {
+    const v = $('#parecida').value, cod = (v.split(' · ').pop() || '').trim(); if (!cod) return;
+    const { data: p } = await sb.from('productos').select('*').eq('empresa_id', e).eq('codigo', cod).maybeSingle(); if (!p) return;
+    ['categoria_id', 'proveedor_id', 'temporada_id', 'marca_id'].forEach(k => { if (p[k] && form[k].querySelector(`option[value="${p[k]}"]`)) form[k].value = p[k]; });
+    if (+p.precio) { form.precio.value = fmt.num(+p.precio); autoPre = form.precio.value; }
+    if (+p.costo) form.costo.value = fmt.num(+p.costo);
+    form.tiene_variantes.value = String(p.tiene_variantes); form.publicar_web.value = String(p.publicar_web !== false);
+    const { data: vs } = await sb.from('variantes').select('talle_id').eq('producto_id', p.id).eq('activa', true);
+    presetT = new Set((vs || []).map(x => x.talle_id).filter(Boolean));
+    pintarMargen(); pintarPrecios(); await sugerirFamilia();
+    toast(`Copié lo de ${p.nombre}: poné el nombre nuevo y creala`);
+  }
+  function prepararNueva() {
+    $('#fila-nueva').style.display = '';
+    const fam = params.get('familia'), prov = params.get('proveedor');
+    if (fam && form.categoria_id.querySelector(`option[value="${fam}"]`)) form.categoria_id.value = fam;
+    if (prov && form.proveedor_id.querySelector(`option[value="${prov}"]`)) form.proveedor_id.value = prov;
+    form.categoria_id.addEventListener('change', sugerirFamilia);
+    form.publicar_web.addEventListener('change', sugerirFamilia);
+    $('#parecida').addEventListener('change', usarParecida);
+    sugerirFamilia(); form.nombre.focus();
+  }
+  // si la abrieron desde el remito, se le avisa para que la agregue sola al renglón
+  function avisarRemito() {
+    if (!window.opener || !params.get('desde')) return;
+    try { window.opener.postMessage({ percha: 'prenda-nueva', producto_id: id }, location.origin); } catch (_) { return; }
+    const m = modal(`<h2>✓ Prenda creada</h2><p class="sub">Ya quedó en el remito, en un renglón nuevo. Podés cerrar esta pestaña.</p><div class="pie"><button class="btn" data-quedar>Seguir en la ficha</button><button class="btn primario" data-cerrar>Volver al remito</button></div>`);
+    $('[data-quedar]', m).onclick = () => m.cerrar();
+    $('[data-cerrar]', m).onclick = () => { window.close(); m.cerrar(); };
   }
 
   function pintarAcciones() {
@@ -262,8 +335,10 @@ APP.ready.then(async () => {
     // artículo único o kit: su variante "sin talle ni color" para que el stock (o el disponible) tenga dónde colgar
     if (!d.tiene_variantes || d.tipo === 'kit') await sb.from('variantes').insert(APP.conEmpresa({ producto_id: id, sku: d.codigo, ean: d.ean }));
     history.replaceState(null, '', `producto.html?id=${id}`);
-    toast('Producto creado'); $('#card-matriz').style.display = ''; $('#tb-mov').parentElement.style.display = ''; $('#card-fotos').style.display = '';
+    toast('Producto creado'); $('#card-matriz').style.display = ''; $('#tb-mov').parentElement.style.display = ''; $('#card-fotos').style.display = ''; $('#fila-nueva').style.display = 'none';
     await cargar();
+    if (d.tiene_variantes && d.tipo === 'prenda') $('#btn-agregar-variantes').click();   // talles y colores en el mismo paso
+    else avisarRemito();
   }
   let tAuto, guardando = Promise.resolve();
   async function autoguardar() {
@@ -575,7 +650,7 @@ APP.ready.then(async () => {
     const escalas = escs || [], deFam = (cat && cat.escalas) || [];
     const ordenEsc = escalas.slice().sort((a, b) => (deFam.includes(b.id) ? 1 : 0) - (deFam.includes(a.id) ? 1 : 0) || a.orden - b.orden);
     const usadosT = new Set(variantes.map(v => v.talle).filter(Boolean)), usadosC = new Set(variantes.map(v => v.color).filter(Boolean));
-    const selT = new Set(talles.filter(t => usadosT.has(t.codigo)).map(t => t.id)), selC = new Set(colores.filter(c => usadosC.has(c.codigo)).map(c => c.id));
+    const selT = new Set(presetT && !variantes.length ? [...presetT] : talles.filter(t => usadosT.has(t.codigo)).map(t => t.id)), selC = new Set(colores.filter(c => usadosC.has(c.codigo)).map(c => c.id));
     let escActiva = (ordenEsc.find(s => talles.some(t => t.escala_id === s.id && selT.has(t.id))) || ordenEsc[0] || {}).id, busca = '';
     const GRUPOS = ['Negros', 'Blancos y crudos', 'Grises', 'Nudes y marrones', 'Rojos', 'Rosas', 'Naranjas y corales', 'Amarillos y dorados', 'Verdes y aguas', 'Azules', 'Violetas y lilas', 'Combinados', 'Estampados', 'Otros'];
     const nrm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -607,7 +682,7 @@ APP.ready.then(async () => {
         const nuevas = combos.map(([t, c]) => { const T = talles.find(x => x.id === t), C = colores.find(x => x.id === c); return APP.conEmpresa({ producto_id: id, talle_id: t || null, color_id: c || null, sku: [producto.codigo, T && T.codigo, C && C.codigo].filter(Boolean).join('-') }); });
         const r = await sb.from('variantes').insert(nuevas); if (r.error) { toast(mensajeError(r.error), 'error'); return; }
         if (!producto.tiene_variantes) await sb.from('productos').update({ tiene_variantes: true }).eq('id', id);
-        m.cerrar(); toast(`${nuevas.length} combinaciones creadas`); await cargar();
+        m.cerrar(); toast(`${nuevas.length} combinaciones creadas`); await cargar(); presetT = null; avisarRemito();
       };
     };
     pintar();
