@@ -1,4 +1,4 @@
--- 121 · (SIN APLICAR, esperando decisión de Diego) publicaciones de la web cruzadas con el código general → al modelo
+-- 121 · (APLICADA 11/11) publicaciones de la web cruzadas con el código general → al modelo
 -- Ver la explicación en la 120 original: venta #95 FUNNY Smile quedó pendiente porque la publicación estaba atada a MEDIAS VARIAS.
 begin;
 -- 2) publicaciones de la web cruzadas con un código general cuando el modelo existe (mismo nombre, color/talle único)
