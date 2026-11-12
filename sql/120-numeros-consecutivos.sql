@@ -1,15 +1,9 @@
--- 120 · Números de venta consecutivos + web cruzada con el modelo y no con el código general (11/11, pedido de Diego)
+-- 120 · Números de venta consecutivos (11/11, pedido de Diego)
 -- 1) Venta #70 de Emi el 10/11, cuando ya iba por la 94: su caja tenía guardado el número 70 desde fines de octubre
 --    (se reserva al abrir el punto de venta para verlo en el ticket) y lo usó semanas después. Regla nueva:
 --    · el número guardado vale solo si nadie vendió uno más alto mientras tanto;
 --    · si no, se toma el más bajo reservado y libre después de la última venta (no quedan huecos), o uno nuevo;
 --    · las ventas de la web usan el mismo criterio (antes salteaban el número que mostraba la caja).
--- 2) Pendiente de la venta #95 (web, MEDIAS SOQUETE ALTO «FUNNY» Smile): la publicación estaba cruzada con MEDIAS VARIAS
---    (comparten el código 900203) aunque el modelo existe en Percha. Se recruzan con el modelo las publicaciones cuyo
---    nombre es exactamente el de un modelo y el color/talle coincide con una sola variante (74). Quedan 8 en el código
---    general (5 de LESS «MARINA» XXXL con colores duplicados en Percha y 3 de FUNNY sin ese color en Percha).
---    tn-sync ya no vuelve a cruzarlas con el código general (busca el modelo por nombre).
---    El cambio de cruce pasa por el trigger de "stock a decidir": si web y Percha no coinciden, pregunta (no pisa).
 begin;
 
 create or replace function venta_numero_tomar(e uuid) returns bigint
@@ -128,18 +122,5 @@ begin
   end loop;
   return jsonb_build_object('id', v_id, 'numero', v_num, 'creditos', creditos_out, 'reservada', es_res, 'numero_mostrar', case when es_res then 'R-' || lpad((v_num - 1000000)::text, 6, '0') end);
 end $function$;
-
--- 2) publicaciones de la web cruzadas con un código general cuando el modelo existe (mismo nombre, color/talle único)
-with x as (
-  select ci.id ci_id, trim(split_part(ci.valores, '/', 1)) col_txt, ci.talle_canal, p.id pid
-  from canal_items ci join variantes v on v.id = ci.variante_id join productos g on g.id = v.producto_id and g.es_generico
-  join productos p on p.empresa_id = ci.empresa_id and p.activo and not p.es_generico and upper(p.nombre) = upper(ci.nombre)
-  where ci.empresa_id = '82c05bbf-e63e-4d25-a762-6f1ee6d27f43'),
-m as (
-  select x.ci_id, (select array_agg(vv.id) from v_variantes vv where vv.producto_id = x.pid and vv.activa and lower(vv.color_nombre) = lower(x.col_txt)
-     and (vv.talle_nombre is null or lower(vv.talle_nombre) = lower(coalesce(x.talle_canal, '')))) cands from x)
-update canal_items ci set variante_id = m.cands[1], cruce = 'manual'
-from m where m.ci_id = ci.id and cardinality(m.cands) = 1
-  and not exists (select 1 from canal_items c2 where c2.variante_id = m.cands[1]);
 
 commit;
