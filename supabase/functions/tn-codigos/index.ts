@@ -53,15 +53,19 @@ Deno.serve(async (req) => {
     const prodDeVar = new Map(variantes.map((v: any) => [v.id, prod.get(v.producto_id)]));
 
     // ---- lo que dice la web ahora ----
-    const web = new Map<string, { sku: string; mpn: string }>(); let completo = true;
+    // también los TALLES con la notación de Percha (12/11, Diego): XXL → 2XL, XXXL → 3XL, XXXXL → 4XL en el valor del talle
+    const nota = (x: string) => String(x).replace(/\bXXXXL\b/gi, "4XL").replace(/\bXXXL\b/gi, "3XL").replace(/\bXXL\b/gi, "2XL");
+    const esTalleAttr = (a: unknown) => /^(talle|talla|tamano|tamaño|size)$/i.test(String((a && typeof a === "object" ? ((a as any).es ?? Object.values(a as any)[0]) : a) || "").trim());
+    const web = new Map<string, { sku: string; mpn: string; values?: any[]; iT?: number }>(); let completo = true;
+    const guardarProd = (p: any) => { const iT = (p.attributes || []).findIndex(esTalleAttr); for (const v of p.variants || []) web.set(String(v.id), { sku: v.sku ?? "", mpn: v.mpn ?? "", values: v.values || [], iT }); };
     if (soloExt.length) {
-      for (const pid of soloExt) { const r = await fetch(`${base}/products/${pid}?fields=id,variants`, { headers }); if (!r.ok) { completo = false; break; } const p = await r.json(); for (const v of p.variants || []) web.set(String(v.id), { sku: v.sku ?? "", mpn: v.mpn ?? "" }); await espera(300); }
+      for (const pid of soloExt) { const r = await fetch(`${base}/products/${pid}?fields=id,attributes,variants`, { headers }); if (!r.ok) { completo = false; break; } const p = await r.json(); guardarProd(p); for (const v of [] as any[]) web.set(String(v.id), { sku: v.sku ?? "", mpn: v.mpn ?? "" }); await espera(300); }
     } else {
       for (let page = 1; page <= 50; page++) {
-        const r = await fetch(`${base}/products?per_page=200&page=${page}&fields=id,variants`, { headers });
+        const r = await fetch(`${base}/products?per_page=200&page=${page}&fields=id,attributes,variants`, { headers });
         if (r.status === 404) break; if (!r.ok) { completo = false; break; }
         const lote = await r.json(); if (!Array.isArray(lote) || !lote.length) break;
-        for (const p of lote) for (const v of p.variants || []) web.set(String(v.id), { sku: v.sku ?? "", mpn: v.mpn ?? "" });
+        for (const p of lote) guardarProd(p);
         if (lote.length < 200) break; await espera(300);
       }
     }
@@ -75,7 +79,13 @@ Deno.serve(async (req) => {
       if (!p || p.es_generico || !String(p.codigo || "").trim()) continue;
       const w = web.get(String(it.variante_ext)); if (!w) continue;   // ya no está en la web (tn-sync la borra)
       const cod = String(p.codigo).trim();
-      if (w.sku !== cod || w.mpn !== cod) corregir.push({ it, cod, antes: w.sku });
+      // el valor del talle con la notación de Percha (solo si cambia la notación: no se toca nada más)
+      let values: any[] | null = null;
+      if (w.iT != null && w.iT >= 0 && w.values && w.values[w.iT]) {
+        const actual = String(w.values[w.iT].es ?? w.values[w.iT]), nuevo = nota(actual);
+        if (nuevo !== actual) values = w.values.map((x: any, i: number) => i === w.iT ? { es: nuevo } : (x && typeof x === "object" ? x : { es: String(x) }));
+      }
+      if (w.sku !== cod || w.mpn !== cod || values) corregir.push({ it, cod, antes: w.sku, values });
       else if (it.sku !== cod || it.mpn !== cod) cache.push({ id: it.id, cod });
     }
     if (simular) { resumen.push({ conexion: cx.id, a_corregir: corregir.length, ejemplos: corregir.slice(0, 40).map((c) => `${c.it.nombre} · ${c.it.valores}: ${c.antes || "(vacío)"} → ${c.cod}`) }); continue; }
@@ -86,10 +96,10 @@ Deno.serve(async (req) => {
     let ok = 0, err = 0, frenado = false; const detalle: string[] = []; const errores: string[] = [];
     for (const c of corregir.slice(0, limite)) {
       if (Date.now() - inicio > 110000) { frenado = true; break; }   // sigue en la próxima vuelta
-      const r = await fetch(`${base}/products/${c.it.producto_ext}/variants/${c.it.variante_ext}`, { method: "PUT", headers, body: JSON.stringify({ sku: c.cod, mpn: c.cod }) });
+      const r = await fetch(`${base}/products/${c.it.producto_ext}/variants/${c.it.variante_ext}`, { method: "PUT", headers, body: JSON.stringify({ sku: c.cod, mpn: c.cod, ...(c.values ? { values: c.values } : {}) }) });
       if (r.status === 429) { frenado = true; break; }
       if (!r.ok) { err++; errores.push(`${c.it.nombre} · ${c.it.valores}: ${r.status} ${(await r.text()).slice(0, 150)}`); await espera(600); continue; }
-      await admin.from("canal_items").update({ sku: c.cod, mpn: c.cod }).eq("id", c.it.id);
+      await admin.from("canal_items").update({ sku: c.cod, mpn: c.cod, ...(c.values ? { valores: c.values.map((x: any) => x.es).join(" / "), talle_canal: c.values[web.get(String(c.it.variante_ext))?.iT ?? 0]?.es ?? null } : {}) }).eq("id", c.it.id);
       ok++; detalle.push(`${c.it.nombre} · ${c.it.valores}: ${c.antes || "(vacío)"} → ${c.cod}`);
       await espera(550);   // la web deja ~2 cambios por segundo
     }

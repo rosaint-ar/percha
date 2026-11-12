@@ -84,12 +84,13 @@ const precio = (v: any) => pesos(Number(v.promotional_price || v.price));
 // Mismo criterio que el armador: «XS al M», «M», «Único» (único = línea de talles chicos o grandes según el nombre).
 function rango(p: any, v: any): [number, number] {
   const i = atributo(p, /talle/i), val = i >= 0 ? (v.values[i]?.es ?? v.values[i]) : v.values.join(" ");
-  const t = String(val).toUpperCase().replace(/[()]/g, " ");
+  // 2XL = XXL, 3XL = XXXL (Percha y la web usan 2XL/3XL desde el 12/11)
+  const t = String(val).toUpperCase().replace(/[()]/g, " ").replace(/\b4XL\b/g, "XXXXL").replace(/\b3XL\b/g, "XXXL").replace(/\b2XL\b/g, "XXL");
   const r = t.match(/\b(XXXL|XXL|XL|XS|S|M|L)\b\s*AL\s*\b(XXXL|XXL|XL|XS|S|M|L)\b/);
   if (r) return [TALLES.indexOf(r[1]), TALLES.indexOf(r[2])];
   const s = t.match(/\b(XXXL|XXL|XL|XS|S|M|L)\b/);
   if (s && t.trim().split(/\s+/).length <= 2) return [TALLES.indexOf(s[1]), TALLES.indexOf(s[1])];
-  return /xxl|xxxl|talles grandes/i.test(p.name) ? [5, 6] : [0, 4];
+  return /xxl|xxxl|\b[234]xl\b|talles grandes/i.test(p.name) ? [5, 6] : [0, 4];
 }
 const leVa = (p: any, v: any, talle: string) => { if (talle === "U") return true; const [a, b] = rango(p, v), i = TALLES.indexOf(talle); return i >= a && i <= b; };
 const enTalle = (talle: string) => (talle === "U" ? "" : ` en talle ${talle}`);
