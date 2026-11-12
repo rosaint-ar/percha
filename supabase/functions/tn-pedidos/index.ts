@@ -154,13 +154,13 @@ Deno.serve(async (req) => {
           const { data: prod } = await admin.from("productos").select("tipo").eq("id", producto_id).single();
           if (prod?.tipo === "kit") {
             const { data: comps } = await admin.from("v_componentes").select("variante_id,comp_producto_id,filtro,cantidad").eq("producto_id", producto_id);
-            const vals: string[] = (pr.variant_values || []).map((x: any) => String(x).trim().toLowerCase());
+            const vals: string[] = (pr.variant_values || []).map((x: any) => String(x).trim().toLowerCase().replace(/xxxxl/g, "4xl").replace(/xxxl/g, "3xl").replace(/xxl/g, "2xl"));   // XXL = 2XL
             const componentes: any[] = [];
             for (const c of comps || []) {
               let vid: string | null = c.variante_id;
               if (!vid && c.comp_producto_id && !c.filtro) {
                 const { data: cand } = await admin.from("v_variantes").select("id,talle_nombre,color_nombre").eq("producto_id", c.comp_producto_id).eq("activa", true);
-                const n = (s: any) => String(s || "").trim().toLowerCase();
+                const n = (s: any) => String(s || "").trim().toLowerCase().replace(/xxxxl/g, "4xl").replace(/xxxl/g, "3xl").replace(/xxl/g, "2xl");
                 const exacta = (cand || []).find((v: any) => vals.includes(n(v.talle_nombre)) && vals.includes(n(v.color_nombre)))
                   || (cand || []).find((v: any) => v.talle_nombre && vals.includes(n(v.talle_nombre)) && !v.color_nombre)
                   || ((cand || []).filter((v: any) => v.talle_nombre && vals.includes(n(v.talle_nombre))).length === 1 ? (cand || []).find((v: any) => v.talle_nombre && vals.includes(n(v.talle_nombre))) : null);

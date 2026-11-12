@@ -10,7 +10,8 @@ const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const UA = "Percha (rosaint.ar@gmail.com)";
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
-const norm = (s: unknown) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+// talles: XXL = 2XL, XXXL = 3XL (Percha usa 2XL/3XL desde el 12/11; la web puede seguir diciendo XXL)
+const norm = (s: unknown) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "").replace(/xxxxl/g, "4xl").replace(/xxxl/g, "3xl").replace(/xxl/g, "2xl");
 const es = (v: unknown) => (v && typeof v === "object" ? ((v as Record<string, string>).es ?? Object.values(v as Record<string, string>)[0] ?? "") : String(v ?? ""));
 
 Deno.serve(async (req) => {

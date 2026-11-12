@@ -16,7 +16,8 @@ const SB_URL = Deno.env.get("SUPABASE_URL")!, ANON = Deno.env.get("SUPABASE_ANON
 const UA = "Percha (rosaint.ar@gmail.com)";
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-key", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
-const n = (s: unknown) => String(s ?? "").trim().toLowerCase();
+// talles: XXL = 2XL, XXXL = 3XL (Percha usa 2XL/3XL desde el 12/11; la web puede seguir diciendo XXL)
+const n = (s: unknown) => String(s ?? "").trim().toLowerCase().replace(/xxxxl/g, "4xl").replace(/xxxl/g, "3xl").replace(/xxl/g, "2xl");
 const cancelado = (o: any) => o.status === "cancelled" || o.payment_status === "refunded" || o.payment_status === "voided";
 
 Deno.serve(async (req) => {

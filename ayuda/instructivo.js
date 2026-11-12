@@ -348,7 +348,8 @@ window.INSTRUCTIVO = {
         'Se abre sola la ventana de **talles y colores**: los talles ya vienen marcados; elegí los colores y tocá {{Crear}}. Si un color o estampa **no está en la lista**, escribilo en el buscador y tocá {{+ Crear como color o estampa nuevo}}: queda creado y elegido.',
         'Si venías del remito, la prenda ya aparece en el renglón: cargá las cantidades por talle y listo.'] },
       { tipo: 'tip', texto: 'Al crearla ya se puede vender suelta o con **BOMBIS «VARIAS»** (el código general: al cobrar se elige el modelo), y se sube sola a la web **oculta** para ponerle fotos.' },
-      { tipo: 'tip', texto: 'No hace falta inventar el código: Percha saltea los que ya existen o que usa alguna publicación vieja de la web.' }
+      { tipo: 'tip', texto: 'No hace falta inventar el código: Percha saltea los que ya existen o que usa alguna publicación vieja de la web.' },
+      { tipo: 'tip', texto: '**Talles de bombachas en rango** (S al L, XL al 2XL…): en la ventana de talles tocá la escala **Bombachas**. Los talles grandes se escriben **2XL, 3XL, 4XL** (no XXL). Si en la web dicen XXL, Percha igual los reconoce como el mismo talle. Para sumar un talle a una escala: Configuración › Talles, colores y familias, tocás el talle y elegís la escala.' }
     ] },
     { id: 'compras-corregir', grupo: 'compras', p: 'compras', titulo: 'Me equivoqué al cargar un remito', nuevo: '2026-11-11', resumen: 'Se corrige el remito y Percha ajusta solo el stock, el costo y la cuenta del proveedor.', bloques: [
       { tipo: 'pasos', items: [
