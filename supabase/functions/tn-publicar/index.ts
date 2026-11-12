@@ -19,6 +19,8 @@ const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
 // talles: XXL = 2XL, XXXL = 3XL (Percha usa 2XL/3XL desde el 12/11; la web puede seguir diciendo XXL)
 const norm = (s: unknown) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "").replace(/xxxxl/g, "4xl").replace(/xxxl/g, "3xl").replace(/xxl/g, "2xl");
+// el talle de la web como lo nombra Percha (sql/139): «Único» solo = sin talle; «Único (35 - 41)» = «Único (35 al 41)»; «S a XL» = «S al XL»
+const talleClave = (s: unknown) => { const x = String(s ?? "").trim(); if (/^([uú]nic[oa]|talle [uú]nico)$/i.test(x)) return ""; return norm(x.replace(/\s*-\s*/g, " al ").replace(/\s+a\s+/gi, " al ")); };
 const es = (v: unknown) => (v && typeof v === "object" ? ((v as Record<string, string>).es ?? Object.values(v as Record<string, string>)[0] ?? "") : String(v ?? ""));
 const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const ESPERA_MIN = 10, CADA_FOTOS_MIN = 5;   // 10 min sin cambios: con 2 se publicaba mientras todavía se estaba corrigiendo la prenda
@@ -172,8 +174,8 @@ Deno.serve(async (req) => {
       const precioN = (v: any) => calcular({ ...v, precio: +v.precio || +p.precio || 0 }, listaTN, ctxPrecios, { ...op, sinRebajas: true }).precio;
       const promoN = (v: any) => { const c = calcular({ ...v, precio: +v.precio || +p.precio || 0 }, listaTN, ctxPrecios, op); return c.rebaja && c.precio < precioN(v) ? c.precio : null; };
       const precioDe = (v: any) => (+precioN(v) || 0).toFixed(2);
-      const variante = (v: any, attrs: string[], visible: boolean) => ({
-        values: attrs.map((a) => ({ es: esColor(a) ? v.color_nombre : esTalle(a) ? v.talle_nombre : "" })),
+      const variante = (v: any, attrs: string[], visible: boolean, vivos: any[] = []) => ({
+        values: attrs.map((a, i) => ({ es: esColor(a) ? v.color_nombre : esTalle(a) ? (vivos.map((x: any) => es((x.values || [])[i])).find((t: string) => talleClave(t) === talleClave(v.talle_nombre)) || v.talle_nombre || "Único") : "" })),
         price: precioDe(v), ...(promoN(v) ? { promotional_price: (+promoN(v)).toFixed(2) } : {}), stock: Math.max(0, Math.floor(+v.stock_web || 0)), sku: p.codigo, mpn: p.codigo, ...MEDIDAS, ...(visible ? {} : { visible: false }) });
       const attrsPara = (vs2: any[]) => [...(vs2.some((v) => v.color) ? ["Color"] : []), ...(vs2.some((v) => v.talle) ? ["Talle"] : [])];
       const avisos: string[] = [], creadas: any[] = [], publicaciones: any[] = [];
@@ -185,7 +187,7 @@ Deno.serve(async (req) => {
           sku: p.codigo, mpn: p.codigo, talle_canal: v.talle_nombre || null, color_canal: v.color_nombre || null, precio: +precioDe(v), precio_promo: promoN(v), stock: Math.max(0, Math.floor(+v.stock_web || 0)),
           publicado: prodTN.published !== false, variante_id: v.id, cruce: "manual", actualizado: new Date().toISOString() }, { onConflict: "conexion_id,variante_ext" });
       };
-      const emparejar = (varsTN: any[], attrs: string[], v: any) => varsTN.find((x: any) => attrs.every((a, i) => norm(es((x.values || [])[i])) === norm(esColor(a) ? v.color_nombre : esTalle(a) ? v.talle_nombre : "")));
+      const emparejar = (varsTN: any[], attrs: string[], v: any) => varsTN.find((x: any) => attrs.every((a, i) => esTalle(a) ? talleClave(es((x.values || [])[i])) === talleClave(v.talle_nombre) : norm(es((x.values || [])[i])) === norm(esColor(a) ? v.color_nombre : "")));
       // una publicación nueva, oculta
       const crearPublicacion = async (nombre: string, vs2: any[]) => {
         const attrs = attrsPara(vs2);
@@ -226,7 +228,7 @@ Deno.serve(async (req) => {
               for (const v of grupo) {
                 if (simular) { creadas.push({ variante: [v.color_nombre, v.talle_nombre].filter(Boolean).join(" ") || "única", publicacion: pe, visible }); continue; }
                 const ya = emparejar(x.info.variants || [], attrs, v);   // ya existe en la web (sin cruzar): se cruza, no se repite
-                const varTN = ya || await tn("POST", `/products/${pe}/variants`, variante(v, attrs, visible));
+                const varTN = ya || await tn("POST", `/products/${pe}/variants`, variante(v, attrs, visible, x.info.variants || []));
                 if (!visible && varTN.visible !== false) avisos.push(`${v.color_nombre} ${v.talle_nombre || ""}: Tienda Nube no dejó ocultar la variante (quedó visible)`);
                 await cruzar(x.info, varTN, v);
               }

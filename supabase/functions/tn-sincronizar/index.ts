@@ -12,6 +12,8 @@ const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
 // talles: XXL = 2XL, XXXL = 3XL (Percha usa 2XL/3XL desde el 12/11; la web puede seguir diciendo XXL)
 const norm = (s: unknown) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "").replace(/xxxxl/g, "4xl").replace(/xxxl/g, "3xl").replace(/xxl/g, "2xl");
+// el talle de la web como lo nombra Percha (sql/139): «Único» solo = sin talle; «Único (35 - 41)» = «Único (35 al 41)»; «S a XL» = «S al XL»
+const talleClave = (s: unknown) => { const x = String(s ?? "").trim(); if (/^([uú]nic[oa]|talle [uú]nico)$/i.test(x)) return ""; return norm(x.replace(/\s*-\s*/g, " al ").replace(/\s+a\s+/gi, " al ")); };
 const es = (v: unknown) => (v && typeof v === "object" ? ((v as Record<string, string>).es ?? Object.values(v as Record<string, string>)[0] ?? "") : String(v ?? ""));
 
 Deno.serve(async (req) => {
@@ -99,7 +101,8 @@ Deno.serve(async (req) => {
             const colorBuscado = colorTN || colorDelNombre(es(p.name));
             const puntuados = vs.map((x: any) => {
               const t = x.talle_id ? attr.get(x.talle_id) : null, c = x.color_id ? attr.get(x.color_id) : null;
-              const pt = talleTN ? puntaje(t, talleTN) : (t ? 0 : 3);
+              // «Único» solo = sin talle; «Único (S al 2XL)» es un talle (antes «Único…» nunca cruzaba solo)
+              const pt = talleClave(talleTN) ? (t && talleClave(t.nombre) === talleClave(talleTN) ? 3 : puntaje(t, talleTN)) : (!t || !talleClave(t.nombre) ? 3 : 0);   // «Único» en la web = sin talle o el talle «Único» de Percha
               const pc = colorBuscado ? puntaje(c, colorBuscado) : (c ? 0 : 3);
               return { x, p: pt && pc ? pt + pc : 0 };
             }).filter((s) => s.p > 0).sort((a, b) => b.p - a.p);
