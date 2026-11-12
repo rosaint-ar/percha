@@ -68,14 +68,16 @@ Deno.serve(async (req) => {
   const headers = { Authentication: `bearer ${sec.access_token}`, "User-Agent": UA, "Content-Type": "application/json" };
   const base = `https://api.tiendanube.com/2025-03/${cx.externo_id}`;
   const items: any[] = []; let page = 1, totalCanal = 0;
+  const catsDe = new Map<string, { pub: boolean; ids: number[] }>();   // categorías de cada publicación (sql/144)
   while (page <= 50) {
-    const r = await fetch(`${base}/products?per_page=200&page=${page}&fields=id,name,handle,published,attributes,variants,images,canonical_url`, { headers });
+    const r = await fetch(`${base}/products?per_page=200&page=${page}&fields=id,name,handle,published,attributes,variants,images,canonical_url,categories`, { headers });
     if (r.status === 404) break;
     // solo un acceso rechazado apaga la conexión; un error pasajero (429, 5xx) no frena el stock, los pedidos ni los precios
     if (!r.ok) { const t = await r.text(); await admin.from("conexiones").update({ ultimo_error: `Tienda Nube ${r.status}: ${t.slice(0, 200)}`, ...(r.status === 401 || r.status === 403 ? { estado: "error" } : {}) }).eq("id", cx.id); return json({ error: `Tienda Nube respondió ${r.status}` }, 502); }
     const prods = await r.json(); if (!Array.isArray(prods) || !prods.length) break;
     totalCanal += prods.length;
     for (const p of prods) {
+      catsDe.set(String(p.id), { pub: !!p.published, ids: (p.categories || []).map((c: any) => Number(c.id)) });
       const attrs: string[] = (p.attributes || []).map((a: any) => es(a));
       const img = (p.images || [])[0]?.src ?? null;
       const prodPercha = porCodigo.get(norm((p.variants?.[0]?.sku || p.variants?.[0]?.mpn || "")));
@@ -131,7 +133,34 @@ Deno.serve(async (req) => {
   const vivos = items.map((i) => i.variante_ext);
   // todas (no solo las primeras 1000) y solo las que no se tocaron durante esta lectura (las recién publicadas no se borran)
   if (vivos.length) { const setVivos = new Set(vivos); const todos = await pag("canal_items", "id,variante_ext,actualizado", (q: any) => q.eq("conexion_id", cx.id).order("id")); const muertos = todos.filter((t: any) => !setVivos.has(t.variante_ext) && (!t.actualizado || t.actualizado < inicioSync)).map((t: any) => t.id); for (let i = 0; i < muertos.length; i += 300) await admin.from("canal_items").delete().in("id", muertos.slice(i, i + 300)); }
+  // ---- categorías de la web (sql/144): el árbol de la tienda y las de cada prenda ----
+  let categorias_actualizadas = 0;
+  try {
+    const arbol: any[] = [];
+    for (let pg = 1; pg <= 5; pg++) { const r = await fetch(`${base}/categories?fields=id,name,parent&per_page=200&page=${pg}`, { headers }); if (!r.ok) break; const l = await r.json(); if (!Array.isArray(l) || !l.length) break; arbol.push(...l); if (l.length < 200) break; }
+    if (arbol.length) {
+      const porId = new Map(arbol.map((c: any) => [Number(c.id), c]));
+      const ruta = (c: any): string => { const p = c.parent ? porId.get(Number(c.parent)) : null; return (p ? ruta(p) + " › " : "") + es(c.name).trim(); };
+      await admin.from("canal_categorias").upsert(arbol.map((c: any, i: number) => ({ conexion_id: cx.id, empresa_id: e, ext_id: Number(c.id), nombre: es(c.name).trim(), padre: c.parent ? Number(c.parent) : null, orden: i, ruta: ruta(c), actualizado: new Date().toISOString() })), { onConflict: "conexion_id,ext_id" });
+      const ids = arbol.map((c: any) => Number(c.id));
+      await admin.from("canal_categorias").delete().eq("conexion_id", cx.id).not("ext_id", "in", `(${ids.join(",")})`);
+      // «Nuevos Ingresos» la maneja Percha sola (30 días): no es una categoría de la prenda
+      const nuevos = new Set(arbol.filter((c: any) => /nuevos ingresos/i.test(es(c.name))).map((c: any) => Number(c.id)));
+      const prodDeVar = new Map(variantes.map((v: any) => [v.id, v.producto_id]));
+      const genericos = new Set(productos.filter((p: any) => p.es_generico).map((p: any) => p.id));
+      const pubsDe = new Map<string, Set<string>>();
+      items.forEach((it) => { const pid = it.variante_id && prodDeVar.get(it.variante_id); if (!pid || genericos.has(pid)) return; if (!pubsDe.has(pid)) pubsDe.set(pid, new Set()); pubsDe.get(pid)!.add(it.producto_ext); });
+      const lote: any[] = [];
+      for (const [pid, pes] of pubsDe) {
+        const info = [...pes].map((pe) => catsDe.get(pe)).filter(Boolean) as { pub: boolean; ids: number[] }[];
+        const usar = info.some((x) => x.pub) ? info.filter((x) => x.pub) : info;   // las visibles mandan (las ocultas viejas no)
+        const cats = [...new Set(usar.flatMap((x) => x.ids).filter((id) => !nuevos.has(id)))].sort((a, b) => a - b);
+        lote.push({ producto_id: pid, cats });
+      }
+      for (let i = 0; i < lote.length; i += 300) { const { data } = await admin.rpc("canal_categorias_a_percha", { p: lote.slice(i, i + 300) }); categorias_actualizadas += Number(data) || 0; }
+    }
+  } catch (_) { /* las categorías no frenan la sincronización */ }
   await admin.from("conexiones").update({ ultima_sync: new Date().toISOString(), ultimo_error: null, estado: "activa" }).eq("id", cx.id);
   const cruzados = items.filter((i) => i.variante_id).length;
-  return json({ ok: true, productos: totalCanal, variantes: items.length, cruzados, sin_cruzar: items.length - cruzados });
+  return json({ ok: true, productos: totalCanal, variantes: items.length, cruzados, sin_cruzar: items.length - cruzados, categorias_actualizadas });
 });

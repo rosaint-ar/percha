@@ -185,6 +185,8 @@ Deno.serve(async (req) => {
       }
       const cats = await categoriasTienda();
       const nuevos = cats.find((c: any) => /nuevos ingresos/i.test(es(c.name)));
+      const { data: pc } = await admin.from("productos").select("categorias_web").eq("id", p.id).maybeSingle();
+      const exactas: number[] | null = Array.isArray(pc?.categorias_web) && pc.categorias_web.length ? pc.categorias_web.map(Number) : null;
       const grandes = cats.filter((c: any) => /talles grandes/i.test(es(c.name)));
       const deModelo = (modelo?.categories || []).filter((c: any) => !/rebajas|favoritos|ofertas|sale/i.test(es(c.name)));
       const ids = new Set<number>(deModelo.map((c: any) => c.id));
@@ -202,6 +204,9 @@ Deno.serve(async (req) => {
       for (const c of cats) { const cn = n2(es(c.name)); const r = DESCRIBE.find(([rc]) => rc.test(cn)); if (!r) continue;
         if (!r[1].test(nomN)) ids.delete(c.id); else if (padres.has(c.parent)) ids.add(c.id); }
       for (const g of grandes) { if (esGrande && (ids.has(g.parent) || padres.has(g.parent))) ids.add(g.id); else if (!esGrande) ids.delete(g.id); }
+      // las tildadas en Percha mandan (exactas); si no había ninguna, las sugeridas quedan en Percha para revisar
+      if (exactas) { ids.clear(); exactas.forEach((id) => ids.add(id)); }
+      else if (!simular) await admin.rpc("producto_categorias_sugeridas", { p_producto: p.id, p_cats: [...ids].filter((id) => !nuevos || id !== nuevos.id).sort((a, b) => a - b) });
       if (nuevos) ids.add(nuevos.id);
       const marca = modelo?.brand || null;
       const tags = [...new Set([...String(info.tags || "").split(",").map((t) => t.trim()).filter(Boolean), "nuevos-ingresos"])].join(", ");
@@ -226,6 +231,44 @@ Deno.serve(async (req) => {
       for (const [pe, pid] of pubs) {
         const { data: p } = await admin.from("productos").select("id,nombre,categoria_id").eq("id", pid).single();
         try { res.completadas.push(await completarPublicacion(pe, p, !!body.forzar)); } catch (err) { res.completadas.push({ publicacion: pe, error: String(err).slice(0, 150) }); }
+      }
+      resumen.push(res); continue;
+    }
+    // ===== categorías cambiadas en Percha → web (sql/144) =====
+    if (!body.producto_id || body.categorias) {
+      const { data: pend } = await admin.from("productos").select("id,nombre,categorias_web").eq("empresa_id", e).eq("categorias_web_pendiente", true).limit(20);
+      if ((pend || []).length) {
+        const nuevos = (await categoriasTienda()).find((c: any) => /nuevos ingresos/i.test(es(c.name)));
+        res.categorias = [];
+        for (const pr of pend || []) {
+          const { data: cr } = await admin.from("canal_items").select("producto_ext,nuevo_hasta,variantes!inner(producto_id)").eq("conexion_id", cx.id).eq("variantes.producto_id", pr.id);
+          const pubs = new Map<string, boolean>(); (cr || []).forEach((c: any) => pubs.set(String(c.producto_ext), (pubs.get(String(c.producto_ext)) || false) || (!!c.nuevo_hasta && c.nuevo_hasta > new Date().toISOString())));
+          let ok = true;
+          for (const [pe, esNuevo] of pubs) {
+            const ids = (Array.isArray(pr.categorias_web) ? pr.categorias_web : []).map(Number);
+            if (esNuevo && nuevos) ids.push(nuevos.id);
+            if (simular) { res.categorias.push({ producto: pr.nombre, publicacion: pe, categorias: ids.length }); continue; }
+            try { await tn("PUT", `/products/${pe}`, { categories: [...new Set(ids)] }); res.categorias.push({ producto: pr.nombre, publicacion: pe, categorias: ids.length }); }
+            catch (err) { if (!String(err).includes(" 404")) { ok = false; res.categorias.push({ producto: pr.nombre, publicacion: pe, error: String(err).slice(0, 120) }); } }
+          }
+          if (ok && !simular) await admin.from("productos").update({ categorias_web_pendiente: false }).eq("id", pr.id);
+        }
+      }
+    }
+    // a mano (Diego, 12/11): sacar de «Nuevos Ingresos» todo lo que está ahí MENOS las publicaciones indicadas
+    if (Array.isArray(body.quitar_nuevos_menos)) {
+      const quedan = new Set(body.quitar_nuevos_menos.map(String));
+      const nuevos = (await categoriasTienda()).find((c: any) => /nuevos ingresos/i.test(es(c.name)));
+      res.quitadas = []; res.quedan = [];
+      if (nuevos) for (let vuelta = 1, pg = 1; vuelta <= 6; vuelta++, pg = simular ? pg + 1 : 1) {
+        const l = await tn("GET", `/products?category_id=${nuevos.id}&per_page=200&page=${pg}&fields=id,name,categories`);
+        if (!Array.isArray(l) || !l.length) break;
+        for (const pr of l) {
+          if (quedan.has(String(pr.id))) { res.quedan.push(es(pr.name)); continue; }
+          if (!simular) await tn("PUT", `/products/${pr.id}`, { categories: (pr.categories || []).map((c: any) => c.id).filter((id: number) => id !== nuevos.id) });
+          res.quitadas.push(es(pr.name));
+        }
+        if (l.length < 200) break;   // de verdad se vuelve a pedir la página 1 (las sacadas ya no aparecen)
       }
       resumen.push(res); continue;
     }

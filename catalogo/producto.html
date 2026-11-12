@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Producto · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611122343">
+<link rel="stylesheet" href="../shell/shell.css?v=202611122356">
 <style>
   .dos{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
   .dos>.card{min-width:0;overflow-x:auto}
@@ -82,6 +82,12 @@
   .sug-par>div{display:flex;justify-content:space-between;gap:10px;padding:8px 12px;cursor:pointer;font-size:13.5px;border-bottom:1px solid var(--linea)}
   .sug-par>div.on,.sug-par>div:hover{background:var(--lila)}
   .sug-par small{font-family:var(--f-mono);color:var(--tinta-3);white-space:nowrap}
+  .cw-lista{columns:2 280px;column-gap:28px}
+  .cw-grupo{break-inside:avoid;margin:0 0 10px}
+  .cw-grupo>summary{cursor:pointer;font-weight:600;padding:4px 0}
+  .cw-item{display:flex;gap:7px;align-items:center;padding:3px 0;font-size:13.5px;cursor:pointer}
+  .cw-item input{margin:0}
+  .cw-aviso{background:var(--aviso-fondo,#FFF6DD);border-radius:10px;padding:9px 12px;margin:4px 0 12px;font-size:13.5px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 </style>
 </head>
 <body data-page="productos" data-etq="Catálogo" data-title="Producto">
@@ -149,6 +155,12 @@
   </div>
 
 
+  <div class="card" id="card-cats-web" hidden>
+    <div class="card-cab"><div><h2>Categorías en la web</h2><p class="sub">Las mismas de Tienda Nube: lo que tildes acá se pone igual en la web, y si las cambian allá, vuelven solas. Al tildar una, se tildan también las de arriba.</p></div><span id="cw-estado" class="sub"></span></div>
+    <div id="cw-aviso"></div>
+    <div id="cw-lista" class="cw-lista"></div>
+  </div>
+
   <div class="card" id="card-fotos">
     <div class="card-cab"><div><h2>Fotos</h2><p class="sub">Generales y por color: en la caja, al elegir el color se ve su foto. Arrastrá para ordenar o para pasar una foto a otro color.</p></div></div>
     <div id="fotos"></div>
@@ -168,10 +180,10 @@
   </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611122343"></script>
-<script src="../shared/precios.js?v=202611122343"></script>
-<script src="../shared/prenda.js?v=202611122343"></script>
-<script src="../shell/shell.js?v=202611122343"></script>
+<script src="../shared/supabase.js?v=202611122356"></script>
+<script src="../shared/precios.js?v=202611122356"></script>
+<script src="../shared/prenda.js?v=202611122356"></script>
+<script src="../shell/shell.js?v=202611122356"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$ , toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -228,7 +240,7 @@ APP.ready.then(async () => {
     form.tiene_variantes.value = String(producto.tiene_variantes); form.activo.value = String(producto.activo); form.publicar_web.value = String(producto.publicar_web !== false); estadoWeb(); form.es_generico.value = String(!!producto.es_generico);
     $('#stock-total').value = fmt.num(variantes.reduce((s, x) => s + (+x.stock || 0), 0));
     $('#ayuda-ean').textContent = producto.tiene_variantes ? 'Con variantes, el código de barras va en cada talle y color.' : '';
-    pintarPrecios(); pintarAcciones(); pintarMargen(); pintarFotos(); pintarHistorial(); cargarPctx();
+    pintarPrecios(); pintarAcciones(); pintarMargen(); pintarFotos(); pintarHistorial(); cargarPctx(); pintarCatsWeb();
     pintarGenerico();
     if (producto.tipo === 'kit') { $('#card-matriz').style.display = 'none'; $('#card-kit').style.display = ''; await pintarKit(); }
     else { $('#card-matriz').style.display = ''; $('#card-kit').style.display = 'none'; pintarMatriz(); }
@@ -537,6 +549,45 @@ APP.ready.then(async () => {
   const reglaTxt = (l, c) => (l.canal ? '<b>web</b> · ' : '') + reglaTxt0(l, c);
   const reglaTxt0 = (l, c) => c.fijo ? 'precio especial: no sigue al de Lista' : l.predeterminada ? 'precio de la prenda' : (c.pct === 100 ? 'igual a Lista' : (c.pct < 100 ? '−' + fmt.dec(100 - c.pct) : '+' + fmt.dec(c.pct - 100)) + '% sobre Lista') + (c.pct !== +l.porcentaje ? ' <span class="chip" title="Excepción para esta familia o producto">excepción</span>' : '') + (l.toma_rebajas === false ? ' · sin rebajas' : '');
   // ---------- en la web: si está, si está oculta, o si se está subiendo ----------
+  // ===== Categorías en la web (sql/144): exactas, elegidas acá; «Nuevos Ingresos» la maneja Percha sola (30 días) =====
+  let catsTienda = null;
+  async function pintarCatsWeb() {
+    const card = $('#card-cats-web'); if (!card || !id || !producto) return;
+    if (!catsTienda) { const { data } = await sb.from('canal_categorias').select('ext_id,nombre,padre,orden,ruta').eq('empresa_id', e).order('orden'); catsTienda = (data || []).map(c => ({ ...c, ext_id: Number(c.ext_id), padre: c.padre == null ? 0 : Number(c.padre) })); }
+    if (!catsTienda.length || producto.es_generico) { card.hidden = true; return; }
+    card.hidden = false;
+    const nuevos = catsTienda.find(c => /nuevos ingresos/i.test(c.nombre));
+    const sel = new Set((Array.isArray(producto.categorias_web) ? producto.categorias_web : []).map(Number));
+    const hijos = new Map(); catsTienda.forEach(c => { const k = c.padre || 0; if (!hijos.has(k)) hijos.set(k, []); hijos.get(k).push(c); });
+    const porId = new Map(catsTienda.map(c => [Number(c.ext_id), c]));
+    const raiz = (hijos.get(0) || []);
+    // la raíz «Shop» (si hay una sola con hijos) no se muestra como grupo: sus hijas son los grupos
+    const plano = raiz.length === 1 && (hijos.get(raiz[0].ext_id) || []).length;
+    // «Shop» (la raíz) se muestra suelta y sus hijas como grupos; las demás raíces, como grupos
+    const grupos = raiz.flatMap(r => (hijos.get(r.ext_id) || []).length && /^(shop|tienda|inicio)$/i.test(r.nombre.trim()) ? [r, ...(hijos.get(r.ext_id) || [])] : [r]);
+    const tieneSel = c => sel.has(Number(c.ext_id)) || (hijos.get(c.ext_id) || []).some(tieneSel);
+    const items = (c, nivel) => (hijos.get(c.ext_id) || []).filter(h => !nuevos || h.ext_id !== nuevos.ext_id).map(h =>
+      `<label class="cw-item" style="padding-left:${nivel * 18}px"><input type="checkbox" data-cw="${h.ext_id}" ${sel.has(Number(h.ext_id)) ? 'checked' : ''}> ${esc(h.nombre)}</label>` + items(h, nivel + 1)).join('');
+    $('#cw-lista').innerHTML = grupos.filter(g => !nuevos || g.ext_id !== nuevos.ext_id).map((g, i) => (/^(shop|tienda|inicio)$/i.test(g.nombre.trim()) && (hijos.get(g.ext_id) || []).length)
+      ? `<label class="cw-item" style="font-weight:600"><input type="checkbox" data-cw="${g.ext_id}" ${sel.has(Number(g.ext_id)) ? 'checked' : ''}> ${esc(g.nombre)}</label>`
+      : `<details class="cw-grupo" ${tieneSel(g) ? 'open' : ''}><summary><label class="cw-item" style="display:inline-flex;font-weight:600" onclick="event.stopPropagation()"><input type="checkbox" data-cw="${g.ext_id}" ${sel.has(Number(g.ext_id)) ? 'checked' : ''}> ${esc(g.nombre)}</label></summary>${items(g, 1)}</details>`).join('');
+    const avisos = [];
+    if (producto.categorias_web_sugeridas) avisos.push(`<div class="cw-aviso">⚠️ Estas las puso Percha <b>por parecido</b> (la prenda no tenía ninguna tildada). Revisalas. <button class="btn chico" id="cw-ok">Están bien</button></div>`);
+    if (!sel.size && producto.publicar_web !== false) avisos.push('<div class="cw-aviso">Tildá las categorías antes de que se suba a la web; si no, Percha pone las de la prenda más parecida (para revisar).</div>');
+    $('#cw-aviso').innerHTML = avisos.join('');
+    $('#cw-estado').textContent = producto.categorias_web_pendiente ? 'Se manda a la web en un minuto' : (sel.size ? '✓ Igual que en la web' : '');
+    if ($('#cw-ok')) $('#cw-ok').onclick = async () => { const { error } = await sb.from('productos').update({ categorias_web_sugeridas: false }).eq('id', id); if (error) return toast(mensajeError(error), 'error'); producto.categorias_web_sugeridas = false; pintarCatsWeb(); toast('Listo'); };
+    $$('[data-cw]').forEach(chk => chk.onchange = async () => {
+      const cid = Number(chk.dataset.cw);
+      if (chk.checked) { for (let c = porId.get(cid); c; c = c.padre ? porId.get(Number(c.padre)) : null) sel.add(Number(c.ext_id)); }   // y las de arriba
+      else { const sacar = x => { sel.delete(Number(x)); (hijos.get(x) || []).forEach(h => sacar(h.ext_id)); }; sacar(cid); }          // y las de abajo
+      const cats = [...sel].sort((a, b) => a - b);
+      const { error } = await sb.from('productos').update({ categorias_web: cats }).eq('id', id);
+      if (error) { toast(mensajeError(error), 'error'); return; }
+      producto.categorias_web = cats; producto.categorias_web_pendiente = true; producto.categorias_web_sugeridas = false; pintarCatsWeb();
+    });
+  }
+
   async function estadoWeb() {
     const el = $('#web-estado'); if (!el || !id) return;
     if (form.publicar_web.value !== 'true') { el.textContent = 'No se sube a Tienda Nube.'; return; }
