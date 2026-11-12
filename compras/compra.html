@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ingresar mercadería · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611121514">
+<link rel="stylesheet" href="../shell/shell.css?v=202611122146">
 <style>
   /* Ingresar mercadería: se carga como viene el remito (un renglón por artículo y color, cantidades por talle) */
   .cab-compra{display:grid;grid-template-columns:minmax(220px,1.4fr) 1fr 150px 110px;gap:12px;align-items:end}
@@ -91,9 +91,9 @@
   <div id="sug" class="sugerencias" style="display:none"></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611121514"></script>
-<script src="../shell/shell.js?v=202611121514"></script>
-<script src="../shared/precios.js?v=202611121514"></script>
+<script src="../shared/supabase.js?v=202611122146"></script>
+<script src="../shell/shell.js?v=202611122146"></script>
+<script src="../shared/precios.js?v=202611122146"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -160,7 +160,7 @@ APP.ready.then(async () => {
   // ---------- cargar una compra guardada ----------
   async function cargar() {
     if (!id) { filas = [filaVacia(), filaVacia(), filaVacia()]; pintarCabecera(); pintar(); return; }
-    const [{ data: c }, { data: ls }] = await Promise.all([sb.from('v_compras').select('*').eq('id', id).single(), sb.from('compra_lineas').select('*').eq('compra_id', id).order('id')]);
+    const [{ data: c }, { data: ls }] = await Promise.all([sb.from('v_compras').select('*').eq('id', id).single(), sb.from('compra_lineas').select('*').eq('compra_id', id).order('orden', { nullsFirst: false }).order('id')]);
     if (!c) { toast('No existe esa compra', 'error'); return; }
     compra = c;
     // prendas que se apagaron después del remito: se traen igual (si no, la pantalla fallaba al corregir o ingresar)
@@ -169,14 +169,16 @@ APP.ready.then(async () => {
     $('#proveedor').value = c.proveedor_id || ''; $('#fecha').value = c.fecha; $('#entrega').value = c.entrega_estimada || ''; $('#referencia').value = c.referencia || '';
     $('#deposito').value = c.deposito_id || $('#deposito').value; $('#descuento').value = ver(c.descuento_pct); $('#nota').value = c.nota || '';
     // un renglón por prenda + color + nombre del proveedor, como en el remito
-    const g = new Map();
+    // (en el orden del remito: solo se juntan los talles SEGUIDOS de un mismo renglón; antes se juntaban renglones iguales aunque
+    // estuvieran lejos y el remito volvía desacomodado, 12/11)
+    const g = []; let kAnt = null;
     (ls || []).forEach(l => {
-      const v = varPorId.get(l.variante_id) || {}, k = [l.producto_id, v.color || '', l.articulo_prov || ''].join('|');
-      if (!g.has(k)) g.set(k, { art: l.articulo_prov || '', producto_id: l.producto_id, color: v.color || '', cant: {}, recibida: {}, vid: {}, costo: +l.costo_unit });
-      const f = g.get(k); f.cant[v.talle || ''] = (f.cant[v.talle || ''] || 0) + +l.pedida; f.recibida[v.talle || ''] = (f.recibida[v.talle || ''] || 0) + +l.recibida;
+      const v = varPorId.get(l.variante_id) || {}, k = [l.producto_id, v.color || '', l.articulo_prov || '', +l.costo_unit].join('|');
+      if (k !== kAnt || g[g.length - 1].cant[v.talle || ''] != null) g.push({ art: l.articulo_prov || '', producto_id: l.producto_id, color: v.color || '', cant: {}, recibida: {}, vid: {}, costo: +l.costo_unit });
+      kAnt = k; const f = g[g.length - 1]; f.cant[v.talle || ''] = (f.cant[v.talle || ''] || 0) + +l.pedida; f.recibida[v.talle || ''] = (f.recibida[v.talle || ''] || 0) + +l.recibida;
       f.vid[v.talle || ''] = l.variante_id;   // la variante exacta del remito (aunque después se haya apagado)
     });
-    filas = [...g.values()]; if (!cerrada()) filas.push(filaVacia());
+    filas = g; if (!cerrada()) filas.push(filaVacia());
     // un código general que ya se guardó así (sin identificar los modelos) no vuelve a exigir que se identifiquen
     filas.forEach(f => { if ((prod(f.producto_id) || {}).es_generico) f.sinIdentificar = true; });
     cambiado = false;
@@ -436,7 +438,7 @@ APP.ready.then(async () => {
   }
   // llegó una parte: cuánto entró de cada talle (lo que no llegó queda esperando)
   async function recibirParte() {
-    const { data: ls } = await sb.from('compra_lineas').select('*').eq('compra_id', id).order('id');
+    const { data: ls } = await sb.from('compra_lineas').select('*').eq('compra_id', id).order('orden', { nullsFirst: false }).order('id');
     const pend = (ls || []).filter(l => l.pedida - l.recibida > 0);
     if (!pend.length) { toast('No queda nada por recibir', 'error'); return; }
     const m = modal(`<h2>¿Qué llegó?</h2><p class="sub">Poné cuántas llegaron de cada una. Lo que falta queda esperando en esta compra.</p>
@@ -529,6 +531,8 @@ APP.ready.then(async () => {
   $('#descuento').onblur = () => { $('#descuento').value = ver(num($('#descuento').value)); };
   // prenda nueva: se crea en otra pestaña (con el proveedor del remito) y, al terminar, entra sola en el renglón que esperaba
   // (el primero con un artículo escrito y sin prenda; si no hay, uno nuevo)
+  let filaQuePide = null;   // el renglón donde estabas al tocar «+ Prenda nueva»
+  document.addEventListener('focusin', ev => { const d = ev.target.dataset || {}; const k = d.art ?? d.buscar; if (k != null) filaQuePide = +k; });
   $('#btn-prenda-nueva').onclick = () => {
     const prov = $('#proveedor').value;
     window.open(`../catalogo/producto.html?nuevo=1&desde=compra${prov ? '&proveedor=' + prov : ''}`, '_blank');
@@ -538,7 +542,7 @@ APP.ready.then(async () => {
     await cargarCatalogo(); ultimaRecarga = Date.now();
     const p = prod(ev.data.producto_id); if (!p) return;
     if (desglose) { desglose.agregar(p.id); toast(`${p.nombre} agregada: cargá cuántas llegaron`); return; }
-    let i = filas.findIndex(x => x.art && !x.producto_id);
+    let i = filaQuePide != null && filas[filaQuePide] && !filas[filaQuePide].producto_id ? filaQuePide : filas.findIndex(x => x.art && !x.producto_id);
     if (i < 0) { i = filas.findIndex(x => !x.art && !x.producto_id); if (i < 0) { filas.push(filaVacia()); i = filas.length - 1; } }
     elegirPrenda(i, p); toast(`${p.nombre} agregada al remito`);
   });
