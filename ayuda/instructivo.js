@@ -413,11 +413,12 @@ window.INSTRUCTIVO = {
       { tipo: 'tip', texto: 'Lo que se crea en Percha va a la web ya conectado y con el mismo stock: no hay que hacer nada.' }
     ] },
     { id: 'prenda-a-la-web', grupo: 'compras', p: 'catalogo_editar', titulo: 'Prenda nueva o color nuevo: va sola a la web', nuevo: '2026-11-04', resumen: 'Se crea en Percha y aparece en Tienda Nube OCULTA, para cargarle las fotos.', bloques: [
-      { tipo: 'pasos', items: ['Creá la prenda en Percha (o agregale el color nuevo, también desde una compra).', 'En unos minutos aparece en **Tienda Nube, oculta**, con sus talles y colores, el precio y el stock.', 'En Tienda Nube cargale las **fotos**, la descripción y la categoría, y **mostrala** desde allá.', 'Las fotos vuelven solas a Percha, cada una con su color.'] },
+      { tipo: 'pasos', items: ['Creá la prenda en Percha (o agregale el color nuevo, también desde una compra).', 'En unos minutos aparece en **Tienda Nube, oculta**, con sus talles y colores, el precio y el stock.', 'Cargale las **fotos** en Percha (en la ficha, cada una con su color): **en unos minutos están en la web**, y la de cada color queda como foto de esas opciones. También podés cargarlas en Tienda Nube: vuelven solas a Percha.', 'En Tienda Nube completá la descripción y la categoría, y **mostrala** desde allá.'] },
+      { tipo: 'ojo', texto: 'Borrar una foto en Percha **no** la borra de la web: si querés sacarla, borrala también en Tienda Nube.' },
       { tipo: 'tabla', filas: [['Prenda nueva', 'una publicación nueva, oculta'], ['Color nuevo', 'oculto: en la publicación de la prenda, o en una publicación nueva si la prenda tiene una por color'], ['Talle nuevo de un color que ya está', 'se suma a esa publicación (ya tiene fotos)']] },
       { tipo: 'texto', texto: 'En la ficha de la prenda, **En la web** dice en qué anda: "se sube en unos minutos", "oculta: cargale fotos" o "visible".' },
       { tipo: 'tip', texto: 'Si una prenda es **solo del local**, en la ficha poné **En la web: No**. Las prendas que ya estaban solo en el local no se suben solas.' },
-      { tipo: 'ojo', texto: 'En Tienda Nube solo se cargan **fotos, textos y categorías** y se muestra u oculta. **Stock y precios se manejan en Percha.**' }
+      { tipo: 'ojo', texto: 'En Tienda Nube solo se cargan **textos y categorías** y se muestra u oculta (las fotos, en Percha o allá). **Stock y precios se manejan en Percha.**' }
     ] },
 
     { id: 'canje', grupo: 'consultas', p: 'ventas_todas', titulo: 'Canje con una influencer', nuevo: '2026-11-05', resumen: 'Prendas sin cargo que salen del stock pero no cuentan como venta.', bloques: [
