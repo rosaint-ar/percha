@@ -49,3 +49,19 @@ update canal_publicar set estado='hecho', hecho=now(), actualizado=now(), error=
 commit;
 select v.sku, v.talle_nombre, v.color_nombre, v.stock, (select ci.variante_ext from canal_items ci where ci.variante_id=v.id limit 1) web
 from v_variantes v where v.producto_codigo='100281' and v.empresa_id='82c05bbf-e63e-4d25-a762-6f1ee6d27f43' order by color_nombre, talle_orden;
+
+-- (3) 12/11 22:20 · Diego cargó la lisa como color «Rosa» (ROS) y apagó «Rosa lisa». En la web sigue sin dejar crear «Rosa»
+-- en esa publicación: las variantes de la web se llaman «Rosa lisa» y se cruzan a mano con «Rosa» de Percha.
+-- Y los SKU: «Rosa corazones» pasa a -RSC (si no, «100281-M AL XL-ROS» era de dos colores a la vez).
+begin;
+insert into canal_items (empresa_id, conexion_id, producto_ext, variante_ext, nombre, valores, sku, mpn, talle_canal, color_canal, precio, stock, publicado, variante_id, cruce, actualizado)
+select '82c05bbf-e63e-4d25-a762-6f1ee6d27f43', '6ecb8eee-1108-463b-a6e4-8161815c730c', '339548046', x.ext, 'LESS «MIA» ELÁSTICO ANCHO ALGODÓN', 'Rosa lisa / ' || x.t, '100281', '100281', x.t, 'Rosa lisa', 9375, x.st, true, v.id, 'manual', now()
+from (values ('1638349630', 'XS al S', 0), ('1638349639', 'M al XL', 2), ('1638349667', '2XL al 3XL', 0)) x(ext, t, st)
+join v_variantes v on v.producto_id = '001154fa-b449-4289-9599-69d2c5237ebf' and v.color = 'ROS' and v.talle_nombre = x.t and v.activa
+on conflict (conexion_id, variante_ext) do nothing;
+update variantes set sku = replace(sku, '-ROS', '-RSC')
+ where producto_id = '001154fa-b449-4289-9599-69d2c5237ebf' and color_id = (select id from atributos where empresa_id = '82c05bbf-e63e-4d25-a762-6f1ee6d27f43' and tipo = 'color' and codigo = 'RSC') and sku like '%-ROS';
+update canal_publicar set estado = 'hecho', hecho = now(), actualizado = now(), error = null, detalle = jsonb_build_object('nota', 'subidas a mano como «Rosa lisa» (la web no acepta «Rosa» en esa publicación)') where id = 252;
+commit;
+select v.color_nombre, v.talle_nombre, v.sku, v.stock, (select ci.variante_ext || ' ' || ci.valores from canal_items ci where ci.variante_id = v.id limit 1) web
+from v_variantes v where v.producto_id = '001154fa-b449-4289-9599-69d2c5237ebf' and v.color in ('ROS', 'RSC') and v.activa order by 1, v.talle_orden;

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Producto · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611122146">
+<link rel="stylesheet" href="../shell/shell.css?v=202611122220">
 <style>
   .dos{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
   .dos>.card{min-width:0;overflow-x:auto}
@@ -132,7 +132,7 @@
         <div class="campo"><label>Proveedor</label><select name="proveedor_id"><option value="">—</option></select></div>
       </div>
       <div class="fila c4">
-        <div class="campo solo-admin"><label>Costo</label><input name="costo" type="text" inputmode="decimal" placeholder="Ej. 14.000"></div>
+        <div class="campo solo-admin"><label>Costo</label><input name="costo" type="text" inputmode="decimal" placeholder="Ej. 14.000"><small id="capa-envio" style="display:block;font-size:12px;color:var(--tinta-3);margin-top:3px"></small></div>
         <div class="campo"><label>Precio de lista</label><input name="precio" type="text" inputmode="decimal" placeholder="Ej. 18.750" required></div>
         <div class="campo solo-admin"><label>Margen</label><div class="margen" id="margen">—</div></div>
         <div class="campo"><label>Stock total</label><input id="stock-total" readonly></div>
@@ -168,10 +168,10 @@
   </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611122146"></script>
-<script src="../shared/precios.js?v=202611122146"></script>
-<script src="../shared/prenda.js?v=202611122146"></script>
-<script src="../shell/shell.js?v=202611122146"></script>
+<script src="../shared/supabase.js?v=202611122220"></script>
+<script src="../shared/precios.js?v=202611122220"></script>
+<script src="../shared/prenda.js?v=202611122220"></script>
+<script src="../shell/shell.js?v=202611122220"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$ , toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -415,6 +415,9 @@ APP.ready.then(async () => {
 
   function pintarMargen() {
     const c = PRECIOS.num(form.costo.value), pr = PRECIOS.num(form.precio.value), m = $('#margen');
+    // la capa del envío / flete del último remito (sql/138): está dentro del costo; si lo cambiás a mano, se va
+    { const ce = $('#capa-envio'), env = producto && +producto.costo_envio;
+      if (ce) ce.textContent = !env ? '' : c === +producto.costo ? `Incluye ${fmt.pesos(env)} de envío (proveedor: ${fmt.pesos(c - env)})` : 'Cambiado a mano: deja de contar el envío aparte'; }
     if (!c || !pr) { m.className = 'margen'; m.innerHTML = '—'; return; }
     const pct = 100 * (pr - c) / pr;
     m.className = 'margen ' + (pct < 40 ? 'bajo' : 'ok');

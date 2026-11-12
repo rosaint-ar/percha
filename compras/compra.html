@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ingresar mercadería · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611122146">
+<link rel="stylesheet" href="../shell/shell.css?v=202611122220">
 <style>
   /* Ingresar mercadería: se carga como viene el remito (un renglón por artículo y color, cantidades por talle) */
   .cab-compra{display:grid;grid-template-columns:minmax(220px,1.4fr) 1fr 150px 110px;gap:12px;align-items:end}
@@ -13,6 +13,11 @@
   .prov-fila{display:flex;gap:6px}.prov-fila select{flex:1;min-width:0}
   .cab-mas{display:grid;grid-template-columns:1fr 170px;gap:12px;margin-top:10px}
   .cab-mas .campo{margin:0}
+  .cab-envio{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin-top:10px}
+  .cab-envio .campo{margin:0}
+  .cab-envio label.chk{display:flex;gap:6px;align-items:center;font-size:13px;color:var(--tinta-2);padding-bottom:9px;cursor:pointer}
+  .cab-envio .env-info{font-size:12.5px;color:var(--tinta-3);padding-bottom:9px}
+  .tot small.env{display:block;color:var(--tinta-3);font-weight:400}
   .renglones{display:grid;gap:8px}
   .rg{display:grid;grid-template-columns:170px minmax(220px,1fr) 160px auto 110px 96px 28px;gap:10px;align-items:start;border:1px solid var(--linea);border-radius:12px;padding:10px 12px;background:var(--superficie-2)}
   .rg.cab{border:0;background:transparent;padding:0 12px;font:700 11px var(--f-ui);text-transform:uppercase;letter-spacing:.04em;color:var(--tinta-3)}
@@ -81,6 +86,11 @@
       <div class="campo" id="campo-entrega"><label>Llega el (si es un pedido)</label><input id="entrega" type="date"></div>
       <select id="deposito" hidden></select>
     </div>
+    <div class="cab-envio">
+      <div class="campo"><label>Envío / flete $</label><input id="envio" inputmode="decimal" placeholder="0" style="width:140px" title="Lo que costó traer la mercadería: se reparte entre las prendas y sube su costo (para márgenes). Al volver a comprar, Percha te propone el precio del proveedor, sin el envío."></div>
+      <label class="chk"><input type="checkbox" id="envio-prov"> Lo cobra el proveedor (va a su cuenta)</label>
+      <span class="env-info" id="env-info"></span>
+    </div>
   </div>
   <div class="card">
     <div class="card-cab"><div><h2>Lo que dice el remito</h2><p class="ayuda-remito" id="ayuda">Un renglón por cada artículo y color, como en el remito. Escribí cómo lo llama el proveedor y elegí qué prenda es en Augusta: <b>la próxima vez Percha la reconoce sola</b>.</p></div></div>
@@ -91,9 +101,9 @@
   <div id="sug" class="sugerencias" style="display:none"></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611122146"></script>
-<script src="../shell/shell.js?v=202611122146"></script>
-<script src="../shared/precios.js?v=202611122146"></script>
+<script src="../shared/supabase.js?v=202611122220"></script>
+<script src="../shell/shell.js?v=202611122220"></script>
+<script src="../shared/precios.js?v=202611122220"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -168,6 +178,7 @@ APP.ready.then(async () => {
       if (faltan.length) { const { data: viejas } = await sb.from('productos').select('id,codigo,nombre,costo,precio,tiene_variantes,categoria_id,tipo,es_generico,generico_filtro').in('id', faltan); (viejas || []).forEach(p => productos.push(p)); } }
     $('#proveedor').value = c.proveedor_id || ''; $('#fecha').value = c.fecha; $('#entrega').value = c.entrega_estimada || ''; $('#referencia').value = c.referencia || '';
     $('#deposito').value = c.deposito_id || $('#deposito').value; $('#descuento').value = ver(c.descuento_pct); $('#nota').value = c.nota || '';
+    $('#envio').value = +c.envio ? ver(c.envio) : ''; $('#envio-prov').checked = !!c.envio_proveedor;
     // un renglón por prenda + color + nombre del proveedor, como en el remito
     // (en el orden del remito: solo se juntan los talles SEGUIDOS de un mismo renglón; antes se juntaban renglones iguales aunque
     // estuvieran lejos y el remito volvía desacomodado, 12/11)
@@ -190,7 +201,7 @@ APP.ready.then(async () => {
     const h = document.querySelector('.cabecera h1, header h1, h1'); if (h) h.textContent = t; document.title = t + ' · Percha';
     const pedido = modoPedido || (compra && ['borrador', 'pedida'].includes(compra.estado));
     $('#campo-entrega').style.visibility = pedido ? '' : 'hidden';
-    $$('#proveedor,#referencia,#fecha,#descuento,#nota,#entrega,#btn-prov').forEach(x => x.disabled = !!cerrada());
+    $$('#proveedor,#referencia,#fecha,#descuento,#nota,#entrega,#btn-prov,#envio,#envio-prov').forEach(x => x.disabled = !!cerrada());
     $('#agregar').style.display = cerrada() ? 'none' : '';
   }
 
@@ -216,8 +227,11 @@ APP.ready.then(async () => {
   }
   function totales() {
     const u = filas.reduce((s, f) => s + unidades(f), 0), sub = filas.reduce((s, f) => s + unidades(f) * f.costo, 0), d = num($('#descuento').value), tot = r2(sub * (1 - d / 100));
-    $('#cifras').innerHTML = `<div><b>${u}</b>prendas</div><div><b>${fmt.pesos(sub)}</b>subtotal</div>${d ? `<div><b>−${fmt.pesos(sub - tot)}</b>descuento ${ver(d)}%</div>` : ''}<div class="gran"><b>${fmt.pesos(tot)}</b>total · revisalo contra el remito</div>`;
-    filas.forEach((f, i) => { const el = $(`.rg[data-f="${i}"] .tot`); if (el && !cerrada()) { const n = unidades(f); el.innerHTML = n ? fmt.pesos(n * f.costo) + `<small>${n} u.</small>` : ''; } });
+    // envío / flete: se reparte proporcional al costo (con descuento) de cada prenda = costo en destino (sql/138)
+    const env = Math.max(0, num($('#envio').value) || 0), envProv = $('#envio-prov').checked, fEnv = env && tot ? env / tot : 0;
+    $('#cifras').innerHTML = `<div><b>${u}</b>prendas</div><div><b>${fmt.pesos(sub)}</b>subtotal</div>${d ? `<div><b>−${fmt.pesos(sub - tot)}</b>descuento ${ver(d)}%</div>` : ''}${env ? `<div><b>+${fmt.pesos(env)}</b>envío${envProv ? '' : ' (aparte)'}</div>` : ''}<div class="gran"><b>${fmt.pesos(tot + (envProv ? env : 0))}</b>total · revisalo contra el remito</div>`;
+    $('#env-info').textContent = env ? (tot ? `Cada prenda suma un ${ver(Math.round(fEnv * 1000) / 10)}% de su costo por el envío` : 'Se reparte cuando cargues las prendas') : '';
+    filas.forEach((f, i) => { const el = $(`.rg[data-f="${i}"] .tot`); if (el) { const n = unidades(f), cu = f.costo * (1 - d / 100); const ya = el.querySelector('small.env'); if (ya) ya.remove(); if (!cerrada()) el.innerHTML = n ? fmt.pesos(n * f.costo) + `<small>${n} u.</small>` : ''; if (n && fEnv && cu) el.insertAdjacentHTML('beforeend', `<small class="env" title="Costo de cada una con el descuento y su parte del envío">c/envío ${fmt.pesos(r2(cu * (1 + fEnv)))} c/u</small>`); } });
   }
   function enganchar() {
     $$('[data-desglosar]').forEach(b => b.onclick = () => desglosar(+b.dataset.desglosar));
@@ -391,7 +405,7 @@ APP.ready.then(async () => {
     usadas.forEach(f => { const p = prod(f.producto_id); Object.entries(f.cant).forEach(([t, n]) => { const vg = f.vid && f.vid[t] && varPorId.get(f.vid[t]); const v = (vg && vg.producto_id === p.id && (vg.color || '') === (f.color || '') ? vg : null) || varDe(p.id, f.color, t); if (!v || !n) return; lineas.push({ variante_id: v.id, producto_id: p.id, descripcion: p.nombre, talle: v.talle_nombre || null, color: v.color_nombre || null, pedida: n, costo_unit: r2(f.costo), articulo_prov: f.art.trim() || null }); }); });
     if (!lineas.length) throw new Error('Cargá al menos una prenda');
     if (!$('#proveedor').value) throw new Error('Elegí el proveedor (así Percha aprende sus nombres y lleva la cuenta)');
-    return { id: id || null, empresa_id: e, proveedor_id: $('#proveedor').value || null, deposito_id: $('#deposito').value || null, fecha: $('#fecha').value, entrega_estimada: $('#entrega').value || null, referencia: $('#referencia').value.trim() || null, descuento_pct: num($('#descuento').value), nota: $('#nota').value.trim() || null, estado, lineas };
+    return { id: id || null, empresa_id: e, proveedor_id: $('#proveedor').value || null, deposito_id: $('#deposito').value || null, fecha: $('#fecha').value, entrega_estimada: $('#entrega').value || null, referencia: $('#referencia').value.trim() || null, descuento_pct: num($('#descuento').value), envio: Math.max(0, num($('#envio').value) || 0), envio_proveedor: $('#envio-prov').checked, nota: $('#nota').value.trim() || null, estado, lineas };
   }
   async function guardarPedido() {
     let p; try { p = armar(compra && compra.estado === 'pedida' ? 'pedida' : 'pedida'); } catch (er) { toast(er.message, 'error'); return null; }
@@ -411,7 +425,7 @@ APP.ready.then(async () => {
     }
     const u = p.lineas.reduce((s, l) => s + l.pedida, 0);
     const m = modal(`<h2>¿Llegó todo lo del remito?</h2><p class="sub">Van a entrar <b>${u} prendas</b> al stock del local y de la web.</p>
-      <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:12px"><input type="checkbox" id="i-costos" checked> Actualizar el costo de las prendas${p.descuento_pct ? ' (con el ' + ver(p.descuento_pct) + '% de descuento)' : ''}</label>
+      <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:12px"><input type="checkbox" id="i-costos" checked> Actualizar el costo de las prendas${[p.descuento_pct ? 'con el ' + ver(p.descuento_pct) + '% de descuento' : '', p.envio ? 'con su parte del envío' : ''].filter(Boolean).length ? ' (' + [p.descuento_pct ? 'con el ' + ver(p.descuento_pct) + '% de descuento' : '', p.envio ? 'con su parte del envío' : ''].filter(Boolean).join(' y ') + ')' : ''}</label>
       <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:6px"><input type="checkbox" id="i-deuda" checked> Sumar a la cuenta del proveedor (lo que se le debe)</label>
       <div class="pie" style="flex-wrap:wrap"><button class="btn" data-no>Cancelar</button><button class="btn" data-parte>Llegó solo una parte</button><button class="btn primario" data-si>Sí, ingresar al stock</button></div>`, { fijo: true });
     $('[data-no]', m).onclick = () => m.cerrar();
@@ -528,6 +542,8 @@ APP.ready.then(async () => {
     const an = $('#b-anular'); if (an) an.onclick = async () => { if (!await confirmar('¿Anular esta compra? No entra nada al stock.', 'Anular')) return; const { error } = await sb.rpc('compras_anular', { p_compra: id }); if (error) { toast(mensajeError(error), 'error'); return; } toast('Compra anulada'); cargar(); };
   }
   $('#descuento').oninput = totales;
+  $('#envio').oninput = totales; $('#envio-prov').onchange = () => { cambiado = true; totales(); };
+  $('#envio').onblur = () => { const n = num($('#envio').value); $('#envio').value = n ? ver(n) : ''; };
   $('#descuento').onblur = () => { $('#descuento').value = ver(num($('#descuento').value)); };
   // prenda nueva: se crea en otra pestaña (con el proveedor del remito) y, al terminar, entra sola en el renglón que esperaba
   // (el primero con un artículo escrito y sin prenda; si no hay, uno nuevo)
