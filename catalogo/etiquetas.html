@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Etiquetas · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611121457">
+<link rel="stylesheet" href="../shell/shell.css?v=202611121514">
 <style>
   .cola td input[type=number]{width:76px;text-align:right}
   .cola td.chk,.cola th.chk{width:34px;text-align:center}
@@ -76,9 +76,9 @@
 </main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611121457"></script>
-<script src="../shared/precios.js?v=202611121457"></script>
-<script src="../shell/shell.js?v=202611121457"></script>
+<script src="../shared/supabase.js?v=202611121514"></script>
+<script src="../shared/precios.js?v=202611121514"></script>
+<script src="../shell/shell.js?v=202611121514"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, confirmar } = APP, e = APP.empresa.id;
@@ -178,6 +178,19 @@ APP.ready.then(async () => {
     toast(r.error ? APP.mensajeError(r.error) : 'Guardado: así salen en todas las compus', r.error ? 'error' : '');
   };
   $('#btn-vaciar').onclick = async () => { if (await confirmar('¿Vaciar la lista de etiquetas?', 'Vaciar')) { cola = []; guardarCola(); pintarCola(); pintarHoja(); } };
+  // prendas con código de barras NUEVO (los repetidos de FactuSOL se regeneraron el 12/11 con 29…): sus etiquetas viejas
+  // ya no sirven. Un toque y entran todas a la lista, con una etiqueta por unidad en stock.
+  {
+    const { data: nuevos } = await sb.from('v_variantes').select('id,stock').eq('empresa_id', e).eq('activa', true).like('ean', '29%').gt('stock', 0);
+    const faltan = (nuevos || []).filter(v => !cola.some(c => c.variante_id === v.id));
+    if (faltan.length) {
+      $('#btn-vaciar').insertAdjacentHTML('beforebegin', `<button class="btn primario" id="btn-cod-nuevos" title="Prendas a las que se les cambió el código de barras: hay que volver a etiquetarlas">🏷️ Código nuevo: ${fmt.num(faltan.reduce((s, v) => s + Math.round(+v.stock), 0))} prendas</button>`);
+      $('#btn-cod-nuevos').onclick = async () => {
+        faltan.forEach(v => cola.push({ variante_id: v.id, cantidad: Math.round(+v.stock), sel: true }));
+        guardarCola(); await cargarInfo(); pintarCola(); pintarHoja(); $('#btn-cod-nuevos').remove(); toast('Agregadas: imprimilas y reemplazá las etiquetas viejas');
+      };
+    }
+  }
   function imprimir(html) {
     let z = document.getElementById('zona-impresion'); if (!z) { z = document.createElement('div'); z.id = 'zona-impresion'; document.body.appendChild(z); }
     z.innerHTML = html; window.print();

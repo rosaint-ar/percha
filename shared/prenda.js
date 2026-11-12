@@ -178,7 +178,8 @@
         if (cambiadas.length || cerrar.length) { const r = await sb.rpc('fallas_guardar', { p: { variante_id: v.id, unidades: cambiadas.map(u => ({ id: u.id, nota: u.nota, descuento_pct: u.modo === 'precio' || u.descuento_pct === '' ? null : u.descuento_pct, precio: u.modo === 'precio' && u.precio !== '' ? u.precio : null, listas: u.listas })), cerrar } }); if (r.error) throw r.error; }
         if (admin) {
           const ean = $('#pr-ean', m).value.trim() || null, pv = $('#pr-precio', m).value.trim(), precio = pv === '' ? null : (window.PRECIOS ? PRECIOS.num(pv) : +pv.replace(/\./g, '').replace(',', '.')), ch = $('#pr-chequeado', m), cambios = {};
-          if (ean !== (v.ean || null)) cambios.ean = ean;
+          // un código de barras que ya tiene otra prenda no se repite (antes la caja agarraba cualquiera de las dos)
+          if (ean !== (v.ean || null)) { const { data: otra } = ean ? await sb.from('variantes').select('id').eq('empresa_id', APP.empresa.id).eq('ean', ean).neq('id', v.id).eq('activa', true).limit(1) : { data: [] }; if ((otra || []).length) toast('Ese código de barras ya lo tiene otra prenda: no se cambió', 'error'); else cambios.ean = ean; }
           if (precio !== (v.precio != null && +v.precio !== +pr.precio ? +v.precio : null)) cambios.precio = precio;
           if (ch && ch.checked) cambios.chequear = null;
           if (Object.keys(cambios).length) { const r = await sb.from('variantes').update(cambios).eq('id', v.id); if (r.error) throw r.error; }
