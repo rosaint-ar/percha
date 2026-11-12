@@ -158,7 +158,8 @@ window.INSTRUCTIVO = {
     ] },
     { id: 'sin-internet', grupo: 'vender', p: 'vender', titulo: 'Si se corta internet', resumen: 'Seguí vendiendo: las ventas se guardan y se suben solas.', bloques: [
       { tipo: 'texto', texto: 'La caja sigue funcionando. Arriba vas a ver **"N ventas por subir"**: cuando vuelve internet se suben solas.' },
-      { tipo: 'ojo', texto: 'Sin internet no se pueden buscar ventas viejas (para un cambio) ni usar notas de crédito. Esperá a que vuelva.' }
+      { tipo: 'ojo', texto: 'Sin internet no se pueden buscar ventas viejas (para un cambio) ni usar notas de crédito. Esperá a que vuelva.' },
+      { tipo: 'tip', texto: 'Si al volver internet una venta **no se pudo subir** (por ejemplo, la caja ya estaba cerrada), no se pierde: arriba aparece {{⚠️ N ventas con problema}}. Tocalo: ves el motivo y podés {{Reintentar}} (o {{Descartar}}, si de verdad no va).' }
     ] },
 
     // ======================= WHATSAPP Y ENVÍOS =======================
@@ -296,7 +297,7 @@ window.INSTRUCTIVO = {
     { id: 'cerrar-caja', grupo: 'caja', p: 'vender', titulo: 'Cerrar la caja', resumen: 'Contás cada medio, ves si cuadra y dejás el cambio para mañana.', bloques: [
       { tipo: 'pasos', items: [
         '{{💰 Caja}} › {{🌙 Cerrar caja}}: te muestra cómo te fue en el turno.',
-        '**Contá lo que hay** en cada medio (efectivo, transferencias, tarjetas). Si coincide, queda en **verde**.',
+        '**Contá lo que hay** en cada medio. El **efectivo** viene vacío: contalo de verdad y escribí cuánto hay (o usá {{🧮 Contar billetes}}). Los demás medios vienen con lo que debería haber: corregilos si no coincide. Si cuadra, queda en **verde**.',
         'Decí **cuánto retirás**: lo que queda es el **cambio para mañana**.',
         'Imprimí el resumen o mandalo por {{WhatsApp}}.'] },
       { tipo: 'ojo', texto: 'Si no cuadra, revisá antes de cerrar: un retiro sin registrar, una venta cobrada con otro medio, un vuelto mal dado.' },
