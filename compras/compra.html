@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ingresar mercadería · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611121443">
+<link rel="stylesheet" href="../shell/shell.css?v=202611121457">
 <style>
   /* Ingresar mercadería: se carga como viene el remito (un renglón por artículo y color, cantidades por talle) */
   .cab-compra{display:grid;grid-template-columns:minmax(220px,1.4fr) 1fr 150px 110px;gap:12px;align-items:end}
@@ -91,9 +91,9 @@
   <div id="sug" class="sugerencias" style="display:none"></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611121443"></script>
-<script src="../shell/shell.js?v=202611121443"></script>
-<script src="../shared/precios.js?v=202611121443"></script>
+<script src="../shared/supabase.js?v=202611121457"></script>
+<script src="../shell/shell.js?v=202611121457"></script>
+<script src="../shared/precios.js?v=202611121457"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -116,11 +116,16 @@ APP.ready.then(async () => {
     productos = ps; porProducto = new Map(); varPorId = new Map();
     vs.forEach(v => { varPorId.set(v.id, v); if (!v.activa) return; if (!porProducto.has(v.producto_id)) porProducto.set(v.producto_id, []); porProducto.get(v.producto_id).push(v); });
   }
+  // costo que se propone: el último que puso el proveedor en un remito (precio de lista, ANTES del descuento del remito).
+  // El costo de la prenda ya viene con descuento: proponer ese y volver a descontarle el % lo bajaba remito tras remito.
+  let ultimoCosto = new Map();
+  async function cargarUltimosCostos() { const { data } = await sb.from('compra_lineas').select('producto_id,costo_unit,id').eq('empresa_id', e).order('id', { ascending: false }).limit(1000); ultimoCosto = new Map(); (data || []).forEach(l => { if (l.producto_id && !ultimoCosto.has(l.producto_id) && +l.costo_unit > 0) ultimoCosto.set(l.producto_id, +l.costo_unit); }); }
+  const costoPropuesto = p => ultimoCosto.get(p.id) || +p.costo || 0;
   async function cargarAprendido() { const { data } = await sb.from('proveedor_articulos').select('*').eq('empresa_id', e).order('veces', { ascending: false }); aprendido = data || []; }
   const [pr, dp] = await Promise.all([
     sb.from('proveedores').select('id,nombre').eq('empresa_id', e).eq('activo', true).order('nombre'),
     sb.from('depositos').select('*').eq('empresa_id', e).eq('activo', true).order('principal', { ascending: false }),
-    cargarCatalogo(), cargarAprendido()
+    cargarCatalogo(), cargarAprendido(), cargarUltimosCostos()
   ]);
   proveedores = pr.data || []; depositos = dp.data || [];
   const pintarProveedores = sel => { $('#proveedor').innerHTML = '<option value="">— Elegí el proveedor —</option>' + proveedores.map(p => `<option value="${p.id}">${esc(p.nombre)}</option>`).join(''); if (sel) $('#proveedor').value = sel; };
@@ -278,13 +283,13 @@ APP.ready.then(async () => {
   function usarAprendido(i, a) {
     const p = prod(a.producto_id); if (!p) return;
     filas[i].producto_id = p.id; filas[i].color = a.color_id && codColor[a.color_id] ? codColor[a.color_id].codigo : ''; filas[i].cant = filas[i].cant || {};
-    if (!filas[i].costo) filas[i].costo = +a.costo || +p.costo || 0;
+    if (!filas[i].costo) filas[i].costo = +a.costo || costoPropuesto(p);
     asegurarVaciaSinPintar(); pintar(); if (p.es_generico) return desglosar(i); const c = $(`[data-cant="${i}"]:not(:disabled)`); if (c) c.focus();
   }
   function elegirPrenda(i, p) {
     const f = filas[i]; f.producto_id = p.id; f.cant = {}; const cols = coloresDe(p.id);
     const c = colorDelTexto(p.id, f.art); f.color = c ? c.k : (cols.length === 1 ? cols[0].k : '');
-    if (!f.costo) f.costo = +p.costo || 0;
+    if (!f.costo) f.costo = costoPropuesto(p);
     asegurarVaciaSinPintar(); pintar();
     if (p.es_generico) return desglosar(i);
     const sig = f.color || !cols.length ? $(`[data-cant="${i}"]:not(:disabled)`) : $(`[data-color="${i}"]`); if (sig) sig.focus();
@@ -295,7 +300,7 @@ APP.ready.then(async () => {
   function desglosar(i) {
     const f0 = filas[i], g = prod(f0.producto_id); if (!g) return;
     const cumple = filtroGen(g), cat = (g.generico_filtro || {}).categoria_id || g.categoria_id;
-    let total = unidades(f0) || '', costo = f0.costo || +g.costo || 0, bloques = [], q = '';
+    let total = unidades(f0) || '', costo = f0.costo || costoPropuesto(g), bloques = [], q = '';
     const m = modal('<div id="dg"></div>', { fijo: true }); $('.modal', m).style.maxWidth = '860px';
     const ident = () => bloques.reduce((s, b) => s + Object.values(b.cant).reduce((a, n) => a + (+n || 0), 0), 0);
     // un color o estampa que la prenda todavía no tiene: se crea ahí mismo, con todos sus talles (el mismo camino que el renglón del remito)
@@ -325,29 +330,38 @@ APP.ready.then(async () => {
             <div>${cols.length ? `<select data-bc="${k}"><option value="">— Color —</option>${cols.map(c => `<option value="${esc(c.k)}" ${c.k === b.color ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}<option value="+">+ Color o estampa nuevo…</option></select>` : `<small style="color:var(--tinta-3)">sin color</small> · <a data-bcn="${k}" style="font-size:12px;cursor:pointer">+ color o estampa</a>`}</div>
             <div class="dg-talles">${ts.map(t => { const v = varDe(p.id, b.color, t.k); return `<label><span>${esc(t.nombre || 'Cant.')}</span><input data-bt="${k}" data-t="${esc(t.k)}" inputmode="numeric" value="${b.cant[t.k] || ''}" ${!v || (cols.length && !b.color) ? 'disabled' : ''}></label>`; }).join('')}</div>
             <button class="x" data-bx="${k}" title="Quitar">×</button></div>`; }).join('')}
-        <div class="pie" style="flex-wrap:wrap"><button class="btn" data-no>Cancelar</button>${t && n < t && n > 0 ? `<button class="btn" data-dejar>Dejar ${t - n} sin identificar</button>` : ''}<button class="btn primario" data-si ${n ? '' : 'disabled'}>Listo</button></div>`;
+        <div class="pie" style="flex-wrap:wrap"><button class="btn" data-no>Cancelar</button><button class="btn" data-dejar hidden></button><button class="btn primario" data-si>Listo</button></div>`;
+      // el contador y los botones se actualizan mientras se escribe, SIN redibujar (antes el primer clic en «Listo» se perdía y el Tab saltaba)
+      const refrescar = () => {
+        const n = ident(), t = +total || 0, c = $('.dg-cuenta', m);
+        c.className = 'dg-cuenta ' + (t && n === t ? 'ok' : 'falta');
+        c.textContent = t ? (n === t ? '✓ Están todas identificadas' : n < t ? 'Faltan identificar ' + (t - n) + ' de ' + t : 'Hay ' + (n - t) + ' de más') : n + ' identificadas';
+        const dj = $('[data-dejar]', m); dj.hidden = !(t && n < t); dj.textContent = n ? `Dejar ${t - n} sin identificar` : `Dejar las ${t} como ${g.nombre}`;
+        $('[data-si]', m).disabled = !n;
+      };
+      refrescar();
       const qi = $('#dg-q', m); qi.oninput = () => { q = qi.value; const pos = qi.selectionStart; pintarDg(); const q2 = $('#dg-q', m); q2.focus(); q2.setSelectionRange(pos, pos); };
-      $('#dg-total', m).onchange = ev => { total = Math.max(0, Math.round(num(ev.target.value))) || ''; pintarDg(); };
-      $('#dg-costo', m).onchange = ev => { costo = num(ev.target.value); };
+      $('#dg-total', m).oninput = ev => { total = Math.max(0, Math.round(num(ev.target.value))) || ''; refrescar(); };
+      $('#dg-costo', m).oninput = ev => { costo = num(ev.target.value); };
       $$('[data-add]', m).forEach(d => d.onclick = () => agregar(d.dataset.add));
       $$('[data-otro]', m).forEach(a => a.onclick = () => agregar(bloques[+a.dataset.otro].producto_id));
       $$('[data-bc]', m).forEach(sel => sel.onchange = () => { const b = bloques[+sel.dataset.bc]; if (sel.value === '+') { sel.value = b.color; return colorNuevoBloque(+sel.dataset.bc); } b.color = sel.value; b.cant = {}; pintarDg(); });
       $$('[data-bcn]', m).forEach(a => a.onclick = () => colorNuevoBloque(+a.dataset.bcn));
-      $$('[data-bt]', m).forEach(inp => inp.onchange = () => { const b = bloques[+inp.dataset.bt]; b.cant[inp.dataset.t] = Math.max(0, Math.round(num(inp.value))) || 0; pintarDg(); });
+      $$('[data-bt]', m).forEach(inp => inp.oninput = () => { const b = bloques[+inp.dataset.bt]; b.cant[inp.dataset.t] = Math.max(0, Math.round(num(inp.value))) || 0; refrescar(); });
       $$('[data-bx]', m).forEach(x => x.onclick = () => { bloques.splice(+x.dataset.bx, 1); pintarDg(); });
       $('#dg-nueva', m).onclick = () => { const prov = $('#proveedor').value; window.open(`../catalogo/producto.html?nuevo=1&desde=compra${cat ? '&familia=' + cat : ''}${prov ? '&proveedor=' + prov : ''}`, '_blank'); };
       $('[data-no]', m).onclick = () => { desglose = null; m.cerrar(); };
       const terminar = dejar => {
         const sinColor = bloques.find(b => coloresDe(b.producto_id).length && !b.color); if (sinColor) { toast('Falta el color de ' + prod(sinColor.producto_id).nombre, 'error'); return; }
         const nuevas = bloques.filter(b => Object.values(b.cant).some(x => +x)).map(b => ({ art: f0.art, producto_id: b.producto_id, color: b.color, cant: b.cant, costo, recibida: {} }));
-        if (!nuevas.length) { toast('Cargá cuántas de cada modelo', 'error'); return; }
+        if (!nuevas.length && !dejar) { toast('Cargá cuántas de cada modelo', 'error'); return; }   // «Dejar las N como VARIAS» sí puede ir sin modelos
         const resto = dejar ? (+total || 0) - ident() : 0;
         if (resto > 0) { const tk = Object.keys(f0.cant)[0] || ''; nuevas.push({ art: f0.art, producto_id: g.id, color: '', cant: { [tk]: resto }, costo, recibida: {}, sinIdentificar: true }); }
         filas.splice(i, 1, ...nuevas); asegurarVaciaSinPintar(); desglose = null; m.cerrar(); pintar();
         toast(`${nuevas.length - (resto > 0 ? 1 : 0)} modelos identificados${resto > 0 ? ' · ' + resto + ' quedan como ' + g.nombre : ''}`);
       };
       $('[data-si]', m).onclick = () => { const t2 = +total || 0, n2 = ident(); if (t2 && n2 !== t2) { toast(n2 < t2 ? `Faltan identificar ${t2 - n2}: buscalas o tocá «Dejar sin identificar»` : `Identificaste ${n2 - t2} de más`, 'error'); return; } terminar(false); };
-      const dj = $('[data-dejar]', m); if (dj) dj.onclick = () => terminar(true);
+      $('[data-dejar]', m).onclick = () => terminar(true);
     }
     pintarDg(); setTimeout(() => { const q1 = $('#dg-q', m); if (q1) q1.focus(); }, 50);
   }
@@ -496,7 +510,14 @@ APP.ready.then(async () => {
       const bc = $('#b-corregir'); if (bc) bc.onclick = empezarCorreccion;
       return;
     }
-    if (compra && compra.estado === 'parcial') { a.innerHTML = '<a class="btn" href="compras.html">← Volver</a><button class="btn" id="b-etq">🏷️ Etiquetas de lo que llegó</button><button class="btn primario" id="b-parte">📦 Llegó lo que faltaba</button>'; $('#b-etq').onclick = etiquetas; $('#b-parte').onclick = recibirParte; return; }
+    if (compra && compra.estado === 'parcial') { a.innerHTML = '<a class="btn" href="compras.html">← Volver</a><button class="btn" id="b-etq">🏷️ Etiquetas de lo que llegó</button><button class="btn" id="b-cerrar-p">El resto no va a llegar</button><button class="btn primario" id="b-parte">📦 Llegó lo que faltaba</button>'; $('#b-etq').onclick = etiquetas; $('#b-parte').onclick = unaVez(recibirParte);
+      // lo que falta ya no viene: la compra queda cerrada con lo que llegó (y su total, el de lo recibido)
+      $('#b-cerrar-p').onclick = unaVez(async () => {
+        if (!await confirmar('¿Cerrar la compra con lo que llegó? Lo que falta deja de esperarse y el total queda en lo recibido.', 'Cerrar la compra')) return;
+        const { error } = await sb.rpc('compras_cerrar_pendiente', { p_compra: id }); if (error) { toast(mensajeError(error), 'error'); return; }
+        toast('Compra cerrada con lo que llegó'); await cargar();
+      });
+      return; }
     const pedido = modoPedido || (compra && ['borrador', 'pedida'].includes(compra.estado));
     a.innerHTML = `${id ? '<button class="btn peligro" id="b-anular">Anular</button>' : ''}<a class="btn" href="compras.html">Volver</a>
       ${pedido ? '<button class="btn" id="b-ingresar">📦 Ya llegó: ingresar al stock</button><button class="btn primario" id="b-pedido">💾 Guardar pedido</button>'

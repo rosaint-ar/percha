@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Inicio · Percha</title>
 <meta name="app-root" content="./">
-<link rel="stylesheet" href="shell/shell.css?v=202611121443">
+<link rel="stylesheet" href="shell/shell.css?v=202611121457">
 <style>
   /* Inicio: saludo + clima, números del mes, ventas de 30 días, canales, lo más vendido y lo que hay que mirar */
   :root{--serie-local:var(--acento);--serie-online:#2A9D8F}
@@ -117,9 +117,9 @@
 </main>
 <div class="tip-graf" id="tip"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="shared/supabase.js?v=202611121443"></script>
-<script src="shared/canales.js?v=202611121443"></script>
-<script src="shell/shell.js?v=202611121443"></script>
+<script src="shared/supabase.js?v=202611121457"></script>
+<script src="shared/canales.js?v=202611121457"></script>
+<script src="shell/shell.js?v=202611121457"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$ } = APP, e = APP.empresa.id;
@@ -143,7 +143,8 @@ APP.ready.then(async () => {
 
   // ---------- números ----------
   const [tab, res, canalesLista] = await Promise.all([sb.rpc('tablero_inicio', { e }), sb.rpc('resumen_inicio', { e }), CANALES.cargar(e)]);
-  if (tab.error) { APP.toast(APP.mensajeError(tab.error), 'error'); return; }
+  if (tab.error || res.error) {   // antes los números quedaban en "…" o en 0 sin decir nada
+    $('#resumen-hoy').innerHTML = `No pude cargar los números (${esc(APP.mensajeError(tab.error || res.error))}). <a href="" onclick="location.reload();return false">Reintentar</a>`; return; }
   const t = tab.data || {}, r = res.data || {};
   const corto = n => n >= 1e6 ? fmt.dec(Math.round(n / 1e5) / 10) + ' M' : n >= 1e3 ? fmt.num(Math.round(n / 1e3)) + ' mil' : fmt.num(n);
 
@@ -210,8 +211,25 @@ APP.ready.then(async () => {
 
   // ---------- para mirar ----------
   const items = [];
+  // lo que hay que hacer hoy, de un vistazo: la caja, lo pendiente, señas, lo que piden y lo que esperamos de los proveedores
+  const [cajaAb, pend, senas, piden, compEsp] = await Promise.all([
+    sb.from('caja_turnos').select('abierto').eq('empresa_id', e).eq('estado', 'abierto').order('abierto', { ascending: false }).limit(1),
+    sb.rpc('pendientes_resumen', { e }),
+    sb.from('ventas').select('id', { count: 'exact', head: true }).eq('empresa_id', e).eq('estado', 'senada'),
+    sb.from('pedidos_clientas').select('id', { count: 'exact', head: true }).eq('empresa_id', e).eq('estado', 'pendiente'),
+    puede('compras') ? sb.from('compras').select('id', { count: 'exact', head: true }).eq('empresa_id', e).in('estado', ['pedida', 'parcial']) : Promise.resolve({ count: 0 })]);
+  if (puede('vender')) { const ab = (cajaAb.data || [])[0]; items.push(ab ? ['caja/caja.html', '💰', 'ok', 'Caja abierta', 'Desde ' + fmt.fechaHora(ab.abierto), '✓'] : ['caja/pos.html', '💰', 'aviso', 'Caja cerrada', 'Abrila para empezar a vender', '🔓']); }
+  { const p = pend.data || {}; if (+p.total) items.push(['#', '📌', 'aviso', 'Pendientes de la caja', [p.definir ? p.definir_unidades + ' vendidas sin definir' : '', p.revisar ? p.revisar + ' con stock para revisar' : '', p.recuentos ? p.recuentos + ' recuentos abiertos' : ''].filter(Boolean).join(' · '), fmt.num(p.total), 'pend']); }
+  if (senas.count) items.push(['caja/ventas.html', '🎟️', 'aviso', 'Señas por retirar', 'Prendas pagadas en parte que esperan a la clienta', fmt.num(senas.count)]);
+  if (piden.count) items.push(['caja/pedidos.html', '📝', 'aviso', 'Lo que piden', 'Clientas esperando algo que no había', fmt.num(piden.count)]);
+  if (compEsp.count) items.push(['compras/compras.html', '🚚', '', 'Compras esperando', 'Pedidos a proveedores que todavía no llegaron', fmt.num(compEsp.count)]);
   items.push(t.por_despachar ? ['caja/envios.html', '📦', 'aviso', 'Envíos por despachar', 'Pedidos pendientes o preparados', t.por_despachar] : ['caja/envios.html', '📦', 'ok', 'Envíos al día', 'No hay pedidos esperando', '✓']);
-  if (r.productos_sin_stock) items.push(['catalogo/productos.html', '🫙', 'aviso', 'Prendas sin stock', `De ${fmt.num(r.productos_activos)} activas`, fmt.num(r.productos_sin_stock)]);
+  // agotadas que SE VENDEN (las que conviene reponer), no todo el catálogo histórico sin stock
+  { const desde = new Date(Date.now() - 30 * 86400000).toISOString();
+    const { data: vend } = await sb.from('venta_lineas').select('variante_id,ventas!inner(fecha,estado,empresa_id)').eq('ventas.empresa_id', e).gte('ventas.fecha', desde).neq('ventas.estado', 'anulada').gt('cantidad', 0).limit(1000);
+    const ids = [...new Set((vend || []).map(x => x.variante_id).filter(Boolean))]; let agot = new Set();
+    for (let i = 0; i < ids.length; i += 300) { const { data: vs } = await sb.from('v_variantes').select('producto_id,stock,producto_tipo').in('id', ids.slice(i, i + 300)).lte('stock', 0).eq('activa', true); (vs || []).filter(v => v.producto_tipo === 'prenda').forEach(v => agot.add(v.producto_id)); }
+    if (agot.size) items.push(['catalogo/inventario.html', '🫙', 'aviso', 'Agotadas que se venden', 'Se vendieron en los últimos 30 días y no queda stock: para reponer', fmt.num(agot.size)]); }
   // la web: publicaciones visibles sin conectar a Percha y conexiones nuevas con stock distinto (sql/117)
   if (APP.esAdmin) {
     const { data: cav } = await sb.rpc('canal_avisos', { e: APP.empresa.id }); const w = cav || {};
@@ -219,7 +237,8 @@ APP.ready.then(async () => {
     if (+w.sin_conectar) items.push([`conexiones/cruce.html?c=${w.conexion}&f=sin_cruzar`, '🔌', 'aviso', 'Publicaciones de la web sin conectar', +w.sin_conectar_con_stock ? `${fmt.num(w.sin_conectar_con_stock)} con stock: Percha no las controla` : 'Visibles en la web y sin su prenda en Percha', fmt.num(w.sin_conectar)]);
   }
   items.push(['catalogo/inventario.html', '👚', '', 'Prendas en el local', puede('costos') ? `Valen ${fmt.pesos(r.valor_costo)} a costo` : 'Unidades en stock', fmt.num(r.unidades)]);
-  $('#mirar').innerHTML = items.map(([href, ic, cl, ti, sub, n]) => `<a href="${href}"><span class="ic ${cl}">${ic}</span><span class="tx"><b>${ti}</b><small>${sub}</small></span><span class="num">${n}</span></a>`).join('');
+  $('#mirar').innerHTML = items.map(([href, ic, cl, ti, sub, n, accion]) => `<a href="${href}"${accion ? ` data-accion="${accion}"` : ''}><span class="ic ${cl}">${ic}</span><span class="tx"><b>${esc(ti)}</b><small>${esc(sub)}</small></span><span class="num">${n}</span></a>`).join('');
+  { const ap = $('#mirar [data-accion="pend"]'); if (ap) ap.onclick = ev => { ev.preventDefault(); if (window.PENDIENTES) PENDIENTES.abrir(); }; }
 
   // ---------- clima ----------
   async function climaCargar() {

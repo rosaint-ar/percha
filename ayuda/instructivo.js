@@ -292,7 +292,8 @@ window.INSTRUCTIVO = {
     // ======================= CAJA =======================
     { id: 'movimientos', grupo: 'caja', p: 'vender', titulo: 'Sacar o poner plata en la caja', resumen: 'Pagos, retiros o cambio que entra: {{💵 Ingreso / retiro}}.', bloques: [
       { tipo: 'pasos', items: ['Arriba en el Punto de venta tocá {{💰 Caja}}.', '{{💵 Ingreso / retiro}}: elegí si sale o entra plata, el monto y el concepto (ej. "pago a proveedor").'] },
-      { tipo: 'ojo', texto: 'Registrá **toda** plata que sale o entra del cajón sin ser venta. Si no, al cerrar la caja no cuadra.' }
+      { tipo: 'ojo', texto: 'Registrá **toda** plata que sale o entra del cajón sin ser venta. Si no, al cerrar la caja no cuadra.' },
+      { tipo: 'tip', texto: '¿Lo cargaste mal o dos veces? En {{💰 Caja}}, al lado del movimiento, tocá {{✕}} y confirmá. Se puede mientras la caja está abierta (administración o quien lo cargó).' }
     ] },
     { id: 'cerrar-caja', grupo: 'caja', p: 'vender', titulo: 'Cerrar la caja', resumen: 'Contás cada medio, ves si cuadra y dejás el cambio para mañana.', bloques: [
       { tipo: 'pasos', items: [
@@ -379,7 +380,8 @@ window.INSTRUCTIVO = {
     ] },
     { id: 'compras-pedido', grupo: 'compras', p: 'compras', titulo: 'Lo pedido que todavía no llegó', nuevo: '2026-11-03', resumen: 'Se anota como pedido; cuando llega, un toque y entra.', bloques: [
       { tipo: 'pasos', items: ['**Compras e ingresos** › {{📝 Anotar un pedido}}: cargalo igual que un remito y tocá {{💾 Guardar pedido}}.', 'Queda arriba de todo en **Compras e ingresos**, esperando.', 'Cuando llega, tocá {{📦 Llegó: ingresarlo}}, revisá y {{📦 Ya llegó: ingresar al stock}}.'] },
-      { tipo: 'tip', texto: '¿Llegó **solo una parte**? Cuando pregunta si llegó todo, tocá {{Llegó solo una parte}} y poné cuántas llegaron de cada una. Lo que falta queda esperando en la misma compra.' }
+      { tipo: 'tip', texto: '¿Llegó **solo una parte**? Cuando pregunta si llegó todo, tocá {{Llegó solo una parte}} y poné cuántas llegaron de cada una. Lo que falta queda esperando en la misma compra.' },
+      { tipo: 'tip', texto: 'Si lo que falta **ya no va a llegar**, abrí la compra y tocá {{El resto no va a llegar}}: queda cerrada con lo que llegó y el total pasa a ser el de lo recibido.' },
     ] },
 
     { id: 'precio-oferta', grupo: 'compras', p: 'catalogo_editar', titulo: 'Precio de lista y oferta', nuevo: '2026-11-03', resumen: 'Una prenda en oferta: el de lista tachado, en el local, en la web o en los dos.', bloques: [
