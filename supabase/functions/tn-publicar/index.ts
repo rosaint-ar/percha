@@ -156,6 +156,101 @@ Deno.serve(async (req) => {
       }
     }
 
+
+    // ===== completar una publicación nueva como las demás de la tienda (12/11, Diego) =====
+    // Categorías: las de la prenda MÁS PARECIDA que ya está publicada (misma familia en Percha, nombre parecido: PIA BORGOÑA
+    // copia de PIA BORDÓ), + «Nuevos Ingresos» y la etiqueta «nuevos-ingresos» (para mostrarlas aparte en la web),
+    // + «Talles grandes» si llega a 2XL/3XL. También la marca, el título y la descripción para Google, y «adulto / mujer».
+    let catsTienda: any[] | null = null;
+    const categoriasTienda = async () => { if (catsTienda) return catsTienda; catsTienda = []; for (let pg = 1; pg <= 5; pg++) { const l = await tn("GET", `/categories?fields=id,name,parent&per_page=200&page=${pg}`).catch(() => []); if (!Array.isArray(l) || !l.length) break; catsTienda.push(...l); if (l.length < 200) break; } return catsTienda; };
+    const PALABRAS_VACIAS = new Set(["de", "la", "el", "y", "con", "c", "x"]);
+    const tokens = (s: string) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter((w) => w && !PALABRAS_VACIAS.has(w));
+    const parecido = (a: string, b: string) => { const ta = tokens(a), tb = tokens(b), sa = new Set(ta), sb = new Set(tb); let p = 0; ta.forEach((w, i) => { if (sb.has(w)) p += i === 0 ? 3 : 1; }); tb.forEach((w) => { if (!sa.has(w)) p -= 0.5; }); return p; };
+    async function completarPublicacion(pe: string, p: any, forzar = false) {
+      const info = await tn("GET", `/products/${pe}?fields=id,name,categories,brand,tags,seo_title,seo_description,variants`);
+      const nombre = es(info.name);
+      if (!forzar && (info.categories || []).length && info.brand) return { publicacion: pe, ya_estaba: true };
+      // la prenda modelo
+      const { data: herm } = await admin.from("productos").select("id,nombre").eq("empresa_id", e).eq("categoria_id", p.categoria_id).neq("id", p.id).limit(3000);
+      const { data: todos } = await admin.from("productos").select("id,nombre").eq("empresa_id", e).eq("activo", true).neq("id", p.id).limit(5000);
+      const orden = [{ h: { id: p.id, nombre: p.nombre } },
+        ...(herm || []).map((h: any) => ({ h, s: parecido(nombre, h.nombre) })).sort((a: any, b: any) => b.s - a.s).slice(0, 12),
+        ...(todos || []).map((h: any) => ({ h, s: parecido(nombre, h.nombre) })).sort((a: any, b: any) => b.s - a.s).slice(0, 12)];
+      let modelo: any = null, modeloNombre = "";
+      for (const { h } of orden) {
+        const { data: cs } = await admin.from("canal_items").select("producto_ext,variantes!inner(producto_id)").eq("conexion_id", cx.id).eq("publicado", true).eq("de_percha", false).eq("variantes.producto_id", h.id).limit(1);
+        if (!cs?.length || String(cs[0].producto_ext) === pe) continue;
+        const m = await tn("GET", `/products/${cs[0].producto_ext}?fields=id,name,categories,brand,seo_title,seo_description,variants`).catch(() => null);
+        if (m && (m.categories || []).length) { modelo = m; modeloNombre = h.nombre; break; }
+      }
+      const cats = await categoriasTienda();
+      const nuevos = cats.find((c: any) => /nuevos ingresos/i.test(es(c.name)));
+      const grandes = cats.filter((c: any) => /talles grandes/i.test(es(c.name)));
+      const deModelo = (modelo?.categories || []).filter((c: any) => !/rebajas|favoritos|ofertas|sale/i.test(es(c.name)));
+      const ids = new Set<number>(deModelo.map((c: any) => c.id));
+      // talles grandes: según los talles de ESTA prenda, no los del modelo
+      const { data: ts } = await admin.from("v_variantes").select("talle_nombre").eq("producto_id", p.id).eq("activa", true);
+      const esGrande = (ts || []).some((t: any) => /\b(2xl|3xl|4xl|xxl|xxxl)\b/i.test(String(t.talle_nombre || "")));
+      const padres = new Set(cats.filter((c: any) => ids.has(c.id)).map((c: any) => c.parent));
+      // las categorías que DESCRIBEN la prenda van solo si su nombre lo dice (no se copian del modelo a ciegas): se sacan
+      // si no corresponde y se suman las de la misma rama que sí (ej. «REGULABLE» → Regulables)
+      const DESCRIBE: [RegExp, RegExp][] = [[/^regulables?$/, /\bregulable/], [/^elastico ancho$/, /\belastico ancho\b/], [/^algodon$/, /\balgodon\b/],
+        [/^puntilla$/, /\bpuntilla\b/], [/^fru fru$/, /\bfru fru\b/], [/^sin costuras?$/, /\b(sin costuras?|seamless)\b/], [/^boxer femenino$/, /\bboxer\b/],
+        [/^colaless$/, /^(less|colaless)\b/], [/^vedetinas?$/, /^vedetina/], [/^culotteless$/, /^culotteless/]];
+      const n2 = (x: string) => String(x || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+      const nomN = n2(nombre);
+      for (const c of cats) { const cn = n2(es(c.name)); const r = DESCRIBE.find(([rc]) => rc.test(cn)); if (!r) continue;
+        if (!r[1].test(nomN)) ids.delete(c.id); else if (padres.has(c.parent)) ids.add(c.id); }
+      for (const g of grandes) { if (esGrande && (ids.has(g.parent) || padres.has(g.parent))) ids.add(g.id); else if (!esGrande) ids.delete(g.id); }
+      if (nuevos) ids.add(nuevos.id);
+      const marca = modelo?.brand || null;
+      const tags = [...new Set([...String(info.tags || "").split(",").map((t) => t.trim()).filter(Boolean), "nuevos-ingresos"])].join(", ");
+      const tienda = (es(modelo?.seo_title).match(/ - (.+)$/) || [])[1] || (marca ? "Comprar en " + marca : "");
+      const seoDesc = es(modelo?.seo_description) ? es(modelo.seo_description).replace(/^(Compr[aá] online )(.+?)( en \d)/i, (_m: string, a: string, _b: string, c: string) => a + nombre + c) : "";
+      const cuerpo: any = { categories: [...ids], tags, ...(marca && !info.brand ? { brand: marca } : {}) };
+      if (!es(info.seo_title) && tienda) cuerpo.seo_title = { es: (nombre + " - " + tienda).slice(0, 70) };
+      if (!es(info.seo_description) && seoDesc && seoDesc !== es(modelo.seo_description)) cuerpo.seo_description = { es: seoDesc.slice(0, 320) };
+      if (simular) return { publicacion: pe, modelo: modeloNombre, categorias: [...ids].length, cuerpo };
+      await tn("PUT", `/products/${pe}`, cuerpo);
+      if (nuevos && !info.categories?.some((c: any) => c.id === nuevos.id)) await admin.from("canal_items").update({ nuevo_hasta: new Date(Date.now() + 30 * 86400000).toISOString() }).eq("conexion_id", cx.id).eq("producto_ext", pe);
+      // «adulto / mujer» (Google Shopping) como el modelo
+      const mv = (modelo?.variants || [])[0];
+      if (mv && (mv.age_group || mv.gender)) for (const v of (info.variants || []).filter((v: any) => !v.age_group || !v.gender)) await tn("PUT", `/products/${pe}/variants/${v.id}`, { age_group: v.age_group || mv.age_group, gender: v.gender || mv.gender }).catch(() => null);
+      return { publicacion: pe, modelo: modeloNombre, categorias: [...ids].length };
+    }
+
+    if (body.completar) {
+      const { data: dp } = await admin.from("canal_items").select("producto_ext,variantes!inner(producto_id)").eq("conexion_id", cx.id).eq("de_percha", true);
+      const pubs = new Map<string, string>(); (dp || []).forEach((c: any) => pubs.set(String(c.producto_ext), c.variantes.producto_id));
+      res.completadas = [];
+      for (const [pe, pid] of pubs) {
+        const { data: p } = await admin.from("productos").select("id,nombre,categoria_id").eq("id", pid).single();
+        try { res.completadas.push(await completarPublicacion(pe, p, !!body.forzar)); } catch (err) { res.completadas.push({ publicacion: pe, error: String(err).slice(0, 150) }); }
+      }
+      resumen.push(res); continue;
+    }
+    // «Nuevos Ingresos» dura 30 días (canal_items.nuevo_hasta): una vez por día se le saca la categoría y la etiqueta
+    if (body.vencer_nuevos || (!body.producto_id && new Date().getUTCHours() === 9 && new Date().getUTCMinutes() < 2)) {
+      const { data: vencidas } = await admin.from("canal_items").select("producto_ext").eq("conexion_id", cx.id).lt("nuevo_hasta", new Date().toISOString());
+      const pes = [...new Set((vencidas || []).map((c: any) => String(c.producto_ext)))];
+      res.nuevos_vencidos = [];
+      if (pes.length) {
+        const nuevos = (await categoriasTienda()).find((c: any) => /nuevos ingresos/i.test(es(c.name)));
+        for (const pe of pes) {
+          try {
+            if (!simular) {
+              const info = await tn("GET", `/products/${pe}?fields=id,categories,tags`);
+              const tags = String(info.tags || "").split(",").map((t: string) => t.trim()).filter((t: string) => t && t.toLowerCase() !== "nuevos-ingresos").join(", ");
+              await tn("PUT", `/products/${pe}`, { categories: (info.categories || []).map((c: any) => c.id).filter((id: number) => !nuevos || id !== nuevos.id), tags });
+              await admin.from("canal_items").update({ nuevo_hasta: null }).eq("conexion_id", cx.id).eq("producto_ext", pe);
+            }
+            res.nuevos_vencidos.push(pe);
+          } catch (err) { if (String(err).includes(" 404")) await admin.from("canal_items").update({ nuevo_hasta: null }).eq("conexion_id", cx.id).eq("producto_ext", pe); }
+        }
+      }
+      if (body.vencer_nuevos) { resumen.push(res); continue; }
+    }
+
     async function publicarProducto(q: any) {
       const { data: p } = await admin.from("productos").select("id,codigo,nombre,precio,tipo,activo,es_generico,publicar_web,categoria_id").eq("id", q.producto_id).single();
       if (!p) return { omitido: "el producto no existe" };
@@ -178,7 +273,7 @@ Deno.serve(async (req) => {
         values: attrs.map((a, i) => ({ es: esColor(a) ? v.color_nombre : esTalle(a) ? (vivos.map((x: any) => es((x.values || [])[i])).find((t: string) => talleClave(t) === talleClave(v.talle_nombre)) || v.talle_nombre || "Único") : "" })),
         price: precioDe(v), ...(promoN(v) ? { promotional_price: (+promoN(v)).toFixed(2) } : {}), stock: Math.max(0, Math.floor(+v.stock_web || 0)), sku: p.codigo, mpn: p.codigo, ...MEDIDAS, ...(visible ? {} : { visible: false }) });
       const attrsPara = (vs2: any[]) => [...(vs2.some((v) => v.color) ? ["Color"] : []), ...(vs2.some((v) => v.talle) ? ["Talle"] : [])];
-      const avisos: string[] = [], creadas: any[] = [], publicaciones: any[] = [];
+      const avisos: string[] = [], creadas: any[] = [], publicaciones: any[] = [], completadas: any[] = [];
       // guardar el cruce de lo que se creó (stock y precios siguen solos desde acá)
       const cruzar = async (prodTN: any, varTN: any, v: any, dePercha = false) => {
         creadas.push({ variante: [v.color_nombre, v.talle_nombre].filter(Boolean).join(" ") || "única", publicacion: String(prodTN.id), variante_ext: String(varTN.id), visible: varTN.visible !== false });
@@ -200,6 +295,7 @@ Deno.serve(async (req) => {
         if (!previa && q.id) await admin.from("canal_publicar").update({ detalle: { ...(q.detalle || {}), creadas_tn: [...(q.detalle?.creadas_tn || []), { id: prod.id, nombre }] } }).eq("id", q.id);
         if (!previa) q.detalle = { ...(q.detalle || {}), creadas_tn: [...(q.detalle?.creadas_tn || []), { id: prod.id, nombre }] };
         for (const v of vs2) { const x = emparejar(prod.variants || [], attrs, v); if (x) await cruzar(prod, x, v, true); else avisos.push(`No encontré en la web ${[v.color_nombre, v.talle_nombre].filter(Boolean).join(" ")}`); }
+        try { completadas.push(await completarPublicacion(String(prod.id), p)); } catch (err) { avisos.push("No se pudieron cargar las categorías: " + String(err).slice(0, 120)); }
       };
 
       if (!(cruces || []).length) {
@@ -239,7 +335,7 @@ Deno.serve(async (req) => {
           await crearPublicacion(color ? `${p.nombre} ${String(grupo[0].color_nombre || "").toUpperCase()}` : p.nombre, grupo);
         }
       }
-      return { publicaciones, creadas: creadas.length, detalle: creadas, avisos };
+      return { publicaciones, creadas: creadas.length, detalle: creadas, avisos, completadas };
     }
 
 
