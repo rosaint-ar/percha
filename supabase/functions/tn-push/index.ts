@@ -129,7 +129,7 @@ Deno.serve(async (req) => {
     }
 
     const items: any[] = [];   // de a tandas: una lista larga de ids no entra en la dirección de la consulta
-    for (let i = 0; i < variantes.length; i += 300) items.push(...await pag(() => admin.from("canal_items").select("id,variante_id,producto_ext,variante_ext,stock,talle_canal,color_canal,publicado,stock_a_decidir").eq("conexion_id", cx.id).in("variante_id", variantes.slice(i, i + 300))));
+    for (let i = 0; i < variantes.length; i += 300) items.push(...await pag(() => admin.from("canal_items").select("id,variante_id,producto_ext,variante_ext,stock,talle_canal,color_canal,publicado,stock_a_decidir,de_percha").eq("conexion_id", cx.id).in("variante_id", variantes.slice(i, i + 300))));
     const stocks: any[] = [];
     for (let i = 0; i < variantes.length; i += 300) { const { data } = await admin.from("v_variantes").select("id,producto_id,producto_tipo,sku,stock,fallas,producto_nombre,talle_nombre,color_nombre,activa").in("id", variantes.slice(i, i + 300)); stocks.push(...(data || [])); }
     const infoVar = new Map(stocks.map((s: any) => [s.id, s]));
@@ -224,7 +224,8 @@ Deno.serve(async (req) => {
         continue;
       }
       // lo que está oculto en la web no se toca (publicaciones viejas o pausadas), salvo que la conexión diga tener en cuenta los ocultos
-      const oculto = (d: any) => !cx.incluir_ocultos && (simular && body.todo ? visible.get(String(d.variante_ext)) === false : d.publicado === false);
+      // o que la publicación la haya creado Percha (prenda nueva, oculta hasta que tenga fotos: el stock tiene que estar, 12/11)
+      const oculto = (d: any) => !cx.incluir_ocultos && !d.de_percha && (simular && body.todo ? visible.get(String(d.variante_ext)) === false : d.publicado === false);
       const ocultos = todos.filter(oculto);
       if (ocultos.length === todos.length) { if (simular) sinTocar.push({ producto: v.producto_nombre, por: "oculto en la web" }); else await admin.from("canal_cola").update({ estado: "hecho", hecho: new Date().toISOString(), error: "oculto en la web: no se manda" }).eq("conexion_id", cx.id).eq("variante_id", vid).eq("estado", "pendiente"); continue; }
       // conexión nueva con stock distinto: se espera la decisión (si ya coinciden, se destraba sola)

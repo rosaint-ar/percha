@@ -180,12 +180,12 @@ Deno.serve(async (req) => {
       const attrsPara = (vs2: any[]) => [...(vs2.some((v) => v.color) ? ["Color"] : []), ...(vs2.some((v) => v.talle) ? ["Talle"] : [])];
       const avisos: string[] = [], creadas: any[] = [], publicaciones: any[] = [];
       // guardar el cruce de lo que se creó (stock y precios siguen solos desde acá)
-      const cruzar = async (prodTN: any, varTN: any, v: any) => {
+      const cruzar = async (prodTN: any, varTN: any, v: any, dePercha = false) => {
         creadas.push({ variante: [v.color_nombre, v.talle_nombre].filter(Boolean).join(" ") || "única", publicacion: String(prodTN.id), variante_ext: String(varTN.id), visible: varTN.visible !== false });
         if (simular) return;
         await admin.from("canal_items").upsert({ empresa_id: e, conexion_id: cx.id, producto_ext: String(prodTN.id), variante_ext: String(varTN.id), nombre: es(prodTN.name), valores: (varTN.values || []).map(es).join(" / "),
           sku: p.codigo, mpn: p.codigo, talle_canal: v.talle_nombre || null, color_canal: v.color_nombre || null, precio: +precioDe(v), precio_promo: promoN(v), stock: Math.max(0, Math.floor(+v.stock_web || 0)),
-          publicado: prodTN.published !== false, variante_id: v.id, cruce: "manual", actualizado: new Date().toISOString() }, { onConflict: "conexion_id,variante_ext" });
+          publicado: prodTN.published !== false, variante_id: v.id, cruce: "manual", actualizado: new Date().toISOString(), ...(dePercha ? { de_percha: true } : {}) }, { onConflict: "conexion_id,variante_ext" });
       };
       const emparejar = (varsTN: any[], attrs: string[], v: any) => varsTN.find((x: any) => attrs.every((a, i) => esTalle(a) ? talleClave(es((x.values || [])[i])) === talleClave(v.talle_nombre) : norm(es((x.values || [])[i])) === norm(esColor(a) ? v.color_nombre : "")));
       // una publicación nueva, oculta
@@ -199,7 +199,7 @@ Deno.serve(async (req) => {
         const prod = previa ? await tn("GET", `/products/${previa.id}?fields=id,name,published,attributes,variants`) : await tn("POST", "/products", cuerpo);
         if (!previa && q.id) await admin.from("canal_publicar").update({ detalle: { ...(q.detalle || {}), creadas_tn: [...(q.detalle?.creadas_tn || []), { id: prod.id, nombre }] } }).eq("id", q.id);
         if (!previa) q.detalle = { ...(q.detalle || {}), creadas_tn: [...(q.detalle?.creadas_tn || []), { id: prod.id, nombre }] };
-        for (const v of vs2) { const x = emparejar(prod.variants || [], attrs, v); if (x) await cruzar(prod, x, v); else avisos.push(`No encontré en la web ${[v.color_nombre, v.talle_nombre].filter(Boolean).join(" ")}`); }
+        for (const v of vs2) { const x = emparejar(prod.variants || [], attrs, v); if (x) await cruzar(prod, x, v, true); else avisos.push(`No encontré en la web ${[v.color_nombre, v.talle_nombre].filter(Boolean).join(" ")}`); }
       };
 
       if (!(cruces || []).length) {
