@@ -29,6 +29,8 @@
     if (window.CAJAFX) CAJAFX.sonido('pedido');
     const raiz = (window.APP && APP.root) || '';
     const a = document.createElement('a'); a.className = 'aviso-pedido'; a.href = raiz + 'caja/ventas.html';
+    // en el Punto de venta: arriba (abajo tapaba Cobrar) y se abre en otra pestaña (si no, se perdía el ticket en curso)
+    if (document.body.dataset.page === 'pos') { a.style.top = '16px'; a.style.bottom = 'auto'; a.target = '_blank'; a.rel = 'noopener'; }
     a.innerHTML = `<span class="ic">🛍️</span><span><b>¡Nuevo pedido en ${esc(canal)}!</b><small>Venta #${esc(v.numero)} · ${pesos(v.total)}</small></span><button class="x" title="Cerrar">✕</button>`;
     const fuera = () => { a.classList.add('sale'); setTimeout(() => a.remove(), 320); };
     a.querySelector('.x').onclick = ev => { ev.preventDefault(); ev.stopPropagation(); fuera(); };

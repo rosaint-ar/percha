@@ -5,7 +5,7 @@
   --acento:#5B4B8A; --acento-rgb:91,75,138;
   --acento-tinta:#fff;
   --lienzo:#EEF0F4; --lienzo-2:#E6E8EE;
-  --tinta:#15171C; --tinta-2:#3C4150; --tinta-3:#7A8194; --tinta-4:#A9AFBF;
+  --tinta:#15171C; --tinta-2:#3C4150; --tinta-3:#5F6678; --tinta-4:#8A90A0;
   --superficie:rgba(255,255,255,.72); --superficie-2:rgba(255,255,255,.92); --superficie-borde:rgba(255,255,255,.9);
   --vidrio:var(--superficie); --vidrio-fuerte:var(--superficie-2); --vidrio-borde:var(--superficie-borde);
   --linea:rgba(21,23,28,.10); --linea-suave:rgba(21,23,28,.06);
@@ -112,7 +112,21 @@ main.app{max-width:1240px;margin:0 auto;padding:10px 28px 72px;position:relative
 .btn.primario{background:linear-gradient(180deg, rgba(var(--acento-rgb),1), rgba(var(--acento-rgb),.86));border-color:rgba(var(--acento-rgb),.9);color:#fff;box-shadow:0 6px 16px rgba(var(--acento-rgb),.3), inset 0 1px 0 rgba(255,255,255,.28)}
 .btn.primario:hover{filter:brightness(1.05);background:var(--acento)}
 .btn.suave{background:var(--lila);border-color:transparent;color:var(--acento);box-shadow:none}
-.btn.peligro{color:var(--error)}
+.btn.peligro{color:var(--error);border-color:rgba(180,48,43,.28)}
+.btn.peligro:hover{background:rgba(180,48,43,.08)}
+/* cartel "hay una versión nueva" (pantallas abiertas todo el día) */
+.aviso-version{position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:9000;background:var(--superficie-2);border:1px solid rgba(var(--acento-rgb),.35);box-shadow:var(--sombra-flotante);border-radius:12px;padding:8px 10px 8px 14px;font:600 13px var(--f-ui);display:flex;gap:10px;align-items:center;max-width:calc(100vw - 24px)}
+.aviso-version button{border:0;border-radius:8px;background:var(--acento);color:#fff;font:700 12.5px var(--f-ui);padding:6px 10px;cursor:pointer}
+/* el menú lateral se desplaza solo: en pantallas bajas "Salir" y la empresa quedaban fuera de la pantalla */
+.lateral nav{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+/* la barra de arriba no empuja la página de costado en el celular */
+.barra-superior .miga{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+/* tablas anchas: se desplazan de costado en vez de romper la pantalla */
+@media (max-width:760px){.card>table.lista,.modal table.lista{display:block;overflow-x:auto;white-space:nowrap}}
+/* formularios en el celular: una columna, y los botones del pie bajan de renglón */
+@media (max-width:560px){.form-modal{grid-template-columns:1fr}.form-modal .campo.c2{grid-column:1/-1}.form-modal .campo,.form-modal .pie{grid-column:1/-1}.modal .pie{flex-wrap:wrap}}
+/* pantallas táctiles: botones para el dedo y sin zoom automático del iPhone al tocar un campo */
+@media (pointer:coarse){.btn{min-height:40px}.btn.chico{min-height:34px}input,select,textarea{font-size:16px}}
 .btn.chico{padding:5px 10px;font-size:12px;border-radius:8px}
 .btn:disabled{opacity:.5;cursor:default;transform:none}
 .btn svg{width:15px;height:15px}
@@ -182,7 +196,8 @@ td .cod{font:500 11px var(--f-mono);color:var(--tinta-3);letter-spacing:.02em}
 @media (max-width:1000px){.tiles{grid-template-columns:1fr 1fr}.fila.c3,.fila.c4{grid-template-columns:1fr 1fr}}
 @media (max-width:900px){
   body.con-lateral{grid-template-columns:1fr}
-  .lateral{position:fixed;left:0;top:0;bottom:0;width:min(84vw,300px);transform:translateX(-105%);transition:transform .2s ease;box-shadow:var(--sombra-flotante)}
+  .barra-superior .reloj{display:none}
+  .lateral{position:fixed;left:0;top:0;bottom:0;height:100dvh;width:min(84vw,300px);transform:translateX(-105%);transition:transform .2s ease;box-shadow:var(--sombra-flotante)}
   body.lateral-abierta .lateral{transform:none}
   .telon{position:fixed;inset:0;background:rgba(21,23,28,.3);z-index:29;display:none}
   body.lateral-abierta .telon{display:block}

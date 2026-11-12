@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Promociones · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611121407">
+<link rel="stylesheet" href="../shell/shell.css?v=202611121441">
 <style>
   .pestanas{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
   .pestanas a{font:600 13px var(--f-ui);color:var(--tinta);text-decoration:none;padding:8px 14px;border:1px solid var(--linea);background:var(--superficie-2);border-radius:10px}
@@ -38,16 +38,16 @@
     <table class="lista" id="tb"><tr><th>Nombre</th><th>Regla</th><th>Alcance</th><th>Dónde</th><th>Vigencia</th><th>Activa</th><th></th></tr></table></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611121407"></script>
-<script src="../shared/canales.js?v=202611121407"></script>
-<script src="../shell/shell.js?v=202611121407"></script>
+<script src="../shared/supabase.js?v=202611121441"></script>
+<script src="../shared/canales.js?v=202611121441"></script>
+<script src="../shell/shell.js?v=202611121441"></script>
 <script>
 APP.ready.then(async () => {
   const { esc, $, $$, toast, modal, confirmar, mensajeError, fmt } = APP, e = APP.empresa.id;
   if (!APP.esAdmin) { document.querySelector('main').innerHTML = '<div class="card"><p>Esta sección es solo para administración.</p></div>'; return; }
   const [{ data: cats }, { data: prods }, { data: listas }] = await Promise.all([sb.from('categorias').select('id,nombre').eq('empresa_id', e).eq('activa', true).order('orden'), sb.from('productos').select('id,nombre,codigo,precio,categoria_id').eq('empresa_id', e).eq('activo', true).order('nombre').limit(5000), sb.from('listas_precios').select('id,nombre').eq('empresa_id', e).eq('activa', true).order('orden')]);
   const nice = s => s.charAt(0) + s.slice(1).toLowerCase();
-  const canales = await CANALES.cargar(e);
+  const canales = CANALES.activos(await CANALES.cargar(e));   // solo los canales prendidos
   const dondeTxt = cs => !cs || !cs.length || cs.length >= canales.length ? 'Todos los canales' : cs.map(k => CANALES.nombre(canales, k)).join(' · ');
   let volver = null;   // si se abrió desde otra pantalla (la conexión), al guardar vuelve allá
   const DIAS = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá', 'Do'];
@@ -61,7 +61,7 @@ APP.ready.then(async () => {
     (data || []).forEach(p => tb.insertAdjacentHTML('beforeend', `<tr><td><b>${esc(p.nombre)}</b></td><td>${regla(p)}</td><td>${esc(alcance(p))}</td><td><span class="chip ${p.canales && p.canales.length ? '' : 'ok'}">${esc(dondeTxt(p.canales))}</span>${p.listas && p.listas.length ? `<br><small>${esc(p.listas.map(id => (listas.find(l => l.id === id) || {}).nombre).filter(Boolean).join(', '))}</small>` : ''}</td><td><small>${p.desde ? fmt.fecha(p.desde) : 'siempre'}${p.hasta ? ' → ' + fmt.fecha(p.hasta) : ''} · ${(p.dias_semana || []).length === 7 ? 'todos los días' : (p.dias_semana || []).map(d => DIAS[d - 1]).join(' ')}</small></td><td>${p.activa ? '<span class="chip ok">activa</span>' : '<span class="chip gris">pausada</span>'}</td><td><button class="btn chico" data-e="${p.id}">Editar</button> <button class="btn chico" data-p="${p.id}">${p.activa ? 'Pausar' : 'Activar'}</button></td></tr>`));
     if (!(data || []).length) tb.insertAdjacentHTML('beforeend', '<tr><td colspan="7" class="vacio">Sin promociones. Creá la primera: por ejemplo "3 bombachas, paga 2".</td></tr>');
     $$('[data-e]', tb).forEach(b => b.onclick = () => editar(data.find(p => p.id === b.dataset.e)));
-    $$('[data-p]', tb).forEach(b => b.onclick = async () => { const p = data.find(x => x.id === b.dataset.p); await sb.from('promociones').update({ activa: !p.activa }).eq('id', p.id); cargar(); });
+    $$('[data-p]', tb).forEach(b => b.onclick = async () => { const p = data.find(x => x.id === b.dataset.p); b.disabled = true; const r = await sb.from('promociones').update({ activa: !p.activa }).eq('id', p.id); if (r.error) { b.disabled = false; toast(mensajeError(r.error), 'error'); return; } cargar(); });
   }
   function editar(p, previo) {
     const pk = { q: '', fam: '' };   // selector de productos (como el panel de Tienda Nube)
@@ -87,7 +87,7 @@ APP.ready.then(async () => {
       <label style="margin-top:12px">Precios de oferta puntuales <small>(mandan sobre el %)</small></label>
       ${fijos == null ? '<p class="sub">Cargando…</p>' : `<div class="reb-tabla"><table>${fijos.length ? fijos.map(filaFijo).join('') : '<tr><td class="vacio">Sin precios de oferta puntuales.</td></tr>'}</table></div>
       <div class="reb-alta"><input id="f-prod" list="dl-prods-reb" placeholder="Producto (nombre o código)" style="flex:1;min-width:200px"><datalist id="dl-prods-reb">${prods.map(x => `<option value="${esc(x.codigo)} · ${esc(x.nombre)}"></option>`).join('')}</datalist><input id="f-precio" type="number" step="1" min="0" placeholder="Precio de oferta" style="width:140px"><button type="button" class="btn" id="f-mas">+ Agregar</button></div>`}`;
-    const m = modal('<div id="pe"></div>'); $('.modal', m).style.maxWidth = '640px';
+    const m = modal('<div id="pe"></div>', { fijo: true }); $('.modal', m).style.maxWidth = '640px';   // fija: un toque afuera no borra todo lo cargado
     const visibles = () => { const pal = pk.q.toLowerCase().split(/\s+/).filter(Boolean); return prods.filter(x => (!pk.fam || x.categoria_id === pk.fam) && pal.every(w => (x.nombre + ' ' + x.codigo).toLowerCase().includes(w))); };
     function pintarPicker() {
       const sel = new Set(p.producto_ids || []), vs = visibles(), cont = $('#pk-lista', m);
@@ -146,12 +146,23 @@ APP.ready.then(async () => {
       const mas = $('#p-mas-esc', m); if (mas) mas.onclick = () => { leer(); const ult = p.escalones[p.escalones.length - 1] || { n: 2, valor: 5 }; p.escalones.push({ n: ult.n * 2, valor: Math.min(100, ult.valor + 5) }); pintar(); const ins = $$('.esc-fila [data-k="valor"]', m); ins[ins.length - 1].focus(); };
       $$('[data-quitar]', m).forEach(b => b.onclick = () => { leer(); p.escalones.splice(+b.dataset.quitar, 1); pintar(); });
       $('[data-no]', m).onclick = () => m.cerrar();
-      const del = $('[data-del]', m); if (del) del.onclick = async () => { if (await confirmar('¿Borrar la promoción?', 'Borrar')) { await sb.from('promociones').delete().eq('id', p.id); m.cerrar(); cargar(); } };
+      const del = $('[data-del]', m); if (del) del.onclick = async () => {
+        // si ya se usó en ventas, se pausa (borrarla les sacaba a esas ventas qué promo tuvieron)
+        const { count } = await sb.from('venta_lineas').select('id', { count: 'exact', head: true }).eq('promocion_id', p.id);
+        if (count) { if (!await confirmar(`Ya se aplicó en ${count} renglones de ventas: se pausa (no se borra) para no perder ese historial. ¿Pausarla?`, 'Pausar')) return; const r = await sb.from('promociones').update({ activa: false }).eq('id', p.id); if (r.error) { toast(mensajeError(r.error), 'error'); return; } m.cerrar(); toast('Promoción pausada'); cargar(); return; }
+        if (await confirmar('¿Borrar la promoción?', 'Borrar')) { const r = await sb.from('promociones').delete().eq('id', p.id); if (r.error) { toast(mensajeError(r.error), 'error'); return; } m.cerrar(); cargar(); } };
       $('[data-si]', m).onclick = guardar;
     };
+    let guardandoP = false;
     const guardar = async () => {
+      if (guardandoP) return;   // doble clic: una sola promoción
       leer();
       if (!p.nombre.trim()) { toast('Ponele un nombre', 'error'); return; }
+      if (p.desde && p.hasta && p.desde > p.hasta) { toast('«Desde» tiene que ser antes que «Hasta»', 'error'); return; }
+      if (p.tipo !== 'rebaja' && !(p.dias_semana || []).length) { toast('Tildá al menos un día', 'error'); return; }
+      guardandoP = true; try { await guardarSeguro(); } finally { guardandoP = false; }
+    };
+    const guardarSeguro = async () => {
       if (p.tipo === 'nxm' && !(p.n > p.m && p.m > 0)) { toast('"Lleva" tiene que ser mayor que "paga"', 'error'); return; }
       if (p.tipo === 'cantidad') {
         const es = p.escalones.filter(x => x.n > 0 && x.valor > 0).sort((a, b) => a.n - b.n).map(x => ({ n: x.n, valor: x.valor, canales: x.canales && x.canales.length ? x.canales : null }));

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ventas · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611121407">
+<link rel="stylesheet" href="../shell/shell.css?v=202611121441">
 <style>
   .filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
   .filtros input[type=date],.filtros select{border:1px solid var(--linea);background:var(--superficie-2);padding:8px 10px;border-radius:var(--radio-mini)}
@@ -50,7 +50,7 @@
     <div class="card" style="padding:0"><table class="lista" id="tb"><thead><tr><th>Ticket</th><th>Fecha</th><th>Canal</th><th>Clienta</th><th>Atendió</th><th>Pago</th><th class="num">Total</th><th>Estado</th><th>Factura</th><th></th></tr></thead><tbody></tbody></table></div>
   </section>
   <section id="t-senas" style="display:none"><div class="card" style="padding:0"><table class="lista" id="tb-senas"><thead><tr><th>Ticket</th><th>Fecha</th><th>Clienta</th><th class="num">Total</th><th class="num">Pagado</th><th class="num">Saldo</th><th></th></tr></thead><tbody></tbody></table></div></section>
-  <section id="t-cierres" style="display:none"><div class="card" style="padding:0"><table class="lista" id="tb-cierres"><thead><tr><th>Caja</th><th>Abierta</th><th>Cerrada</th><th class="num">Ventas</th><th class="num">Diferencia</th><th></th></tr></thead><tbody></tbody></table></div></section>
+  <section id="t-cierres" style="display:none"><div class="card" style="padding:0"><table class="lista" id="tb-cierres"><thead><tr><th>Caja</th><th>Abierta</th><th>Cerrada</th><th class="num">Contado</th><th class="num">Diferencia</th><th></th></tr></thead><tbody></tbody></table></div></section>
   <section id="t-creditos" style="display:none"><div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button class="btn primario" id="btn-gift" hidden>🎁 Cargar gift card</button></div><div class="card" style="padding:0"><table class="lista" id="tb-creditos"><thead><tr><th>Código</th><th>Tipo</th><th>Clienta</th><th>Emitido</th><th class="num">Monto</th><th class="num">Saldo</th><th>Estado</th></tr></thead><tbody></tbody></table></div></section>
   <section id="t-canjes" style="display:none">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap"><p class="sub" style="margin:0">Prendas entregadas sin cargo (influencers): salen del stock, pero <b>no cuentan como venta</b> en Inicio, métricas ni cierres.</p><button class="btn primario" id="btn-canje">🤝 Nuevo canje</button></div>
@@ -60,12 +60,12 @@
 </main>
 <div id="impresion"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611121407"></script>
-<script src="../shared/canales.js?v=202611121407"></script>
-<script src="../shell/shell.js?v=202611121407"></script>
-<script src="../shared/ticket-cambio.js?v=202611121407"></script>
-<script src="../shared/nota-credito.js?v=202611121407"></script>
-<script src="../shared/facturar.js?v=202611121407"></script>
+<script src="../shared/supabase.js?v=202611121441"></script>
+<script src="../shared/canales.js?v=202611121441"></script>
+<script src="../shell/shell.js?v=202611121441"></script>
+<script src="../shared/ticket-cambio.js?v=202611121441"></script>
+<script src="../shared/nota-credito.js?v=202611121441"></script>
+<script src="../shared/facturar.js?v=202611121441"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -151,8 +151,9 @@ APP.ready.then(async () => {
         <div class="pie"><button class="btn" data-no>Volver</button><button class="btn peligro" data-si>Anular</button></div>`);
       $('[data-no]', m2).onclick = () => m2.cerrar();
       $('[data-si]', m2).onclick = async () => {
+        const bA = $('[data-si]', m2); if (bA.disabled) return; bA.disabled = true;   // doble toque: una sola anulación
         const { error } = await sb.rpc('caja_anular_venta', { p_venta: v.id, p_motivo: $('#an-motivo', m2).value.trim() || 'sin motivo' });
-        if (error) { toast(mensajeError(error), 'error'); return; } m2.cerrar(); m.cerrar(); toast(v.factura_estado === 'autorizado' ? 'Venta anulada: stock devuelto y nota de crédito en camino' : 'Venta anulada, stock devuelto'); if (v.factura_estado === 'autorizado') FACTURA.llamar({ accion: 'facturar', empresa_id: e }).catch(() => {}).then(cargar); cargar();
+        if (error) { bA.disabled = false; toast(mensajeError(error), 'error'); return; } m2.cerrar(); m.cerrar(); toast(v.factura_estado === 'autorizado' ? 'Venta anulada: stock devuelto y nota de crédito en camino' : 'Venta anulada, stock devuelto'); if (v.factura_estado === 'autorizado') FACTURA.llamar({ accion: 'facturar', empresa_id: e }).catch(() => {}).then(cargar); cargar();
       };
     };
   }
@@ -363,7 +364,7 @@ APP.ready.then(async () => {
   async function cargarCierres() {
     const { data } = await sb.from('caja_turnos').select('*, cajas(nombre)').eq('empresa_id', e).order('abierto', { ascending: false }).limit(60);
     const tb = $('#tb-cierres tbody'); tb.innerHTML = (data || []).map(t => { const dif = (t.arqueo || []).reduce((s, a) => s + (+a.diferencia || 0), 0);
-      return `<tr><td>${esc(t.cajas ? t.cajas.nombre : '')} ${t.estado === 'abierto' ? '<span class="chip ok">abierta</span>' : ''}</td><td>${fmt.fechaHora(t.abierto)}</td><td>${t.cerrado ? fmt.fechaHora(t.cerrado) : '—'}</td><td class="num">${t.arqueo ? fmt.num((t.arqueo || []).reduce((s, a) => s + 0, 0)) : ''}</td><td class="num" style="color:${Math.abs(dif) < 1 ? 'var(--ok)' : 'var(--error)'}">${t.arqueo ? (dif > 0 ? '+' : '') + fmt.pesos(dif) : '—'}</td><td>${t.arqueo ? `<button class="btn chico" data-arq="${t.id}">Ver arqueo</button>` : ''}</td></tr>`; }).join('') || '<tr><td colspan="6" class="vacio">Todavía no hay cierres.</td></tr>';
+      return `<tr><td>${esc(t.cajas ? t.cajas.nombre : '')} ${t.estado === 'abierto' ? '<span class="chip ok">abierta</span>' : ''}</td><td>${fmt.fechaHora(t.abierto)}</td><td>${t.cerrado ? fmt.fechaHora(t.cerrado) : '—'}</td><td class="num">${t.arqueo && t.arqueo.length ? fmt.pesos(t.arqueo.reduce((s, a) => s + (+a.declarado || 0), 0)) : ''}</td><td class="num" style="color:${Math.abs(dif) < 1 ? 'var(--ok)' : 'var(--error)'}">${t.arqueo ? (dif > 0 ? '+' : '') + fmt.pesos(dif) : '—'}</td><td>${t.arqueo ? `<button class="btn chico" data-arq="${t.id}">Ver arqueo</button>` : ''}</td></tr>`; }).join('') || '<tr><td colspan="6" class="vacio">Todavía no hay cierres.</td></tr>';
     $$('[data-arq]', tb).forEach(b => b.onclick = () => { const t = data.find(x => x.id === b.dataset.arq);
       modal(`<h2>Arqueo · ${fmt.fechaHora(t.abierto)} → ${fmt.fechaHora(t.cerrado)}</h2><table class="lista" style="margin-top:10px"><tr><th>Medio</th><th class="num">Esperado</th><th class="num">Contado</th><th class="num">Dif.</th></tr>${t.arqueo.map(a => `<tr><td>${esc(a.nombre)}</td><td class="num">${fmt.pesos(a.esperado)}</td><td class="num">${fmt.pesos(a.declarado)}</td><td class="num" style="color:${Math.abs(a.diferencia) < 1 ? 'var(--ok)' : 'var(--error)'}">${a.diferencia > 0 ? '+' : ''}${fmt.pesos(a.diferencia)}</td></tr>`).join('')}</table>${t.notas ? `<p class="sub" style="margin-top:8px">${esc(t.notas)}</p>` : ''}<div class="pie"><button class="btn" onclick="this.closest('.modal-fondo').remove()">Cerrar</button></div>`); });
   }

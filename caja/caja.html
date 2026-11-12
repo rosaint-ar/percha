@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Caja · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611121407">
+<link rel="stylesheet" href="../shell/shell.css?v=202611121441">
 <style>
   /* Caja: la plata del cajón. No se vende acá (eso es el Punto de venta). */
   .estado{display:grid;grid-template-columns:1fr auto;gap:18px;align-items:center;padding:22px 24px;margin-bottom:14px}
@@ -64,11 +64,11 @@
 </main>
 <div id="impresion"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611121407"></script>
-<script src="../shell/shell.js?v=202611121407"></script>
-<script src="../shared/caja-fx.js?v=202611121407"></script>
-<script src="../shared/tareas.js?v=202611121407"></script>
-<script src="turno.js?v=202611121407"></script>
+<script src="../shared/supabase.js?v=202611121441"></script>
+<script src="../shell/shell.js?v=202611121441"></script>
+<script src="../shared/caja-fx.js?v=202611121441"></script>
+<script src="../shared/tareas.js?v=202611121441"></script>
+<script src="turno.js?v=202611121441"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal } = APP, e = APP.empresa.id;
@@ -87,6 +87,8 @@ APP.ready.then(async () => {
       turno ? sb.rpc('caja_esperado', { p_turno: turno.id }) : Promise.resolve({ data: null }),
       turno ? sb.from('caja_movimientos').select('*').eq('turno_id', turno.id).order('fecha', { ascending: false }) : Promise.resolve({ data: [] })
     ]);
+    // si no se pudo leer, se dice (antes mostraba "Caja cerrada · Abrir caja" con la caja abierta, y se podía abrir otra)
+    if (h.error || esp.error || mv.error) { toast('No se pudo leer la caja: ' + APP.mensajeError(h.error || esp.error || mv.error) + '. Recargá la página.', 'error'); return; }
     hist = h.data || [];
     pintarEstado(esp.data, mv.data || []);
     pintarHistorial();

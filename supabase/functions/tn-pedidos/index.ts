@@ -77,17 +77,18 @@ Deno.serve(async (req) => {
     // desde la última vez (con margen de 2 h); la primera vez, solo desde que se activó la conexión (no importa el pasado)
     const desde = body.desde ? new Date(body.desde).toISOString() : new Date(new Date(cx.ultima_sync_pedidos || cx.creada).getTime() - 2 * 3600 * 1000).toISOString();
     const ahora = new Date().toISOString();
-    let pedidos: any[] = [], page = 1;
+    let pedidos: any[] = [], page = 1, leyoTodo = true;
     while (page <= 20) {
       const r = await fetch(`${base}/orders?per_page=100&page=${page}&updated_at_min=${encodeURIComponent(desde)}`, { headers });
       if (r.status === 404) break;
-      if (!r.ok) { await admin.from("conexiones").update({ ultimo_error: `Pedidos TN ${r.status}` }).eq("id", cx.id); break; }
+      // si la web falla, NO se avanza la marca de "leído hasta acá" (antes, una caída de más de 2 h perdía pedidos)
+      if (!r.ok) { leyoTodo = false; await admin.from("conexiones").update({ ultimo_error: `Pedidos TN ${r.status}` }).eq("id", cx.id); break; }
       const lote = await r.json(); if (!Array.isArray(lote) || !lote.length) break;
       pedidos = pedidos.concat(lote); if (lote.length < 100) break; page++;
     }
     // catálogos de apoyo
     // todas las variantes del canal (PostgREST corta en 1000: se pagina)
-    let items: any[] = []; for (let d = 0; ; d += 1000) { const { data } = await admin.from("canal_items").select("variante_ext,variante_id,producto_ext").eq("conexion_id", cx.id).range(d, d + 999); items = items.concat(data || []); if (!data || data.length < 1000) break; }
+    let items: any[] = []; for (let d = 0; ; d += 1000) { const { data } = await admin.from("canal_items").select("variante_ext,variante_id,producto_ext,talle_canal,color_canal").eq("conexion_id", cx.id).range(d, d + 999); items = items.concat(data || []); if (!data || data.length < 1000) break; }
     const porExt = new Map(items.map((i: any) => [i.variante_ext, i]));
     // todas, también las apagadas (se apagan para que no salgan en la caja, pero los pedidos de la web las siguen usando)
     const { data: formas } = await admin.from("formas_pago").select("id,nombre,tipo,activa").eq("empresa_id", e);
@@ -147,7 +148,7 @@ Deno.serve(async (req) => {
         let costo = 0, producto_id: string | null = null;
         if (it?.variante_id) { const { data: v } = await admin.from("v_variantes").select("costo,producto_id").eq("id", it.variante_id).single(); costo = +v?.costo || 0; producto_id = v?.producto_id || null; }
         else problemas.push(`${pr.name} (${pr.sku || "sin sku"}) no está cruzado: no descontó stock`);
-        const linea: any = { variante_id: it?.variante_id || null, producto_id, descripcion: pr.name, talle: pr.variant_values?.[0] || null, color: pr.variant_values?.[1] || null, cantidad: cant, precio_lista: precio, precio_unit: precio, descuento_pct: 0, total: r2(precio * cant), costo_unit: costo };
+        const linea: any = { variante_id: it?.variante_id || null, producto_id, descripcion: pr.name, talle: it?.talle_canal ?? pr.variant_values?.[0] ?? null, color: it?.color_canal ?? pr.variant_values?.[1] ?? null, cantidad: cant, precio_lista: precio, precio_unit: precio, descuento_pct: 0, total: r2(precio * cant), costo_unit: costo };
         // kit (box/pack): los componentes "por producto" se resuelven con el talle/color que eligió la clienta en el canal;
         // los que no se pueden resolver van a la variante "sin definir" (el Conteo los acomoda después)
         if (producto_id) {
@@ -213,7 +214,7 @@ Deno.serve(async (req) => {
         await admin.from("canal_pedidos").upsert({ empresa_id: e, conexion_id: cx.id, pedido_ext: String(o.id), numero_ext: String(o.number ?? ""), estado_ext: o.status, pago_ext: o.payment_status, total: +o.total || 0, fecha: o.created_at, cliente: o.customer?.name || o.contact_name || null, problema: "No se pudo cargar: " + String((err as Error)?.message || err).slice(0, 300), actualizado: ahora }, { onConflict: "conexion_id,pedido_ext" });
       }
     }
-    if (!body.solo_pedido && !body.desde) await admin.from("conexiones").update({ ultima_sync_pedidos: ahora }).eq("id", cx.id);
+    if (leyoTodo && !body.solo_pedido && !body.desde) await admin.from("conexiones").update({ ultima_sync_pedidos: ahora }).eq("id", cx.id);
     await admin.from("conexiones").update({ pedidos_hasta: null }).eq("id", cx.id);
     resumen.push({ conexion: cx.id, pedidos_leidos: pedidos.length, nuevos, anulados, con_problema: conProblema });
   }

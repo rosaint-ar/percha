@@ -25,8 +25,10 @@
       $('#t-contar', m).onclick = () => { const c = $('#t-bil', m); c.hidden = !c.hidden; if (!c.hidden && !c.innerHTML) fx().billetes(c, t => { $('#t-ini', m).value = t; }); };
       $('[data-no]', m).onclick = () => { m.cerrar(); resolve(null); };
       $('[data-si]', m).onclick = async () => {
-        const b = $('[data-si]', m); b.disabled = true;
+        const b = $('[data-si]', m); if (b.disabled) return; b.disabled = true;
         const ini = +$('#t-ini', m).value || 0;
+        // otra pestaña o equipo ya la abrió: se usa esa (antes quedaban dos turnos abiertos)
+        const ya = await abierto(caja.id); if (ya) { m.cerrar(); toast('La caja ya estaba abierta'); resolve(ya); return; }
         const r = await sb.from('caja_turnos').insert(APP.conEmpresa({ caja_id: caja.id, efectivo_inicial: ini })).select().single();
         if (r.error) { b.disabled = false; fx().sonido('error'); toast(mensajeError(r.error), 'error'); return; }
         m.cerrar(); resolve(r.data);
@@ -44,10 +46,11 @@
         <div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Registrar</button></div>`);
       $('[data-no]', m).onclick = () => { m.cerrar(); resolve(false); };
       $('[data-si]', m).onclick = async () => {
+        const b = $('[data-si]', m); if (b.disabled) return;   // doble toque: un solo movimiento
         const monto = +$('#m-monto', m).value; if (!monto) { toast('Poné el monto', 'error'); return; }
-        const tipo = $('#m-tipo', m).value;
+        const tipo = $('#m-tipo', m).value; b.disabled = true;
         const r = await sb.from('caja_movimientos').insert(APP.conEmpresa({ turno_id: turno.id, tipo, monto, concepto: $('#m-con', m).value.trim() || null, user_id: APP.user.id }));
-        if (r.error) { fx().sonido('error'); toast(mensajeError(r.error), 'error'); return; }
+        if (r.error) { b.disabled = false; fx().sonido('error'); toast(mensajeError(r.error), 'error'); return; }
         m.cerrar(); fx().sonido('ok'); toast((tipo === 'retiro' ? 'Retiro' : 'Ingreso') + ' de ' + fmt.pesos(monto) + ' registrado'); resolve(true);
       };
     });
@@ -84,7 +87,7 @@
         <div data-paso="2" hidden>
           <h2>🧮 Contá lo que hay</h2><p class="sub">Anotá lo que contaste en cada medio. Si coincide, queda en verde.</p>
           <table class="lista" style="margin-top:10px"><tr><th>Medio</th><th class="num">Debería haber</th><th class="num">Contaste</th><th class="num">Diferencia</th></tr>
-          ${filas.map(f => `<tr data-id="${f.forma_pago_id}" data-esp="${f.esperado}" data-tipo="${f.tipo}"><td>${esc(f.nombre)}${f.tipo === 'efectivo' ? ` <small style="color:var(--tinta-3)">(arrancó con ${fmt.pesos(esp.efectivo_inicial)}${esp.movimientos ? ', ' + (esp.movimientos > 0 ? '+' : '') + fmt.pesos(esp.movimientos) + ' de ingresos/retiros' : ''})</small>` : ''}</td><td class="num">${fmt.pesos(f.esperado)}</td><td class="num"><input type="number" step="1" value="${Math.round(f.esperado)}" style="width:120px;text-align:right;font-family:var(--f-mono);border:1px solid var(--linea);border-radius:7px;padding:4px 6px"></td><td class="num dif">—</td></tr>`).join('')}</table>
+          ${filas.map(f => `<tr data-id="${f.forma_pago_id}" data-esp="${f.esperado}" data-tipo="${f.tipo}"><td>${esc(f.nombre)}${f.tipo === 'efectivo' ? ` <small style="color:var(--tinta-3)">(arrancó con ${fmt.pesos(esp.efectivo_inicial)}${esp.movimientos ? ', ' + (esp.movimientos > 0 ? '+' : '') + fmt.pesos(esp.movimientos) + ' de ingresos/retiros' : ''})</small>` : ''}</td><td class="num">${fmt.pesos(f.esperado)}</td><td class="num"><input type="number" step="1" value="${f.tipo === 'efectivo' ? '' : Math.round(f.esperado)}" placeholder="${f.tipo === 'efectivo' ? 'contalo' : ''}" style="width:120px;text-align:right;font-family:var(--f-mono);border:1px solid var(--linea);border-radius:7px;padding:4px 6px"></td><td class="num dif">—</td></tr>`).join('')}</table>
           ${efv ? '<button class="btn chico" type="button" id="c-contar" style="margin-top:8px">🧮 Contar billetes del efectivo</button><div id="c-bil" hidden></div>' : ''}
           <div class="aviso-caja" id="c-veredicto" style="margin-top:12px"></div>
           <div class="pie"><button class="btn" data-ir="1">← Volver</button><button class="btn primario" data-ir="3">${efv ? 'Seguir →' : 'Cerrar caja'}</button></div></div>
@@ -100,6 +103,7 @@
       const ir = n => { $$('[data-paso]', m).forEach(p => p.hidden = p.dataset.paso !== String(n)); if (n === 3) { $('#c-contado', m).textContent = fmt.pesos(contadoEfectivo()); const r = $('#c-retiro', m); if (r.value === '') r.value = Math.max(0, contadoEfectivo() - Math.round(+esp.efectivo_inicial || 0)); r.focus(); r.select(); retira(); } };
       const calc = () => {
         let falta = 0, sobra = 0;
+        { const te = $('tr[data-tipo="efectivo"] input', m); if (te && te.value === '') { $$('tr[data-id] .dif', m).forEach(td => { td.textContent = ''; }); const v0 = $('#c-veredicto', m); v0.className = 'aviso-caja info'; v0.innerHTML = '🧮 Contá el <b>efectivo</b> y escribí cuánto hay (o usá «Contar billetes»).'; return; } }
         $$('tr[data-id]', m).forEach(tr => { const d = (+$('input', tr).value || 0) - +tr.dataset.esp; const td = $('.dif', tr); td.textContent = Math.abs(d) < 1 ? '✓' : (d > 0 ? '+' : '') + fmt.pesos(d); td.style.color = Math.abs(d) < 1 ? 'var(--ok)' : 'var(--error)'; if (d <= -1) falta -= d; if (d >= 1) sobra += d; });
         const v = $('#c-veredicto', m);
         v.className = 'aviso-caja ' + (!falta && !sobra ? 'ok' : 'error');
@@ -109,14 +113,18 @@
       const cb = $('#c-contar', m); if (cb) cb.onclick = () => { const c = $('#c-bil', m); c.hidden = !c.hidden; if (!c.hidden && !c.innerHTML) fx().billetes(c, t => { $('input', $('tr[data-tipo="efectivo"]', m)).value = t; calc(); }); };
       $('#c-retiro', m).oninput = retira;
       $('[data-no]', m).onclick = () => { m.cerrar(); resolve(false); };
-      $$('[data-ir]', m).forEach(b => b.onclick = () => { const n = +b.dataset.ir; if (n === 3 && !efv) $('[data-si]', m).click(); else ir(n); });
+      $$('[data-ir]', m).forEach(b => b.onclick = () => { const n = +b.dataset.ir;
+        { const te = $('tr[data-tipo="efectivo"] input', m); if (n === 3 && te && te.value === '') { toast('Primero contá el efectivo', 'error'); te.focus(); return; } } if (n === 3 && !efv) $('[data-si]', m).click(); else ir(n); });
       $('[data-si]', m).onclick = async () => {
-        const b = $('[data-si]', m); b.disabled = true;
+        const b = $('[data-si]', m); if (b.disabled) return;
+        if (efv && quedaDe() < 0) { toast('Estás retirando más efectivo del que contaste', 'error'); return; }   // antes trababa el botón
+        b.disabled = true;
         const arqueo = $$('tr[data-id]', m).map(tr => ({ forma_pago_id: tr.dataset.id, nombre: $('td', tr).textContent.trim().split(' (')[0], esperado: +tr.dataset.esp, declarado: +$('input', tr).value || 0, diferencia: r2((+$('input', tr).value || 0) - +tr.dataset.esp) }));
         if (efv && quedaDe() < 0) { toast('Estás retirando más efectivo del que contaste', 'error'); return; }
         const queda = efv ? Math.max(0, quedaDe()) : null;
-        const r = await sb.from('caja_turnos').update({ estado: 'cerrado', cerrado: new Date().toISOString(), cerrado_por: APP.user.id, arqueo, efectivo_queda: queda, fuera_caja: esp.fuera || null, notas: $('#c-notas', m).value.trim() || null }).eq('id', turno.id);
+        const r = await sb.from('caja_turnos').update({ estado: 'cerrado', cerrado: new Date().toISOString(), cerrado_por: APP.user.id, arqueo, efectivo_queda: queda, fuera_caja: esp.fuera || null, notas: $('#c-notas', m).value.trim() || null }).eq('id', turno.id).eq('estado', 'abierto').select('id');
         if (r.error) { b.disabled = false; fx().sonido('error'); toast(mensajeError(r.error), 'error'); return; }
+        if (!(r.data || []).length) { m.cerrar(); resolve(true); toast('Esta caja ya la había cerrado alguien más', 'error'); return; }
         m.cerrar(); resolve(true);
         const dif = arqueo.reduce((s, a) => s + a.diferencia, 0);
         const datos = [caja, Object.assign({}, turno, { cerrado: new Date().toISOString(), notas: $('#c-notas', m).value.trim() || null }), Object.assign({}, esp, { medios: filas.filter(f => f.ventas).map(f => ({ nombre: f.nombre, monto: f.tipo === 'efectivo' ? f.esperado - esp.efectivo_inicial - esp.movimientos : f.esperado })) }), arqueo, queda, nombrePila()];

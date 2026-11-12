@@ -168,7 +168,7 @@
       leerUnidades();
       const g = $('[data-guardar]', m), dif = nuevo - actual;
       if (dif && !motivo) { toast('Elegí por qué cambia el stock', 'error'); $('#pr-motivo', m).scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
-      if (nuevo < 0) { toast('El stock no puede quedar negativo', 'error'); return; }
+      if (dif && nuevo < 0) { toast('El stock no puede quedar negativo', 'error'); return; }   // si no se toca el stock, igual se puede guardar lo demás
       if (unidades.length > nuevo) { toast(`Marcaste ${unidades.length} con falla y el stock queda en ${nuevo}`, 'error'); return; }
       g.disabled = true; g.textContent = 'Guardando…';
       try {

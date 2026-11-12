@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lo que piden · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611121407">
+<link rel="stylesheet" href="../shell/shell.css?v=202611121441">
 <style>
   /* Lo que piden y no hay: agrupado por prenda, para conseguir o reponer y avisarle a la clienta */
   .lp-arriba{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
@@ -35,9 +35,9 @@
   </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611121407"></script>
-<script src="../shell/shell.js?v=202611121407"></script>
-<script src="../shared/pedido-clienta.js?v=202611121407"></script>
+<script src="../shared/supabase.js?v=202611121441"></script>
+<script src="../shell/shell.js?v=202611121441"></script>
+<script src="../shared/pedido-clienta.js?v=202611121441"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -71,7 +71,7 @@ APP.ready.then(async () => {
         ${g.pedidos.some(p => p.estado === 'pendiente') ? `<div class="lp-acc"><button class="btn chico" data-gc="${esc(g.k)}">✓ Conseguido (todos)</button><button class="btn chico" data-gd="${esc(g.k)}">Descartar</button></div>` : ''}</div>
         ${g.pedidos.map(p => `<div class="lp-ped"><div><b>${esc(p.cliente_nombre || 'Sin nombre')}</b>${p.telefono ? ' · ' + esc(p.telefono) : ''}${tc(p) ? ' · ' + esc(tc(p)) : ''}${+p.cantidad > 1 ? ' · ×' + p.cantidad : ''}${p.producto_id && p.variante_id && +p.stock_hoy > 0 ? ' <span class="chip ok">hay ' + p.stock_hoy + '</span>' : ''}
             <div class="q">${fmt.fechaHora(p.creado)}${p.anoto ? ' · anotó ' + esc(p.anoto) : ''}${p.nota ? ' · ' + esc(p.nota) : ''}</div></div>
-          <div class="acc"><span class="chip ${ESTADO[p.estado][1]}">${ESTADO[p.estado][0]}</span>${p.estado !== 'avisada' && p.estado !== 'descartado' ? `${telWsp(p.telefono) ? `<button class="btn chico primario" data-av="${p.id}">📲 Avisarle</button>` : `<button class="btn chico" data-avm="${p.id}" title="No tiene teléfono: marcala como avisada si le avisaste">Ya le avisé</button>`}${p.estado === 'pendiente' ? `<button class="btn chico" data-co="${p.id}">✓ Conseguido</button>` : ''}<button class="btn chico" data-de="${p.id}" title="Descartar">✕</button>` : ''}</div></div>`).join('')}
+          <div class="acc"><span class="chip ${ESTADO[p.estado][1]}">${ESTADO[p.estado][0]}</span>${p.estado !== 'avisada' && p.estado !== 'descartado' ? `${telWsp(p.telefono) ? `<button class="btn chico primario" data-av="${p.id}">📲 Avisarle</button>` : `<button class="btn chico" data-avm="${p.id}" title="No tiene teléfono: marcala como avisada si le avisaste">Ya le avisé</button>`}${p.estado === 'pendiente' ? `<button class="btn chico" data-co="${p.id}">✓ Conseguido</button>` : ''}<button class="btn chico" data-de="${p.id}" title="Descartar">✕</button>` : `<button class="btn chico" data-vuelve="${p.id}" title="Se marcó por error: vuelve a «por resolver»">↩ Volver a por resolver</button>`}</div></div>`).join('')}
       </div>`; }).join('')
       : `<div class="vacio">${filtro === 'abiertos' ? 'No hay pedidos por resolver. Cuando una clienta pide algo que no hay, anotalo desde la caja con <b>📝 Lo pidieron</b>.' : 'Nada por acá.'}</div>`;
     const cambiar = async (ids, estado) => { const { error } = await sb.from('pedidos_clientas').update({ estado, resuelto: estado === 'pendiente' ? null : new Date().toISOString(), resuelto_por: APP.user.id }).in('id', ids); if (error) { toast(mensajeError(error), 'error'); return false; } await cargar(); return true; };
@@ -79,6 +79,7 @@ APP.ready.then(async () => {
     $$('[data-co]').forEach(b => b.onclick = () => cambiar([b.dataset.co], 'conseguido'));
     $$('[data-de]').forEach(b => b.onclick = async () => { if (await confirmar('¿Descartar este pedido? (no se consigue o ya no lo quiere)', 'Descartar')) cambiar([b.dataset.de], 'descartado'); });
     $$('[data-avm]').forEach(b => b.onclick = () => cambiar([b.dataset.avm], 'avisada'));
+    $$('[data-vuelve]').forEach(b => b.onclick = () => cambiar([b.dataset.vuelve], 'pendiente'));
     $$('[data-gc]').forEach(b => b.onclick = () => cambiar(grupo(b.dataset.gc).pedidos.filter(p => p.estado === 'pendiente').map(p => p.id), 'conseguido'));
     $$('[data-gd]').forEach(b => b.onclick = async () => { const g = grupo(b.dataset.gd); if (await confirmar(`¿Descartar los ${g.pedidos.length} pedidos de ${g.nombre}?`, 'Descartar')) cambiar(g.pedidos.filter(p => p.estado !== 'avisada').map(p => p.id), 'descartado'); });
     // avisarle por WhatsApp (a su número) y queda como avisada

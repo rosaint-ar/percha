@@ -131,7 +131,7 @@ Deno.serve(async (req) => {
     const items: any[] = [];   // de a tandas: una lista larga de ids no entra en la dirección de la consulta
     for (let i = 0; i < variantes.length; i += 300) items.push(...await pag(() => admin.from("canal_items").select("id,variante_id,producto_ext,variante_ext,stock,talle_canal,color_canal,publicado,stock_a_decidir").eq("conexion_id", cx.id).in("variante_id", variantes.slice(i, i + 300))));
     const stocks: any[] = [];
-    for (let i = 0; i < variantes.length; i += 300) { const { data } = await admin.from("v_variantes").select("id,producto_id,producto_tipo,sku,stock,fallas,producto_nombre,talle_nombre,color_nombre").in("id", variantes.slice(i, i + 300)); stocks.push(...(data || [])); }
+    for (let i = 0; i < variantes.length; i += 300) { const { data } = await admin.from("v_variantes").select("id,producto_id,producto_tipo,sku,stock,fallas,producto_nombre,talle_nombre,color_nombre,activa").in("id", variantes.slice(i, i + 300)); stocks.push(...(data || [])); }
     const infoVar = new Map(stocks.map((s: any) => [s.id, s]));
     // kits: componentes y variantes de los productos componentes (para resolver talle/color)
     const kitsIds = [...new Set(stocks.filter((s: any) => s.producto_tipo === "kit").map((s: any) => s.producto_id))];
@@ -148,6 +148,7 @@ Deno.serve(async (req) => {
     // stock que corresponde a un ítem del canal (antes de restar lo reservado)
     const stockPara = (d: any): number => {
       const v = infoVar.get(d.variante_id); if (!v) return 0;
+      if (v.producto_tipo !== "kit" && v.activa === false) return 0;   // talle·color sacado en Percha: en la web queda sin stock (antes se seguía vendiendo)
       if (v.producto_tipo !== "kit") return Math.max(0, Math.floor((+v.stock || 0) - (+v.fallas || 0)));   // las prendas con falla son solo del local
       const talle = n((d.talle_canal || "").split("/")[0]), color = n(d.color_canal);
       let minimo = Infinity;

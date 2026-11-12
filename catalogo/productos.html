@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Catálogo · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611121407">
+<link rel="stylesheet" href="../shell/shell.css?v=202611121441">
 <style>
   .filtros{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
   .filtros .buscador{flex:1 1 260px;min-width:0}
@@ -86,8 +86,8 @@
   <div class="barra-sel" id="barra-sel" hidden></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611121407"></script>
-<script src="../shell/shell.js?v=202611121407"></script>
+<script src="../shared/supabase.js?v=202611121441"></script>
+<script src="../shell/shell.js?v=202611121441"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id, PAG = 100, admin = APP.esAdmin;
@@ -127,8 +127,11 @@ APP.ready.then(async () => {
     const q = $('#q').value.trim();
     // Un número largo es un código de barras: abre directo la variante
     if (reiniciar && /^\d{8,14}$/.test(q)) {
-      const { data: v } = await sb.from('variantes').select('producto_id').eq('empresa_id', e).eq('ean', q).maybeSingle();
-      if (v) { location.href = `producto.html?id=${v.producto_id}&ean=${q}`; return; }
+      // el mismo código puede estar en más de una prenda: antes daba error y no encontraba nada
+      const { data: vs } = await sb.from('variantes').select('producto_id').eq('empresa_id', e).eq('ean', q).eq('activa', true).limit(5);
+      const ps = [...new Set((vs || []).map(x => x.producto_id))];
+      if (ps.length === 1) { location.href = `producto.html?id=${ps[0]}&ean=${q}`; return; }
+      if (ps.length > 1) toast(`Ese código de barras está en ${ps.length} prendas distintas: corregilo en la que no corresponde`, 'error');
     }
     const { data, error } = await consulta('*').order('nombre').range(desde, desde + PAG - 1);
     if (id !== ultimaConsulta) return;
@@ -207,7 +210,13 @@ APP.ready.then(async () => {
     const m = modal(`<h2>${fmt.num(elegidos.size)} productos</h2><p class="sub">Los inactivos no aparecen en la caja ni en los recuentos. No se borra nada.</p>
       <div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn" data-v="false">Desactivar</button><button class="btn primario" data-v="true">Activar</button></div>`);
     $('[data-no]', m).onclick = () => m.cerrar();
-    $$('[data-v]', m).forEach(b => b.onclick = async () => { try { await actualizarEnTandas({ activo: b.dataset.v === 'true' }); } catch (err) { toast(mensajeError(err), 'error'); return; } m.cerrar(); toast('Listo'); cargar(true); });
+    $$('[data-v]', m).forEach(b => b.onclick = async () => {
+      if (b.dataset.v === 'false') {   // desactivar con stock: la mercadería desaparece de la caja y de los recuentos
+        const ids = [...elegidos]; let conSt = 0, u = 0;
+        for (let i = 0; i < ids.length; i += 200) { const { data } = await sb.from('v_variantes').select('producto_id,stock').in('producto_id', ids.slice(i, i + 200)).gt('stock', 0); const s = new Set((data || []).map(x => x.producto_id)); conSt += s.size; u += (data || []).reduce((a, x) => a + (+x.stock || 0), 0); }
+        if (conSt && !await confirmar(`${conSt} de esos productos tienen stock (${fmt.num(u)} prendas). Si los desactivás, no aparecen en la caja ni en los recuentos. ¿Desactivarlos igual?`, 'Desactivar')) return;
+      }
+      try { await actualizarEnTandas({ activo: b.dataset.v === 'true' }); } catch (err) { toast(mensajeError(err), 'error'); return; } m.cerrar(); toast('Listo'); cargar(true); });
   }
 
   // ---------- cambiar precios en masa ----------
@@ -215,10 +224,12 @@ APP.ready.then(async () => {
     let red0 = '100'; try { red0 = localStorage.getItem('percha_redondeo') || '100'; } catch (_) { }
     const st = { campo: 'precio', op: 'sube', valor: '', red: red0, arriba: true, desc: '' };
     const OPS = { sube: ['Subir %', '%'], baja: ['Bajar %', '%'], suma: ['Sumar $', '$'], resta: ['Restar $', '$'], fijar: ['Dejar en $', '$'], markup: ['Según el costo', 'veces'] };
-    const m = modal('<div id="cp"></div>'); $('.modal', m).style.maxWidth = '760px';
+    const m = modal('<div id="cp"></div>', { fijo: true }); $('.modal', m).style.maxWidth = '760px';
     let ultimo = null, tSim;
+    // $ se escribe como en todo Percha ("1.000" = mil; antes sumaba $1); los % aceptan coma
+    const valorNum = () => /sube|baja/.test(st.op) ? (+String(st.valor).replace(',', '.') || 0) : APP.numAR(st.valor);
     const payload = simular => {
-      const v = +String(st.valor).replace(',', '.') || 0;
+      const v = valorNum();
       const op = { sube: 'porcentaje', baja: 'porcentaje', suma: 'monto', resta: 'monto', fijar: 'fijar', markup: 'markup' }[st.op];
       const valor = st.op === 'baja' || st.op === 'resta' ? -v : v;
       const red = st.red === 'no' ? 'no' : st.red + (st.arriba ? '+' : '');
@@ -249,7 +260,7 @@ APP.ready.then(async () => {
       if (ultimo) mostrar(ultimo);
     };
     const simular = () => { clearTimeout(tSim); tSim = setTimeout(async () => {
-      const v = +String(st.valor).replace(',', '.'); if (!v && st.op !== 'fijar') { ultimo = null; $('#cp-prev', m).innerHTML = '<p class="sub" style="text-align:center;padding:20px 0">Escribí el valor para ver cómo quedan los precios.</p>'; $('[data-si]', m).disabled = true; return; }
+      const v = valorNum(); if (!(v > 0)) { ultimo = null; $('#cp-prev', m).innerHTML = '<p class="sub" style="text-align:center;padding:20px 0">Escribí el valor para ver cómo quedan los precios.</p>'; $('[data-si]', m).disabled = true; return; }
       $('#cp-prev', m).classList.add('cp-cargando');
       const { data, error } = await sb.rpc('precios_masivo', { p: payload(true) });
       $('#cp-prev', m).classList.remove('cp-cargando');

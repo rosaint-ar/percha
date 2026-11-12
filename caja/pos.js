@@ -81,7 +81,7 @@ APP.ready.then(async () => {
     else if (!q && familia === 'top' && masVendidos.length) lista = masVendidos.map(pid => lista.find(x => x.pid === pid)).filter(Boolean).slice(0, 48);
     else if (!q) lista.sort((a, b) => a.vars[0].producto_nombre.localeCompare(b.vars[0].producto_nombre));
     // se dibujan de a 60 para que la pantalla arranque al instante; "Ver más" trae el resto
-    const max = q ? 120 : grillaMax;
+    const max = q ? Math.max(120, grillaMax) : grillaMax;
     $('#grilla').classList.toggle('con-fotos', !!q); $('#grilla').innerHTML = lista.slice(0, max).map(x => tile(x.pid, x.vars, x.coinciden, !!q)).join('') || '<div class="vacio">Nada con ese nombre.<br><button class="btn chico" type="button" data-lo-piden style="margin-top:8px">📝 ¿Lo pidió una clienta? Anotalo</button></div>';
     { const bl = $('#grilla [data-lo-piden]'); if (bl && window.PEDIDO_CLIENTA) bl.onclick = () => PEDIDO_CLIENTA.anotar({ texto: ($('#q') || {}).value || '' }); }
     if (lista.length > max) $('#grilla').insertAdjacentHTML('beforeend', `<div class="vacio"><button class="btn" id="btn-grilla-mas">Ver ${fmt.num(Math.min(120, lista.length - max))} más</button></div>`);
@@ -220,8 +220,11 @@ APP.ready.then(async () => {
     });
   }
   // cobrar y seña pasan primero por la definición de genéricos y de kits
-  $('#btn-cobrar').onclick = async () => { if (!C.carrito.lineas.length) return; if (await definirModelos() && await definirKits()) C.cobrar(false); };
-  $('#btn-sena').onclick = async () => { if (!C.carrito.lineas.length) return C.retirarSena(); if (await definirModelos() && await definirKits()) C.cobrar(true); };
+  // una sola vez aunque se toque dos veces (o F9 dos veces): antes se abrían dos ventanas de cobro
+  let cobrando = false;
+  const unaVez = fn => async () => { if (cobrando) return; cobrando = true; try { await fn(); } finally { cobrando = false; } };
+  $('#btn-cobrar').onclick = unaVez(async () => { if (!C.carrito.lineas.length) return; if (await definirModelos() && await definirKits()) await C.cobrar(false); });
+  $('#btn-sena').onclick = unaVez(async () => { if (!C.carrito.lineas.length) return C.retirarSena(); if (await definirModelos() && await definirKits()) await C.cobrar(true); });
 
   // ================= Movimiento: la prenda vuela al ticket, el renglón entra, el total sube =================
   // Todo es visual: se mira el ticket después de que caja.js lo dibuja (no cambia nada de la venta).

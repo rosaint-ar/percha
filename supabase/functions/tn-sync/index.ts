@@ -67,7 +67,8 @@ Deno.serve(async (req) => {
   while (page <= 50) {
     const r = await fetch(`${base}/products?per_page=200&page=${page}&fields=id,name,handle,published,attributes,variants,images,canonical_url`, { headers });
     if (r.status === 404) break;
-    if (!r.ok) { const t = await r.text(); await admin.from("conexiones").update({ ultimo_error: `Tienda Nube ${r.status}: ${t.slice(0, 200)}`, estado: "error" }).eq("id", cx.id); return json({ error: `Tienda Nube respondió ${r.status}` }, 502); }
+    // solo un acceso rechazado apaga la conexión; un error pasajero (429, 5xx) no frena el stock, los pedidos ni los precios
+    if (!r.ok) { const t = await r.text(); await admin.from("conexiones").update({ ultimo_error: `Tienda Nube ${r.status}: ${t.slice(0, 200)}`, ...(r.status === 401 || r.status === 403 ? { estado: "error" } : {}) }).eq("id", cx.id); return json({ error: `Tienda Nube respondió ${r.status}` }, 502); }
     const prods = await r.json(); if (!Array.isArray(prods) || !prods.length) break;
     totalCanal += prods.length;
     for (const p of prods) {
@@ -112,7 +113,8 @@ Deno.serve(async (req) => {
     if (prods.length < 200) break; page++;
   }
   // los cruces manuales previos se respetan
-  const { data: manuales } = await admin.from("canal_items").select("variante_ext,variante_id").eq("conexion_id", cx.id).eq("cruce", "manual");
+  const inicioSync = new Date(Date.now() - 60000).toISOString();
+  const manuales = await pag("canal_items", "variante_ext,variante_id", (q: any) => q.eq("conexion_id", cx.id).eq("cruce", "manual"));   // de a 1000 (eran más de 1000)
   const man = new Map((manuales || []).map((m: any) => [m.variante_ext, m.variante_id]));
   items.forEach((it) => { if (man.has(it.variante_ext)) { it.variante_id = man.get(it.variante_ext); it.cruce = "manual"; } });
   // guardar en tandas
@@ -122,7 +124,8 @@ Deno.serve(async (req) => {
   }
   // borrar lo que ya no está en el canal
   const vivos = items.map((i) => i.variante_ext);
-  if (vivos.length) { const { data: todos } = await admin.from("canal_items").select("id,variante_ext").eq("conexion_id", cx.id); const muertos = (todos || []).filter((t: any) => !vivos.includes(t.variante_ext)).map((t: any) => t.id); if (muertos.length) await admin.from("canal_items").delete().in("id", muertos); }
+  // todas (no solo las primeras 1000) y solo las que no se tocaron durante esta lectura (las recién publicadas no se borran)
+  if (vivos.length) { const setVivos = new Set(vivos); const todos = await pag("canal_items", "id,variante_ext,actualizado", (q: any) => q.eq("conexion_id", cx.id).order("id")); const muertos = todos.filter((t: any) => !setVivos.has(t.variante_ext) && (!t.actualizado || t.actualizado < inicioSync)).map((t: any) => t.id); for (let i = 0; i < muertos.length; i += 300) await admin.from("canal_items").delete().in("id", muertos.slice(i, i + 300)); }
   await admin.from("conexiones").update({ ultima_sync: new Date().toISOString(), ultimo_error: null, estado: "activa" }).eq("id", cx.id);
   const cruzados = items.filter((i) => i.variante_id).length;
   return json({ ok: true, productos: totalCanal, variantes: items.length, cruzados, sin_cruzar: items.length - cruzados });

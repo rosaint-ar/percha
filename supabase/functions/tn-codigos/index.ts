@@ -3,7 +3,7 @@
 // Mismo criterio que tn-publicar (sku = mpn = productos.codigo). Lo llama el cron cada 10 minutos (x-cron-key).
 // Lee los códigos EN VIVO de la web (si alguien los cambia a mano en Tienda Nube, se vuelven a corregir).
 // No toca: lo que no está cruzado, lo cruzado con un código general (BOMBIS «VARIAS», MEDIAS VARIAS) ni nada que no sea el código.
-// body.simular = true: no escribe, devuelve lo que cambiaría. body.limite = N (máx. cambios por vuelta, 150 por defecto).
+// body.simular = true: no escribe, devuelve lo que cambiaría. body.limite = N (máx. cambios por vuelta, 80 por defecto: así termina antes de que corte el cron).
 // body.solo_ext = ["274965279", …]: solo esas publicaciones (para probar).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 const SB_URL = Deno.env.get("SUPABASE_URL")!, ANON = Deno.env.get("SUPABASE_ANON_KEY")!, SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, CRON_KEY = Deno.env.get("CRON_KEY") || "";
@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
     filtroEmpresa = body.empresa_id;
   }
   const simular = !!body.simular;
-  const limite = Math.max(1, Math.min(500, +body.limite || 150));
+  const limite = Math.max(1, Math.min(500, +body.limite || 80));
   const soloExt: string[] = Array.isArray(body.solo_ext) ? body.solo_ext.map(String) : [];
   const pag = async (q: () => any) => { let todo: any[] = []; for (let d = 0; ; d += 1000) { const { data, error } = await q().range(d, d + 999); if (error) throw error; todo = todo.concat(data || []); if (!data || data.length < 1000) break; } return todo; };
 

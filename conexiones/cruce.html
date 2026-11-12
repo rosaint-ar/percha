@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cruce de productos · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611121407">
+<link rel="stylesheet" href="../shell/shell.css?v=202611121441">
 <style>
   .filtros{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
   .pestanas{display:flex;gap:4px;background:var(--relleno);padding:3px;border-radius:10px}
@@ -37,8 +37,8 @@
   <div class="card" style="padding:0"><table class="lista" id="tb"><thead></thead><tbody></tbody></table><div id="mas" style="padding:12px;text-align:center;display:none"><button class="btn" id="btn-mas">Ver más</button></div></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611121407"></script>
-<script src="../shell/shell.js?v=202611121407"></script>
+<script src="../shared/supabase.js?v=202611121441"></script>
+<script src="../shell/shell.js?v=202611121441"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -81,7 +81,7 @@ APP.ready.then(async () => {
   let pedido = 0;
   async function cargar(reiniciar) {
     if (reiniciar) { pagina = 0; filas = []; }
-    const q = $('#q').value.trim(), mio = ++pedido;   // si llega otra carga mientras tanto, esta se descarta (evita filas duplicadas)
+    const q = $('#q').value.replace(/[,()*%\\]/g, ' ').replace(/\s+/g, ' ').trim(), mio = ++pedido;   // comas o paréntesis rompían la búsqueda   // si llega otra carga mientras tanto, esta se descarta (evita filas duplicadas)
     let data;
     if (filtro === 'nuevos') {
       // productos del canal que no tienen producto propio en el local: se crean tal cual (nombre, foto, precio, variantes) con código automático
@@ -141,7 +141,13 @@ APP.ready.then(async () => {
       $$('[data-cruzar]').forEach(b => b.onclick = () => cruzar(filas.find(x => String(x.id) === b.dataset.cruzar)));
       $$('[data-crear]').forEach(b => b.onclick = async () => { b.disabled = true; const { data, error } = await sb.rpc('canal_crear_variante', { p_item: +b.dataset.crear }); if (error) { toast(mensajeError(error), 'error'); b.disabled = false; return; } toast('Variante creada en el local y cruzada'); empujar(); contar(); cargar(true); });
       $$('[data-igualar]').forEach(b => b.onclick = async () => { const { error } = await sb.rpc('ajustar_stock', { p_variante: b.dataset.igualar, p_nuevo: +b.dataset.canal, p_nota: 'Conciliación: se tomó el stock del canal' }); if (error) { toast(mensajeError(error), 'error'); return; } toast('Stock del local actualizado'); empujar(); contar(); cargar(true); });
-      $$('input[data-stock]').forEach(i => i.onchange = async () => { const { error } = await sb.rpc('ajustar_stock', { p_variante: i.dataset.stock, p_nuevo: +i.value || 0, p_nota: 'Conciliación desde el cruce' }); if (error) { toast(mensajeError(error), 'error'); return; } toast('Stock del local actualizado · se manda al canal'); empujar(); contar(); cargar(true); });
+      $$('input[data-stock]').forEach(i => i.onchange = async () => {
+        // borrar el número no lo deja en 0 (y no se manda a la web); 0 se confirma
+        const n = i.value.trim() === '' ? NaN : Math.round(+i.value);
+        if (isNaN(n) || n < 0) { i.value = i.defaultValue; toast('Poné un número de 0 para arriba', 'error'); return; }
+        if (n === +i.defaultValue) return;
+        if (n === 0 && !await confirmar('¿Dejar el stock del local en 0? También se manda a la web.', 'Dejar en 0')) { i.value = i.defaultValue; return; }
+        const { error } = await sb.rpc('ajustar_stock', { p_variante: i.dataset.stock, p_nuevo: n, p_nota: 'Conciliación desde el cruce' }); if (error) { toast(mensajeError(error), 'error'); return; } toast('Stock del local actualizado · se manda al canal'); empujar(); contar(); cargar(true); });
     }
     $('#mas').style.display = (data || []).length === PAG ? 'block' : 'none';
     $('#resumen').textContent = `${fmt.num(filas.length)} filas`;
@@ -157,7 +163,7 @@ APP.ready.then(async () => {
       $$('[data-v]', s).forEach(d => d.onclick = async () => { const r = await sb.from('canal_items').update({ variante_id: d.dataset.v, cruce: 'manual' }).eq('id', item.id); if (r.error) { toast(mensajeError(r.error), 'error'); return; } m.cerrar(); toast('Cruzado'); await contar(); cargar(true); const x = aDecidir.find(a => a.variante_id === d.dataset.v); if (x && APP.esAdmin) preguntar(x); }); };
     $('#cz-q', m).addEventListener('input', buscar); buscar();
     $('[data-no]', m).onclick = () => m.cerrar();
-    const qt = $('[data-quitar]', m); if (qt) qt.onclick = async () => { await sb.from('canal_items').update({ variante_id: null, cruce: 'ninguno' }).eq('id', item.id); m.cerrar(); contar(); cargar(true); };
+    const qt = $('[data-quitar]', m); if (qt) qt.onclick = async () => { if (!await confirmar('¿Quitar el cruce? Esa publicación deja de recibir el stock del local.', 'Quitar')) return; const r = await sb.from('canal_items').update({ variante_id: null, cruce: 'ninguno' }).eq('id', item.id); if (r.error) { toast(mensajeError(r.error), 'error'); return; } m.cerrar(); contar(); cargar(true); };
   }
   $$('#pestanas button').forEach(b => b.onclick = () => { $$('#pestanas button').forEach(x => x.classList.toggle('on', x === b)); filtro = b.dataset.f; cargar(true); });
   let t; $('#q').addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => cargar(true), 250); });

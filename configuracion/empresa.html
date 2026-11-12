@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Configuración · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611121407">
+<link rel="stylesheet" href="../shell/shell.css?v=202611121441">
 <style>
   .pestanas{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
   .pestanas a{font:600 13px var(--f-ui);color:var(--tinta);text-decoration:none;padding:8px 14px;border:1px solid var(--linea);background:var(--superficie-2);border-radius:10px}
@@ -131,9 +131,9 @@
   </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611121407"></script>
-<script src="../shell/shell.js?v=202611121407"></script>
-<script src="../shared/medios-pago.js?v=202611121407"></script>
+<script src="../shared/supabase.js?v=202611121441"></script>
+<script src="../shell/shell.js?v=202611121441"></script>
+<script src="../shared/medios-pago.js?v=202611121441"></script>
 <script>
 APP.ready.then(async () => {
   const { esc, $, $$, toast, mensajeError, fmt } = APP, e = APP.empresa.id;
@@ -212,7 +212,8 @@ APP.ready.then(async () => {
   // ---- listas de precios ----
   let listas = [];
   async function cargarListas() {
-    listas = (await sb.from('listas_precios').select('*').eq('empresa_id', e).order('orden')).data || [];
+    // la lista «Tienda Nube» la maneja la conexión con la web: acá no se muestra (borrarla o apagarla rompía los precios de la web)
+    listas = (await sb.from('listas_precios').select('*').eq('empresa_id', e).is('canal', null).order('orden')).data || [];
     const tb = $('#tb-listas'); tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());
     listas.forEach(l => tb.insertAdjacentHTML('beforeend', `<tr data-id="${l.id}"><td><input data-k="nombre" value="${esc(l.nombre)}"></td><td class="num"><input data-k="porcentaje" type="number" step="0.5" value="${l.porcentaje}"></td><td>${l.predeterminada ? '<span class="chip">base</span>' : ''}</td><td class="centro">${siNo('activa', l.activa)}</td><td>${l.predeterminada ? '' : borrar}</td></tr>`));
     APP.autoguardar(tb, 'listas_precios');
@@ -428,7 +429,11 @@ APP.ready.then(async () => {
     const deps = (await sb.from('depositos').select('*').eq('empresa_id', e).order('principal', { ascending: false })).data || [];
     const tb = $('#tb-dep'); tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());
     deps.forEach(d => tb.insertAdjacentHTML('beforeend', `<tr data-id="${d.id}"><td><input data-k="codigo" value="${esc(d.codigo)}"></td><td><input data-k="nombre" value="${esc(d.nombre)}"></td><td class="centro">${siNo('principal', d.principal)}</td><td class="centro">${siNo('activo', d.activo)}</td><td>${d.principal ? '' : borrar}</td></tr>`));
-    APP.autoguardar(tb, 'depositos');
+    // un solo depósito principal: al marcar uno, los demás se desmarcan; no se puede quedar sin principal
+    APP.autoguardar(tb, 'depositos', { alGuardar: async (tr, d) => {
+      if (d.principal === true) { const r = await sb.from('depositos').update({ principal: false }).eq('empresa_id', e).neq('id', tr.dataset.id); if (r.error) toast(mensajeError(r.error), 'error'); cargarDep(); }
+      else if (d.principal === false) { const { count } = await sb.from('depositos').select('id', { count: 'exact', head: true }).eq('empresa_id', e).eq('principal', true); if (!count) { await sb.from('depositos').update({ principal: true }).eq('id', tr.dataset.id); toast('Tiene que haber un depósito principal: marcá otro como principal y este se desmarca solo', 'error'); cargarDep(); } }
+    } });
     $$('[data-borrar]', tb).forEach(b => b.onclick = async () => { const tr = b.closest('tr'); if (await APP.eliminar('depositos', tr.dataset.id, { nombre: $('[data-k="nombre"]', tr).value, campoActivo: 'activo' })) cargarDep(); });
   }
   async function nuevoDep() {

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ingresar mercadería · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611121407">
+<link rel="stylesheet" href="../shell/shell.css?v=202611121441">
 <style>
   /* Ingresar mercadería: se carga como viene el remito (un renglón por artículo y color, cantidades por talle) */
   .cab-compra{display:grid;grid-template-columns:minmax(220px,1.4fr) 1fr 150px 110px;gap:12px;align-items:end}
@@ -91,9 +91,9 @@
   <div id="sug" class="sugerencias" style="display:none"></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611121407"></script>
-<script src="../shell/shell.js?v=202611121407"></script>
-<script src="../shared/precios.js?v=202611121407"></script>
+<script src="../shared/supabase.js?v=202611121441"></script>
+<script src="../shell/shell.js?v=202611121441"></script>
+<script src="../shared/precios.js?v=202611121441"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -109,8 +109,9 @@ APP.ready.then(async () => {
   async function paginar(q, pag = 1000) { let d = 0, t = []; while (true) { const { data, error } = await q().range(d, d + pag - 1); if (error) throw error; t = t.concat(data || []); if (!data || data.length < pag) break; d += pag; } return t; }
   async function cargarCatalogo() {
     const [ps, vs] = await Promise.all([
-      paginar(() => sb.from('productos').select('id,codigo,nombre,costo,precio,tiene_variantes,categoria_id,tipo,es_generico,generico_filtro').eq('empresa_id', e).eq('activo', true).order('nombre')),
-      paginar(() => sb.from('v_variantes').select('id,producto_id,talle,talle_nombre,talle_orden,color,color_nombre,stock,activa').eq('empresa_id', e))
+      // solo prendas (un kit, el envío, la seña o la gift card no entran por remito) · orden fijo para que las páginas no se pisen
+      paginar(() => sb.from('productos').select('id,codigo,nombre,costo,precio,tiene_variantes,categoria_id,tipo,es_generico,generico_filtro').eq('empresa_id', e).eq('activo', true).not('tipo', 'in', '(kit,envio,sena,gift_card)').order('nombre').order('id')),
+      paginar(() => sb.from('v_variantes').select('id,producto_id,talle,talle_nombre,talle_orden,color,color_nombre,stock,activa').eq('empresa_id', e).order('id'))
     ]);
     productos = ps; porProducto = new Map(); varPorId = new Map();
     vs.forEach(v => { varPorId.set(v.id, v); if (!v.activa) return; if (!porProducto.has(v.producto_id)) porProducto.set(v.producto_id, []); porProducto.get(v.producto_id).push(v); });
@@ -128,9 +129,13 @@ APP.ready.then(async () => {
   if (depositos.length > 1) $('#deposito').hidden = false;
   $('#fecha').value = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 
-  // al volver de crear una prenda en otra pestaña, ya aparece para elegir
-  let ultimaRecarga = Date.now();
-  window.addEventListener('focus', async () => { if (Date.now() - ultimaRecarga < 4000) return; ultimaRecarga = Date.now(); await cargarCatalogo(); pintar(); });
+  // (la prenda creada en otra pestaña llega por "message": no se recarga todo al volver a la ventana, eso borraba lo que se estaba escribiendo)
+  // salir a mitad de un remito sin guardar: avisa
+  let cambiado = false, ocupado = false;
+  document.addEventListener('input', ev => { if (!ev.target.closest('.modal-fondo')) cambiado = true; });
+  window.addEventListener('beforeunload', ev => { if (cambiado && !cerrada()) { ev.preventDefault(); ev.returnValue = ''; } });
+  // lo que guarda o ingresa, una sola vez aunque se toque dos veces (antes: dos pedidos, o el stock entraba dos veces)
+  const unaVez = fn => async (...a) => { if (ocupado || document.querySelector('.modal-fondo')) return; ocupado = true; try { return await fn(...a); } finally { ocupado = false; } };
 
   // ---------- ayudas de una prenda ----------
   const prod = idp => productos.find(p => p.id === idp);
@@ -153,16 +158,23 @@ APP.ready.then(async () => {
     const [{ data: c }, { data: ls }] = await Promise.all([sb.from('v_compras').select('*').eq('id', id).single(), sb.from('compra_lineas').select('*').eq('compra_id', id).order('id')]);
     if (!c) { toast('No existe esa compra', 'error'); return; }
     compra = c;
+    // prendas que se apagaron después del remito: se traen igual (si no, la pantalla fallaba al corregir o ingresar)
+    { const faltan = [...new Set((ls || []).map(l => l.producto_id))].filter(pid => pid && !prod(pid));
+      if (faltan.length) { const { data: viejas } = await sb.from('productos').select('id,codigo,nombre,costo,precio,tiene_variantes,categoria_id,tipo,es_generico,generico_filtro').in('id', faltan); (viejas || []).forEach(p => productos.push(p)); } }
     $('#proveedor').value = c.proveedor_id || ''; $('#fecha').value = c.fecha; $('#entrega').value = c.entrega_estimada || ''; $('#referencia').value = c.referencia || '';
     $('#deposito').value = c.deposito_id || $('#deposito').value; $('#descuento').value = ver(c.descuento_pct); $('#nota').value = c.nota || '';
     // un renglón por prenda + color + nombre del proveedor, como en el remito
     const g = new Map();
     (ls || []).forEach(l => {
       const v = varPorId.get(l.variante_id) || {}, k = [l.producto_id, v.color || '', l.articulo_prov || ''].join('|');
-      if (!g.has(k)) g.set(k, { art: l.articulo_prov || '', producto_id: l.producto_id, color: v.color || '', cant: {}, recibida: {}, costo: +l.costo_unit });
+      if (!g.has(k)) g.set(k, { art: l.articulo_prov || '', producto_id: l.producto_id, color: v.color || '', cant: {}, recibida: {}, vid: {}, costo: +l.costo_unit });
       const f = g.get(k); f.cant[v.talle || ''] = (f.cant[v.talle || ''] || 0) + +l.pedida; f.recibida[v.talle || ''] = (f.recibida[v.talle || ''] || 0) + +l.recibida;
+      f.vid[v.talle || ''] = l.variante_id;   // la variante exacta del remito (aunque después se haya apagado)
     });
     filas = [...g.values()]; if (!cerrada()) filas.push(filaVacia());
+    // un código general que ya se guardó así (sin identificar los modelos) no vuelve a exigir que se identifiquen
+    filas.forEach(f => { if ((prod(f.producto_id) || {}).es_generico) f.sinIdentificar = true; });
+    cambiado = false;
     pintarCabecera(); pintar();
   }
   function pintarCabecera() {
@@ -360,7 +372,7 @@ APP.ready.then(async () => {
     const gen = usadas.find(f => (prod(f.producto_id) || {}).es_generico && !f.sinIdentificar); if (gen) { setTimeout(() => desglosar(filas.indexOf(gen)), 50); throw new Error(`Identificá qué modelos son las ${prod(gen.producto_id).nombre}`); }
     const sinCant = usadas.find(f => !unidades(f)); if (sinCant) throw new Error(`Poné cuántas llegaron de ${prod(sinCant.producto_id).nombre}${sinCant.art ? ' (' + sinCant.art + ')' : ''}, o quitá el renglón`);
     const lineas = [];
-    usadas.forEach(f => { const p = prod(f.producto_id); Object.entries(f.cant).forEach(([t, n]) => { const v = varDe(p.id, f.color, t); if (!v || !n) return; lineas.push({ variante_id: v.id, producto_id: p.id, descripcion: p.nombre, talle: v.talle_nombre || null, color: v.color_nombre || null, pedida: n, costo_unit: r2(f.costo), articulo_prov: f.art.trim() || null }); }); });
+    usadas.forEach(f => { const p = prod(f.producto_id); Object.entries(f.cant).forEach(([t, n]) => { const vg = f.vid && f.vid[t] && varPorId.get(f.vid[t]); const v = (vg && vg.producto_id === p.id && (vg.color || '') === (f.color || '') ? vg : null) || varDe(p.id, f.color, t); if (!v || !n) return; lineas.push({ variante_id: v.id, producto_id: p.id, descripcion: p.nombre, talle: v.talle_nombre || null, color: v.color_nombre || null, pedida: n, costo_unit: r2(f.costo), articulo_prov: f.art.trim() || null }); }); });
     if (!lineas.length) throw new Error('Cargá al menos una prenda');
     if (!$('#proveedor').value) throw new Error('Elegí el proveedor (así Percha aprende sus nombres y lleva la cuenta)');
     return { id: id || null, empresa_id: e, proveedor_id: $('#proveedor').value || null, deposito_id: $('#deposito').value || null, fecha: $('#fecha').value, entrega_estimada: $('#entrega').value || null, referencia: $('#referencia').value.trim() || null, descuento_pct: num($('#descuento').value), nota: $('#nota').value.trim() || null, estado, lineas };
@@ -370,22 +382,29 @@ APP.ready.then(async () => {
     const { data, error } = await sb.rpc('compras_guardar', { p });
     if (error) { toast(mensajeError(error), 'error'); return null; }
     if (!id) { id = data.id; history.replaceState(null, '', `compra.html?id=${id}`); }
-    await cargarAprendido(); toast('Pedido guardado: cuando llegue, entrá acá y tocá "Ingresar al stock"'); await cargar(); return data;
+    cambiado = false;
+    await cargarAprendido(); if (!guardarPedido.callado) toast('Pedido guardado: cuando llegue, entrá acá y tocá "Ingresar al stock"'); await cargar(); return data;
   }
   async function ingresar() {
     let p; try { p = armar('pedida'); } catch (er) { toast(er.message, 'error'); return; }
+    // el mismo remito ya cargado (otra persona, otro día): se avisa antes de que el stock entre dos veces
+    if (p.referencia && p.proveedor_id) {
+      const { data: ya } = await sb.from('compras').select('id,numero,fecha').eq('empresa_id', e).eq('proveedor_id', p.proveedor_id).ilike('referencia', p.referencia).neq('estado', 'anulada');
+      const otro = (ya || []).find(x => x.id !== id);
+      if (otro && !await confirmar(`El remito ${p.referencia} de este proveedor ya está cargado (compra #${String(otro.numero).padStart(5, '0')} del ${fmt.fecha(otro.fecha)}). ¿Cargarlo igual?`, 'Cargarlo igual')) return;
+    }
     const u = p.lineas.reduce((s, l) => s + l.pedida, 0);
     const m = modal(`<h2>¿Llegó todo lo del remito?</h2><p class="sub">Van a entrar <b>${u} prendas</b> al stock del local y de la web.</p>
       <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:12px"><input type="checkbox" id="i-costos" checked> Actualizar el costo de las prendas${p.descuento_pct ? ' (con el ' + ver(p.descuento_pct) + '% de descuento)' : ''}</label>
       <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:6px"><input type="checkbox" id="i-deuda" checked> Sumar a la cuenta del proveedor (lo que se le debe)</label>
       <div class="pie" style="flex-wrap:wrap"><button class="btn" data-no>Cancelar</button><button class="btn" data-parte>Llegó solo una parte</button><button class="btn primario" data-si>Sí, ingresar al stock</button></div>`, { fijo: true });
     $('[data-no]', m).onclick = () => m.cerrar();
-    $('[data-parte]', m).onclick = async () => { m.cerrar(); if (await guardarPedido()) recibirParte(); };
+    $('[data-parte]', m).onclick = async () => { m.cerrar(); guardarPedido.callado = true; const ok = await guardarPedido(); guardarPedido.callado = false; if (ok) recibirParte(); };
     $('[data-si]', m).onclick = async () => {
-      const b = $('[data-si]', m); b.disabled = true; b.textContent = 'Ingresando…';
+      const b = $('[data-si]', m); if (b.disabled) return; b.disabled = true; b.textContent = 'Ingresando…';
       const { data, error } = await sb.rpc('compras_ingresar', { p: Object.assign(p, { actualizar_costos: $('#i-costos', m).checked, asentar_deuda: $('#i-deuda', m).checked }) });
       if (error) { toast(mensajeError(error), 'error'); b.disabled = false; b.textContent = 'Sí, ingresar al stock'; return; }
-      m.cerrar(); if (!id) { id = data.id; history.replaceState(null, '', `compra.html?id=${id}`); }
+      m.cerrar(); cambiado = false; if (!id) { id = data.id; history.replaceState(null, '', `compra.html?id=${id}`); }
       await Promise.all([cargarCatalogo(), cargarAprendido()]); await cargar(); listo(data);
     };
   }
@@ -417,6 +436,7 @@ APP.ready.then(async () => {
     $('[data-nada]', m).onclick = () => $$('input[data-l]', m).forEach(i => i.value = 0);
     $('[data-no]', m).onclick = () => m.cerrar();
     $('[data-si]', m).onclick = async () => {
+      if ($('[data-si]', m).disabled) return;
       const lineas = $$('input[data-l]', m).map(i => ({ linea_id: +i.dataset.l, cantidad: Math.min(+i.dataset.max, Math.max(0, Math.round(num(i.value)))) }));
       $('[data-si]', m).disabled = true;
       const { data, error } = await sb.rpc('compras_recibir', { p: { empresa_id: e, compra_id: id, nota: $('#r-nota', m).value.trim() || null, actualizar_costos: $('#r-costos', m).checked, asentar_deuda: $('#r-deuda', m).checked, lineas } });
@@ -442,7 +462,7 @@ APP.ready.then(async () => {
     nuevo.forEach(n => { if (vistos.has(n.producto_id)) return; vistos.add(n.producto_id); const viejo = [...original.values()].find(o => o.producto_id === n.producto_id);
       if (!viejo || +viejo.costo !== +n.costo) costos.push({ nombre: (prod(n.producto_id) || {}).nombre, antes: viejo ? viejo.costo : null, ahora: n.costo }); });
     const total = Math.round([...nuevo.values()].reduce((s, n) => s + n.cant * n.costo, 0) * (1 - (+p.descuento_pct || 0) / 100) * 100) / 100, antes = +compra.total || 0;
-    if (!difs.length && !costos.length && total === antes && p.proveedor_id === compra.proveedor_id && (p.referencia || '') === (compra.referencia || '')) { toast('No cambiaste nada'); return; }
+    if (!difs.length && !costos.length && total === antes && p.proveedor_id === compra.proveedor_id && (p.referencia || '') === (compra.referencia || '') && p.fecha === compra.fecha && (p.nota || '') === (compra.nota || '')) { toast('No cambiaste nada'); return; }
     const provNom = idp => (proveedores.find(x => x.id === idp) || {}).nombre || 'el proveedor';
     const m = modal(`<h2>${anularTodo ? '¿Anular el remito?' : '¿Guardar la corrección?'}</h2>
       ${difs.length ? `<p class="sub" style="margin-top:8px"><b>Stock</b> (solo la diferencia):</p><ul style="margin:4px 0 0 18px;font-size:13.5px;line-height:1.6">${difs.map(x => `<li><b style="color:${x.d > 0 ? 'var(--ok)' : 'var(--error)'}">${x.d > 0 ? '+' : ''}${fmt.num(x.d)}</b> ${esc(nombreVar(x.vid))}</li>`).join('')}</ul>` : '<p class="sub">El stock no cambia.</p>'}
@@ -481,7 +501,7 @@ APP.ready.then(async () => {
     a.innerHTML = `${id ? '<button class="btn peligro" id="b-anular">Anular</button>' : ''}<a class="btn" href="compras.html">Volver</a>
       ${pedido ? '<button class="btn" id="b-ingresar">📦 Ya llegó: ingresar al stock</button><button class="btn primario" id="b-pedido">💾 Guardar pedido</button>'
         : '<button class="btn" id="b-pedido" title="Para mercadería que pediste y todavía no llegó">Todavía no llegó: guardar como pedido</button><button class="btn primario" id="b-ingresar">📦 Ingresar al stock</button>'}`;
-    $('#b-ingresar').onclick = ingresar; $('#b-pedido').onclick = guardarPedido;
+    $('#b-ingresar').onclick = unaVez(ingresar); $('#b-pedido').onclick = unaVez(guardarPedido);
     const an = $('#b-anular'); if (an) an.onclick = async () => { if (!await confirmar('¿Anular esta compra? No entra nada al stock.', 'Anular')) return; const { error } = await sb.rpc('compras_anular', { p_compra: id }); if (error) { toast(mensajeError(error), 'error'); return; } toast('Compra anulada'); cargar(); };
   }
   $('#descuento').oninput = totales;

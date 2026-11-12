@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Conexiones · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611121407">
+<link rel="stylesheet" href="../shell/shell.css?v=202611121441">
 <style>
   .canales{display:grid;grid-template-columns:1fr 1fr;gap:14px}
   .canal-card .logo{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font:800 16px var(--f-titulo);color:#fff}
@@ -49,9 +49,9 @@
   <div class="card" id="precios" style="margin-top:14px;display:none"></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611121407"></script>
-<script src="../shared/precios.js?v=202611121407"></script>
-<script src="../shell/shell.js?v=202611121407"></script>
+<script src="../shared/supabase.js?v=202611121441"></script>
+<script src="../shared/precios.js?v=202611121441"></script>
+<script src="../shell/shell.js?v=202611121441"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -86,10 +86,10 @@ APP.ready.then(async () => {
         <div class="av-fila"><button class="btn" id="btn-tomar">⚠ Tomar todo de la web</button><small class="sub">Al revés: el local toma el stock, los nombres y las variantes de Tienda Nube.</small></div>
         <div class="av-fila"><button class="btn peligro" id="btn-desconectar">Desconectar Tienda Nube</button><small class="sub">Borra el cruce guardado. No toca nada en la tienda.</small></div>
       </details>`;
-    $('#chk-empujar').onchange = async ev => { const r = await sb.from('conexiones').update({ empujar_stock: ev.target.checked }).eq('id', cx.id); toast(r.error ? mensajeError(r.error) : (ev.target.checked ? 'El local manda el stock a Tienda Nube' : 'Empuje desactivado'), r.error ? 'error' : ''); cx.empujar_stock = ev.target.checked; };
+    $('#chk-empujar').onchange = async ev => { const r = await sb.from('conexiones').update({ empujar_stock: ev.target.checked }).eq('id', cx.id); toast(r.error ? mensajeError(r.error) : (ev.target.checked ? 'El local manda el stock a Tienda Nube' : 'Stock compartido apagado'), r.error ? 'error' : ''); if (r.error) ev.target.checked = !ev.target.checked; else cx.empujar_stock = ev.target.checked; };
     $('#chk-ocultos').onchange = async ev => { const r = await sb.from('conexiones').update({ incluir_ocultos: ev.target.checked }).eq('id', cx.id); toast(r.error ? mensajeError(r.error) : (ev.target.checked ? 'Los ocultos de la tienda ahora cuentan' : 'Los ocultos de la tienda no cuentan para nada'), r.error ? 'error' : ''); if (r.error) ev.target.checked = !ev.target.checked; else { cx.incluir_ocultos = ev.target.checked; cargarTN(); } };
     $('#btn-todo').onclick = async () => {
-      if (!cx.empujar_stock) { toast('Primero activá "El local manda el stock"', 'error'); return; }
+      if (!cx.empujar_stock) { toast('Primero activá «Stock compartido con la web»', 'error'); return; }
       if (!await confirmar(`Se va a escribir en Tienda Nube el stock del local de las ${fmt.num(res.cruzados || 0)} variantes cruzadas. Lo que diga Tienda Nube hoy se pisa. ¿Seguimos?`, 'Enviar todo')) return;
       const { data: n, error } = await sb.rpc('encolar_todo', { p_conexion: cx.id }); if (error) { toast(mensajeError(error), 'error'); return; }
       toast(`${fmt.num(n)} variantes en cola: se envían en un minuto`); llamar('tn-push', {}).catch(() => {});

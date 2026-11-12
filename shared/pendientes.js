@@ -5,9 +5,9 @@
    La píldora la pone el shell arriba; PENDIENTES.abrir() muestra el panel. */
 (function () {
   const css = `
-  .pend-panel{position:fixed;top:0;right:0;bottom:0;width:min(440px,100vw);z-index:60;background:var(--superficie-2);box-shadow:var(--sombra-flotante);display:flex;flex-direction:column;animation:pend-entra .2s ease-out}
+  .pend-panel{position:fixed;top:0;right:0;bottom:0;width:min(440px,100vw);z-index:35;background:var(--superficie-2);box-shadow:var(--sombra-flotante);display:flex;flex-direction:column;animation:pend-entra .2s ease-out}
   @keyframes pend-entra{from{transform:translateX(30px);opacity:0}to{transform:none;opacity:1}}
-  .pend-telon{position:fixed;inset:0;z-index:59;background:rgba(21,23,28,.25)}
+  .pend-telon{position:fixed;inset:0;z-index:34;background:rgba(21,23,28,.25)}
   .pend-cab{display:flex;align-items:center;justify-content:space-between;padding:18px 20px 12px;border-bottom:1px solid var(--linea-suave)}
   .pend-cab h2{margin:0;font-size:18px}.pend-cab button{border:0;background:var(--relleno);width:34px;height:34px;border-radius:10px;cursor:pointer;font-size:16px}
   .pend-cuerpo{overflow:auto;padding:12px 20px 24px;flex:1}

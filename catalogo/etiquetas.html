@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Etiquetas · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611121407">
+<link rel="stylesheet" href="../shell/shell.css?v=202611121441">
 <style>
   .cola td input[type=number]{width:76px;text-align:right}
   .cola td.chk,.cola th.chk{width:34px;text-align:center}
@@ -76,9 +76,9 @@
 </main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611121407"></script>
-<script src="../shared/precios.js?v=202611121407"></script>
-<script src="../shell/shell.js?v=202611121407"></script>
+<script src="../shared/supabase.js?v=202611121441"></script>
+<script src="../shared/precios.js?v=202611121441"></script>
+<script src="../shell/shell.js?v=202611121441"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, confirmar } = APP, e = APP.empresa.id;
@@ -93,8 +93,10 @@ APP.ready.then(async () => {
 
   async function cargarInfo() {
     const ids = cola.map(c => c.variante_id); if (!ids.length) { info = {}; return; }
-    const { data } = await sb.from('v_variantes').select('*').in('id', ids);
-    info = Object.fromEntries((data || []).map(v => [v.id, v]));
+    // de a 300 (una lista larga no entra en la consulta); si falla, NO se toca la cola (antes se vaciaba sola sin internet)
+    let data = [];
+    for (let i = 0; i < ids.length; i += 300) { const r = await sb.from('v_variantes').select('*').in('id', ids.slice(i, i + 300)); if (r.error) { toast('No pude leer las prendas de la cola: ' + APP.mensajeError(r.error), 'error'); info = {}; return; } data = data.concat(r.data || []); }
+    info = Object.fromEntries(data.filter(v => v.activa !== false).map(v => [v.id, v]));
     cola = cola.filter(c => info[c.variante_id]); guardarCola();
     const pids = [...new Set(Object.values(info).map(v => v.producto_id))];
     const { data: ps } = await sb.from('productos').select('id,categoria_id,tipo').in('id', pids);

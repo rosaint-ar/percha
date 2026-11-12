@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Producto · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611121407">
+<link rel="stylesheet" href="../shell/shell.css?v=202611121441">
 <style>
   .dos{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
   .dos>.card{min-width:0;overflow-x:auto}
@@ -53,6 +53,7 @@
   .foto-t.arrastrando{opacity:.35}
   .foto-t .portada{position:absolute;left:6px;top:6px;font:700 9.5px var(--f-ui);letter-spacing:.04em;text-transform:uppercase;background:var(--acento);color:#fff;border-radius:6px;padding:2px 6px}
   .foto-t .acc{position:absolute;inset:auto 6px 6px 6px;display:flex;justify-content:space-between;opacity:0;transition:opacity .12s}
+  @media (hover:none){.foto-t .acc{opacity:1}}   /* en el celular los botones de la foto se ven siempre */
   .foto-t:hover .acc{opacity:1}
   .foto-t .acc button{width:28px;height:28px;border-radius:8px;border:0;background:rgba(255,255,255,.94);cursor:pointer;display:grid;place-items:center;font:700 13px var(--f-ui);color:var(--tinta-2);box-shadow:0 1px 3px rgba(0,0,0,.18)}
   .foto-t .acc button:hover{color:var(--acento)}.foto-t .acc button.x:hover{color:var(--error)}
@@ -167,10 +168,10 @@
   </div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611121407"></script>
-<script src="../shared/precios.js?v=202611121407"></script>
-<script src="../shared/prenda.js?v=202611121407"></script>
-<script src="../shell/shell.js?v=202611121407"></script>
+<script src="../shared/supabase.js?v=202611121441"></script>
+<script src="../shared/precios.js?v=202611121441"></script>
+<script src="../shared/prenda.js?v=202611121441"></script>
+<script src="../shell/shell.js?v=202611121441"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$ , toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -221,6 +222,7 @@ APP.ready.then(async () => {
     producto = p.data; variantes = (v.data || []).filter(x => x.activa !== false); precios = pr.data || [];   // lo sacado (apagado) no se muestra
     const mv = await sb.from('v_movimientos').select('*').eq('producto_id', id).order('fecha', { ascending: false }).limit(15);
     $('h1').innerHTML = `${esc(producto.nombre)}`;
+    { const vm = $('#ver-movs'); if (vm) vm.href = 'inventario.html?q=' + encodeURIComponent(producto.codigo) + '#movimientos'; }
     document.title = producto.nombre + ' · ' + APP.empresa.nombre;
     ['codigo', 'nombre', 'tipo', 'categoria_id', 'proveedor_id', 'temporada_id', 'marca_id', 'costo', 'precio', 'ean', 'descripcion'].forEach(k => form[k].value = producto[k] ?? '');
     form.tiene_variantes.value = String(producto.tiene_variantes); form.activo.value = String(producto.activo); form.publicar_web.value = String(producto.publicar_web !== false); estadoWeb(); form.es_generico.value = String(!!producto.es_generico);
@@ -342,7 +344,7 @@ APP.ready.then(async () => {
     const d = {
       codigo: form.codigo.value.trim(), nombre: form.nombre.value.trim(), tipo: form.tipo.value,
       categoria_id: form.categoria_id.value || null, proveedor_id: form.proveedor_id.value || null, temporada_id: form.temporada_id.value || null, marca_id: form.marca_id.value || null,
-      costo: PRECIOS.num(form.costo.value), precio: PRECIOS.num(form.precio.value), ean: form.ean.value.trim() || null,
+      costo: form.costo.value.trim() ? PRECIOS.num(form.costo.value) : null, precio: PRECIOS.num(form.precio.value), ean: form.ean.value.trim() || null,
       tiene_variantes: form.tiene_variantes.value === 'true', activo: form.activo.value === 'true', publicar_web: form.publicar_web.value === 'true', es_generico: form.es_generico.value === 'true', descripcion: form.descripcion.value.trim() || null
     };
     if (d.tipo === 'kit') { d.tiene_variantes = false; form.tiene_variantes.value = 'false'; }
@@ -353,8 +355,9 @@ APP.ready.then(async () => {
     const d = datosForm();
     if (!d.codigo || !d.nombre) { toast('Completá código y nombre', 'error'); return; }
     if (id) return autoguardar();
+    const g = $('#btn-guardar'); if (g) { if (g.disabled) return; g.disabled = true; }   // doble clic: un solo producto
     const r = await sb.from('productos').insert(APP.conEmpresa(d)).select().single();
-    if (r.error) { toast(mensajeError(r.error), 'error'); return; }
+    if (r.error) { if (g) g.disabled = false; toast(mensajeError(r.error), 'error'); return; }
     id = r.data.id;
     // artículo único o kit: su variante "sin talle ni color" para que el stock (o el disponible) tenga dónde colgar
     if (!d.tiene_variantes || d.tipo === 'kit') await sb.from('variantes').insert(APP.conEmpresa({ producto_id: id, sku: d.codigo, ean: d.ean }));
@@ -369,8 +372,11 @@ APP.ready.then(async () => {
   async function autoguardar() {
     const d = datosForm();
     if (!d.codigo || !d.nombre) { estado('Falta código o nombre', 'mal'); return; }
+    if (!form.precio.value.trim()) { estado('Falta el precio', 'mal'); return; }   // borrar el precio para reescribirlo no lo deja en $0
     const cambios = {}; Object.keys(d).forEach(k => { if ((producto[k] ?? null) !== (d[k] ?? null) && String(producto[k] ?? '') !== String(d[k] ?? '')) cambios[k] = d[k]; });
     if (!Object.keys(cambios).length) { estado('Guardado ✓', 'ok'); return; }
+    // pasar a "sin talles ni colores" con varias variantes prendidas escondería las demás (y se seguirían vendiendo)
+    if (cambios.tiene_variantes === false && variantes.length > 1) { form.tiene_variantes.value = 'true'; delete cambios.tiene_variantes; toast(`Tiene ${variantes.length} talles·colores: primero sacalos en «Talles y colores»`, 'error'); if (!Object.keys(cambios).length) { estado('Guardado ✓', 'ok'); return; } }
     // cambió el precio y el producto tiene precio de oferta: se elige si la oferta queda igual o sigue el mismo % de descuento
     let seguirOferta = false;
     if ('precio' in cambios && +producto.precio > 0) {
@@ -399,8 +405,12 @@ APP.ready.then(async () => {
     if (['tipo', 'tiene_variantes', 'es_generico'].some(k => k in cambios) || (antes.tipo !== producto.tipo)) await cargar();
   }
   // el precio se guarda al salir del campo (no mientras se escribe): puede preguntar qué pasa con la oferta
-  form.addEventListener('input', ev => { if (!id || !APP.esAdmin || ev.target.matches('select') || ev.target.name === 'precio') return; clearTimeout(tAuto); estado('Escribiendo…'); tAuto = setTimeout(() => { guardando = guardando.then(autoguardar); }, 700); });
-  form.addEventListener('change', ev => { if (!id || !APP.esAdmin || ev.target.value === '__nuevo__') return; clearTimeout(tAuto); guardando = guardando.then(autoguardar); });
+  // la cadena de guardados nunca queda trabada: si uno falla, el siguiente igual corre
+  const encolar = () => { guardando = guardando.catch(() => { }).then(autoguardar).catch(err => { estado('No se guardó', 'mal'); toast(mensajeError(err), 'error'); }); };
+  form.addEventListener('input', ev => { if (!id || !APP.esAdmin || ev.target.matches('select') || ev.target.name === 'precio') return; clearTimeout(tAuto); estado('Escribiendo…'); tAuto = setTimeout(encolar, 700); });
+  form.addEventListener('change', ev => { if (!id || !APP.esAdmin || ev.target.value === '__nuevo__') return; clearTimeout(tAuto); encolar(); });
+  // salir con algo sin guardar: avisa (antes se perdía lo último escrito)
+  window.addEventListener('beforeunload', ev => { const s = $('#acc-estado'); if (s && /Escribiendo|Guardando/.test(s.textContent)) { ev.preventDefault(); ev.returnValue = ''; } });
   form.addEventListener('submit', ev => ev.preventDefault());
 
   function pintarMargen() {
@@ -578,7 +588,9 @@ APP.ready.then(async () => {
     $('[data-no]', m).onclick = () => m.cerrar();
     const todas = () => Object.values(ofertas.promos).map(p => p.id);
     const q = $('[data-quitar]', m); if (q) q.onclick = async () => { const { error } = await sb.from('rebaja_precios').delete().in('promocion_id', todas()).eq('producto_id', id).is('variante_id', null); if (error) { toast(mensajeError(error), 'error'); return; } m.cerrar(); toast('Oferta quitada: vuelve al precio de Lista'); await cargarPctx(); };
-    $('[data-si]', m).onclick = async () => {
+    // doble clic: una sola oferta (antes podía crear dos promociones y decir "Ya existe" aunque se guardara bien)
+    $('[data-si]', m).onclick = async () => { const bS = $('[data-si]', m); if (bS.disabled) return; bS.disabled = true; try { await guardarOferta(); } finally { if (bS.isConnected) bS.disabled = false; } };
+    const guardarOferta = async () => {
       const precio = PRECIOS.num(inp.value);
       if (!(precio > 0)) { toast('Poné el precio de oferta', 'error'); inp.focus(); return; }
       if (precio >= cb.base) { toast('La oferta tiene que ser menor que el precio de Lista (' + fmt.pesos(cb.base) + ')', 'error'); inp.focus(); return; }
@@ -616,7 +628,7 @@ APP.ready.then(async () => {
     }; }
     $$('[data-fijar]', tb).forEach(b => b.onclick = async () => {
       const l = listas.find(x => x.id === b.dataset.fijar), fijo = precios.find(p => p.lista_id === l.id && !p.variante_id);
-      if (fijo) { await sb.from('precios').delete().eq('lista_id', l.id).eq('producto_id', id).is('variante_id', null); }
+      if (fijo) { if (!await confirmar(`¿Volver a la regla de ${l.nombre}? Se borra el precio especial y se calcula solo desde el de Lista.`, 'Volver a la regla')) return; const r = await sb.from('precios').delete().eq('lista_id', l.id).eq('producto_id', id).is('variante_id', null); if (r.error) { toast(mensajeError(r.error), 'error'); return; } }
       else {
         const m = modal(`<h2>Precio especial · ${esc(l.nombre)}</h2><p class="sub">Solo para la lista ${esc(l.nombre)}: queda fijo y <b>no cambia</b> cuando cambia el precio de Lista. Para cambiar el precio de la prenda, usá <b>Cambiar precio</b> en la fila de Lista.</p><div class="campo" style="margin-top:10px"><label>Precio</label><input id="p-fijo" type="text" inputmode="decimal" value="${precioDe(l)}"></div><div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Poner precio especial</button></div>`);
         await new Promise(res => { $('[data-no]', m).onclick = () => { m.cerrar(); res(); }; $('[data-si]', m).onclick = async () => { const r = await sb.from('precios').insert(APP.conEmpresa({ lista_id: l.id, producto_id: id, precio: PRECIOS.num($('#p-fijo', m).value) })); if (r.error) toast(mensajeError(r.error), 'error'); m.cerrar(); res(); }; });
@@ -635,6 +647,7 @@ APP.ready.then(async () => {
       const b = $('#btn-unico'); if (b) b.onclick = () => abrirVariante(v);
       $('#btn-agregar-variantes').style.display = 'none'; return;
     }
+    $('#btn-agregar-variantes').style.display = '';
     if (!variantes.length) { m.innerHTML = '<p class="vacio">Todavía no tiene talles ni colores. Agregalos con el botón de arriba.</p>'; return; }
     const ts = [...new Map(variantes.map(v => [v.talle || '', { c: v.talle || '', n: v.talle_nombre || 'Sin talle', o: v.talle_orden ?? 999 }])).values()].sort((a, b) => a.o - b.o);
     const cs = [...new Map(variantes.map(v => [v.color || '', { c: v.color || '', n: v.color_nombre || 'Sin color', hex: v.color_hex }])).values()].sort((a, b) => a.n.localeCompare(b.n));
@@ -679,6 +692,7 @@ APP.ready.then(async () => {
     const stockDe = vid => +((variantes.find(x => x.id === vid) || {}).stock || 0);
     const ordenEsc = escalas.slice().sort((a, b) => (deFam.includes(b.id) ? 1 : 0) - (deFam.includes(a.id) ? 1 : 0) || a.orden - b.orden);
     const selT = new Set(presetT && !activas.length ? [...presetT] : activas.map(v => v.talle_id).filter(Boolean)), selC = new Set(activas.map(v => v.color_id).filter(Boolean));
+    const t0 = new Set(activas.map(v => v.talle_id).filter(Boolean)), c0 = new Set(activas.map(v => v.color_id).filter(Boolean));
     let escActiva = (ordenEsc.find(s => talles.some(t => t.escala_id === s.id && selT.has(t.id))) || ordenEsc[0] || {}).id, busca = '';
     const GRUPOS = ['Negros', 'Blancos y crudos', 'Grises', 'Nudes y marrones', 'Rojos', 'Rosas', 'Naranjas y corales', 'Amarillos y dorados', 'Verdes y aguas', 'Azules', 'Violetas y lilas', 'Combinados', 'Estampados', 'Otros'];
     const nrm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -690,7 +704,10 @@ APP.ready.then(async () => {
       const tsN = [...selT], csN = [...selC];
       const combos = (tsN.length ? tsN : [null]).flatMap(t => (csN.length ? csN : [null]).map(c => [t, c])).filter(([t, c]) => t || c);
       const de = (t, c) => vars.find(v => (v.talle_id || null) === t && (v.color_id || null) === c);
-      const crear = combos.filter(([t, c]) => !de(t, c)), prender = combos.map(([t, c]) => de(t, c)).filter(v => v && !v.activa);
+      // solo se agregan las combinaciones de un talle o color RECIÉN tildado (si la prenda tenía la grilla incompleta a
+      // propósito, no se completa sola ni vuelve lo que se había sacado de a una)
+      const nuevoEje = ([t, c]) => !activas.length || (t && !t0.has(t)) || (c && !c0.has(c));
+      const crear = combos.filter(nuevoEje).filter(([t, c]) => !de(t, c)), prender = combos.filter(nuevoEje).map(([t, c]) => de(t, c)).filter(v => v && !v.activa);
       const queda = v => (v.talle_id ? selT.has(v.talle_id) : !selT.size) && (v.color_id ? selC.has(v.color_id) : !selC.size);
       const salen = activas.filter(v => !queda(v)), conStock = salen.filter(v => stockDe(v.id) !== 0), apagar = salen.filter(v => stockDe(v.id) === 0);
       return { crear, prender, apagar, conStock };
@@ -746,6 +763,12 @@ APP.ready.then(async () => {
         const P = plan(), nombre = v => [nomT(v.talle_id), nomC(v.color_id)].filter(x => !/^sin /.test(x)).join(' · ') || 'única';
         if (P.apagar.length && !await confirmar('Se sacan ' + P.apagar.length + ' combinaciones: ' + P.apagar.slice(0, 8).map(nombre).join(', ') + (P.apagar.length > 8 ? '…' : '') + '. Dejan de ofrecerse en la caja y en la web (no se borra el historial).', 'Sacar')) return;
         ev.target.disabled = true;
+        // el stock de ahora (la ficha pudo quedar abierta mientras entraba un remito): lo que tiene stock no se saca
+        if (P.apagar.length) {
+          const { data: fr } = await sb.from('v_variantes').select('id,stock').in('id', P.apagar.map(v => v.id));
+          const conSt = new Set((fr || []).filter(x => +x.stock !== 0).map(x => x.id));
+          if (conSt.size) { P.conStock = P.conStock.concat(P.apagar.filter(v => conSt.has(v.id))); P.apagar = P.apagar.filter(v => !conSt.has(v.id)); }
+        }
         const nuevas = P.crear.map(([t, c]) => { const T = talles.find(x => x.id === t), C = colores.find(x => x.id === c); return APP.conEmpresa({ producto_id: id, talle_id: t || null, color_id: c || null, sku: [producto.codigo, T && T.codigo, C && C.codigo].filter(Boolean).join('-') }); });
         const errores = [];
         if (nuevas.length) { const r = await sb.from('variantes').insert(nuevas); if (r.error) errores.push(mensajeError(r.error)); }
@@ -773,8 +796,8 @@ APP.ready.then(async () => {
     if (!(comps || []).length) tb.insertAdjacentHTML('beforeend', '<tr><td colspan="6" class="vacio">Todavía no tiene componentes. Buscá arriba la primera prenda.</td></tr>');
     $('#kit-resumen').innerHTML = (comps || []).length ? `Se pueden armar <b>${fmt.num(disponible || 0)}</b> kits con el stock actual · costo del kit <b>${fmt.pesos(costo)}</b> · precio ${fmt.pesos(producto.precio)} → margen <b>${producto.precio ? fmt.pct(100 * (producto.precio - costo) / producto.precio) : '—'}</b>` : '';
     $('#stock-total').value = fmt.num(disponible || 0);
-    $$('input[data-c]', tb).forEach(i => i.onchange = async () => { await sb.from('producto_componentes').update({ cantidad: Math.max(1, +i.value || 1) }).eq('id', i.dataset.c); pintarKit(); });
-    $$('[data-x]', tb).forEach(b => b.onclick = async () => { await sb.from('producto_componentes').delete().eq('id', b.dataset.x); pintarKit(); });
+    $$('input[data-c]', tb).forEach(i => i.onchange = async () => { const r = await sb.from('producto_componentes').update({ cantidad: Math.max(1, +i.value || 1) }).eq('id', i.dataset.c); if (r.error) toast(mensajeError(r.error), 'error'); pintarKit(); });
+    $$('[data-x]', tb).forEach(b => b.onclick = async () => { if (!await confirmar('¿Sacar esta prenda del kit?', 'Sacar')) return; const r = await sb.from('producto_componentes').delete().eq('id', b.dataset.x); if (r.error) toast(mensajeError(r.error), 'error'); pintarKit(); });
   }
   const kq = $('#kit-q'), ksug = $('#kit-sug');
   kq.addEventListener('input', async () => {
@@ -793,7 +816,7 @@ APP.ready.then(async () => {
   // ---------- filtros (kit y genérico) ----------
   const partir = s => s.split(',').map(x => x.trim()).filter(Boolean);
   async function llenarFiltros() {
-    const cats = $$('select[name=categoria_id] option').map(o => `<option value="${o.value}">${esc(o.textContent)}</option>`).join('');
+    const cats = $$('select[name=categoria_id] option').filter(o => o.value && o.value !== '__nuevo__').map(o => `<option value="${o.value}">${esc(o.textContent)}</option>`).join('');
     $('#kf-cat').innerHTML = '<option value="">Todas</option>' + cats;
     const { data: gens } = await sb.from('productos').select('id,nombre').eq('empresa_id', e).eq('es_generico', true).order('nombre');
     $('#kf-def').innerHTML = '<option value="">—</option>' + (gens || []).map(g => `<option value="${g.id}">${esc(g.nombre)}</option>`).join('');
@@ -827,7 +850,7 @@ APP.ready.then(async () => {
     const tb = $('#tb-mov'); tb.querySelectorAll('tr').forEach((x, i) => i && x.remove());
     const motivo = { inicial: 'Carga inicial', compra: 'Compra', venta: 'Venta', devolucion: 'Devolución', ajuste: 'Ajuste', transferencia: 'Transferencia', recuento: 'Recuento' };
     if (!movs.length) { tb.insertAdjacentHTML('beforeend', '<tr><td colspan="4" class="vacio">Sin movimientos todavía.</td></tr>'); return; }
-    movs.forEach(mv => { const v = variantes.find(x => x.id === mv.variante_id) || {};
+    movs.forEach(mv => { const v = variantes.find(x => x.id === mv.variante_id) || { talle_nombre: mv.talle_nombre, color_nombre: mv.color_nombre };
       tb.insertAdjacentHTML('beforeend', `<tr><td>${fmt.fechaHora(mv.fecha)}</td><td>${esc([v.talle_nombre, v.color_nombre].filter(Boolean).join(' · ') || 'único')}</td><td class="num">${+mv.cantidad > 0 ? '+' : ''}${fmt.dec(mv.cantidad)}</td><td>${mv.venta_numero ? 'Venta #' + String(mv.venta_numero).padStart(6, '0') : esc(motivo[mv.tipo] || mv.tipo)}${mv.motivo && mv.motivo !== mv.tipo ? ' · ' + esc(mv.motivo) : ''}${mv.nota && !mv.venta_numero ? ' · <small>' + esc(mv.nota) + '</small>' : ''}${mv.usuario ? ' <small style="color:var(--tinta-3)">· ' + esc(mv.usuario) + '</small>' : ''}</td></tr>`); });
   }
 

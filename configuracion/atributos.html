@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Talles, colores y familias · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611121407">
+<link rel="stylesheet" href="../shell/shell.css?v=202611121441">
 <style>
   .pestanas{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
   .pestanas a{font:600 13px var(--f-ui);color:var(--tinta);text-decoration:none;padding:8px 14px;border:1px solid var(--linea);background:var(--superficie-2);border-radius:10px}
@@ -96,8 +96,8 @@
 </main>
 <div id="impresion" hidden></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611121407"></script>
-<script src="../shell/shell.js?v=202611121407"></script>
+<script src="../shared/supabase.js?v=202611121441"></script>
+<script src="../shell/shell.js?v=202611121441"></script>
 <script>
 APP.ready.then(async () => {
   const { esc, $, $$, toast, mensajeError, fmt, confirmar } = APP, e = APP.empresa.id;
@@ -131,13 +131,20 @@ APP.ready.then(async () => {
     { n: 'En blanco', tipo: 'otro', d: 'La armás vos', t: [] },
   ];
 
-  let escalas = [], talles = [], colores = [], cats = [];
+  let escalas = [], talles = [], colores = [], cats = [], todosAtr = [];
+  // de a 1000 (la base corta ahí y la web crea colores sola: un día pasa los 1000)
+  const paginar = async q => { let d = 0, t = []; while (true) { const { data, error } = await q().range(d, d + 999); if (error) throw error; t = t.concat(data || []); if (!data || data.length < 1000) break; d += 1000; } return t; };
   async function cargar() {
-    const [a, b, c] = await Promise.all([
-      sb.from('talle_escalas').select('*').eq('empresa_id', e).eq('activa', true).order('orden'),
-      sb.from('atributos').select('*').eq('empresa_id', e).eq('activo', true).order('orden').order('nombre'),
-      sb.from('categorias').select('*').eq('empresa_id', e).eq('activa', true).order('orden').order('nombre')]);
-    escalas = a.data || []; talles = (b.data || []).filter(x => x.tipo === 'talle'); colores = (b.data || []).filter(x => x.tipo === 'color'); cats = c.data || [];
+    let a, b, c;
+    try {
+      [a, b, c] = await Promise.all([
+        sb.from('talle_escalas').select('*').eq('empresa_id', e).eq('activa', true).order('orden'),
+        paginar(() => sb.from('atributos').select('*').eq('empresa_id', e).order('orden').order('nombre').order('id')),   // todos: los apagados también (para no repetir códigos ni nombres)
+        sb.from('categorias').select('*').eq('empresa_id', e).eq('activa', true).order('orden').order('nombre')]);
+      if (a.error) throw a.error; if (c.error) throw c.error;
+    } catch (err) { toast('No se pudo cargar: ' + mensajeError(err), 'error'); return; }
+    todosAtr = b; const act = b.filter(x => x.activo);
+    escalas = a.data || []; talles = act.filter(x => x.tipo === 'talle'); colores = act.filter(x => x.tipo === 'color'); cats = c.data || [];
     pintarEscalas(); pintarColores(); pintarFamilias();
   }
 
@@ -182,23 +189,32 @@ APP.ready.then(async () => {
   }
   const codigoLibre = (nombre, sufijo) => {
     let c = String(nombre).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, '').slice(0, 12) || 'T';
-    const usados = new Set(talles.map(t => t.codigo));
+    const usados = new Set(todosAtr.filter(t => t.tipo === 'talle').map(t => t.codigo).concat(talles.map(t => t.codigo)));   // también los apagados: el código no se puede repetir
     if (usados.has(c) && sufijo) c = (c + '-' + sufijo).slice(0, 16);
     let k = 2, base = c; while (usados.has(c)) c = base + k++;
     return c;
   };
+  // el lugar que sigue al último de la escala (antes caía en el medio y los talles se mezclaban entre escalas)
+  const ordenSiguiente = escalaId => { const s = escalas.find(x => x.id === escalaId) || { orden: 9 }; return Math.max(s.orden * 100, ...tallesDe(escalaId).map(t => +t.orden || 0)) + 1; };
+  const tN = s => String(s || '').trim().toLowerCase().replace(/xxxxl/g, '4xl').replace(/xxxl/g, '3xl').replace(/xxl/g, '2xl');
   async function nuevoTalle(escalaId) {
-    const s = escalas.find(x => x.id === escalaId), n = tallesDe(escalaId).length;
+    const s = escalas.find(x => x.id === escalaId);
     const d = await APP.formulario({ titulo: 'Nuevo talle · ' + s.nombre, campos: [{ k: 'nombre', label: 'Talle', requerido: true, placeholder: 'Ej. XL, 95, 38/39' }, { k: 'codigo', label: 'Código (opcional)', placeholder: 'Se arma solo', ayuda: 'Va en el código de cada variante (SKU)' }],
-      alGuardar: async d => { const r = await sb.from('atributos').insert(APP.conEmpresa({ tipo: 'talle', nombre: d.nombre, codigo: d.codigo || codigoLibre(d.nombre, s.tipo.slice(0, 3).toUpperCase()), escala_id: escalaId, orden: s.orden * 100 + n + 1 })); if (r.error) throw r.error; } });
+      alGuardar: async d => {
+        // no repetir: el mismo talle en esta escala no; en otra escala, se pregunta; si estaba apagado, se vuelve a prender
+        const igual = todosAtr.find(t => t.tipo === 'talle' && tN(t.nombre) === tN(d.nombre));
+        if (igual && igual.activo && igual.escala_id === escalaId) throw new Error(`«${igual.nombre}» ya está en esta escala`);
+        if (igual && !igual.activo) { const r = await sb.from('atributos').update({ activo: true, escala_id: escalaId, orden: ordenSiguiente(escalaId) }).eq('id', igual.id); if (r.error) throw r.error; return; }
+        if (igual && !await confirmar(`«${igual.nombre}» ya existe en ${(escalas.find(x => x.id === igual.escala_id) || {}).nombre || 'Sin escala'}. Si es el mismo, conviene pasarlo de escala en vez de crear otro. ¿Crear otro igual?`, 'Crear otro')) throw new Error('No se creó');
+        const r = await sb.from('atributos').insert(APP.conEmpresa({ tipo: 'talle', nombre: d.nombre, codigo: d.codigo || codigoLibre(d.nombre, s.tipo.slice(0, 3).toUpperCase()), escala_id: escalaId, orden: ordenSiguiente(escalaId) })); if (r.error) throw r.error; } });
     if (d) { toast('Talle agregado'); cargar(); }
   }
   async function editarTalle(t) {
     if (!t) return;
     const pend = APP.formulario({ titulo: 'Talle ' + t.nombre, boton: 'Guardar',
       campos: [{ k: 'nombre', label: 'Talle', requerido: true, valor: t.nombre, ancho: 'c2' }, { k: 'codigo', label: 'Código', requerido: true, valor: t.codigo, ancho: 'c2' },
-        { k: 'escala_id', label: 'Escala', tipo: 'select', opciones: escalas.map(s => [s.id, s.nombre]), valor: t.escala_id }],
-      alGuardar: async d => { const cambio = { nombre: d.nombre, codigo: d.codigo }; if (d.escala_id !== t.escala_id) { const s = escalas.find(x => x.id === d.escala_id); cambio.escala_id = d.escala_id; cambio.orden = s.orden * 100 + tallesDe(s.id).length + 1; } const r = await sb.from('atributos').update(cambio).eq('id', t.id); if (r.error) throw r.error; } });
+        { k: 'escala_id', label: 'Escala', tipo: 'select', opciones: [['', '— Sin escala —']].concat(escalas.map(s => [s.id, s.nombre])), valor: t.escala_id || '' }],
+      alGuardar: async d => { const cambio = { nombre: d.nombre, codigo: d.codigo }; const nueva = d.escala_id || null; if (nueva !== (t.escala_id || null)) { cambio.escala_id = nueva; if (nueva) cambio.orden = ordenSiguiente(nueva); } const r = await sb.from('atributos').update(cambio).eq('id', t.id); if (r.error) throw r.error; } });
     const m = document.querySelector('.con-formulario'); const pie = m && m.querySelector('.pie');
     if (pie) { pie.style.justifyContent = 'space-between'; pie.insertAdjacentHTML('afterbegin', '<button type="button" class="btn peligro" data-quitar>Eliminar</button>'); pie.querySelector('[data-quitar]').onclick = async () => { if (await APP.eliminar('atributos', t.id, { nombre: t.nombre, campoActivo: 'activo' })) { m.cerrar(); cargar(); } }; }
     if (await pend) { toast('Guardado'); cargar(); }
@@ -208,7 +224,9 @@ APP.ready.then(async () => {
       campos: [{ k: 'nombre', label: 'Nombre', requerido: true, valor: s.nombre }, { k: 'descripcion', label: 'Para qué prendas', valor: s.descripcion || '' },
         { k: 'tipo', label: 'Tipo', tipo: 'select', opciones: Object.entries(TIPOS), valor: s.tipo, ancho: 'c2' }, { k: 'orden', label: 'Orden en la pantalla', tipo: 'number', valor: s.orden, ancho: 'c2' },
         { k: 'admite_copa', label: '¿Lleva copa? (corpiños)', tipo: 'select', opciones: [['false', 'No'], ['true', 'Sí, contorno + copa']], valor: String(!!s.admite_copa) }],
-      alGuardar: async d => { const r = await sb.from('talle_escalas').update({ nombre: d.nombre, descripcion: d.descripcion, tipo: d.tipo, orden: Math.round(d.orden || 0), admite_copa: d.admite_copa === 'true' }).eq('id', s.id); if (r.error) throw r.error; } });
+      alGuardar: async d => { const r = await sb.from('talle_escalas').update({ nombre: d.nombre, descripcion: d.descripcion, tipo: d.tipo, orden: Math.round(d.orden || 0), admite_copa: d.admite_copa === 'true' }).eq('id', s.id); if (r.error) throw r.error;
+        // si cambió el lugar de la escala, sus talles se renumeran con la base nueva (si no, se mezclaban con los de otra escala)
+        if (Math.round(d.orden || 0) !== s.orden) { const base = Math.round(d.orden || 0) * 100; const ts = tallesDe(s.id); const rs = await Promise.all(ts.map((t, i) => sb.from('atributos').update({ orden: base + i + 1 }).eq('id', t.id))); const er = rs.find(x => x.error); if (er) throw er.error; } } });
     const m = document.querySelector('.con-formulario'); const pie = m && m.querySelector('.pie');
     if (pie) { pie.style.justifyContent = 'space-between'; pie.insertAdjacentHTML('afterbegin', '<button type="button" class="btn peligro" data-quitar>Eliminar escala</button>'); pie.querySelector('[data-quitar]').onclick = async () => {
       if (tallesDe(s.id).length) { toast('Primero pasá sus talles a otra escala o eliminalos', 'error'); return; }
@@ -223,19 +241,24 @@ APP.ready.then(async () => {
       <div class="plantillas">${PLANTILLAS.map((p, i) => `<button type="button" class="plantilla${i ? '' : ' on'}" data-p="${i}"><b>${esc(p.n)}</b><small>${esc(p.t.length ? p.t.join(' · ') : p.d)}</small></button>`).join('')}</div>
       <div class="campo" style="margin-top:14px"><label>Nombre</label><input id="ne-nombre" value="${esc(elegida.n)}"></div>
       <div class="campo"><label>Talles (en orden, separados por coma)</label><input id="ne-talles" value="${esc(elegida.t.join(', '))}"></div>
-      <div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Crear escala</button></div>`);
+      <div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Crear escala</button></div>`, { fijo: true });
     $('.modal', m).style.maxWidth = '620px';
     $$('[data-p]', m).forEach(b => b.onclick = () => { elegida = PLANTILLAS[+b.dataset.p]; $$('[data-p]', m).forEach(x => x.classList.toggle('on', x === b)); $('#ne-nombre', m).value = elegida.n; $('#ne-talles', m).value = elegida.t.join(', '); });
     $('[data-no]', m).onclick = () => m.cerrar();
     $('[data-si]', m).onclick = async () => {
+      const b = $('[data-si]', m); if (b.disabled) return;
       const nombre = $('#ne-nombre', m).value.trim(); if (!nombre) { toast('Falta el nombre', 'error'); return; }
       const lista = $('#ne-talles', m).value.split(',').map(x => x.trim()).filter(Boolean);
+      // talles que ya existen: se avisa en vez de crearlos repetidos
+      const repetidos = lista.filter(t => talles.some(x => tN(x.nombre) === tN(t)));
+      if (repetidos.length && !await confirmar(`Estos talles ya existen en otra escala: ${repetidos.join(', ')}. Si son los mismos, conviene pasarlos de escala (tocándolos) en vez de repetirlos. ¿Crear la escala igual, con talles repetidos?`, 'Crear igual')) return;
+      b.disabled = true;
       const orden = Math.max(0, ...escalas.map(s => s.orden)) + 1;
       const r = await sb.from('talle_escalas').insert(APP.conEmpresa({ nombre, descripcion: elegida.d, tipo: elegida.tipo, orden, admite_copa: !!elegida.copa })).select().single();
-      if (r.error) { toast(mensajeError(r.error), 'error'); return; }
+      if (r.error) { b.disabled = false; toast(mensajeError(r.error), 'error'); return; }
       const filas = lista.map((t, i) => APP.conEmpresa({ tipo: 'talle', nombre: t, codigo: '', escala_id: r.data.id, orden: orden * 100 + i + 1 }));
-      filas.forEach(f => { f.codigo = codigoLibre(f.nombre, elegida.tipo.slice(0, 3).toUpperCase()); talles.push({ codigo: f.codigo }); });
-      if (filas.length) { const r2 = await sb.from('atributos').insert(filas); if (r2.error) { toast(mensajeError(r2.error), 'error'); } }
+      filas.forEach(f => { f.codigo = codigoLibre(f.nombre, elegida.tipo.slice(0, 3).toUpperCase()); todosAtr.push({ tipo: 'talle', codigo: f.codigo }); });
+      if (filas.length) { const r2 = await sb.from('atributos').insert(filas); if (r2.error) { m.cerrar(); toast('La escala se creó, pero sus talles no: ' + mensajeError(r2.error), 'error'); cargar(); return; } }
       m.cerrar(); toast('Escala creada'); cargar();
     };
   }
@@ -282,7 +305,14 @@ APP.ready.then(async () => {
       campos: [{ k: 'nombre', label: 'Nombre', requerido: true, valor: nuevo ? '' : c.nombre, ancho: 'c2', placeholder: 'Ej. Rosa viejo' }, { k: 'codigo', label: 'Código', valor: nuevo ? '' : c.codigo, ancho: 'c2', placeholder: 'Se arma solo' },
         { k: 'grupo', label: 'Familia de color', tipo: 'select', opciones: gruposExistentes().map(g => [g, g]), valor: nuevo ? 'Otros' : (c.grupo || 'Otros'), ancho: 'c2' }, { k: 'hex', label: 'Color de referencia', tipo: 'color', valor: nuevo ? '#E6DEF0' : (c.hex || '#E6DEF0'), ancho: 'c2' }],
       alGuardar: async d => {
-        const cod = (d.codigo || nrm(d.nombre).replace(/[^a-z]/g, '').slice(0, 3)).toUpperCase();
+        // el código no se puede repetir (tampoco con los apagados): «Amarillo flúo» ya no choca con «Amarillo»
+        const ocup = new Set(todosAtr.filter(x => x.tipo === 'color' && (nuevo || x.id !== c.id)).map(x => x.codigo));
+        let cod = (d.codigo || nrm(d.nombre).replace(/[^a-z]/g, '').slice(0, 3) || 'COL').toUpperCase();
+        if (!d.codigo) { let k = 2; const base = cod; while (ocup.has(cod)) cod = base + k++; }
+        else if (ocup.has(cod)) throw new Error('Ese código ya lo usa otro color');
+        const igual = todosAtr.find(x => x.tipo === 'color' && (nuevo || x.id !== c.id) && nrm(x.nombre) === nrm(d.nombre));
+        if (igual && igual.activo) throw new Error(`Ya hay un color «${igual.nombre}»`);
+        if (igual && nuevo) { const r0 = await sb.from('atributos').update({ activo: true, grupo: d.grupo, hex: d.hex }).eq('id', igual.id); if (r0.error) throw r0.error; return; }   // estaba apagado: se vuelve a usar
         const fila = { nombre: d.nombre, codigo: cod, grupo: d.grupo, hex: d.hex };
         const r = nuevo ? await sb.from('atributos').insert(APP.conEmpresa(Object.assign({ tipo: 'color', orden: 999 }, fila))) : await sb.from('atributos').update(fila).eq('id', c.id);
         if (r.error) throw r.error; } });
@@ -298,7 +328,7 @@ APP.ready.then(async () => {
     $('#familias').innerHTML = cats.map(c => { const es = escalas.filter(s => (c.escalas || []).includes(s.id));
       return `<div class="familia fila-edit" data-id="${c.id}"><input data-k="orden" type="number" value="${c.orden}" aria-label="Orden"><input data-k="nombre" value="${esc(c.nombre)}" aria-label="Nombre"><button class="btn-eliminar" data-borrar title="Eliminar">✕</button>
         <div class="esc-chips">${es.length ? es.map(s => `<button class="esc-chip" data-esc-fam="${c.id}">${esc(s.nombre)}</button>`).join('') : `<button class="esc-chip vacio" data-esc-fam="${c.id}">Elegir escalas</button>`}</div></div>`; }).join('');
-    APP.autoguardar($('#familias'), 'categorias');
+    APP.autoguardar($('#familias'), 'categorias', { transformar: d => { if (typeof d.nombre === 'string') d.nombre = d.nombre.toUpperCase(); return d; } });   // como al crearlas: siempre en mayúsculas
     $$('#familias [data-borrar]').forEach(b => b.onclick = async () => { const f = b.closest('.familia'); if (await APP.eliminar('categorias', f.dataset.id, { nombre: $('[data-k="nombre"]', f).value, campoActivo: 'activa' })) cargar(); });
     $$('[data-esc-fam]').forEach(b => b.onclick = () => escalasDeFamilia(cats.find(c => c.id === b.dataset.escFam)));
   }

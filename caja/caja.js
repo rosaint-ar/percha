@@ -51,7 +51,7 @@ APP.ready.then(async () => {
         else { toast('No se pudo cargar el catálogo', 'error'); }
       }
     }
-    const selV = $('#sel-vendedora'); selV.innerHTML = vendedoras.map(x => `<option value="${x.user_id}" ${x.user_id === APP.user.id ? 'selected' : ''}>${esc(x.nombre)}</option>`).join('');
+    const selV = $('#sel-vendedora'); selV.innerHTML = vendedoras.map(x => `<option value="${x.user_id}" ${x.user_id === (carrito.vendedora || APP.user.id) ? 'selected' : ''}>${esc(x.nombre)}</option>`).join('');
     $('#dl-clientes').innerHTML = clientes.map(x => `<option value="${esc(x.nombre)}">${esc(x.telefono || '')}</option>`).join('');
   }
 
@@ -97,11 +97,11 @@ APP.ready.then(async () => {
     if (!turno) abrirTurno();
   }
   function pintarEstado() {
-    const cola = colaPendiente().length;
+    const cola = colaPendiente().length, fallidas = colaFallidas().length;
     $('#estado-caja').innerHTML = turno
       ? `<span class="punto" id="punto-red"></span><span class="chip ok">Caja abierta</span><span style="font-size:12.5px;color:var(--tinta-3)">${esc(caja.nombre)} · desde ${fmt.fechaHora(turno.abierto)}</span>
          <a class="btn chico" href="caja.html" title="Ingresos, retiros y cierre de caja">💰 Caja</a><a class="btn chico" href="ventas.html">Ventas del día</a><button class="btn chico" id="btn-pedido" type="button" title="Una clienta pidió algo que no hay: anotalo">📝 Lo pidieron</button><button class="btn chico" id="btn-tareas" type="button" title="Las tareas del local de hoy" hidden>✨ Tareas</button><button class="btn chico" id="btn-sonido" title="Prender o apagar los sonidos de la caja">${fx.sonidoActivo() ? '🔊' : '🔇'}</button>
-         ${cola ? `<button class="btn chico suave" id="btn-sync">${cola} venta${cola > 1 ? 's' : ''} por subir</button>` : ''}`
+         ${cola ? `<button class="btn chico suave" id="btn-sync">${cola} venta${cola > 1 ? 's' : ''} por subir</button>` : ''}${fallidas ? `<button class="btn chico peligro" id="btn-fallidas">⚠️ ${fallidas} venta${fallidas > 1 ? 's' : ''} con problema</button>` : ''}`
       : `<span class="punto off"></span><span class="chip aviso">Caja cerrada</span><button class="btn chico primario" id="btn-abrir">🔓 Abrir caja</button><a class="btn chico" href="ventas.html">Ventas</a><button class="btn chico" id="btn-sonido" title="Prender o apagar los sonidos de la caja">${fx.sonidoActivo() ? '🔊' : '🔇'}</button>`;
     const b = $('#btn-abrir'); if (b) b.onclick = abrirTurno;
     const m = $('#btn-mov'); if (m) m.onclick = movimientoCaja;
@@ -109,6 +109,7 @@ APP.ready.then(async () => {
     if (window.TAREAS) { TAREAS.pintarChip(); const bt = $('#btn-tareas'); if (bt) bt.onclick = TAREAS.panel; }
     const bp = $('#btn-pedido'); if (bp) bp.onclick = () => window.PEDIDO_CLIENTA && PEDIDO_CLIENTA.anotar({ texto: ($('#q') || {}).value ? $('#q').value.trim() : '' });
     const s = $('#btn-sync'); if (s) s.onclick = sincronizar;
+    const bf = $('#btn-fallidas'); if (bf) bf.onclick = verFallidas;
     const so = $('#btn-sonido'); if (so) so.onclick = () => { const on = fx.alternarSonido(); so.textContent = on ? '🔊' : '🔇'; toast(on ? 'Sonidos prendidos' : 'Sonidos apagados'); };
     actualizarRed();
   }
@@ -445,8 +446,11 @@ APP.ready.then(async () => {
       <div><div class="n">${l.canje ? (esGen(l) ? esc(pieza) + ' suelta' : `<span class="cambiable" data-cambiar="${i}" title="Tocá para cambiarla por otra">${esc(l.variante.producto_nombre)}</span>`) + ' <span class="chip">cambio</span>' : l.parte ? esc(l.desc) + ' <span class="chip ok">queda en el local</span>' : l.devuelta ? esc(l.variante.producto_nombre) : `<span class="cambiable" data-cambiar="${i}" title="Tocá para cambiar el talle, el color o la prenda">${esc(l.variante.producto_nombre)}</span>`}${l.devuelta && !l.parte ? ' <span class="chip error">devuelve</span>' : ''}</div><div class="v">${l.canje ? (esGen(l) ? 'se elige al cobrar' : esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || 'único')) + ' · por la del conjunto' : l.parte ? 'entra a ' + esc(l.variante.producto_nombre) : l.devuelta ? esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || l.variante.sku || '') : `<span class="cambiable" data-cambiar="${i}">${esc([l.variante.talle_nombre, l.variante.color_nombre].filter(Boolean).join(' · ') || 'único')}</span>`}${l.canje ? "" : " · " + fmt.pesos(l.precioLista)}${l.descPct && l.precioManual == null ? ' −' + l.descPct + '%' : ''}${!l.devuelta && controlaStock(l.variante) && llevando(l.variante) > Math.max(+l.variante.stock || 0, 0) ? '<span class="sinstock-chip" title="El sistema dice que no hay suficiente">⚠ sin stock</span>' : ''}</div>${l.precioManual != null && !l.devuelta && !l.canje ? `<div class="promo manual">Precio cambiado a mano</div>` : ''}${l.conv ? `<div class="promo">Pagó ${fmt.pesos(l.conv.pago)} a precio ${esc(nombreLista(l.conv.de))} = ${fmt.pesos(l.precioFinal)} a precio ${esc(nombreLista(carrito.lista))}</div>` : ''}${l.mismoModelo ? `<div class="promo">↔ Mismo modelo y color: se cambia sin diferencia</div>` : ''}${l.gift ? `<div class="promo">🎁 Código <b>${esc(l.gift.codigo)}</b>${l.gift.para ? ' · para ' + esc(l.gift.para) : ''} · vale ${fmt.pesos(l.gift.valor)} · <a href="#" data-gift="${i}">cambiar</a></div>` : ''}${l.rebaja && !l.devuelta && l.precioManual == null ? `<div class="promo">▼ ${esc(l.rebaja.nombre)} · antes ${fmt.pesos(l.precioBase)}</div>` : ''}${l.promo ? `<div class="promo">★ ${esc(l.promo.nombre)} · −${fmt.pesos(l.descPromo)}/u</div>` : ''}${(+l.variante.fallas > 0 || l.falla) && !l.devuelta && !l.canje ? `<button class="falla ${l.falla ? 'on' : ''}" data-falla="${i}" title="${l.falla ? 'Tocá para desmarcar' : esc(l.variante.falla_nota || '')}">${l.falla ? '◆ Con falla' + (l.fallaU && l.fallaU.nota ? ': ' + esc(l.fallaU.nota) : '') + (l.descFalla ? ' · ' + (l.fallaU && l.fallaU.precio != null ? 'precio de falla' : fmt.dec(l.descFalla) + '% off') : '') : '◆ Hay ' + fmt.num(l.variante.fallas) + ' con falla · ¿es esta?'}</button>` : ''}${puedeSinParte(l) ? `<button class="parte-btn" data-parte="${i}" title="${esc(SP.texto)}: el total baja ${fmt.pesos(SP.monto)} (se puede cambiar en el renglón)">${esc(SP.boton)} · −${fmt.pesos(SP.monto)}</button>` : ''}${puedeSinParte(l) && genCanje() ? `<button class="parte-btn" data-cambio="${i}" title="La ${esc(pieza.toLowerCase())} del conjunto queda en el local y se lleva una suelta: al cobrar se elige cuál">${esc(SP.cambio_boton || 'Cambio ' + pieza.toLowerCase())}</button>` : ''}</div>
       <div class="t">${l.devuelta && !l.sinTicket ? fmt.pesos(l.total) : `<input class="pu${l.precioManual != null && !l.canje ? ' manual' : ''}" data-pu="${i}" type="number" min="0" step="1" value="${l.precioFinal}" data-orig="${l.precioFinal}" title="Precio por unidad: escribí otro para cambiarlo (F2)"${APP.puede('descuentos') ? '' : ' readonly'}>${Math.abs(l.cantidad) > 1 ? `<small>${l.cantidad} u. = ${fmt.pesos(l.total)}</small>` : ''}`}</div>
       <div class="ctrl"><button data-i="${i}" data-d="-1">−</button><input data-i="${i}" data-q value="${l.cantidad}"><button data-i="${i}" data-d="1">+</button><span class="desc">desc % <input data-i="${i}" data-desc type="number" min="0" max="100" value="${l.precioManual != null ? 0 : l.descPct || 0}"${l.precioManual != null ? ' disabled title="Tiene precio a mano"' : ''}></span><button class="quitar" data-i="${i}" data-x title="Quitar">×</button></div></div>`).join('');
-    $$('[data-d]', cont).forEach(b => b.onclick = () => { const l = carrito.lineas[+b.dataset.i]; l.cantidad += +b.dataset.d * (l.devuelta ? -1 : 1); if ((l.devuelta ? -l.cantidad : l.cantidad) <= 0) carrito.lineas.splice(+b.dataset.i, 1); pintar(); });
-    $$('[data-q]', cont).forEach(i => i.onchange = () => { const n = parseInt(i.value) || 0; const l = carrito.lineas[+i.dataset.i]; if (n === 0) carrito.lineas.splice(+i.dataset.i, 1); else l.cantidad = l.devuelta ? -Math.abs(n) : Math.abs(n); pintar(); });
+    $$('[data-d]', cont).forEach(b => b.onclick = () => { const l = carrito.lineas[+b.dataset.i];
+      if (l.devuelta && l.maxDev && +b.dataset.d > 0 && -l.cantidad >= l.maxDev) { toast(`De esa prenda se llevó ${l.maxDev} en ese ticket`, 'error'); return; }   // no se devuelve más de lo comprado
+      l.cantidad += +b.dataset.d * (l.devuelta ? -1 : 1); if ((l.devuelta ? -l.cantidad : l.cantidad) <= 0) carrito.lineas.splice(+b.dataset.i, 1); pintar(); });
+    $$('[data-q]', cont).forEach(i => i.onchange = () => { let n = parseInt(i.value) || 0; const l = carrito.lineas[+i.dataset.i];
+      if (l.devuelta && l.maxDev && Math.abs(n) > l.maxDev) { toast(`De esa prenda se llevó ${l.maxDev} en ese ticket`, 'error'); n = l.maxDev; } if (n === 0) carrito.lineas.splice(+i.dataset.i, 1); else l.cantidad = l.devuelta ? -Math.abs(n) : Math.abs(n); pintar(); });
     $$('[data-desc]', cont).forEach(i => i.onchange = () => { if (!APP.puede('descuentos') && +i.value > 0) { toast('Los descuentos los habilita administración', 'error'); i.value = 0; return; } carrito.lineas[+i.dataset.i].descPct = Math.min(100, Math.max(0, +i.value || 0)); pintar(); });
     $$('[data-x]', cont).forEach(b => b.onclick = () => { carrito.lineas.splice(+b.dataset.i, 1); pintar(); });
     $$('[data-pu]', cont).forEach(inp => { inp.onfocus = () => inp.select(); inp.onchange = () => ponerPrecio(+inp.dataset.pu, inp.value);
@@ -464,7 +468,7 @@ APP.ready.then(async () => {
     $('#btn-cobrar').disabled = !c.lineas.length;
     { const bs = $('#btn-sena'); bs.disabled = !!carrito.cambio; bs.textContent = c.lineas.length ? 'Dejar seña' : '🎟️ Retirar seña'; }
   }
-  $('#btn-vaciar').onclick = async () => { if (!carrito.lineas.length || await confirmar('¿Vaciar el ticket?', 'Vaciar')) { carrito.lineas = []; carrito.cambio = null; carrito.devolviendo = false; carrito.envio = null; pintarEntrega(); carrito.descPct = 0; $('#desc-general').value = 0; $('#nota').value = ''; pintar(); } };
+  $('#btn-vaciar').onclick = async () => { if (!carrito.lineas.length || await confirmar('¿Vaciar el ticket?', 'Vaciar')) { $('#sel-cliente').value = ''; if ($('#sel-origen')) $('#sel-origen').value = 'local'; carrito.lista = (listas.find(x => x.predeterminada) || listas[0] || {}).id; carrito.lineas = []; carrito.cambio = null; carrito.devolviendo = false; carrito.envio = null; pintarEntrega(); carrito.descPct = 0; $('#desc-general').value = 0; $('#nota').value = ''; pintar(); } };
   $('#desc-general').onchange = ev => { if (!APP.puede('descuentos') && +ev.target.value > 0) { toast('Los descuentos los habilita administración', 'error'); ev.target.value = 0; } carrito.descPct = Math.min(100, Math.max(0, +ev.target.value || 0)); pintar(); };
   $('#sel-vendedora').onchange = ev => carrito.vendedora = ev.target.value;
 
@@ -543,6 +547,7 @@ APP.ready.then(async () => {
   }
   async function cobrar(modoSena) {
     const c = calcular(); if (!c.lineas.length) return;
+    if (document.querySelector('#cb-pagos')) return;   // doble F9 / doble toque: una sola ventana de cobro
     if (!turno && !reservado) { toast('Primero abrí la caja', 'error'); abrirTurno(); return; }
     if (modoSena && c.lineas.some(l => l.gift)) { toast('Las gift cards no se señan: cobralas completas', 'error'); return; }
     if (!(await revisarStock())) return;
@@ -621,7 +626,8 @@ APP.ready.then(async () => {
       $('[data-no]', m2).onclick = () => m2.cerrar();
       $('[data-si]', m2).onclick = async () => {
         const codigo = $('#cr-cod', m2).value.trim().toUpperCase(); if (!codigo) return;
-        const { data } = await sb.from('creditos').select('*').eq('empresa_id', e).eq('codigo', codigo).maybeSingle();
+        const { data, error: ec } = await sb.from('creditos').select('*').eq('empresa_id', e).eq('codigo', codigo).maybeSingle();
+        if (ec) { toast(mensajeError(ec), 'error'); return; }
         if (!data || data.estado !== 'vigente' || +data.saldo <= 0) { toast('Ese código no tiene saldo vigente', 'error'); return; }
         if (pagos.some(p => p.credito_id === data.id)) { toast('Ese crédito ya está aplicado', 'error'); return; }
         const t = total(); const pagado = pagos.reduce((s, p) => s + p.monto, 0);
@@ -633,20 +639,23 @@ APP.ready.then(async () => {
     pintarPagos();
     $('[data-no]', m).onclick = () => m.cerrar();
     $('[data-si]', m).onclick = async () => {
+      if ($('[data-si]', m).disabled) return;
       $('[data-si]', m).disabled = true;
+      if (!calcular().lineas.length) { m.cerrar(); return; }   // el ticket ya se cobró en otra ventana
       const t = total(); const pagado = r2(pagos.reduce((s, p) => s + p.monto, 0));
       // el vuelto se descuenta del efectivo
       const pagosFinal = pagos.map(p => ({ ...p })); const vuelto = t.aPagar > 0 ? r2(pagado - t.aPagar) : 0;
       if (!modoSena && vuelto > 0) { const ef = pagosFinal.find(p => p.tipo === 'efectivo'); ef.monto = r2(ef.monto - vuelto); }
+      const cliente = await resolverCliente();
+      if (cliente === false) { $('[data-si]', m).disabled = false; return; }   // no quiso crear la clienta nueva
       const creditos_a_emitir = [];
       if (!modoSena && t.aPagar < 0) {
         // devolución con saldo a favor: nota de crédito salvo que se haya devuelto en efectivo
         const devuelto = pagosFinal.reduce((s, p) => s + p.monto, 0);
-        if (Math.abs(devuelto - t.aPagar) > 0.5) { creditos_a_emitir.push({ tipo: 'nota_credito', monto: r2(-t.aPagar - (-devuelto)), cliente_id: carrito.cliente, vence: null, nota: 'Por cambio/devolución', lista_id: carrito.lista }); }
+        if (Math.abs(devuelto - t.aPagar) > 0.5) { creditos_a_emitir.push({ tipo: 'nota_credito', monto: r2(-t.aPagar - (-devuelto)), cliente_id: cliente, vence: null, nota: 'Por cambio/devolución', lista_id: carrito.lista }); }
       }
       // gift cards vendidas: una por renglón, con el código elegido, a precio de lista (lo que vale en la web)
-      if (!modoSena) t.lineas.filter(l => l.gift && l.cantidad > 0).forEach(l => creditos_a_emitir.push({ tipo: 'gift_card', codigo: l.gift.codigo, monto: l.gift.valor, lista_id: listaBase(), cliente_id: carrito.cliente, vence: null, nota: 'Gift card vendida', dedicatoria: { para: l.gift.para || null, de: l.gift.de || null, mensaje: l.gift.mensaje || null } }));
-      const cliente = await resolverCliente();
+      if (!modoSena) t.lineas.filter(l => l.gift && l.cantidad > 0).forEach(l => creditos_a_emitir.push({ tipo: 'gift_card', codigo: l.gift.codigo, monto: l.gift.valor, lista_id: listaBase(), cliente_id: cliente, vence: null, nota: 'Gift card vendida', dedicatoria: { para: l.gift.para || null, de: l.gift.de || null, mensaje: l.gift.mensaje || null } }));
       const payload = {
         empresa_id: e, offline_id: crypto.randomUUID(), tipo: carrito.cambio ? 'cambio' : 'venta', estado: modoSena ? 'senada' : 'completada',
         caja_id: reservado ? null : caja.id, turno_id: reservado ? null : turno.id, reservada: !!reservado, pin: reservado || undefined, cliente_id: cliente, vendedora_id: carrito.vendedora, lista_id: carrito.lista,
@@ -685,9 +694,13 @@ APP.ready.then(async () => {
   }
   async function resolverCliente() {
     const nombre = $('#sel-cliente').value.trim(); if (!nombre) return null;
-    const ya = clientes.find(c => norm(c.nombre) === norm(nombre)); if (ya) { if (ya.lista_id) {} return ya.id; }
+    const ya = clientes.find(c => norm(c.nombre) === norm(nombre)); if (ya) return ya.id;
+    // nombre que no está: se pregunta (antes "maria" y "María Pérez" quedaban como dos clientas sin avisar)
+    const parecidas = clientes.filter(c => norm(c.nombre).includes(norm(nombre)) || norm(nombre).includes(norm(c.nombre))).slice(0, 3).map(c => c.nombre);
+    if (!await confirmar(`«${nombre}» no está en las clientas.${parecidas.length ? ' Parecidas: ' + parecidas.join(', ') + '.' : ''} ¿Crearla como clienta nueva?`, 'Crear clienta')) return false;
     const r = await sb.from('clientes').insert(APP.conEmpresa({ nombre })).select().single();
-    if (r.error) return null; clientes.push(r.data); return r.data.id;
+    if (r.error) { toast('No se pudo crear la clienta: ' + mensajeError(r.error), 'error'); return null; }
+    clientes.push(r.data); return r.data.id;
   }
   // ================= Entrega (envío) =================
   // la venta puede llevar una entrega: medio (retiro, cadete, correo…), costo, dirección y contacto. Queda en Envíos para despachar.
@@ -695,7 +708,7 @@ APP.ready.then(async () => {
   const lineaEnvio = () => carrito.lineas.find(l => l.variante && l.variante.producto_tipo === 'envio');
   function pintarEntrega() { const b = document.getElementById('btn-entrega'); if (b) b.innerHTML = carrito.envio ? '🚚 ' + esc(carrito.envio.metodo) + (carrito.envio.costo ? ' · ' + fmt.pesos(carrito.envio.costo) : '') : '🚚 Entrega'; }
   async function entrega() {
-    if (!metodosEnvio) { const { data } = await sb.from('envio_metodos').select('*').eq('empresa_id', e).eq('activo', true).order('orden'); metodosEnvio = data || []; }
+    if (!metodosEnvio) { const { data, error: em } = await sb.from('envio_metodos').select('*').eq('empresa_id', e).eq('activo', true).order('orden'); if (em) { toast(mensajeError(em), 'error'); return; } metodosEnvio = data || []; }
     if (!metodosEnvio.length) { toast('No hay medios de envío: se cargan en Configuración › Envíos', 'error'); return; }
     const act = carrito.envio || {}; let sel = metodosEnvio.find(x => x.id === act.metodo_id) || null;
     const cli = clientes.find(c => norm(c.nombre) === norm($('#sel-cliente').value.trim()));
@@ -727,6 +740,27 @@ APP.ready.then(async () => {
 
   // ---- envío con cola sin internet ----
   const colaPendiente = () => JSON.parse(localStorage.getItem(LS('cola_ventas')) || '[]');
+  const colaFallidas = () => JSON.parse(localStorage.getItem(LS('cola_fallidas')) || '[]');
+  // ventas sin internet que la base rechazó: se ven, se reintentan o se descartan (con confirmación)
+  function verFallidas() {
+    const f = colaFallidas(); if (!f.length) return;
+    const m = modal(`<h2>⚠️ Ventas que no se pudieron subir</h2><p class="sub">Se cobraron sin internet y la base no las aceptó. Revisá el motivo: podés reintentar o descartarla (si la descartás, esa venta no queda registrada).</p>
+      <table class="lista" style="margin-top:10px">${f.map((p, i) => `<tr><td>${fmt.fechaHora(p._cuando)}<br><small>${esc((p.lineas || []).map(l => l.descripcion).slice(0, 3).join(', '))}</small></td><td class="num">${fmt.pesos((p.pagos || []).reduce((s, x) => s + (+x.monto || 0), 0))}</td><td><small style="color:var(--error)">${esc(p._error || '')}</small></td><td style="white-space:nowrap"><button class="btn chico primario" data-re="${i}">Reintentar</button> <button class="btn chico peligro" data-des="${i}">Descartar</button></td></tr>`).join('')}</table>
+      <div class="pie"><button class="btn" data-no>Cerrar</button></div>`);
+    $('[data-no]', m).onclick = () => m.cerrar();
+    const sacar = i => { const g = colaFallidas(); g.splice(i, 1); localStorage.setItem(LS('cola_fallidas'), JSON.stringify(g)); };
+    $$('[data-re]', m).forEach(b => b.onclick = async () => {
+      b.disabled = true; const p = Object.assign({}, colaFallidas()[+b.dataset.re]); delete p._error; delete p._cuando;
+      if (turno && !p.reservada) { p.turno_id = turno.id; p.caja_id = caja.id; }   // si se rechazó por la caja cerrada, va al turno de ahora
+      const { error } = await sb.rpc('caja_registrar_venta', { p });
+      if (error) { b.disabled = false; toast(mensajeError(error), 'error'); return; }
+      sacar(+b.dataset.re); m.cerrar(); toast('Venta subida ✓'); empujarStock(); pintarEstado(); if (colaFallidas().length) verFallidas();
+    });
+    $$('[data-des]', m).forEach(b => b.onclick = async () => {
+      if (!await confirmar('¿Descartar esta venta? No va a quedar registrada ni va a descontar stock.', 'Descartar')) return;
+      sacar(+b.dataset.des); m.cerrar(); pintarEstado(); if (colaFallidas().length) verFallidas();
+    });
+  }
   async function enviarVenta(payload) {
     try {
       const { data, error } = await sb.rpc('caja_registrar_venta', { p: payload });
@@ -748,7 +782,8 @@ APP.ready.then(async () => {
     for (const p of [...cola]) {
       const { error } = await sb.rpc('caja_registrar_venta', { p });
       if (error && /fetch|network/i.test(error.message)) break;
-      if (error) { toast(`Una venta guardada no se pudo subir: ${mensajeError(error)}`, 'error'); }
+      // la base la rechazó: NO se pierde. Queda en "con problema" para reintentar o descartar a conciencia
+      if (error) { const f = colaFallidas(); f.push(Object.assign({}, p, { _error: mensajeError(error), _cuando: new Date().toISOString() })); localStorage.setItem(LS('cola_fallidas'), JSON.stringify(f)); toast(`Una venta guardada no se pudo subir: ${mensajeError(error)}. Quedó en «con problema».`, 'error'); }
       cola = cola.filter(x => x.offline_id !== p.offline_id); localStorage.setItem(LS('cola_ventas'), JSON.stringify(cola));
     }
     empujarStock(); pintarEstado(); if (!colaPendiente().length) toast('Ventas pendientes subidas');
@@ -965,10 +1000,13 @@ APP.ready.then(async () => {
     };
     // la venta elegida: se marca lo que devuelve
     const abrir = async n => {
-      const { data: v } = await sb.rpc('venta_para_cambio', { e, p_numero: n });
+      const { data: v, error: ev } = await sb.rpc('venta_para_cambio', { e, p_numero: n });
+      if (ev) { det.innerHTML = `<div class="vacio">No se pudo buscar el ticket: ${esc(mensajeError(ev))}</div>`; return; }
       if (!v) { det.innerHTML = '<div class="vacio">No existe ese ticket.</div>'; return; }
       if (v.estado === 'anulada') { det.innerHTML = '<div class="vacio">Esa venta está anulada.</div>'; return; }
+      if (v.estado === 'senada') { det.innerHTML = '<div class="vacio">Es una seña que todavía no se retiró: primero retirala («🎟️ Retirar seña»).</div>'; return; }
       const ls = v.lineas || [];
+      if (!ls.length) { det.innerHTML = '<div class="vacio">De ese ticket ya se devolvió todo.</div>'; return; }
       lista.hidden = true; qIn.hidden = true;
       det.innerHTML = `<p class="sub" style="margin:8px 0">Venta <b>${esc(v.mostrar)}</b> · ${fmt.fechaHora(v.fecha)} · ${fmt.pesos(v.total)}. Marcá lo que devuelve:</p>
         <table class="lista">${ls.map(l => `<tr><td><input type="checkbox" data-l="${l.id}"></td><td>${esc(l.descripcion)}<br><small>${esc([l.talle, l.color].filter(Boolean).join(' · '))}</small></td><td class="num">${l.cantidad}× ${fmt.pesos(l.precio_unit)}</td></tr>`).join('')}</table>
@@ -981,7 +1019,7 @@ APP.ready.then(async () => {
         const lo = listaPagada(v);   // la lista con que pagó: lo que devuelve se valora ahí
         carrito.cambio = { id: v.id, numero: v.numero, pagos: v.pagos || [] }; carrito.lista = lo;
         sel.forEach(l => { const v2 = catalogo.find(x => x.id === l.variante_id) || { id: l.variante_id, producto_id: l.producto_id, producto_nombre: l.descripcion, talle_nombre: l.talle, color_nombre: l.color, precio: l.precio_lista, costo: l.costo_unit };
-          carrito.lineas.push({ variante: v2, cantidad: -l.cantidad, descPct: 0, devuelta: true, precioFijo: l.precio_unit, listaOrigen: lo }); });
+          carrito.lineas.push({ variante: v2, cantidad: -l.cantidad, maxDev: l.cantidad, descPct: 0, devuelta: true, precioFijo: l.precio_unit, listaOrigen: lo }); });
         m.cerrar(); pintar(); toast('Agregá ahora lo que se lleva, o cobrá para devolver el dinero / emitir nota de crédito'); $('#q').focus();
       };
       // una sola prenda: ya queda marcada · Espacio marca o desmarca · Enter carga

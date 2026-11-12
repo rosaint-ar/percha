@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Inventario · Percha</title>
 <meta name="app-root" content="../">
-<link rel="stylesheet" href="../shell/shell.css?v=202611121407">
+<link rel="stylesheet" href="../shell/shell.css?v=202611121441">
 <style>
   .tiles-inv{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:16px}
   .tiles-inv .t span,.tiles-inv .t small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -123,10 +123,10 @@
   <div id="vista"></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="../shared/supabase.js?v=202611121407"></script>
-<script src="../shared/precios.js?v=202611121407"></script>
-<script src="../shared/prenda.js?v=202611121407"></script>
-<script src="../shell/shell.js?v=202611121407"></script>
+<script src="../shared/supabase.js?v=202611121441"></script>
+<script src="../shared/precios.js?v=202611121441"></script>
+<script src="../shared/prenda.js?v=202611121441"></script>
+<script src="../shell/shell.js?v=202611121441"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -356,6 +356,8 @@ APP.ready.then(async () => {
       let c = sb.from('v_movimientos').select('*').eq('empresa_id', e).gte('fecha', $('#mv-desde').value + 'T00:00:00').lte('fecha', $('#mv-hasta').value + 'T23:59:59').order('fecha', { ascending: false }).limit(1000);
       if ($('#mv-tipo').value) c = c.eq('tipo', $('#mv-tipo').value);
       if (movFiltro && movFiltro.ref) c = c.eq('referencia', movFiltro.ref);
+      // lo buscado se filtra EN LA BASE (antes se traían los últimos 1000 de todo el local y una prenda vieja salía "sin movimientos")
+      else { const s = $('#mv-q').value.replace(/[,()*%\\]/g, ' ').trim(); if (s) c = c.or(`producto_codigo.ilike.%${s}%,producto_nombre.ilike.%${s}%,sku.ilike.%${s}%`); }
       const { data, error } = await c; if (error) { toast(mensajeError(error), 'error'); return; }
       const qq = nrm($('#mv-q').value); filas = (data || []).filter(m => !qq || (movFiltro && movFiltro.ref) || nrm(`${m.producto_nombre} ${m.producto_codigo} ${m.sku} ${m.talle_nombre || ''} ${m.color_nombre || ''}`).includes(qq));
       const det = m => m.venta_numero ? `Ticket #${String(m.venta_numero).padStart(6, '0')}` : m.recuento_nombre ? esc(m.recuento_nombre) : esc(m.motivo || m.nota || '');

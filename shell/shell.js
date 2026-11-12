@@ -8,17 +8,32 @@
   // El navegador guarda las páginas hasta 10 minutos: después de publicar un arreglo, un equipo podía seguir con la versión vieja.
   // Al abrir cada pantalla se mira version.json (lo escribe herramientas/versionar.js al publicar); si hay una más nueva que la de
   // este archivo, se vuelve a pedir la página sin caché y se recarga. Una sola vez por versión (sin bucles); sin internet, sigue igual.
+  // Con una pantalla abierta todo el día (el Punto de venta) se vuelve a mirar cada 15 minutos y al volver a la pestaña:
+  // ahí no se recarga sola (se perdería el ticket): aparece un cartel "Hay una versión nueva · Actualizar".
   (function () {
     const yo = ((document.currentScript && document.currentScript.src.match(/[?&]v=(\d+)/)) || [])[1];
     if (!yo || !window.fetch) return;
-    fetch(ROOT + 'version.json?t=' + Date.now(), { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(async j => {
+    let avisado = false;
+    const mirar = primera => fetch(ROOT + 'version.json?t=' + Date.now(), { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(async j => {
       if (!j || !j.v || j.v <= yo) return;
+      if (!primera) {
+        if (avisado || !document.body) return; avisado = true;
+        const b = document.createElement('div'); b.className = 'aviso-version';
+        b.innerHTML = '✨ Hay una versión nueva de Percha <button type="button">Actualizar</button>';
+        b.querySelector('button').onclick = async () => { try { await fetch(location.href, { cache: 'reload' }); } catch (_) { } location.reload(); };
+        document.body.appendChild(b); return;
+      }
       const k = 'percha_actualizada_' + j.v;
       try { if (sessionStorage.getItem(k)) return; sessionStorage.setItem(k, '1'); } catch (_) { return; }
       try { await fetch(location.href, { cache: 'reload' }); } catch (_) { }
       location.reload();
     }).catch(() => { });
+    mirar(true);
+    setInterval(() => mirar(false), 15 * 60 * 1000);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') mirar(false); });
   })();
+  // Números escritos como en Argentina: en los campos numéricos de pesos el punto de miles no va (antes "50.000" quedaba en 50)
+  document.addEventListener('keydown', e => { const t = e.target; if (e.key === '.' && t && t.matches && t.matches('input[type=number]') && t.step !== 'any' && !/\./.test(t.getAttribute('step') || '')) e.preventDefault(); }, true);
   const body = document.body;
   const SISTEMA = 'Percha';
 
@@ -78,9 +93,15 @@
   function modal(html, opciones) {
     const fondo = document.createElement('div'); fondo.className = 'modal-fondo';
     fondo.innerHTML = `<div class="modal" role="dialog">${html}</div>`;
-    fondo.cerrar = () => fondo.remove();
-    fondo.addEventListener('click', e => { if (e.target === fondo && !(opciones && opciones.fijo)) fondo.cerrar(); });
-    document.addEventListener('keydown', function esc(e) { if (e.key === 'Escape') { fondo.cerrar(); document.removeEventListener('keydown', esc); } });
+    // Escape cierra solo la ventana de ARRIBA y nunca una "fija" (antes cerraba todas a la vez y dejaba procesos colgados).
+    // Si se cierra sin elegir (Escape o tocando afuera), quien la abrió se entera con fondo.alCerrar.
+    const esc = e => { if (e.key !== 'Escape' || (opciones && opciones.fijo)) return; if ([...document.querySelectorAll('.modal-fondo')].pop() !== fondo) return; e.stopPropagation(); descartar(); };
+    fondo.cerrar = () => { if (!fondo.isConnected) return; fondo.remove(); document.removeEventListener('keydown', esc); };
+    const descartar = () => { if (!fondo.isConnected) return; fondo.cerrar(); if (typeof fondo.alCerrar === 'function') fondo.alCerrar(); };
+    // tocar afuera cierra solo si el toque EMPEZÓ afuera (seleccionar texto y soltar fuera ya no borra lo escrito)
+    let abajo = null; fondo.addEventListener('mousedown', e => { abajo = e.target; });
+    fondo.addEventListener('click', e => { if (e.target === fondo && abajo === fondo && !(opciones && opciones.fijo)) descartar(); });
+    document.addEventListener('keydown', esc);
     body.appendChild(fondo);
     const primero = fondo.querySelector('input,select,textarea,button'); if (primero) primero.focus();
     return fondo;
@@ -90,6 +111,7 @@
       const m = modal(`<p style="margin:0 0 4px">${esc(texto)}</p><div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>${esc(botonOk || 'Confirmar')}</button></div>`);
       $('[data-no]', m).onclick = () => { m.cerrar(); res(false); };
       $('[data-si]', m).onclick = () => { m.cerrar(); res(true); };
+      m.alCerrar = () => res(false);
     });
   }
   function mensajeError(err) {
@@ -98,6 +120,12 @@
     if (/Email not confirmed/i.test(m)) return 'El correo todavía no está confirmado.';
     if (/duplicate key|already exists/i.test(m)) return 'Ya existe un registro con ese dato.';
     if (/row-level security|permission denied/i.test(m)) return 'No tenés permiso para hacer eso.';
+    if (/JWT expired|refresh token|invalid jwt/i.test(m)) return 'Se venció la sesión. Volvé a entrar.';
+    if (/violates foreign key/i.test(m)) return 'No se puede: está en uso en otro lado (ventas, compras o movimientos).';
+    if (/violates check constraint/i.test(m)) return 'Hay un dato que no es válido. Revisá los números y las fechas.';
+    if (/null value in column/i.test(m)) return 'Falta completar un dato obligatorio.';
+    if (/invalid input syntax/i.test(m)) return 'Hay un dato con un formato que no corresponde (revisá números y fechas).';
+    if (/Could not find the function|schema cache/i.test(m)) return 'Esta función todavía no está disponible. Recargá la página; si sigue, avisale a administración.';
     if (/Failed to fetch|NetworkError/i.test(m)) return 'Sin conexión. Revisá internet e intentá de nuevo.';
     return m;
   }
@@ -118,9 +146,12 @@
     if (!session) { location.replace(ROOT + 'login.html?next=' + encodeURIComponent(location.pathname + location.search)); return null; }
     return session;
   }
+  // sin internet se usan las empresas, el rol y los permisos guardados la última vez (antes decía "Sin empresa asignada")
+  const guardado = (k, v) => { try { if (v === undefined) return JSON.parse(localStorage.getItem('percha_cache_' + k) || 'null'); localStorage.setItem('percha_cache_' + k, JSON.stringify(v)); } catch (_) { return null; } };
   async function cargarEmpresas() {
     const { data, error } = await sb.rpc('mis_empresas');
-    if (error) { toast(mensajeError(error), 'error'); return []; }
+    if (error) { const g = guardado('empresas'); if (g && g.length) { toast('Sin conexión: uso los datos guardados', 'error'); return g; } toast(mensajeError(error), 'error'); APP.sinConexion = true; return []; }
+    guardado('empresas', data || []);
     return data || [];
   }
   function elegirEmpresa(empresas) {
@@ -128,7 +159,9 @@
     return empresas.find(e => e.id === guardada) || empresas[0] || null;
   }
   async function cargarRol(empresaId) {
-    const { data } = await sb.from('empresa_usuarios').select('rol,nombre').eq('empresa_id', empresaId).eq('user_id', APP.user.id).maybeSingle();
+    const { data, error } = await sb.from('empresa_usuarios').select('rol,nombre').eq('empresa_id', empresaId).eq('user_id', APP.user.id).maybeSingle();
+    if (error) return guardado('rol_' + empresaId) || { rol: 'visor', nombre: APP.user.email };
+    if (data) guardado('rol_' + empresaId, data);
     return data || { rol: 'visor', nombre: APP.user.email };
   }
 
@@ -195,7 +228,7 @@
     $('#btn-menu').onclick = () => body.classList.toggle('lateral-abierta');
     const sel = $('#sel-empresa'); if (sel) sel.onchange = () => { localStorage.setItem('percha_empresa', sel.value); location.reload(); };
     $('#btn-salir').onclick = () => APP.salir();
-    const reloj = () => { $('#reloj').textContent = new Date().toLocaleString('es-AR', { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).replace(/\./g, ''); };
+    const reloj = () => { $('#reloj').textContent = new Date().toLocaleString('es-AR', { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }).replace(/\./g, ''); };
     reloj(); setInterval(reloj, 30000);
     if (body.dataset.title && !$('.cab-pagina', main)) {
       const cab = document.createElement('div'); cab.className = 'cab-pagina';
@@ -240,6 +273,10 @@
     APP.user = session.user;
     APP.empresas = await cargarEmpresas();
     APP.empresa = elegirEmpresa(APP.empresas);
+    if (!APP.empresa && APP.sinConexion) {
+      body.innerHTML = `<main class="app"><div class="card"><h2>No me pude conectar</h2><p>Revisá internet y probá de nuevo.</p><p><button class="btn primario" onclick="location.reload()">Reintentar</button></p></div></main>`;
+      return new Promise(() => {});
+    }
     if (!APP.empresa) {
       body.innerHTML = `<main class="app"><div class="card"><h2>Sin empresa asignada</h2><p>Tu usuario (${esc(APP.user.email)}) todavía no pertenece a ninguna empresa. Pedile a quien administra el sistema que te agregue.</p><p><button class="btn" onclick="APP.salir()">Salir</button></p></div></main>`;
       return new Promise(() => {});
@@ -249,7 +286,9 @@
     APP.rol = APP.miembro.rol;
     APP.esAdmin = ['duenio', 'admin'].includes(APP.rol);
     // permisos de este usuario (los de su rol + los que se le cambiaron en Configuración › Usuarios)
-    { const { data: pm } = await sb.rpc('mis_permisos', { e: APP.empresa.id }); APP.permisos = pm || {}; }
+    { const { data: pm, error: epm } = await sb.rpc('mis_permisos', { e: APP.empresa.id }); if (epm) APP.permisos = guardado('permisos_' + APP.empresa.id) || {}; else { APP.permisos = pm || {}; guardado('permisos_' + APP.empresa.id, APP.permisos); } }
+    // se cerró la sesión (venció o se salió en otra pestaña): a ingresar, en vez de pantallas vacías
+    try { sb.auth.onAuthStateChange(ev => { if (ev === 'SIGNED_OUT') location.replace(ROOT + 'login.html?next=' + encodeURIComponent(location.pathname + location.search)); }); } catch (_) { }
     APP.puede = k => !!(APP.permisos || {})[k];
     // pantalla sin permiso: se va a la primera que sí pueda usar
     if (!permite(PERMISO_PAGINA[body.dataset.page])) { const ir = MENU.find(m => m.href && m.href !== '#' && !m.prox && permite(m.p)); if (ir) { location.replace(ROOT + ir.href); return new Promise(() => {}); } }
@@ -281,12 +320,14 @@
       let ctl;
       if (c.tipo === 'select') ctl = `<select id="${id}"${req}>${(c.opciones || []).map(([v, t]) => `<option value="${esc(v)}" ${String(v) === String(val) ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
       else if (c.tipo === 'textarea') ctl = `<textarea id="${id}" rows="3" placeholder="${esc(c.placeholder || '')}"${req}>${esc(val)}</textarea>`;
-      else ctl = `<input id="${id}" type="${c.tipo || 'text'}" value="${esc(val)}" placeholder="${esc(c.placeholder || '')}"${c.tipo === 'number' ? ' step="any"' : ''}${req}>`;
+      // los números van en un campo de texto que acepta "18.750" o "18.750,50" (se leen con APP.numAR)
+      else ctl = c.tipo === 'number' ? `<input id="${id}" type="text" inputmode="decimal" value="${esc(val === '' ? '' : String(val).replace('.', ','))}" placeholder="${esc(c.placeholder || '')}"${req}>` : `<input id="${id}" type="${c.tipo || 'text'}" value="${esc(val)}" placeholder="${esc(c.placeholder || '')}"${req}>`;
       return `<div class="campo${c.ancho === 'c2' ? ' c2' : ''}"><label for="${id}">${esc(c.label)}${c.requerido ? ' *' : ''}</label>${ctl}${c.ayuda ? `<span class="ayuda">${esc(c.ayuda)}</span>` : ''}</div>`;
     };
     const m = modal(`<h2>${esc(titulo)}</h2>${sub ? `<p class="sub">${esc(sub)}</p>` : ''}<form class="form-modal">${campos.map(campo).join('')}<div class="pie"><button type="button" class="btn" data-no>Cancelar</button><button type="submit" class="btn primario" data-si>${esc(boton || 'Agregar')}</button></div></form>`);
     m.classList.add('con-formulario');
-    const leer = () => { const d = {}; campos.forEach(c => { const el = $('#f-' + c.k, m); let v = el.value; if (c.tipo === 'number') v = v === '' ? null : +v; else if (typeof v === 'string') v = v.trim(); if (v === '' ) v = null; d[c.k] = v; }); return d; };
+    m.alCerrar = () => res(null);   // cerrada con Escape: quien la abrió no queda esperando
+    const leer = () => { const d = {}; campos.forEach(c => { const el = $('#f-' + c.k, m); let v = el.value; if (c.tipo === 'number') v = v.trim() === '' ? null : APP.numAR(v); else if (typeof v === 'string') v = v.trim(); if (v === '' ) v = null; d[c.k] = v; }); return d; };
     $('[data-no]', m).onclick = () => { m.cerrar(); res(null); };
     $('form', m).onsubmit = async ev => {
       ev.preventDefault();
@@ -306,9 +347,10 @@
       const tr = el.closest('[data-id]'); if (!tr) return;
       let d = { [el.dataset.k]: leer(el) }; if (op.transformar) d = op.transformar(d, tr) || d;
       tr.classList.remove('guardado', 'error-guardar'); tr.classList.add('guardando');
-      const r = await sb.from(tabla).update(d).eq('id', tr.dataset.id);
+      const r = await sb.from(tabla).update(d).eq('id', tr.dataset.id).select('id');
       tr.classList.remove('guardando');
       if (r.error) { tr.classList.add('error-guardar'); toast(mensajeError(r.error), 'error'); return; }
+      if (!(r.data || []).length) { tr.classList.add('error-guardar'); toast('No se guardó: no tenés permiso para cambiar esto', 'error'); return; }   // la base no tocó nada: antes quedaba en verde igual
       tr.classList.add('guardado'); setTimeout(() => tr.classList.remove('guardado'), 1400);
       if (op.alGuardar) op.alGuardar(tr, d);
     };
@@ -324,6 +366,8 @@
   // el conteo, los pendientes y Catálogo › Códigos generales. Regla: familia + palabras que tiene / no tiene el nombre,
   // más las excepciones a mano (quitar = sacado aunque cumpla; sumar = incluido aunque no cumpla).
   // p = { id, nombre, categoria_id, es_generico, tipo }
+  // "63.750" → 63750 · "63.750,50" → 63750.5 · "12,5" → 12.5 · "1.5" → 1.5 (punto decimal solo si no son miles)
+  APP.numAR = s => { s = String(s ?? '').replace(/[$\s]/g, ''); if (!s) return 0; if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.'); else if (/^-?\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, ''); const n = +s; return isNaN(n) ? 0 : n; };
   APP.encajaGenerico = (f, p) => {
     f = f || {}; if (!p || p.es_generico || p.tipo === 'kit') return false;
     if ((f.quitar || []).includes(p.id)) return false;
@@ -336,8 +380,9 @@
 
   APP.eliminar = async (tabla, id, { nombre, campoActivo = 'activa' } = {}) => {
     if (!await confirmar(`¿Eliminar ${nombre ? '"' + nombre + '"' : 'este registro'}? Si ya se usó, queda desactivado para no perder el historial.`, 'Eliminar')) return null;
-    const r = await sb.from(tabla).delete().eq('id', id);
-    if (!r.error) { toast('Eliminado'); return 'eliminado'; }
+    const r = await sb.from(tabla).delete().eq('id', id).select('id');
+    if (!r.error && (r.data || []).length) { toast('Eliminado'); return 'eliminado'; }
+    if (!r.error) { toast('No se eliminó: no tenés permiso para borrar esto', 'error'); return null; }   // la base no dejó (antes decía "Eliminado" igual)
     if (/foreign key|violates|referenc/i.test(r.error.message || '') || r.error.code === '23503') {
       const r2 = await sb.from(tabla).update({ [campoActivo]: false }).eq('id', id);
       if (r2.error) { toast(mensajeError(r2.error), 'error'); return null; }

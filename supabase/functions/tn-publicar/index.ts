@@ -21,7 +21,7 @@ const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: 
 const norm = (s: unknown) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "").replace(/xxxxl/g, "4xl").replace(/xxxl/g, "3xl").replace(/xxl/g, "2xl");
 const es = (v: unknown) => (v && typeof v === "object" ? ((v as Record<string, string>).es ?? Object.values(v as Record<string, string>)[0] ?? "") : String(v ?? ""));
 const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
-const ESPERA_MIN = 2, CADA_FOTOS_MIN = 5;
+const ESPERA_MIN = 10, CADA_FOTOS_MIN = 5;   // 10 min sin cambios: con 2 se publicaba mientras todavía se estaba corrigiendo la prenda
 const MEDIDAS = { weight: "0.010", width: "4.00", height: "4.00", depth: "4.00" };   // Augusta: todo en 10 g y 4×4×4 (piso del Correo)
 const esColor = (a: string) => ["color", "colores", "estampa"].includes(norm(a));
 const esTalle = (a: string) => ["talle", "talles", "talla", "tamano", "medida"].includes(norm(a));
@@ -158,8 +158,8 @@ Deno.serve(async (req) => {
       const { data: p } = await admin.from("productos").select("id,codigo,nombre,precio,tipo,activo,es_generico,publicar_web,categoria_id").eq("id", q.producto_id).single();
       if (!p) return { omitido: "el producto no existe" };
       if (!p.activo || p.es_generico || !p.publicar_web || !["prenda", "varios"].includes(p.tipo)) return { omitido: "no va a la web (inactivo, genérico, kit o marcado solo local)" };
-      const { data: vs } = await admin.from("v_variantes").select("id,producto_id,talle,talle_nombre,talle_orden,color,color_nombre,precio,stock_web,activa").eq("producto_id", p.id).eq("activa", true);
-      const variantes = (vs || []).sort((a: any, b: any) => String(a.color_nombre || "").localeCompare(String(b.color_nombre || "")) || (a.talle_orden ?? 999) - (b.talle_orden ?? 999));
+      const { data: vs } = await admin.from("v_variantes").select("id,producto_id,sku,talle,talle_nombre,talle_orden,color,color_nombre,precio,stock_web,activa").eq("producto_id", p.id).eq("activa", true);
+      const variantes = (vs || []).filter((v: any) => !/-SD$/i.test(v.sku || "")).sort((a: any, b: any) => String(a.color_nombre || "").localeCompare(String(b.color_nombre || "")) || (a.talle_orden ?? 999) - (b.talle_orden ?? 999));
       if (!variantes.length) return { omitido: "no tiene variantes activas" };
       const { data: cruces } = await admin.from("canal_items").select("variante_id,producto_ext,variante_ext").eq("conexion_id", cx.id).in("variante_id", variantes.map((v: any) => v.id));
       const cruzadas = new Set((cruces || []).map((c: any) => c.variante_id));
