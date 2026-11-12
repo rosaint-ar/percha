@@ -202,6 +202,27 @@ Deno.serve(async (req) => {
       const todos = porVariante.get(vid) || []; if (!todos.length) continue;
       const v = infoVar.get(vid); const esKit = v?.producto_tipo === "kit";
       if (!v || genericos.has(v.producto_id) || /-SD$/i.test(v.sku || "")) { if (simular) sinTocar.push({ producto: v?.producto_nombre, por: "genérico: la web lo maneja sola" }); else if (filas.length) await admin.from("canal_cola").update({ estado: "hecho", hecho: new Date().toISOString(), error: "genérico: no se manda" }).eq("conexion_id", cx.id).eq("variante_id", vid).eq("estado", "pendiente"); continue; }
+      // PERCHA MANDA (12/11, Diego): un talle·color que se sacó en Percha (activa = false) se saca también de la publicación de
+      // la web. Si es la única opción que le queda a esa publicación (Tienda Nube no deja borrarla), queda con stock 0.
+      if (!esKit && v.activa === false) {
+        if (simular) { sinTocar.push({ producto: v.producto_nombre, por: "sacado en Percha: se borra de la web" }); continue; }
+        let fallo: string | null = null;
+        for (const d of todos) {
+          const r = await fetch(`${base}/products/${d.producto_ext}/variants/${d.variante_ext}`, { method: "DELETE", headers });
+          if (r.status === 429) { frenado = true; fallo = "429"; break; }
+          if (r.ok || r.status === 404) { await admin.from("canal_items").delete().eq("id", d.id); detalle.push(`${d.producto_ext}/${d.variante_ext} ${d.talle_canal || ""} ${d.color_canal || ""}: borrada de la web (sacada en Percha)`); continue; }
+          // la última opción de la publicación no se puede borrar: queda sin stock
+          const r2 = await fetch(`${base}/products/${d.producto_ext}/variants/${d.variante_ext}`, { method: "PUT", headers, body: JSON.stringify({ stock: 0 }) });
+          if (r2.status === 429) { frenado = true; fallo = "429"; break; }
+          if (!r2.ok) { fallo = `${r.status}/${r2.status} ${(await r2.text()).slice(0, 150)}`; continue; }
+          await admin.from("canal_items").update({ stock: 0, actualizado: new Date().toISOString() }).eq("id", d.id);
+        }
+        if (fallo === "429") break;
+        const fila = filas.find((f: any) => f.variante_id === vid);
+        if (fallo) { err++; if (fila) await admin.from("canal_cola").update({ intentos: (fila.intentos || 0) + 1, error: fallo, estado: (fila.intentos || 0) + 1 >= 5 ? "error" : "pendiente" }).eq("id", fila.id); }
+        else { ok++; await admin.from("canal_cola").update({ estado: "hecho", hecho: new Date().toISOString(), error: "sacada en Percha: borrada de la web" }).eq("conexion_id", cx.id).eq("variante_id", vid).eq("estado", "pendiente"); }
+        continue;
+      }
       // lo que está oculto en la web no se toca (publicaciones viejas o pausadas), salvo que la conexión diga tener en cuenta los ocultos
       const oculto = (d: any) => !cx.incluir_ocultos && (simular && body.todo ? visible.get(String(d.variante_ext)) === false : d.publicado === false);
       const ocultos = todos.filter(oculto);
