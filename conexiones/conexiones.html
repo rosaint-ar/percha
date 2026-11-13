@@ -30,6 +30,7 @@
   .fila-sw{display:flex;align-items:center;gap:10px;min-height:38px;font-size:13.5px}
   .bloque{border-top:1px solid var(--linea-suave);padding-top:14px;margin-top:14px}
   .bloque h3{font:700 14px var(--f-ui);margin:0 0 4px}
+  .fila-num{font-size:13.5px;line-height:2.5;margin:2px 0}.fila-num input{display:inline-block;margin:0 3px;padding:4px 6px!important;height:auto!important}
   .rev-tabla{max-height:52vh;overflow:auto;border:1px solid var(--linea-suave);border-radius:12px;margin-top:10px}
   .rev-tabla s{color:var(--tinta-3)}
 </style>
@@ -78,6 +79,7 @@ APP.ready.then(async () => {
       <div class="datos"><div class="dato"><b>${fmt.num(res.items || 0)}</b><span>prendas publicadas</span></div><div class="dato ${res.sin_cruzar ? 'mal' : 'bien'}"><b>${fmt.num(res.sin_cruzar || 0)}</b><span>sin cruzar con el local</span></div><div class="dato ${res.stock_distinto ? 'mal' : 'bien'}"><b>${fmt.num(res.stock_distinto || 0)}</b><span>con stock distinto</span></div></div>
       <div class="fila-sw" style="align-items:flex-start"><label class="switch" style="margin-top:2px"><input type="checkbox" id="chk-empujar" ${cx.empujar_stock ? 'checked' : ''}><span></span></label><span><b>Stock compartido con la web</b><br><small class="sub">Cada venta, compra o ajuste del local actualiza Tienda Nube al momento. Los pedidos de la web entran solos como ventas.</small></span></div>
       <div class="acciones" style="margin-top:12px"><a class="btn primario" href="cruce.html?c=${cx.id}">Ver cruce de productos</a><button class="btn" id="btn-pedidos">Pedidos recientes</button></div>
+      <div id="tn-config"></div>
       <details class="avanzado"><summary>Opciones avanzadas</summary>
         <p class="sub" style="margin:6px 0 10px">Se usan pocas veces. Las que tienen ⚠ cambian muchos datos de una sola vez: usalas solo si sabés para qué.</p>
         <div class="fila-sw" style="align-items:flex-start"><label class="switch" style="margin-top:2px"><input type="checkbox" id="chk-ocultos" ${cx.incluir_ocultos ? 'checked' : ''}><span></span></label><span><b>Tener en cuenta los productos ocultos de la tienda</b><br><small class="sub">Apagado, lo oculto en Tienda Nube no cuenta para nada. Hoy hay ${fmt.num(res.ocultos || 0)} ocultos.</small></span></div>
@@ -115,7 +117,59 @@ APP.ready.then(async () => {
     };
     $('#btn-sync').onclick = async () => { const b = $('#btn-sync'); b.disabled = true; b.textContent = 'Sincronizando…'; try { const j = await llamar('tn-sync', { conexion_id: cx.id }); toast(`${fmt.num(j.variantes)} variantes leídas · ${fmt.num(j.cruzados)} cruzadas · ${fmt.num(j.sin_cruzar)} sin cruzar`); } catch (err) { toast(err.message, 'error'); } cargarTN(); };
     $('#btn-desconectar').onclick = async () => { if (!await confirmar('¿Desconectar Tienda Nube? Se borra el cruce guardado; no se toca nada en la tienda.', 'Desconectar')) return; await sb.from('conexiones').delete().eq('id', cx.id); cargarTN(); };
+    pintarConfig(cx);
     cargarPrecios(cx);
+  }
+
+  // ================= Cómo se sincroniza (13/11): la configuración de la conexión (conexiones.config) =================
+  // Lo que antes estaba fijo para Augusta: fotos desde Percha, lo nuevo a la web (oculto o no), espera, Nuevos Ingresos,
+  // medidas para el envío y los códigos. Cada cambio se guarda al momento.
+  const CFG_DEF = { fotos_desde_percha: true, publicar_nuevos: true, nuevos_ocultos: true, espera_min: 10, medidas: null, nuevos_ingresos_dias: 30, codigos_percha: true };
+  function pintarConfig(cx) {
+    const caja = $('#tn-config'); if (!caja) return;
+    const c = Object.assign({}, CFG_DEF, cx.config || {}), md = c.medidas || {};
+    const sw = (id, on, titulo, texto) => `<div class="fila-sw" style="align-items:flex-start"><label class="switch" style="margin-top:2px"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}><span></span></label><span><b>${titulo}</b><br><small class="sub">${texto}</small></span></div>`;
+    caja.innerHTML = `<div class="bloque"><h3>Fotos de los productos</h3>
+        <p class="sub" style="margin:0 0 6px">Las fotos se manejan en Tienda Nube: todas las de la web se ven en Percha y se actualizan solas (si se agregan, se borran o se cambia el orden allá, cambian acá).${cx.ultima_sync_fotos ? ' Última revisión: ' + fmt.fechaHora(cx.ultima_sync_fotos) + '.' : ''}</p>
+        ${sw('cfg-fotos', c.fotos_desde_percha, 'También se pueden subir y borrar fotos desde Percha', 'Lo que subas en la ficha de la prenda va a la web (una sola vez, sin repetir) y lo que borres se borra también allá. Apagado, en Percha las fotos de la web solo se miran.')}
+      </div>
+      <div class="bloque"><h3>Lo nuevo de Percha</h3>
+        ${sw('cfg-nuevos', c.publicar_nuevos, 'Una prenda o un color nuevo se crea solo en la web', 'Con su precio, su stock y sus talles. Apagado, lo nuevo queda solo en el local hasta que lo prendas.')}
+        ${sw('cfg-ocultos', c.nuevos_ocultos, '…oculto, para completar fotos y texto allá', 'Un color nuevo se muestra solo apenas tiene su foto.')}
+        <div class="fila-num">Esperar <input id="cfg-espera" inputmode="numeric" style="width:64px;text-align:center" value="${esc(String(c.espera_min))}"> minutos sin cambios antes de subirla (por si todavía la estás corrigiendo).</div>
+        <div class="fila-num">Queda en «Nuevos Ingresos» <input id="cfg-dias" inputmode="numeric" style="width:64px;text-align:center" value="${esc(String(c.nuevos_ingresos_dias))}"> días (0 = no usar esa categoría).</div>
+        <div class="fila-num">Para el envío, cada prenda pesa <input id="cfg-peso" inputmode="decimal" style="width:70px;text-align:center" value="${md.peso != null ? esc(String(md.peso).replace('.', ',')) : ''}" placeholder="kg"> kg y mide <input id="cfg-ancho" inputmode="decimal" style="width:52px;text-align:center" value="${md.ancho != null ? esc(String(md.ancho)) : ''}" placeholder="an"> × <input id="cfg-alto" inputmode="decimal" style="width:52px;text-align:center" value="${md.alto != null ? esc(String(md.alto)) : ''}" placeholder="al"> × <input id="cfg-prof" inputmode="decimal" style="width:52px;text-align:center" value="${md.profundidad != null ? esc(String(md.profundidad)) : ''}" placeholder="pr"> cm (vacío = no se manda).</div>
+        ${sw('cfg-codigos', c.codigos_percha, 'Percha pone sus códigos en la web', 'El SKU de cada opción de la web es el código de la prenda en Percha; si alguien lo cambia allá, se vuelve a corregir.')}
+      </div>
+      <div class="bloque"><h3>Avisos al instante</h3><p class="sub" id="cfg-avisos" style="margin:0">Revisando…</p></div>`;
+    const guardar = async (parcial, msj) => {
+      const nuevo = Object.assign({}, cx.config || {}, parcial);
+      const r = await sb.from('conexiones').update({ config: nuevo }).eq('id', cx.id);
+      if (r.error) { toast(mensajeError(r.error), 'error'); pintarConfig(cx); return; }
+      cx.config = nuevo; toast(msj || 'Guardado');
+    };
+    const sws = { 'cfg-fotos': ['fotos_desde_percha', 'Fotos desde Percha: prendido', 'Fotos desde Percha: apagado (solo Tienda Nube)'], 'cfg-nuevos': ['publicar_nuevos', 'Lo nuevo va solo a la web', 'Lo nuevo queda solo en el local'],
+      'cfg-ocultos': ['nuevos_ocultos', 'Lo nuevo se crea oculto', 'Lo nuevo se crea visible'], 'cfg-codigos': ['codigos_percha', 'Percha pone los códigos en la web', 'Percha ya no toca los códigos de la web'] };
+    for (const [id, [k, si, no]] of Object.entries(sws)) $('#' + id).onchange = ev => guardar({ [k]: ev.target.checked }, ev.target.checked ? si : no);
+    const entero = (id, k, min, max) => { const el = $('#' + id); el.onchange = () => { const n = Math.round(APP.numAR(el.value)); if (!(n >= min && n <= max)) { toast(`Poné un número entre ${min} y ${max}`, 'error'); el.value = c[k]; return; } c[k] = n; guardar({ [k]: n }); }; };
+    entero('cfg-espera', 'espera_min', 1, 240); entero('cfg-dias', 'nuevos_ingresos_dias', 0, 365);
+    ['cfg-peso', 'cfg-ancho', 'cfg-alto', 'cfg-prof'].forEach(id => $('#' + id).onchange = () => {
+      const v = ['cfg-peso', 'cfg-ancho', 'cfg-alto', 'cfg-prof'].map(x => $('#' + x).value.trim());
+      if (v.every(x => !x)) { guardar({ medidas: null }, 'Las medidas ya no se mandan'); return; }
+      const n = v.map(x => APP.numAR(x)); if (n.some(x => !(x > 0))) { toast('Completá el peso y las tres medidas (o dejalas todas vacías)', 'error'); return; }
+      guardar({ medidas: { peso: n[0], ancho: n[1], alto: n[2], profundidad: n[3] } }, 'Medidas guardadas');
+    });
+    // avisos al instante (webhooks): cuáles tiene la tienda y botón para crear los que faltan
+    const NOMBRES = { 'order/paid': 'pedido pagado', 'order/updated': 'pedido cambiado', 'order/cancelled': 'pedido cancelado', 'product/created': 'producto nuevo', 'product/updated': 'producto cambiado (fotos, visible…)', 'product/deleted': 'producto borrado', 'app/uninstalled': 'se desconectó la app' };
+    const pintarAvisos = (j) => {
+      const r = (j.resumen || [])[0] || {}; const el = $('#cfg-avisos'); if (!el) return;
+      if (r.error || !Array.isArray(r.avisos)) { el.textContent = 'No se pudieron revisar: ' + (r.error || 'sin respuesta'); return; }
+      const faltan = (r.avisos || []).filter(a => !a.activo);
+      el.innerHTML = (faltan.length ? `La web avisa al momento ${fmt.num((r.avisos || []).length - faltan.length)} de ${fmt.num((r.avisos || []).length)} cosas. Faltan: ${faltan.map(a => esc(NOMBRES[a.evento] || a.evento)).join(', ')}. Sin aviso, igual se revisa cada 5 a 30 minutos. <button class="btn" id="btn-avisos" style="margin-left:6px">Activar los que faltan</button>`
+        : '✓ La web avisa al momento los pedidos y los cambios de productos (fotos incluidas).');
+      const b = $('#btn-avisos'); if (b) b.onclick = async () => { b.disabled = true; try { const j2 = await llamar('tn-publicar', { avisos: 'registrar' }); pintarAvisos(j2); toast('Avisos activados'); } catch (err) { toast(err.message, 'error'); b.disabled = false; } };
+    };
+    llamar('tn-publicar', { avisos: 'ver' }).then(pintarAvisos).catch(err => { const el = $('#cfg-avisos'); if (el) el.textContent = 'No se pudieron revisar: ' + err.message; });
   }
 
   // ================= Precios en Tienda Nube: la lista de la conexión, el envío y los descuentos =================

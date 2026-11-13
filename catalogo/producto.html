@@ -51,6 +51,9 @@
   .foto-t:hover{transform:translateY(-2px);box-shadow:0 8px 18px rgba(21,23,28,.16)}
   .foto-t img{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
   .foto-t.arrastrando{opacity:.35}
+  .foto-t .de-web{position:absolute;right:6px;top:6px;font:700 9px var(--f-ui);letter-spacing:.04em;text-transform:uppercase;background:rgba(44,51,87,.86);color:#fff;border-radius:6px;padding:2px 5px}
+  .foto-t .subiendo-web{position:absolute;right:6px;top:6px;font:700 9px var(--f-ui);background:rgba(255,255,255,.92);color:var(--tinta-2);border-radius:6px;padding:2px 5px}
+  .fotos-nota{font-size:12.5px;color:var(--tinta-3);margin:0 0 10px}
   .foto-t .portada{position:absolute;left:6px;top:6px;font:700 9.5px var(--f-ui);letter-spacing:.04em;text-transform:uppercase;background:var(--acento);color:#fff;border-radius:6px;padding:2px 6px}
   .foto-t .acc{position:absolute;inset:auto 6px 6px 6px;display:flex;justify-content:space-between;opacity:0;transition:opacity .12s}
   @media (hover:none){.foto-t .acc{opacity:1}}   /* en el celular los botones de la foto se ven siempre */
@@ -456,20 +459,24 @@ APP.ready.then(async () => {
   }
 
   // ---------- fotos: generales y por color ----------
-  let fotos = [];
+  let fotos = [], cxFotos;   // cxFotos: la conexión con Tienda Nube (undefined = sin leer, null = no hay)
   const IC_MAS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
   async function pintarFotos() {
     const cont = $('#fotos'); if (!producto) return;
-    fotos = (await sb.from('producto_fotos').select('*').eq('producto_id', id).order('orden').order('creado')).data || [];
+    fotos = ((await sb.from('producto_fotos').select('*').eq('producto_id', id).order('orden').order('creado')).data || []).filter(f => !f.borrar_web);
+    // Fotos: Tienda Nube manda (13/11). Las de la web se ven acá y se actualizan solas; subir/borrar desde Percha según la conexión
+    if (cxFotos === undefined) { const { data: cxs } = await sb.from('conexiones').select('config').eq('empresa_id', e).eq('canal', 'tiendanube').eq('estado', 'activa').limit(1); cxFotos = (cxs || [])[0] || null; }
+    const hayWeb = !!cxFotos, puedeSubir = APP.esAdmin && (!hayWeb || (cxFotos.config || {}).fotos_desde_percha !== false);
+    const deWeb = f => f.origen === 'tiendanube';
     const colores = [...new Map(variantes.filter(v => v.color).map(v => [v.color, { id: (colores_attr.find(c => c.codigo === v.color) || {}).id, nombre: v.color_nombre, hex: v.color_hex }])).values()].filter(c => c.id).sort((a, b) => a.nombre.localeCompare(b.nombre));
     const conFoto = new Set(fotos.map(f => f.color_id || ''));
     const grupos = [{ id: '', nombre: 'Generales', hex: null }].concat(colores.filter(c => conFoto.has(c.id))), sinFoto = colores.filter(c => !conFoto.has(c.id));
-    cont.innerHTML = grupos.map(g => { const fs2 = fotos.filter(f => (f.color_id || '') === g.id);
+    cont.innerHTML = (hayWeb ? `<p class="fotos-nota">Las fotos se manejan en Tienda Nube: las de la web (marcadas «web») se actualizan solas y el orden es el de allá.${puedeSubir ? ' Lo que subas o borres acá va también a la web.' : ' Para cambiarlas, hacelo en Tienda Nube.'}</p>` : '') + grupos.map(g => { const fs2 = fotos.filter(f => (f.color_id || '') === g.id);
       return `<div class="fotos-grupo"><h3>${g.hex ? `<i style="background:${esc(g.hex)}"></i>` : ''}${esc(g.nombre)} <small>${fs2.length ? fmt.num(fs2.length) : g.id ? 'usa las generales' : 'sin fotos'}</small></h3>
-        <div class="fotos-fila" data-grupo="${g.id}">${fs2.map(f => `<div class="foto-t" draggable="${APP.esAdmin}" data-f="${f.id}"><img src="${esc(f.url)}" alt="" loading="lazy">${f.url === producto.imagen_url ? '<span class="portada">Portada</span>' : ''}
-          ${APP.esAdmin ? `<div class="acc"><button type="button" data-portada="${f.id}" title="Usar de portada">★</button><button type="button" class="x" data-borrar="${f.id}" title="Quitar">✕</button></div>` : ''}</div>`).join('')}
-          ${APP.esAdmin ? `<label class="foto-mas" title="Subir fotos">${IC_MAS}<input type="file" accept="image/*" multiple hidden data-subir="${g.id}"></label>` : ''}</div></div>`; }).join('')
-      + (sinFoto.length ? `<div class="fotos-grupo"><h3>Colores que usan las fotos generales <small>${fmt.num(sinFoto.length)}</small></h3><div class="fotos-sin">${sinFoto.map(c => `<label class="foto-chip" data-grupo="${c.id}" title="${APP.esAdmin ? 'Subí una foto de este color o arrastrá una foto acá' : ''}"><i style="background:${esc(c.hex || '#E6DEF0')}"></i>${esc(c.nombre)}${APP.esAdmin ? ` <b>+</b><input type="file" accept="image/*" multiple hidden data-subir="${c.id}">` : ''}</label>`).join('')}</div></div>` : '');
+        <div class="fotos-fila" data-grupo="${g.id}">${fs2.map(f => `<div class="foto-t" draggable="${APP.esAdmin}" data-f="${f.id}"><img src="${esc(f.url)}" alt="" loading="lazy">${f.url === producto.imagen_url ? '<span class="portada">Portada</span>' : ''}${deWeb(f) ? '<span class="de-web" title="Foto de Tienda Nube">web</span>' : ''}
+          ${APP.esAdmin ? `<div class="acc"><button type="button" data-portada="${f.id}" title="Usar de portada">★</button>${!deWeb(f) || puedeSubir ? `<button type="button" class="x" data-borrar="${f.id}" title="Quitar">✕</button>` : ''}</div>` : ''}</div>`).join('')}
+          ${puedeSubir ? `<label class="foto-mas" title="Subir fotos">${IC_MAS}<input type="file" accept="image/*" multiple hidden data-subir="${g.id}"></label>` : ''}</div></div>`; }).join('')
+      + (sinFoto.length ? `<div class="fotos-grupo"><h3>Colores que usan las fotos generales <small>${fmt.num(sinFoto.length)}</small></h3><div class="fotos-sin">${sinFoto.map(c => `<label class="foto-chip" data-grupo="${c.id}" title="${APP.esAdmin ? 'Subí una foto de este color o arrastrá una foto acá' : ''}"><i style="background:${esc(c.hex || '#E6DEF0')}"></i>${esc(c.nombre)}${puedeSubir ? ` <b>+</b><input type="file" accept="image/*" multiple hidden data-subir="${c.id}">` : ''}</label>`).join('')}</div></div>` : '');
     $$('[data-subir]', cont).forEach(inp => inp.onchange = async () => {
       const lab = inp.closest('.foto-mas,.foto-chip'); lab.classList.add('subiendo');
       try {
@@ -487,8 +494,11 @@ APP.ready.then(async () => {
     $$('[data-portada]', cont).forEach(b => b.onclick = async () => { const f = fotos.find(x => x.id === b.dataset.portada); const r = await sb.from('productos').update({ imagen_url: f.url }).eq('id', id); if (r.error) { toast(mensajeError(r.error), 'error'); return; } producto.imagen_url = f.url; toast('Portada cambiada'); pintarFotos(); });
     $$('[data-borrar]', cont).forEach(b => b.onclick = async () => {
       const f = fotos.find(x => x.id === b.dataset.borrar);
-      if (!await confirmar('¿Quitar esta foto del producto?', 'Quitar')) return;
-      const r = await sb.from('producto_fotos').delete().eq('id', f.id); if (r.error) { toast(mensajeError(r.error), 'error'); return; }
+      const enLaWeb = deWeb(f) || (f.web && Object.values(f.web).some(x => x && x !== 'borrada'));
+      if (!await confirmar(enLaWeb ? '¿Quitar esta foto? Se borra también de Tienda Nube.' : '¿Quitar esta foto del producto?', 'Quitar')) return;
+      const r = enLaWeb ? await sb.from('producto_fotos').update({ borrar_web: true }).eq('id', f.id) : await sb.from('producto_fotos').delete().eq('id', f.id);
+      if (r.error) { toast(mensajeError(r.error), 'error'); return; }
+      if (enLaWeb) toast('Se borra de la web en un minuto');
       if (f.url === producto.imagen_url) { const otra = fotos.find(x => x.id !== f.id && !x.color_id) || fotos.find(x => x.id !== f.id); await sb.from('productos').update({ imagen_url: otra ? otra.url : null }).eq('id', id); producto.imagen_url = otra ? otra.url : null; }
       pintarFotos();
     });
@@ -511,6 +521,7 @@ APP.ready.then(async () => {
       fila.addEventListener('drop', async ev => { ev.preventDefault(); if (!arr) return; arr = null;
         const cambios = [];
         $$('.fotos-fila', cont).forEach(fl => $$('.foto-t', fl).forEach((t, i) => { const f = fotos.find(x => x.id === t.dataset.f), g = fl.dataset.grupo || null;
+          if (deWeb(f)) { if ((f.color_id || null) !== g) cambios.push(sb.from('producto_fotos').update({ color_id: g }).eq('id', f.id)); return; }   // de la web: el orden lo manda la web
           if (f.orden !== i + 1 || (f.color_id || null) !== g) cambios.push(sb.from('producto_fotos').update({ orden: i + 1, color_id: g }).eq('id', f.id)); }));
         const rs = await Promise.all(cambios); const mal = rs.find(r => r.error); if (mal) toast(mensajeError(mal.error), 'error');
         pintarFotos(); });

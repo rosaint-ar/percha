@@ -35,11 +35,12 @@ Deno.serve(async (req) => {
   const soloExt: string[] = Array.isArray(body.solo_ext) ? body.solo_ext.map(String) : [];
   const pag = async (q: () => any) => { let todo: any[] = []; for (let d = 0; ; d += 1000) { const { data, error } = await q().range(d, d + 999); if (error) throw error; todo = todo.concat(data || []); if (!data || data.length < 1000) break; } return todo; };
 
-  let qc = admin.from("conexiones").select("id,empresa_id,externo_id,canal").eq("estado", "activa").eq("canal", "tiendanube");
+  let qc = admin.from("conexiones").select("id,empresa_id,externo_id,canal,config").eq("estado", "activa").eq("canal", "tiendanube");
   if (filtroEmpresa) qc = qc.eq("empresa_id", filtroEmpresa);
   const { data: conexiones } = await qc;
   const resumen: any[] = [];
   for (const cx of conexiones || []) {
+    if (cx.config?.codigos_percha === false) { resumen.push({ conexion: cx.id, omitido: "apagado en Conexiones" }); continue; }   // Conexiones › «Percha pone los códigos en la web»
     const { data: sec } = await admin.from("conexion_secretos").select("access_token").eq("conexion_id", cx.id).maybeSingle();
     if (!sec) continue;
     const headers = { Authentication: `bearer ${sec.access_token}`, "User-Agent": UA, "Content-Type": "application/json" };

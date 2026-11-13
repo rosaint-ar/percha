@@ -2,6 +2,7 @@
 // Canjea el código por el token permanente, guarda la conexión y vuelve a Percha.
 // Necesita en app_config: tn_app_id, tn_client_secret. Desplegar con --no-verify-jwt (lo llama Tienda Nube, sin sesión).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import { registrarAvisos, CONFIG_DEFECTO } from "../_shared/tn.ts";
 const SB_URL = Deno.env.get("SUPABASE_URL")!, SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const UA = "Percha (rosaint.ar@gmail.com)";
 const volverA = (base: string, q: string) => new Response(null, { status: 302, headers: { Location: (base || "https://rosaint-ar.github.io/percha/conexiones/conexiones.html") + "?" + q } });
@@ -29,6 +30,9 @@ async function manejar(req: Request): Promise<Response> {
   const { data: cx, error } = await admin.from("conexiones").upsert({ empresa_id: st.empresa_id, canal: "tiendanube", externo_id: storeId, nombre, url: s?.url_with_protocol || null, estado: "activa", ultimo_error: null }, { onConflict: "empresa_id,canal,externo_id" }).select().single();
   if (error || !cx) return volverA(volver, "tn=error&detalle=" + encodeURIComponent("no se pudo guardar la conexión"));
   await admin.from("conexion_secretos").upsert({ conexion_id: cx.id, access_token: tok.access_token, scope: tok.scope || null, actualizado: new Date().toISOString() });
+  // configuración inicial (se cambia en Conexiones) y avisos al instante de pedidos y productos: una tienda nueva queda andando sola
+  if (!cx.config || !("fotos_desde_percha" in cx.config)) await admin.from("conexiones").update({ config: { ...CONFIG_DEFECTO, ...(cx.config || {}) } }).eq("id", cx.id);
+  try { await registrarAvisos(admin, cx, tok.access_token); } catch (_) { /* se pueden activar después desde Conexiones */ }
   await admin.from("oauth_estados").delete().eq("estado", estado);
   await admin.from("app_config").delete().eq("clave", "tn_volver_" + estado);
   return volverA(volver, "tn=ok");
