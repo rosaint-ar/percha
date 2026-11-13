@@ -23,6 +23,10 @@ const norm = (s: unknown) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g
 const talleClave = (s: unknown) => { const x = String(s ?? "").trim(); if (/^([uú]nic[oa]|talle [uú]nico)$/i.test(x)) return ""; return norm(x.replace(/\s*-\s*/g, " al ").replace(/\s+a\s+/gi, " al ")); };
 const es = (v: unknown) => (v && typeof v === "object" ? ((v as Record<string, string>).es ?? Object.values(v as Record<string, string>)[0] ?? "") : String(v ?? ""));
 const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
+// nombre del archivo de una foto, sin lo que le agrega Tienda Nube («mwdmtl8m-8x5d1-66867da5…-1024-1024.png» → «mwdmtl8m-8x5d1»):
+// sirve para saber si una foto de Percha ya está en una publicación (y para encontrar copias repetidas)
+const archivoBase = (u: unknown) => { const f = decodeURIComponent(String(u || "").split("?")[0].split("/").pop() || "").toLowerCase();
+  return f.replace(/-[0-9a-f]{16,}-\d+-\d+\.[a-z0-9]+$/, "").replace(/-\d+-\d+\.[a-z0-9]+$/, "").replace(/\.[a-z0-9]+$/, ""); };
 const ESPERA_MIN = 10, CADA_FOTOS_MIN = 5, MAX_FOTOS = 25, FOTOS_DESDE = "2026-11-12T23:15:00Z";   // fotos de Percha → web: de a 25 por vuelta   // 10 min sin cambios: con 2 se publicaba mientras todavía se estaba corrigiendo la prenda
 const MEDIDAS = { weight: "0.010", width: "4.00", height: "4.00", depth: "4.00" };   // Augusta: todo en 10 g y 4×4×4 (piso del Correo)
 const esColor = (a: string) => ["color", "colores", "estampa"].includes(norm(a));
@@ -294,6 +298,66 @@ Deno.serve(async (req) => {
       if (body.vencer_nuevos) { resumen.push(res); continue; }
     }
 
+    // a mano (13/11, Diego): fotos REPETIDAS en las publicaciones (mismo archivo subido dos veces). Se queda la que
+    // Percha tiene anotada (o la primera); las opciones que usaban la copia pasan a la que queda. {deduplicar_fotos: true | [publicaciones]}
+    if (body.deduplicar_fotos) {
+      let pes: string[] = Array.isArray(body.deduplicar_fotos) ? body.deduplicar_fotos.map(String) : [];
+      const { data: fw } = await admin.from("producto_fotos").select("producto_id,web").eq("empresa_id", e).not("web", "is", null);
+      const anotadas = new Set<string>(), pidsDe = new Map<string, Set<string>>();
+      (fw || []).forEach((f: any) => Object.entries(f.web || {}).forEach(([pe, id]) => { anotadas.add(String(id)); if (!pidsDe.has(pe)) pidsDe.set(pe, new Set()); pidsDe.get(pe)!.add(f.producto_id); }));
+      if (!pes.length) pes = [...pidsDe.keys()];
+      res.duplicadas = []; const tocadas: any[] = [];
+      for (const pe of pes) {
+        let pr: any;
+        try { pr = await tn("GET", `/products/${pe}?fields=id,name,published,images,variants`); } catch (err) { res.duplicadas.push({ publicacion: pe, error: String(err).slice(0, 120) }); continue; }
+        const grupos = new Map<string, any[]>();
+        for (const im of pr.images || []) { const k = archivoBase(im.src) + "|" + im.width + "x" + im.height; if (!grupos.has(k)) grupos.set(k, []); grupos.get(k)!.push(im); }
+        const borrar: any[] = [];
+        for (const [, ims] of grupos) {
+          if (ims.length < 2) continue;
+          const queda = ims.find((im: any) => anotadas.has(String(im.id))) || ims.slice().sort((a: any, b: any) => a.id - b.id)[0];
+          for (const im of ims) if (im !== queda) borrar.push({ im, queda });
+        }
+        if (!borrar.length) { tocadas.push(pr); continue; }   // igual se revisa en Percha (copias traídas de vuelta)
+        res.duplicadas.push({ publicacion: pe, nombre: es(pr.name), fotos: (pr.images || []).length, copias: borrar.length });
+        if (simular) continue;
+        for (const { im, queda } of borrar) {
+          for (const v of (pr.variants || []).filter((v: any) => String(v.image_id) === String(im.id))) { try { await tn("PUT", `/products/${pe}/variants/${v.id}`, { image_id: queda.id }); } catch (_) { /* sigue */ } }
+          try { await tn("DELETE", `/products/${pe}/images/${im.id}`); } catch (err) { if (!String(err).includes(" 404")) res.duplicadas.push({ publicacion: pe, imagen: im.id, error: String(err).slice(0, 120) }); }
+        }
+        tocadas.push({ ...(await tn("GET", `/products/${pe}?fields=id,published,images,variants`)) });
+      }
+      // y en Percha: las copias que la sincronización había traído como «de la web» se van
+      if (tocadas.length && !simular) res.fotos = await sincronizarFotos(tocadas);
+      resumen.push(res); continue;
+    }
+
+    // a mano (13/11, Diego): que TODOS los colores de estas prendas se vean en la web (opciones visibles, publicación
+    // publicada). {mostrar_colores: [producto_id…]} → informa; con aplicar: true, los muestra.
+    if (Array.isArray(body.mostrar_colores)) {
+      const { data: cr } = await admin.from("canal_items").select("producto_ext,variante_ext,variante_id,variantes!inner(producto_id,color_id,activa)")
+        .eq("conexion_id", cx.id).in("variantes.producto_id", body.mostrar_colores);
+      const cids = [...new Set((cr || []).map((c: any) => c.variantes?.color_id).filter(Boolean))];
+      const { data: cols } = cids.length ? await admin.from("atributos").select("id,nombre").in("id", cids) : { data: [] };
+      const colorDe = new Map((cols || []).map((x: any) => [x.id, x.nombre]));
+      const porPub = new Map<string, any[]>(); (cr || []).forEach((c: any) => { const pe = String(c.producto_ext); if (!porPub.has(pe)) porPub.set(pe, []); porPub.get(pe)!.push(c); });
+      res.colores = [];
+      for (const [pe, lista] of porPub) {
+        let pr: any;
+        try { pr = await tn("GET", `/products/${pe}?fields=id,name,published,variants`); } catch (err) { res.colores.push({ publicacion: pe, error: String(err).slice(0, 120) }); continue; }
+        const vext = new Set(lista.map((c: any) => String(c.variante_ext)));
+        const ocultas = (pr.variants || []).filter((v: any) => vext.has(String(v.id)) && v.visible === false);
+        const sinCruce = lista.filter((c: any) => !(pr.variants || []).some((v: any) => String(v.id) === String(c.variante_ext)));
+        const fila = { publicacion: pe, nombre: es(pr.name), publicada: pr.published !== false, opciones: (pr.variants || []).length,
+          ocultas: ocultas.map((v: any) => (v.values || []).map(es).join(" ")), no_estan: sinCruce.map((c: any) => colorDe.get(c.variantes?.color_id) || "?") };
+        res.colores.push(fila);
+        if (!body.aplicar || simular) continue;
+        for (const v of ocultas) { try { await tn("PUT", `/products/${pe}/variants/${v.id}`, { visible: true }); } catch (err) { (fila as any).error = String(err).slice(0, 120); } }
+        if (pr.published === false) { try { await tn("PUT", `/products/${pe}`, { published: true }); } catch (err) { (fila as any).error = String(err).slice(0, 120); } }
+      }
+      resumen.push(res); continue;
+    }
+
     async function publicarProducto(q: any) {
       const { data: p } = await admin.from("productos").select("id,codigo,nombre,precio,tipo,activo,es_generico,publicar_web,categoria_id").eq("id", q.producto_id).single();
       if (!p) return { omitido: "el producto no existe" };
@@ -387,8 +451,34 @@ Deno.serve(async (req) => {
     // a las demás, solo las fotos nuevas (desde FOTOS_DESDE: las anteriores ya se habían cargado a mano en la web).
     // Por color: a la publicación que tiene ese color y, si esas opciones no tenían foto, queda como su foto.
     // producto_fotos.web guarda {publicación: id de la imagen}: no se repite y la sincronización de vuelta no la duplica.
-    if (!body.producto_id || body.fotos_percha) {
+    // 13/11: candado (una sola vuelta sube fotos a la vez: corre cada minuto y subir tarda más → se duplicaban) y,
+    // antes de subir, se mira si ese archivo ya está en la publicación (entonces se anota, no se sube de nuevo).
+    let candado = false;
+    if ((!body.producto_id || body.fotos_percha) && !simular) {
+      const ahoraC = new Date();
+      const { data: tomado } = await admin.from("conexiones").update({ fotos_subiendo_hasta: new Date(ahoraC.getTime() + 5 * 60000).toISOString() })
+        .eq("id", cx.id).or(`fotos_subiendo_hasta.is.null,fotos_subiendo_hasta.lt.${ahoraC.toISOString()}`).select("id");
+      candado = !!(tomado && tomado.length);
+      if (!candado) res.fotos_a_la_web = { omitido: "otra vuelta está subiendo fotos" };
+    }
+    if ((!body.producto_id || body.fotos_percha) && (candado || simular)) try {
       const subidas: any[] = []; let n = 0;
+      const enLaWeb = new Map<string, Map<string, string>>();   // publicación → (nombre de archivo → id de imagen)
+      const imagenesDe = async (pe: string) => {
+        if (!enLaWeb.has(pe)) {
+          const m = new Map<string, string>();
+          try { for (const im of (await tn("GET", `/products/${pe}/images?fields=id,src`)) || []) { const k = archivoBase(im.src); if (k && !m.has(k)) m.set(k, String(im.id)); } } catch (_) { /* si no se puede leer, se sube igual */ }
+          enLaWeb.set(pe, m);
+        }
+        return enLaWeb.get(pe)!;
+      };
+      const fotoDelColor = async (pe: string, ids: string[], imgId: string) => {
+        try {
+          const vs = await tn("GET", `/products/${pe}/variants?fields=id,image_id,visible`);
+          for (const v of (vs || []).filter((v: any) => ids.includes(String(v.id)) && (!v.image_id || v.visible === false)))
+            await tn("PUT", `/products/${pe}/variants/${v.id}`, { ...(!v.image_id ? { image_id: +imgId } : {}), visible: true });
+        } catch (_) { /* la foto ya está; la asignación a la opción queda para hacer a mano */ }
+      };
       const { data: pend } = await admin.from("producto_fotos").select("id,producto_id,color_id,url,orden,creado,web")
         .eq("empresa_id", e).eq("origen", "manual").not("url", "ilike", "%mitiendanube.com%").is("web", null).order("creado").limit(400);   // web null = todavía no se revisó
       const porProd = new Map<string, any[]>(); (pend || []).forEach((f: any) => { if (!porProd.has(f.producto_id)) porProd.set(f.producto_id, []); porProd.get(f.producto_id)!.push(f); });
@@ -405,24 +495,26 @@ Deno.serve(async (req) => {
             if (web[pe]) continue;
             if (!x.dePercha && (f.creado < FOTOS_DESDE || !x.publicado)) continue;   // publicaciones viejas: solo lo nuevo, y no a las ocultas viejas
             if (f.color_id && !x.colores.has(f.color_id)) continue;                  // foto de un color que esa publicación no tiene
+            const ya = (await imagenesDe(pe)).get(archivoBase(f.url));
+            if (ya) { web[pe] = ya; cambio = true; subidas.push({ publicacion: pe, foto: f.id, ya_estaba: ya }); if (f.color_id && !simular) await fotoDelColor(pe, x.colores.get(f.color_id)!, ya); continue; }   // ya está: se anota, no se duplica
             if (simular) { subidas.push({ publicacion: pe, foto: f.id, color: !!f.color_id }); continue; }
             let img: any;
             try { img = await tn("POST", `/products/${pe}/images`, { src: f.url }); }
             catch (err) { subidas.push({ publicacion: pe, foto: f.id, error: String(err).slice(0, 150) }); if (String(err).includes(" 404")) web[pe] = "borrada"; cambio = true; continue; }
-            web[pe] = String(img.id); cambio = true; n++;
-            // por color: si esas opciones no tenían foto, esta pasa a ser su foto
-            if (f.color_id) {
-              try {
-                const vs = await tn("GET", `/products/${pe}/variants?fields=id,image_id`);
-                for (const v of (vs || []).filter((v: any) => x.colores.get(f.color_id)!.includes(String(v.id)) && !v.image_id)) await tn("PUT", `/products/${pe}/variants/${v.id}`, { image_id: img.id });
-              } catch (_) { /* la foto ya está; la asignación a la opción queda para hacer a mano */ }
-            }
+            web[pe] = String(img.id); cambio = true; n++; (await imagenesDe(pe)).set(archivoBase(f.url), String(img.id));
+            // por color: si esas opciones no tenían foto, esta pasa a ser su foto; y si estaban OCULTAS (color nuevo en una
+            // publicación que ya existía: se crea oculto hasta tener foto), ya tiene foto → se muestran (13/11, Diego)
+            if (f.color_id) await fotoDelColor(pe, x.colores.get(f.color_id)!, String(img.id));
             subidas.push({ publicacion: pe, foto: f.id, imagen: String(img.id) });
           }
-          if (!simular && (cambio || !f.web)) await admin.from("producto_fotos").update({ web }).eq("id", f.id);   // {} = revisada, no va a ninguna
+          // {} = revisada, no va a ninguna. La foto de un color que todavía no está en la web queda pendiente (va cuando el color llegue)
+          const colorEsperando = !!f.color_id && ![...pubs.values()].some((x) => x.colores.has(f.color_id));
+          if (!simular && (cambio || (!f.web && !colorEsperando))) await admin.from("producto_fotos").update({ web }).eq("id", f.id);
         }
       }
-      res.fotos_a_la_web = { subidas: subidas.filter((s) => s.imagen).length, errores: subidas.filter((s) => s.error).length, detalle: subidas.slice(0, 30) };
+      res.fotos_a_la_web = { subidas: subidas.filter((s) => s.imagen).length, ya_estaban: subidas.filter((s) => s.ya_estaba).length, errores: subidas.filter((s) => s.error).length, detalle: subidas.slice(0, 30) };
+    } finally {
+      if (candado) await admin.from("conexiones").update({ fotos_subiendo_hasta: null }).eq("id", cx.id);
     }
 
     // ================= 2) fotos y visibilidad: de la web a Percha =================
@@ -478,8 +570,9 @@ Deno.serve(async (req) => {
           const sola = (pubsDe.get(pid)?.size || 1) <= 1;
           const deseadas: { color_id: string | null; url: string; orden: number }[] = [];
           const dePercha = new Set((fotosDe.get(pid) || []).flatMap((f: any) => Object.values(f.web || {}).map(String)));   // las que subió Percha: ya están en Percha
+          const archivosPercha = new Set((fotosDe.get(pid) || []).filter((f: any) => f.origen === "manual").map((f: any) => archivoBase(f.url)).filter(Boolean));   // 13/11: una copia de una foto de Percha tampoco vuelve
           for (const im of (pr.images || []).sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0))) {
-            if (dePercha.has(String(im.id))) continue;
+            if (dePercha.has(String(im.id)) || archivosPercha.has(archivoBase(im.src))) continue;
             // de qué color es: el de las variantes que la usan; si la publicación es de un solo color, ese; si no, general
             const usan = new Set(lista.filter((x: any) => String((varPorExt.get(String(x.c.variante_ext)) as any)?.image_id) === String(im.id)).map((x: any) => x.v.color_id).filter(Boolean));
             const color = usan.size === 1 ? [...usan][0] as string : colores.size === 1 ? [...colores][0] as string : null;
