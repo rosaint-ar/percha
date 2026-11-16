@@ -30,7 +30,7 @@
 <body data-page="conexiones" data-etq="Conexiones" data-title="Cruce de productos" data-subtitle="Lo que hay en el local contra lo publicado en el canal">
 <main class="app">
   <div class="filtros">
-    <div class="pestanas" id="pestanas"><button class="on" data-f="todo">Todo</button><button data-f="a_decidir" id="tab-decidir" style="display:none">A decidir<b id="n-decidir"></b></button><button data-f="distinto">Stock distinto<b id="n-distinto"></b></button><button data-f="sin_cruzar">Sin cruzar<b id="n-sin"></b></button><button data-f="sin_publicar">En el local pero no en <span id="nopub-canal">el canal</span><b id="n-nopub"></b></button><button data-f="nuevos">Nuevos en <span id="nuevos-canal">el canal</span><b id="n-nuevos"></b></button></div>
+    <div class="pestanas" id="pestanas"><button class="on" data-f="todo">Todo</button><button data-f="a_decidir" id="tab-decidir" style="display:none">A decidir<b id="n-decidir"></b></button><button data-f="distinto">Stock distinto<b id="n-distinto"></b></button><button data-f="sin_cruzar">Sin cruzar<b id="n-sin"></b></button><button data-f="general" id="tab-general" style="display:none" title="Visibles en la web y atadas a un código general: Percha no les controla el stock">En código general<b id="n-general"></b></button><button data-f="sin_publicar">En el local pero no en <span id="nopub-canal">el canal</span><b id="n-nopub"></b></button><button data-f="nuevos">Nuevos en <span id="nuevos-canal">el canal</span><b id="n-nuevos"></b></button></div>
     <div class="buscador" style="min-width:240px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" placeholder="Buscar"></div>
     <span class="sub" id="resumen" style="margin-left:auto"></span>
   </div>
@@ -59,7 +59,12 @@ APP.ready.then(async () => {
     $('#n-distinto').textContent = fmt.num(x.stock_distinto || 0); $('#n-sin').textContent = fmt.num(x.sin_cruzar || 0); $('#n-nopub').textContent = fmt.num(x.percha_sin_publicar || 0); $('#n-nuevos').textContent = fmt.num(x.nuevos || 0);
     aDecidir = (await sb.rpc('canal_a_decidir', { c: cxId })).data || [];
     $('#n-decidir').textContent = fmt.num(aDecidir.length); $('#tab-decidir').style.display = aDecidir.length || filtro === 'a_decidir' ? '' : 'none';
+    // publicaciones visibles atadas a un código general (BOMBIS «VARIAS», packs de «VARIAS»): Percha no les controla el stock (16/11)
+    generales = (await sb.rpc('canal_variantes_generales', { e })).data || [];
+    const { count: nGen } = generales.length ? await sb.from('v_cruce_canal').select('variante_ext', { count: 'exact', head: true }).eq('conexion_id', cxId).eq('publicado', true).in('variante_id', generales) : { count: 0 };
+    $('#n-general').textContent = fmt.num(nGen || 0); $('#tab-general').style.display = nGen || filtro === 'general' ? '' : 'none';
   }
+  let generales = [];
   // Conexión nueva con stock distinto: Percha no manda nada a la web de esa prenda hasta que se elija cuál vale (sql/117)
   let aDecidir = [];
   const nomV = x => [x.talle, x.color].filter(Boolean).join(' · ') || 'único';
@@ -127,6 +132,7 @@ APP.ready.then(async () => {
     } else {
       let c = sb.from('v_cruce_canal').select('*').eq('conexion_id', cxId).order('nombre').order('valores').range(pagina * PAG, pagina * PAG + PAG - 1);
       if (filtro === 'distinto') c = c.eq('estado_stock', 'distinto'); if (filtro === 'sin_cruzar') c = c.is('variante_id', null);
+      if (filtro === 'general') c = c.eq('publicado', true).in('variante_id', generales.length ? generales : ['00000000-0000-0000-0000-000000000000']);
       if (q) c = c.or(`nombre.ilike.%${q}%,sku.ilike.%${q}%,valores.ilike.%${q}%`);
       ({ data } = await c); if (mio !== pedido) return;
       $('#tb thead').innerHTML = `<tr class="grupos"><th colspan="2">En el local</th><th colspan="4" class="canal ini fin">En ${esc(CANAL)}</th><th colspan="2"></th></tr>

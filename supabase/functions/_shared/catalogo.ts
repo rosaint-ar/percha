@@ -6,13 +6,21 @@
 import { clienteTN, es, norm, talleClave, primeraImagen } from "./tn.ts";
 import { fotosDesdeLaWeb } from "./fotos.ts";
 
-export async function sincronizarCatalogo(admin: any, cx: any, token: string): Promise<any> {
+// el nombre como conjunto de palabras (sin acentos, sin importar el orden; XXXL = 3XL): «LESS «ROUSE» REGULABLE ALGODÓN» es la
+// misma prenda que «LESS «ROUSE» ALGODÓN REGULABLE» (16/11: por el orden distinto, ROUSE quedó atada al código general y la
+// venta #84 del local no bajó la web)
+const VACIAS = new Set(["de", "la", "el", "y", "con", "c"]);
+export const nombreClave = (s: unknown) => [...new Set(String(s ?? "").split(/[^\p{L}\p{N}]+/u).map(norm).filter((w) => w && !VACIAS.has(w)))].sort().join(" ");
+
+export async function sincronizarCatalogo(admin: any, cx: any, token: string, op: { simular?: boolean } = {}): Promise<any> {
   // ---- catálogo de Percha para cruzar ----
   const e = cx.empresa_id;
   const pag = async (tabla: string, sel: string, filtro: (q: any) => any) => { let desde = 0, todo: any[] = []; while (true) { const { data, error } = await filtro(admin.from(tabla).select(sel)).range(desde, desde + 999); if (error) throw error; todo = todo.concat(data || []); if (!data || data.length < 1000) break; desde += 1000; } return todo; };
   const productos = await pag("productos", "id,codigo,nombre,tiene_variantes,es_generico,activo", (q: any) => q.eq("empresa_id", e));
   // los modelos por nombre: para no cruzar con un código general (BOMBIS «VARIAS», MEDIAS VARIAS) lo que ya existe como modelo
-  const porNombre = new Map(productos.filter((p: any) => !p.es_generico && p.activo).map((p: any) => [norm(p.nombre), p]));
+  const porNombre = new Map<string, any>();   // si dos prendas tienen las mismas palabras, ninguna (no se adivina)
+  for (const p of productos.filter((p: any) => !p.es_generico && p.activo)) { const k = nombreClave(p.nombre); porNombre.set(k, porNombre.has(k) ? null : p); }
+  const porNombreDe = (nombre: string) => porNombre.get(nombreClave(nombre)) || (colorDelNombre(nombre) ? porNombre.get(nombreClave(nombre.slice(0, nombre.lastIndexOf(colorDelNombre(nombre))))) : null) || null;
   const variantes = await pag("variantes", "id,producto_id,sku,ean,talle_id,color_id", (q: any) => q.eq("empresa_id", e).eq("activa", true));
   const atributos = await pag("atributos", "id,tipo,codigo,nombre", (q: any) => q.eq("empresa_id", e));
   const porCodigo = new Map(productos.map((p: any) => [norm(p.codigo), p]));
@@ -62,7 +70,8 @@ export async function sincronizarCatalogo(admin: any, cx: any, token: string): P
         let prodV = porCodigo.get(codigoV) || prodPercha;
         // el SKU es el de un código general (Emi carga muchos modelos con el mismo código): si el modelo existe en Percha
         // con el mismo nombre, se cruza con el modelo; si no, queda en el código general (y al venderse pide elegir el modelo)
-        if (prodV && prodV.es_generico) prodV = porNombre.get(norm(es(p.name))) || prodV;
+        if (prodV && prodV.es_generico) prodV = porNombreDe(es(p.name)) || prodV;
+        if (!prodV) prodV = porNombreDe(es(p.name));   // código que Percha no conoce: por el nombre
         if (prodV && esCombo(es(p.name)) !== esCombo(nombresProd.get(prodV.id) || "")) prodV = null;
         if (v.barcode && porEan.has(norm(v.barcode))) { variante_id = porEan.get(norm(v.barcode)).id; cruce = "barcode"; }
         else if (prodV) {
@@ -94,6 +103,18 @@ export async function sincronizarCatalogo(admin: any, cx: any, token: string): P
   const manuales = await pag("canal_items", "variante_ext,variante_id", (q: any) => q.eq("conexion_id", cx.id).eq("cruce", "manual"));   // de a 1000 (eran más de 1000)
   const man = new Map((manuales || []).map((m: any) => [m.variante_ext, m.variante_id]));
   items.forEach((it) => { if (man.has(it.variante_ext)) { it.variante_id = man.get(it.variante_ext); it.cruce = "manual"; } });
+  // simular: qué conexiones cambiarían, sin escribir nada
+  if (op.simular) {
+    const hoy = await pag("canal_items", "variante_ext,variante_id,publicado,stock", (q: any) => q.eq("conexion_id", cx.id));
+    const antesDe = new Map(hoy.map((h: any) => [String(h.variante_ext), h.variante_id]));
+    const nomVar = new Map<string, string>(); const vIds = new Set<string>();
+    items.forEach((it) => { const a = antesDe.get(String(it.variante_ext)); if ((a || null) !== (it.variante_id || null)) { if (a) vIds.add(a); if (it.variante_id) vIds.add(it.variante_id); } });
+    const ids = [...vIds];
+    for (let i = 0; i < ids.length; i += 200) { const { data } = await admin.from("v_variantes").select("id,producto_nombre,color_nombre,talle_nombre,stock").in("id", ids.slice(i, i + 200)); (data || []).forEach((v: any) => nomVar.set(v.id, [v.producto_nombre, v.color_nombre, v.talle_nombre].filter(Boolean).join(" ") + " (Percha " + (+v.stock || 0) + ")")); }
+    const cambios = items.filter((it) => (antesDe.get(String(it.variante_ext)) || null) !== (it.variante_id || null))
+      .map((it) => ({ web: it.nombre + " [" + it.valores + "]" + (it.publicado ? "" : " (oculta)") + " web " + (it.stock ?? "-"), antes: nomVar.get(antesDe.get(String(it.variante_ext))) || "sin conectar", despues: nomVar.get(it.variante_id) || "sin conectar" }));
+    return { ok: true, simular: true, productos: totalCanal, variantes: items.length, cambios };
+  }
   // las que estaban ocultas y ahora se ven: que reciban el stock de Percha (antes se perdía si esta lectura llegaba primero)
   const antes = await pag("canal_items", "variante_ext,publicado", (q: any) => q.eq("conexion_id", cx.id).eq("publicado", false));
   const ocultasAntes = new Set(antes.map((a: any) => String(a.variante_ext)));
@@ -135,6 +156,11 @@ export async function sincronizarCatalogo(admin: any, cx: any, token: string): P
     }
   } catch (_) { /* las categorías no frenan la sincronización */ }
   for (const it of aMostrar) await admin.rpc("encolar_canal", { e, v: it.variante_id });
+  // lo que está en una publicación visible SÍ está en la web: «En la web: Sí» (16/11: ROUSE y 61 más estaban «solo local»
+  // estando en la web; así un color nuevo de esa prenda no iba a la web)
+  { const prodDeV = new Map(variantes.map((v: any) => [v.id, v.producto_id])); const genericos = new Set(productos.filter((p: any) => p.es_generico).map((p: any) => p.id));
+    const enWeb = [...new Set(items.filter((it) => it.publicado && it.variante_id).map((it) => prodDeV.get(it.variante_id)).filter((pid: any) => pid && !genericos.has(pid)))];
+    for (let i = 0; i < enWeb.length; i += 200) await admin.from("productos").update({ publicar_web: true }).in("id", enWeb.slice(i, i + 200)).eq("publicar_web", false); }
   // ---- fotos: la web manda (todas las publicaciones: también limpia lo que ya no corresponde) ----
   let fotos: any = null;
   try { fotos = await fotosDesdeLaWeb(admin, cx, crudos, { completo: true, visibilidad: false }); await admin.from("conexiones").update({ ultima_sync_fotos: new Date().toISOString() }).eq("id", cx.id); }
