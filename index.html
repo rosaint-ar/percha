@@ -233,10 +233,10 @@ APP.ready.then(async () => {
   // la web: publicaciones visibles sin conectar a Percha y conexiones nuevas con stock distinto (sql/117)
   if (APP.esAdmin) {
     const { data: cav } = await sb.rpc('canal_avisos', { e: APP.empresa.id }); const w = cav || {};
-    if (+w.a_decidir) items.push([`conexiones/cruce.html?c=${w.conexion}&f=a_decidir`, '⚖️', 'aviso', 'Stock a decidir con la web', 'Se conectaron con stock distinto: elegí cuál vale', fmt.num(w.a_decidir)]);
-    if (+w.en_codigo_general) items.push([`conexiones/cruce.html?c=${w.conexion}&f=general`, '🧩', 'aviso', 'En la web, atadas a un código general', 'Percha no les controla el stock: conectalas a su prenda', fmt.num(w.en_codigo_general)]);
-    if (+w.stock_sin_web) items.push([`conexiones/cruce.html?c=${w.conexion}&f=sin_publicar`, '🛍️', 'aviso', 'Con stock en el local y no en la web', 'Talles o colores de prendas de la web que no tienen publicación', fmt.num(w.stock_sin_web)]);
-    if (+w.web_no_marcada) items.push([`conexiones/cruce.html?c=${w.conexion}`, '🏷️', 'aviso', 'En la web pero marcadas «solo local»', 'Revisá «En la web» en la ficha', fmt.num(w.web_no_marcada)]);
+    if (+w.a_decidir) items.push([`conexiones/revision.html?c=${w.conexion}&f=decidir`, '⚖️', 'aviso', 'Stock a decidir con la web', 'Se conectaron con stock distinto: elegí cuál vale', fmt.num(w.a_decidir)]);
+    if (+w.en_codigo_general) items.push([`conexiones/revision.html?c=${w.conexion}&f=general`, '🧩', 'aviso', 'En la web, atadas a un código general', 'Percha no les controla el stock: conectalas a su prenda', fmt.num(w.en_codigo_general)]);
+    if (+w.stock_sin_web) items.push([`conexiones/revision.html?c=${w.conexion}&f=sin_web`, '🛍️', 'aviso', 'Con stock en el local y no en la web', 'Talles o colores de prendas de la web que no tienen publicación', fmt.num(w.stock_sin_web)]);
+    if (+w.web_no_marcada) items.push([`conexiones/revision.html?c=${w.conexion}&f=flag`, '🏷️', 'aviso', 'En la web pero marcadas «solo local»', 'Revisá «En la web» en la ficha', fmt.num(w.web_no_marcada)]);
     if (+w.sin_conectar) items.push([`conexiones/cruce.html?c=${w.conexion}&f=sin_cruzar`, '🔌', 'aviso', 'Publicaciones de la web sin conectar', +w.sin_conectar_con_stock ? `${fmt.num(w.sin_conectar_con_stock)} con stock: Percha no las controla` : 'Visibles en la web y sin su prenda en Percha', fmt.num(w.sin_conectar)]);
   }
   items.push(['catalogo/inventario.html', '👚', '', 'Prendas en el local', puede('costos') ? `Valen ${fmt.pesos(r.valor_costo)} a costo` : 'Unidades en stock', fmt.num(r.unidades)]);

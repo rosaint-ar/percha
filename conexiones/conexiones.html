@@ -78,7 +78,7 @@ APP.ready.then(async () => {
       ${cx.ultimo_error ? `<p class="sub" style="color:var(--error)">${esc(cx.ultimo_error)}</p>` : ''}
       <div class="datos"><div class="dato"><b>${fmt.num(res.items || 0)}</b><span>prendas publicadas</span></div><div class="dato ${res.sin_cruzar ? 'mal' : 'bien'}"><b>${fmt.num(res.sin_cruzar || 0)}</b><span>sin cruzar con el local</span></div><div class="dato ${res.stock_distinto ? 'mal' : 'bien'}"><b>${fmt.num(res.stock_distinto || 0)}</b><span>con stock distinto</span></div></div>
       <div class="fila-sw" style="align-items:flex-start"><label class="switch" style="margin-top:2px"><input type="checkbox" id="chk-empujar" ${cx.empujar_stock ? 'checked' : ''}><span></span></label><span><b>Stock compartido con la web</b><br><small class="sub">Cada venta, compra o ajuste del local actualiza Tienda Nube al momento. Los pedidos de la web entran solos como ventas.</small></span></div>
-      <div class="acciones" style="margin-top:12px"><a class="btn primario" href="cruce.html?c=${cx.id}">Ver cruce de productos</a><button class="btn" id="btn-pedidos">Pedidos recientes</button></div>
+      <div class="acciones" style="margin-top:12px"><a class="btn primario" href="revision.html?c=${cx.id}">Revisión de la web</a><a class="btn" href="cruce.html?c=${cx.id}">Ver cruce de productos</a><button class="btn" id="btn-pedidos">Pedidos recientes</button></div>
       <div id="tn-config"></div>
       <details class="avanzado"><summary>Opciones avanzadas</summary>
         <p class="sub" style="margin:6px 0 10px">Se usan pocas veces. Las que tienen ⚠ cambian muchos datos de una sola vez: usalas solo si sabés para qué.</p>

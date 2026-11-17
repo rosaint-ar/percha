@@ -127,6 +127,20 @@ Deno.serve(async (req) => {
     if (!cx.empujar_stock && !simular) continue;   // la web todavía no la maneja Percha
     const cfg = configDe(cx);
     const { tn } = clienteTN(cx.externo_id, sec.access_token);
+    // 17/11 · Revisión de la web: mostrar (o volver a ocultar) una publicación desde Percha. Al mostrarla, sus opciones
+    // conectadas reciben enseguida el stock de Percha (mientras estaba oculta, tn-push no le mandaba nada).
+    if (body.mostrar || body.ocultar) {
+      const pe = String(body.mostrar || body.ocultar), ver = !!body.mostrar;
+      const { data: its } = await admin.from("canal_items").select("id,variante_id").eq("conexion_id", cx.id).eq("producto_ext", pe);
+      if (!its || !its.length) { resumen.push({ conexion: cx.id, error: "Esa publicación no es de esta tienda" }); continue; }
+      if (!simular) {
+        await tn("PUT", `/products/${pe}`, { published: ver });
+        await admin.from("canal_items").update({ publicado: ver, actualizado: new Date().toISOString() }).eq("conexion_id", cx.id).eq("producto_ext", pe);
+        if (ver) for (const v of new Set(its.map((x: any) => x.variante_id).filter(Boolean))) await admin.rpc("encolar_canal", { e: cx.empresa_id, v });
+      }
+      resumen.push({ conexion: cx.id, publicacion: pe, visible: ver, opciones: its.length });
+      continue;
+    }
     const MEDIDAS = cfg.medidas ? { weight: (+cfg.medidas.peso || 0).toFixed(3), width: (+cfg.medidas.ancho || 0).toFixed(2), height: (+cfg.medidas.alto || 0).toFixed(2), depth: (+cfg.medidas.profundidad || 0).toFixed(2) } : {};
     const ESPERA_MIN = Math.max(1, +cfg.espera_min || 10), DIAS_NUEVOS = Math.max(0, +cfg.nuevos_ingresos_dias || 0);
     const e = cx.empresa_id, res: any = { conexion: cx.id, publicados: [], fotos: null };

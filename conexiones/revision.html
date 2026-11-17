@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Revisión de la web · Percha</title>
+<meta name="app-root" content="../">
+<link rel="stylesheet" href="../shell/shell.css?v=202611122356">
+<style>
+  .rv-tops{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin-bottom:12px}
+  .rv-cat{border:1px solid var(--linea);background:var(--superficie-2);border-radius:12px;padding:9px 12px;text-align:left;cursor:pointer;font:500 12.5px var(--f-ui);color:var(--tinta-2);display:flex;gap:8px;align-items:flex-start;transition:border-color .12s,background .12s}
+  .rv-cat b{font:800 19px var(--f-mono);color:var(--tinta);min-width:28px}
+  .rv-cat.alta b{color:var(--error)}.rv-cat.media b{color:var(--aviso)}.rv-cat.baja b{color:var(--tinta-2)}
+  .rv-cat.on{border-color:var(--acento);background:var(--lila-suave)}
+  .rv-cat.cero{opacity:.45}
+  .rv-barra{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+  .rv-item{background:var(--superficie-2);border:1px solid var(--linea);border-radius:14px;padding:12px 14px;margin-bottom:10px}
+  .rv-item.ok{opacity:.55}
+  .rv-cab{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+  .rv-cab h3{margin:0;font-size:15px;line-height:1.3}
+  .rv-cab h3 a{color:var(--tinta);text-decoration:none;border-bottom:1px dashed var(--tinta-3);cursor:pointer}
+  .rv-que{font-size:13px;color:var(--tinta-2);margin:3px 0 0}
+  .rv-filas{margin-top:10px;display:grid;gap:6px}
+  .rv-fila{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr) auto;gap:10px;align-items:center;border:1px solid var(--linea);border-radius:10px;padding:7px 10px;font-size:13px}
+  .rv-fila .web{background:rgba(var(--acento-rgb),.06);border-radius:8px;padding:5px 8px}
+  .rv-fila small{color:var(--tinta-3);font-family:var(--f-mono);font-size:11.5px}
+  .rv-fila .n{font:700 13px var(--f-mono)}
+  .rv-acc{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}
+  .rv-acc-item{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+  @media (max-width:760px){.rv-fila{grid-template-columns:1fr}.rv-acc{justify-content:flex-start}}
+  .rv-vars{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px;table-layout:fixed}
+  .rv-vars td{overflow-wrap:anywhere}
+  .modal.rv-ancha{width:min(900px,96vw);max-width:min(900px,96vw)}
+  .rv-vars td,.rv-vars th{padding:5px 6px;border-bottom:1px solid var(--linea);text-align:left}
+  .rv-vars select{font-size:12.5px;padding:3px 4px;width:100%}
+  .rv-cargando{padding:40px;text-align:center;color:var(--tinta-3)}
+</style>
+</head>
+<body data-page="conexiones" data-etq="Conexiones" data-title="Revisión de la web" data-subtitle="Lo que no cuadra entre Percha y la web, para arreglarlo acá mismo">
+<main class="app">
+  <div class="rv-tops" id="cats"></div>
+  <div class="rv-barra">
+    <div class="buscador" style="min-width:260px;flex:1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" placeholder="Buscar prenda, código, SKU o número de publicación"></div>
+    <label style="display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" id="ver-ok"> Mostrar lo marcado «está bien así»</label>
+    <span class="sub" id="resumen"></span>
+  </div>
+  <div id="lista"><div class="rv-cargando">Revisando Percha y la web…</div></div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../shared/supabase.js?v=202611122356"></script>
+<script src="../shell/shell.js?v=202611122356"></script>
+<script src="../shared/cruce.js?v=202611172100"></script>
+<script src="../shared/prenda.js?v=202611122356"></script>
+<script>
+APP.ready.then(async () => {
+  const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
+  if (!APP.esAdmin) { $('main').innerHTML = '<div class="card"><p>Solo administración puede revisar y corregir la conexión con la web.</p></div>'; return; }
+  const params = new URLSearchParams(location.search); let cxId = params.get('c');
+  if (!cxId) { const { data } = await sb.from('conexiones').select('id').eq('empresa_id', e).eq('estado', 'activa').limit(1).maybeSingle(); cxId = data && data.id; }
+  if (!cxId) { $('main').innerHTML = '<div class="card"><p>No hay ningún canal conectado. <a href="conexiones.html">Conectar</a></p></div>'; return; }
+  $('#acciones-pagina').innerHTML = `<a class="btn" href="cruce.html?c=${cxId}">← Cruce de productos</a> <button class="btn" id="btn-vivo" title="Lee la web ahora y compara el stock con Percha (no cambia nada)">Comparar stock con la web ahora</button> <button class="btn" id="btn-act">Actualizar</button>`;
+
+  // ---------------- datos ----------------
+  const todo = async (q) => { let t = []; for (let d = 0; ; d += 1000) { const { data, error } = await q().range(d, d + 999); if (error) throw error; t = t.concat(data || []); if (!data || data.length < 1000) break; } return t; };
+  let P = [], V = [], W = [], OK = new Map(), ATR = [], vivo = null;
+  async function cargarDatos() {
+    [P, V, W, OK, ATR] = await Promise.all([
+      todo(() => sb.from('productos').select('id,codigo,nombre,tipo,activo,es_generico,publicar_web,precio').eq('empresa_id', e).order('codigo')),
+      todo(() => sb.from('v_variantes').select('id,producto_id,sku,ean,activa,talle,talle_nombre,talle_orden,color,color_nombre,stock,stock_web,fallas,precio').eq('empresa_id', e).order('producto_codigo')),
+      todo(() => sb.from('canal_items').select('id,producto_ext,variante_ext,nombre,valores,sku,mpn,precio,precio_promo,stock,publicado,variante_id,cruce,talle_canal,color_canal,stock_a_decidir').eq('conexion_id', cxId).order('producto_ext')),
+      todo(() => sb.from('canal_revision_ok').select('clave,nota').eq('empresa_id', e)).then(r => new Map(r.map(x => [x.clave, x.nota]))),
+      todo(() => sb.from('atributos').select('id,tipo,codigo,nombre,orden,activo').eq('empresa_id', e).in('tipo', ['talle', 'color']).order('orden'))]);
+    CRUCE.olvidar();
+  }
+
+  // ---------------- la revisión (misma lógica que la auditoría del 17/11) ----------------
+  const norm = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const ESP = { blanca: 'blanco', negra: 'negro', roja: 'rojo', leopard: 'leopardo', zebra: 'cebra', estampada: 'estampado', print: 'animal print', rabit: 'rabbit' };
+  const colN = c => { let s = norm(c); for (let i = 0; i < 3; i++) s = s.replace(/^(algodon|camisero|morley|modal|microfibra|flores|lycra|puntilla|encaje)\s+/, ''); s = s.replace(/\s+lovers$/, ''); return ESP[s] || s; };
+  const tN = t => norm(String(t || '').replace(/\(.*\)/, '')).replace(/\b(talle|t)\b/g, '').replace(/\s/g, '').replace(/^xxxl$/, '3xl').replace(/^xxl$/, '2xl');
+  const tPar = t => norm((String(t || '').match(/\(([^)]+)\)/) || [])[1] || '');
+  const talleIgual = (a, b) => tN(a) === tN(b) || (tPar(a) && tPar(a) === norm(b)) || (tPar(b) && tPar(b) === norm(a)) || /^unic/.test(tN(a)) && /^unic/.test(tN(b));
+  const VACIAS = new Set('de del la el y con c s less conjunto set pack x2 x3 x5 x7 bombacha corpino body pijama camison camisolin vedetina culotteless colaless medias media'.split(' '));
+  const palabras = s => new Set(norm(s).split(' ').filter(w => w && !VACIAS.has(w) && !/^\d+$/.test(w)));
+  const sw = v => Math.max(0, Math.floor(+v.stock_web || 0));
+  const nomV = v => [v.talle_nombre, v.color_nombre].filter(Boolean).join(' · ') || 'sin talle ni color';
+
+  const CATS = [
+    ['vivo', 'alta', 'Stock distinto ahora', 'Comparación en vivo con la web'],
+    ['decidir', 'alta', 'Stock a decidir', 'Se conectó con stock distinto: elegí cuál vale'],
+    ['color', 'alta', 'Conectada a otro color', 'La web dice un color y Percha tiene ese color, pero está conectada a otro'],
+    ['dos_pub', 'alta', 'En dos publicaciones', 'Un talle·color de Percha en publicaciones distintas (¿son colores distintos?)'],
+    ['general', 'alta', 'Atadas a un código general', 'La venta descuenta de «VARIAS» y no del modelo'],
+    ['sin_web', 'alta', 'Stock sin publicación', 'Hay stock en el local y en la web no se puede comprar'],
+    ['oculta', 'alta', 'Stock en publicación oculta', 'Está en la web pero la publicación está oculta'],
+    ['web_sin', 'alta', 'Stock en la web sin conectar', 'La web tiene stock y Percha no lo controla'],
+    ['detalle', 'media', 'La web separa colores', 'Varias opciones de la web en un solo talle·color de Percha'],
+    ['prenda', 'media', 'Prenda distinta', 'El nombre de la publicación no se parece al de la prenda'],
+    ['talle', 'media', 'Talle distinto', 'El talle de la web no es el de Percha'],
+    ['sin_color', 'media', 'Talles «sin color» repetidos', 'La prenda tiene talles sin color y los mismos con color'],
+    ['sin_talle', 'media', 'Sin talle en prenda con talles', 'Un talle·color sin talle en una prenda que tiene talles'],
+    ['apagada_conectada', 'media', 'Conectada a algo apagado', 'Opción con stock o visible conectada a un talle·color apagado'],
+    ['prenda_apagada', 'media', 'Prenda apagada con stock o visible', 'Está apagada en Percha pero tiene stock o se ve en la web'],
+    ['oferta', 'baja', 'Oferta igual o mayor al precio', 'La web muestra un descuento que no existe'],
+    ['flag', 'baja', '«En la web» mal marcado', 'Códigos generales marcados para la web, o prendas visibles marcadas solo local'],
+    ['sku', 'baja', 'SKU repetido', 'Dos talles·colores con el mismo SKU'],
+  ];
+  let hall = [];
+  function revisar() {
+    const prod = new Map(P.map(p => [p.id, p])), vari = new Map(V.map(v => [v.id, v]));
+    const varsDe = new Map(); V.forEach(v => { if (!varsDe.has(v.producto_id)) varsDe.set(v.producto_id, []); varsDe.get(v.producto_id).push(v); });
+    const wPorVar = new Map(); W.forEach(w => { if (!w.variante_id) return; if (!wPorVar.has(w.variante_id)) wPorVar.set(w.variante_id, []); wPorVar.get(w.variante_id).push(w); });
+    const pubs = new Map(); W.forEach(w => { if (!pubs.has(w.producto_ext)) pubs.set(w.producto_ext, []); pubs.get(w.producto_ext).push(w); });
+    const gen = p => p && p.es_generico;
+    const vistosPrenda = new Set();
+    const H = []; const add = (tipo, clave, x) => H.push({ tipo, clave: tipo + ':' + clave, ...x });
+    // en vivo
+    if (vivo) vivo.forEach((d, i) => add('vivo', i, { titulo: `${d.producto} · ${[d.talle, d.color].filter(Boolean).join(' · ')}`, que: `La web tiene ${d.web}, Percha manda ${d.mandaria}${d.reservado ? ` (−${d.reservado} de pedidos sin cargar)` : ''}. Se corrige solo en el próximo envío; si no, revisá la conexión.`, filas: [] }));
+    for (const w of W) {
+      const v = w.variante_id && vari.get(w.variante_id), p = v && prod.get(v.producto_id);
+      if (w.stock_a_decidir) add('decidir', w.id, { producto: p, titulo: p ? p.nombre : w.nombre, que: `La web tiene ${fmt.num(w.stock)} y Percha ${fmt.num(v ? sw(v) : 0)}. Hasta que elijas, no se manda stock.`, filas: [w], decidir: v });
+      if (!w.variante_id) { if (+w.stock > 0) add('web_sin', w.id, { titulo: w.nombre, que: `La web tiene ${fmt.num(w.stock)} en «${w.valores || 'única'}» y no está conectada a nada.`, filas: [w] }); continue; }
+      if (!v || !p) continue;
+      if (gen(p)) { add('general', w.id, { producto: p, titulo: w.nombre, que: `Atada a ${p.codigo} ${p.nombre}. Conectala a su prenda.`, filas: [w] }); continue; }
+      // color
+      const enNombre = c => { const t = new Set(norm(w.nombre).split(' ')), pr = new Set(norm(p.nombre).split(' ')); const ws = norm(c).split(' '); return ws.every(x => t.has(x)) && !ws.every(x => pr.has(x)); };   // «MARTHA SOFT AQUA II» ya dice «Aqua II»
+      if (w.color_canal && v.color_nombre && colN(w.color_canal) !== colN(v.color_nombre) && !enNombre(v.color_nombre)) {
+        const cand = (varsDe.get(v.producto_id) || []).filter(x => x.id !== v.id && x.color_nombre && colN(x.color_nombre) === colN(w.color_canal) && (!v.talle_nombre || norm(x.talle_nombre) === norm(v.talle_nombre)));
+        if (cand.length) add('color', w.id, { producto: p, titulo: p.nombre, que: `En la web es «${w.color_canal}» y está conectada a «${v.color_nombre}».`, filas: [w], sugerida: cand[0] });
+      }
+      // talle
+      if (w.talle_canal && v.talle_nombre && !talleIgual(w.talle_canal, v.talle_nombre)) add('talle', w.id, { producto: p, titulo: p.nombre, que: `En la web «${w.talle_canal}», en Percha «${v.talle_nombre}».`, filas: [w] });
+      // prenda distinta
+      if (p.tipo !== 'kit' && !vistosPrenda.has(w.producto_ext + p.id)) { vistosPrenda.add(w.producto_ext + p.id); const a = palabras(w.nombre), b = palabras(p.nombre); const c = [...a].filter(x => b.has(x)).length; if (c / Math.max(1, Math.min(a.size, b.size)) < 0.5) add('prenda', w.producto_ext + ':' + p.id, { producto: p, titulo: w.nombre, que: `Conectada a ${p.codigo} ${p.nombre}.`, filas: pubs.get(w.producto_ext).filter(x => x.variante_id && vari.get(x.variante_id) && vari.get(x.variante_id).producto_id === p.id) }); }
+      if (!v.activa && (w.publicado || +w.stock > 0)) add('apagada_conectada', w.id, { producto: p, titulo: p.nombre, que: `«${nomV(v)}» está apagado en Percha y la opción ${w.publicado ? 'se ve en la web' : 'tiene stock en la web'}.`, filas: [w], reactivar: v });
+      if (w.precio_promo != null && +w.precio_promo >= +w.precio && +w.precio > 0) add('oferta', w.id, { producto: p, titulo: w.nombre, que: `Precio ${fmt.pesos(w.precio)} y oferta ${fmt.pesos(w.precio_promo)}${w.publicado ? '' : ' (oculta)'}. Percha no la toca: corregila en Tienda Nube o avisame para que la ponga Percha.`, filas: [w] });
+    }
+    for (const [vid, ws] of wPorVar) {
+      const v = vari.get(vid), p = v && prod.get(v.producto_id); if (!v || !p || gen(p) || p.tipo === 'kit' || ws.length < 2) continue;
+      const pe = new Set(ws.map(w => w.producto_ext));
+      if (pe.size > 1) add('dos_pub', vid, { producto: p, titulo: `${p.nombre} · ${nomV(v)}`, que: `Está en ${pe.size} publicaciones. Si son colores distintos, separalos; si una es vieja, desconectala.`, filas: ws });
+      else if (ws.some(w => w.stock != null)) add('detalle', vid, { producto: p, titulo: `${p.nombre} · ${nomV(v)}`, que: `La web lo vende como ${ws.length} opciones (${ws.map(w => w.color_canal || w.valores).filter(Boolean).slice(0, 6).join(', ')}${ws.length > 6 ? '…' : ''}) y en Percha es uno solo con ${fmt.num(v.stock)}.`, filas: ws, separar: true });
+    }
+    for (const p of P) {
+      if (p.es_generico) { if (p.publicar_web) add('flag', 'g' + p.id, { producto: p, titulo: `${p.codigo} ${p.nombre}`, que: 'Es un código general y está marcado «En la web: Sí».', filas: [], soloLocal: true }); continue; }
+      const vs = varsDe.get(p.id) || [], act = vs.filter(v => v.activa), ws = vs.flatMap(v => wPorVar.get(v.id) || []);
+      const sinColor = act.filter(v => !v.color), conColor = vs.filter(v => v.color && (v.activa || +v.stock));
+      if (sinColor.length && conColor.length) add('sin_color', p.id, { producto: p, titulo: p.nombre, que: `${sinColor.length} talle(s) sin color y ${conColor.length} con color. Pasá las conexiones al color correcto y apagá los repetidos en 0.`, filas: sinColor.flatMap(v => wPorVar.get(v.id) || []), variantes: [...sinColor, ...conColor] });
+      const conT = act.filter(v => v.talle), sinT = act.filter(v => !v.talle);
+      if (conT.length && sinT.length) add('sin_talle', p.id, { producto: p, titulo: p.nombre, que: `${sinT.map(nomV).join(', ')}: sin talle, en una prenda con talles.`, filas: sinT.flatMap(v => wPorVar.get(v.id) || []), variantes: sinT });
+      const stock = vs.reduce((a, v) => a + Math.max(0, +v.stock || 0), 0), vis = ws.filter(w => w.publicado);
+      if (!p.activo && (stock > 0 || vis.length)) add('prenda_apagada', p.id, { producto: p, titulo: p.nombre, que: `Apagada en Percha${stock ? ` con ${fmt.num(stock)} en stock` : ''}${vis.length ? ' y visible en la web' : ''}.`, filas: ws.filter(w => w.publicado || +w.stock > 0), activar: true });
+      if (!p.publicar_web && vis.length && p.activo) add('flag', 's' + p.id, { producto: p, titulo: p.nombre, que: 'Se ve en la web pero está marcada «solo local».', filas: [], enWeb: true });
+      if (p.activo && p.publicar_web && ['prenda', 'varios'].includes(p.tipo)) for (const v of act) {
+        if (/-SD$/i.test(v.sku || '') || sw(v) <= 0) continue; const vw = wPorVar.get(v.id) || [];
+        if (!vw.length) add('sin_web', v.id, { producto: p, titulo: `${p.nombre} · ${nomV(v)}`, que: `${fmt.num(sw(v))} para la web y no está en ninguna publicación.`, filas: [], variante: v, subir: true });
+        else if (!vw.some(w => w.publicado)) add('oculta', v.id, { producto: p, titulo: `${p.nombre} · ${nomV(v)}`, que: `${fmt.num(sw(v))} para la web, pero sus publicaciones están ocultas.`, filas: vw });
+      }
+    }
+    const skus = new Map(); V.forEach(v => { if (!v.sku) return; const k = norm(v.sku); skus.set(k, [...(skus.get(k) || []), v]); });
+    for (const [k, vs] of skus) if (vs.length > 1) { const p = prod.get(vs[0].producto_id); add('sku', k, { producto: p, titulo: `SKU ${vs[0].sku}`, que: vs.map(v => `${prod.get(v.producto_id)?.codigo} ${nomV(v)}${v.activa ? '' : ' (apagado)'}`).join(' · '), filas: [] }); }
+    hall = H;
+  }
+
+  // ---------------- pantalla ----------------
+  let cat = params.get('f') || null;
+  const prodDe = id => P.find(p => p.id === id), varDe = id => V.find(v => v.id === id);
+  function pintar() {
+    const verOk = $('#ver-ok').checked, q = norm($('#q').value);
+    const visibles = hall.filter(h => verOk || !OK.has(h.clave));
+    const cuenta = {}; visibles.forEach(h => cuenta[h.tipo] = (cuenta[h.tipo] || 0) + 1);
+    $('#cats').innerHTML = CATS.filter(([k]) => k !== 'vivo' || vivo).map(([k, g, t, d]) => `<button class="rv-cat ${g}${cat === k ? ' on' : ''}${cuenta[k] ? '' : ' cero'}" data-cat="${k}" title="${esc(d)}"><b>${fmt.num(cuenta[k] || 0)}</b><span>${esc(t)}</span></button>`).join('');
+    $$('[data-cat]').forEach(b => b.onclick = () => { cat = cat === b.dataset.cat ? null : b.dataset.cat; pintar(); });
+    let lista = visibles.filter(h => !cat || h.tipo === cat);
+    if (q) lista = lista.filter(h => norm(`${h.titulo} ${h.que} ${h.producto ? h.producto.codigo + ' ' + h.producto.nombre : ''} ${(h.filas || []).map(w => `${w.producto_ext} ${w.nombre} ${w.valores} ${w.sku}`).join(' ')} ${h.variante ? h.variante.sku : ''}`).includes(q));
+    const orden = Object.fromEntries(CATS.map(([k], i) => [k, i])); lista.sort((a, b) => orden[a.tipo] - orden[b.tipo]);
+    $('#resumen').textContent = `${fmt.num(lista.length)} para revisar${cat ? '' : ` · ${fmt.num(hall.length - visibles.length)} marcadas bien`}`;
+    const MAX = 200;
+    $('#lista').innerHTML = lista.slice(0, MAX).map((h, i) => tarjeta(h, i)).join('') + (lista.length > MAX ? `<p class="sub" style="text-align:center">Se muestran ${MAX} de ${fmt.num(lista.length)}. Elegí un grupo arriba o buscá para ver el resto.</p>` : '') || '<div class="card"><p class="vacio">Nada para revisar acá. 🎉</p></div>';
+    enganchar(lista.slice(0, MAX));
+  }
+  const etiq = Object.fromEntries(CATS.map(([k, g, t]) => [k, [g, t]]));
+  function filaWeb(w, h) {
+    const v = w.variante_id && varDe(w.variante_id), p = v && prodDe(v.producto_id);
+    const local = v ? `<b>${esc(p ? p.codigo : '')}</b> ${esc(nomV(v))}${v.activa ? '' : ' <span class="chip gris">apagado</span>'}<br><small>${esc(v.sku || '')} · stock <span class="n">${fmt.num(v.stock)}</span>${+v.fallas ? ` (${fmt.num(v.fallas)} con falla)` : ''}</small>` : '<span class="chip error">sin conectar</span>';
+    const separable = w.variante_id && v && (h.separar || h.tipo === 'dos_pub' || h.tipo === 'sin_color') ;
+    return `<div class="rv-fila"><div>${local}</div>
+      <div class="web">${esc(w.nombre)}${w.publicado ? '' : ' <span class="chip gris">oculta</span>'}<br><small>#${esc(w.producto_ext)} · «${esc(w.valores || 'única')}» · web <span class="n">${w.stock == null ? 'sin límite' : fmt.num(w.stock)}</span> · ${esc(w.sku || w.mpn || 'sin SKU')}</small></div>
+      <div class="rv-acc">
+        ${h.sugerida && h.filas[0] === w ? `<button class="btn chico primario" data-a="conectar" data-w="${w.id}" data-v="${h.sugerida.id}">Conectar a ${esc(nomV(h.sugerida))}</button>` : ''}
+        ${separable ? `<button class="btn chico" data-a="separar" data-w="${w.id}" title="Crea (o usa) ese color en la prenda, le pasa el stock que tiene la web en esa opción y la conecta">Separar${w.color_canal && (!v.color_nombre || colN(w.color_canal) !== colN(v.color_nombre)) ? ' «' + esc(w.color_canal) + '»' : '…'}</button>` : ''}
+        <button class="btn chico" data-a="elegir" data-w="${w.id}">${w.variante_id ? 'Conectar a otro…' : 'Conectar…'}</button>
+        ${w.publicado ? '' : `<button class="btn chico" data-a="mostrar" data-pe="${esc(w.producto_ext)}" title="Muestra la publicación en la web; recibe el stock de Percha">Mostrar</button>`}
+      </div></div>`;
+  }
+  function tarjeta(h, i) {
+    const [g, t] = etiq[h.tipo], ok = OK.has(h.clave), p = h.producto;
+    let extra = '';
+    if (h.decidir) { const w = h.filas[0]; extra += `<button class="btn chico" data-a="vale" data-vale="web" data-v="${h.decidir.id}">Vale la web (${fmt.num(w.stock)})</button><button class="btn chico" data-a="vale" data-vale="percha" data-v="${h.decidir.id}">Vale el local (${fmt.num(sw(h.decidir))})</button>`; }
+    if (h.subir) extra += `<button class="btn chico primario" data-a="subir" data-p="${p.id}" title="Crea en la web lo que falta de esta prenda, oculto hasta que tenga fotos">Subir a la web…</button><button class="btn chico" data-a="solo_local" data-p="${p.id}">Es solo para el local</button>`;
+    if (h.reactivar) extra += `<button class="btn chico" data-a="reactivar" data-v="${h.reactivar.id}">Volver a prender ${esc(nomV(h.reactivar))}</button>`;
+    if (h.activar) extra += `<button class="btn chico" data-a="activar" data-p="${p.id}">Prender la prenda</button>`;
+    if (h.soloLocal) extra += `<button class="btn chico primario" data-a="solo_local" data-p="${p.id}">Marcar solo local</button>`;
+    if (h.enWeb) extra += `<button class="btn chico primario" data-a="en_web" data-p="${p.id}">Marcar «En la web»</button>`;
+    if (h.variantes) extra += h.variantes.filter(v => v.activa && +v.stock <= 0 && !W.some(w => w.variante_id === v.id)).map(v => `<button class="btn chico" data-a="apagar" data-v="${v.id}" title="Está en 0 y sin conexiones">Apagar ${esc(nomV(v))}</button>`).join('');
+    if (h.separar && h.filas.filter(w => w.color_canal).length > 1) extra += `<button class="btn chico primario" data-a="separar_todo" data-i="${i}">Separar todos los colores</button>`;
+    return `<div class="rv-item${ok ? ' ok' : ''}" data-i="${i}"><div class="rv-cab"><div style="min-width:0;flex:1"><span class="chip ${g === 'alta' ? 'error' : g === 'media' ? 'aviso' : 'gris'}">${esc(t)}</span>
+      <h3 style="margin-top:5px">${p ? `<a data-a="prenda" data-p="${p.id}" title="Ver y editar la prenda">${esc(h.titulo)}</a>` : esc(h.titulo)}</h3><p class="rv-que">${esc(h.que)}${ok && OK.get(h.clave) ? ` · <i>${esc(OK.get(h.clave))}</i>` : ''}</p></div>
+      <div class="rv-acc">${ok ? `<button class="btn chico" data-a="desmarcar" data-k="${esc(h.clave)}">Volver a revisar</button>` : `<button class="btn chico" data-a="ok" data-k="${esc(h.clave)}" title="No vuelve a aparecer como problema">✓ Está bien así</button>`}</div></div>
+      ${(h.filas || []).length ? `<div class="rv-filas">${h.filas.map(w => filaWeb(w, h)).join('')}</div>` : ''}
+      ${extra ? `<div class="rv-acc-item">${extra}</div>` : ''}</div>`;
+  }
+
+  // ---------------- acciones ----------------
+  async function fn(nombre, body) {
+    const { data: { session } } = await sb.auth.getSession();
+    const r = await fetch(`${SUPABASE_URL}/functions/v1/${nombre}`, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SUPABASE_KEY, Authorization: `Bearer ${session.access_token}` }, body: JSON.stringify({ empresa_id: e, ...body }) });
+    const j = await r.json().catch(() => ({})); if (!r.ok || j.error) throw new Error(j.error || `Error ${r.status}`); return j;
+  }
+  const empujar = () => fn('tn-push', {}).catch(() => {});
+  async function rehacer(msj) {
+    const y = window.scrollY; if (msj) toast(msj);
+    try { await cargarDatos(); revisar(); pintar(); window.scrollTo(0, y); } catch (err) { toast(mensajeError(err), 'error'); }
+  }
+  const W_ = id => W.find(w => String(w.id) === String(id));
+  function enganchar(lista) {
+    $$('#lista [data-a]').forEach(b => b.onclick = async (ev) => {
+      ev.preventDefault(); const a = b.dataset.a, h = lista[+(b.closest('[data-i]') || {}).dataset?.i];
+      try {
+        if (a === 'prenda') return abrirPrenda(b.dataset.p);
+        b.disabled = true;
+        if (a === 'ok') { const nota = await APP.formulario({ titulo: 'Está bien así', sub: 'No vuelve a aparecer como problema. Podés anotar por qué (opcional).', campos: [{ k: 'nota', label: 'Nota', tipo: 'text' }], boton: 'Marcar' }); if (!nota) { b.disabled = false; return; }
+          const { error } = await sb.from('canal_revision_ok').upsert({ empresa_id: e, clave: b.dataset.k, nota: nota.nota || null }, { onConflict: 'empresa_id,clave' }); if (error) throw error; return rehacer('Marcada como bien'); }
+        if (a === 'desmarcar') { const { error } = await sb.from('canal_revision_ok').delete().eq('empresa_id', e).eq('clave', b.dataset.k); if (error) throw error; return rehacer(); }
+        if (a === 'conectar') { if (await CRUCE.conectar(+b.dataset.w, b.dataset.v)) { empujar(); return rehacer('Conectada'); } }
+        if (a === 'elegir') { const w = W_(b.dataset.w), v = w.variante_id && varDe(w.variante_id);
+          const r = await CRUCE.elegir({ sub: `${esc(w.nombre)} · «${esc(w.valores || 'única')}» · web ${w.stock == null ? 'sin límite' : fmt.num(w.stock)}`, q: v ? '' : (w.sku || ''), productoId: v ? v.producto_id : null, quitar: !!w.variante_id });
+          if (!r) { b.disabled = false; return; }
+          if (await CRUCE.conectar(w.id, r === 'quitar' ? null : r.variante.id)) { empujar(); return rehacer(r === 'quitar' ? 'Desconectada' : 'Conectada'); } }
+        if (a === 'separar') { const w = W_(b.dataset.w), v = varDe(w.variante_id);
+          let color = w.color_canal && (!v.color_nombre || colN(w.color_canal) !== colN(v.color_nombre)) ? w.color_canal : null;
+          if (!color) { const r = await APP.formulario({ titulo: 'Separar en otro color', sub: `${w.nombre} · «${w.valores || ''}». Escribí el color real de esta opción: se crea en la prenda (o se usa si ya existe) y se conecta.`, campos: [{ k: 'color', label: 'Color', tipo: 'text', valor: sugerirColor(w, v), requerido: true }], boton: 'Separar' }); if (!r || !r.color) { b.disabled = false; return; } color = r.color; }
+          else if (!await confirmar(`Se crea «${color}» en ${prodDe(v.producto_id).nombre} (talle ${v.talle_nombre || 'único'}), pasa ${fmt.num(Math.min(+w.stock || 0, +v.stock || 0))} del stock de «${nomV(v)}» y queda conectada. ¿Seguimos?`, 'Separar')) { b.disabled = false; return; }
+          const { data, error } = await sb.rpc('canal_separar_color', { p_item: w.id, p_color: color }); if (error) throw error; empujar(); const d = data || {}; return rehacer(`Listo: «${color}»${d.creada ? ' creado' : ''}${+d.stock_pasado ? `, pasaron ${fmt.num(d.stock_pasado)}` : ''}`); }
+        if (a === 'separar_todo') { const ws = h.filas.filter(w => w.color_canal); if (!await confirmar(`Se separan ${ws.length} colores (${ws.map(w => w.color_canal).join(', ')}): cada uno se crea en la prenda con el stock que tiene la web y queda conectado. ¿Seguimos?`, 'Separar todos')) { b.disabled = false; return; }
+          let n = 0; for (const w of ws) { const v = varDe(w.variante_id); if (v && v.color_nombre && colN(v.color_nombre) === colN(w.color_canal)) continue; const { error } = await sb.rpc('canal_separar_color', { p_item: w.id }); if (error) { toast(`${w.color_canal}: ${mensajeError(error)}`, 'error'); continue; } n++; }
+          empujar(); return rehacer(`${n} colores separados`); }
+        if (a === 'mostrar') { if (!await confirmar(`La publicación #${b.dataset.pe} se va a ver en la web y recibe el stock de Percha. ¿Seguimos?`, 'Mostrar')) { b.disabled = false; return; } await fn('tn-publicar', { mostrar: b.dataset.pe }); empujar(); return rehacer('Publicación visible en la web'); }
+        if (a === 'vale') { const { error } = await sb.rpc('canal_decidir_stock', { p_variante: b.dataset.v, p_vale: b.dataset.vale }); if (error) throw error; empujar(); return rehacer('Listo'); }
+        if (a === 'subir') { const s = await fn('tn-publicar', { producto_id: b.dataset.p, simular: true }); const x = ((s.resumen || [])[0] || {}).publicados || []; const d = x[0] || {};
+          if (d.omitido) { toast(d.omitido, 'error'); b.disabled = false; return; }
+          const plan = (d.publicaciones || []).map(pp => pp.nueva ? `• Publicación nueva${pp.oculta ? ' oculta' : ''}: «${pp.nombre}» con ${pp.variantes} opción(es)` : `• En la publicación #${pp.publicacion} «${pp.nombre}»: ${pp.variantes} opción(es)${pp.oculta_la_variante ? ' (ocultas)' : ''}`).join('\n');
+          const det = (d.detalle || []).map(c => c.variante).join(', ');
+          if (!await confirmar(`Esto se crea en la web:\n${plan}\n(${det})`, 'Subir')) { b.disabled = false; return; }
+          await fn('tn-publicar', { producto_id: b.dataset.p }); return rehacer('Subido a la web'); }
+        if (a === 'solo_local' || a === 'en_web') { const p = prodDe(b.dataset.p); if (a === 'solo_local' && !await confirmar(`«${p.nombre}» queda solo para el local (toda la prenda). ¿Seguimos?`, 'Solo local')) { b.disabled = false; return; }
+          const { error } = await sb.from('productos').update({ publicar_web: a === 'en_web' }).eq('id', p.id); if (error) throw error; return rehacer('Guardado'); }
+        if (a === 'activar') { const { error } = await sb.from('productos').update({ activo: true }).eq('id', b.dataset.p); if (error) throw error; return rehacer('Prenda prendida'); }
+        if (a === 'reactivar') { const { error } = await sb.from('variantes').update({ activa: true }).eq('id', b.dataset.v); if (error) throw error; empujar(); return rehacer('Prendido'); }
+        if (a === 'apagar') { const { error } = await sb.from('variantes').update({ activa: false }).eq('id', b.dataset.v); if (error) throw error; return rehacer('Apagado'); }
+      } catch (err) { toast(mensajeError(err), 'error'); }
+      b.disabled = false;
+    });
+  }
+  // «CONJUNTO «CIELO» ROSA VIEJO C/ COBRE» → «Rosa viejo c/ cobre»
+  function sugerirColor(w, v) { const p = prodDe(v.producto_id); let s = String(w.nombre || ''); const m = s.match(/»\s*([^«»]+)$/); s = m ? m[1].trim() : ''; if (!s) return w.color_canal || ''; s = s.toLowerCase(); return s.charAt(0).toUpperCase() + s.slice(1); }
+
+  // ---------------- la prenda: nombre, «en la web», prendida, talles·colores ----------------
+  async function abrirPrenda(id) {
+    const p = prodDe(id); if (!p) return; const vs = V.filter(v => v.producto_id === id).sort((a, b) => (a.color_nombre || '').localeCompare(b.color_nombre || '') || (a.talle_orden ?? 999) - (b.talle_orden ?? 999));
+    const talles = ATR.filter(a => a.tipo === 'talle' && a.activo !== false), colores = ATR.filter(a => a.tipo === 'color' && a.activo !== false);
+    const sel = (lista, actual, tipo, vid) => `<select data-attr="${tipo}" data-v="${vid}"><option value="">${tipo === 'talle' ? 'sin talle' : 'sin color'}</option>${lista.map(a => `<option value="${a.id}"${a.codigo === actual ? ' selected' : ''}>${esc(a.nombre)}</option>`).join('')}<option value="+">+ Agregar…</option></select>`;
+    const enWeb = v => W.filter(w => w.variante_id === v.id);
+    const m = modal(`<h2>Prenda ${esc(p.codigo)}</h2>
+      <div class="campo"><label>Nombre (se guarda solo)</label><input id="pr-nom" value="${esc(p.nombre)}"></div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin:8px 0;font-size:13px"><label><input type="checkbox" id="pr-act"${p.activo ? ' checked' : ''}> Prendida</label><label><input type="checkbox" id="pr-web"${p.publicar_web ? ' checked' : ''}> En la web</label><a href="../catalogo/producto.html?id=${p.id}" target="_blank" style="margin-left:auto">Abrir la ficha completa ↗</a></div>
+      <div style="max-height:52vh;overflow:auto"><table class="rv-vars"><colgroup><col style="width:44px"><col style="width:19%"><col style="width:23%"><col style="width:17%"><col style="width:52px"><col></colgroup><tr><th title="Prendido">✓</th><th>Talle</th><th>Color</th><th>SKU</th><th class="num">Stock</th><th>En la web</th></tr>
+      ${vs.map(v => `<tr${v.activa ? '' : ' style="opacity:.5"'}><td><input type="checkbox" data-activa="${v.id}"${v.activa ? ' checked' : ''} title="Prendido"></td><td>${sel(talles, v.talle, 'talle', v.id)}</td><td>${sel(colores, v.color, 'color', v.id)}</td><td class="mono" style="font-size:11.5px">${esc(v.sku || '')}</td><td class="num"><a href="#" data-pv="${v.id}" title="Stock, fallas, precio, código de barras">${fmt.num(v.stock)}</a></td><td style="font-size:12px">${enWeb(v).map(w => `#${esc(w.producto_ext)} «${esc(w.valores || '')}»${w.publicado ? '' : ' (oculta)'}`).join('<br>') || '—'}</td></tr>`).join('')}</table></div>
+      <p class="sub" style="margin-top:8px">✓ = prendido. Cambiar el talle o el color de un talle·color no cambia el SKU ni lo que ya está en la web. Apagar un talle·color que está conectado lo saca de la web.</p>
+      <div class="pie"><button class="btn primario" data-no>Listo</button></div>`);
+    m.querySelector('.modal').classList.add('rv-ancha');
+    let cambio = false; const fin = () => { m.cerrar(); if (cambio) rehacer(); };
+    $('[data-no]', m).onclick = fin; m.alCerrar = () => { if (cambio) rehacer(); };
+    const guardar = async (q, el, msj) => { const { error } = await q; if (error) { toast(mensajeError(error), 'error'); return false; } cambio = true; if (el) { el.style.outline = '2px solid var(--ok)'; setTimeout(() => el.style.outline = '', 700); } if (msj) toast(msj); return true; };
+    $('#pr-nom', m).onchange = ev => { const n = ev.target.value.trim(); if (!n) { ev.target.value = p.nombre; return; } guardar(sb.from('productos').update({ nombre: n }).eq('id', id), ev.target); };
+    $('#pr-act', m).onchange = ev => guardar(sb.from('productos').update({ activo: ev.target.checked }).eq('id', id), null, ev.target.checked ? 'Prenda prendida' : 'Prenda apagada');
+    $('#pr-web', m).onchange = ev => guardar(sb.from('productos').update({ publicar_web: ev.target.checked }).eq('id', id), null, ev.target.checked ? 'Va a la web' : 'Solo local');
+    $$('[data-activa]', m).forEach(c => c.onchange = async () => { const v = varDe(c.dataset.activa);
+      if (!c.checked && enWeb(v).length && !await confirmar(`«${nomV(v)}» está en la web. Si lo apagás, Percha lo saca de la web. ¿Seguimos?`, 'Apagar')) { c.checked = true; return; }
+      if (await guardar(sb.from('variantes').update({ activa: c.checked }).eq('id', v.id), c.closest('tr'))) { c.closest('tr').style.opacity = c.checked ? '' : '.5'; if (!c.checked || enWeb(v).length) empujar(); } });
+    $$('[data-attr]', m).forEach(s => { const previo = s.value; s.onchange = async () => {
+      let val = s.value;
+      if (val === '+') { const r = await APP.formulario({ titulo: s.dataset.attr === 'talle' ? 'Talle nuevo' : 'Color nuevo', campos: [{ k: 'nombre', label: 'Nombre', tipo: 'text', requerido: true }], boton: 'Agregar' }); if (!r || !r.nombre) { s.value = previo; return; }
+        const cod = (r.nombre.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 3) || 'X') + (s.dataset.attr === 'color' ? Math.floor(Math.random() * 900 + 100) : '');
+        const { data, error } = await sb.from('atributos').insert({ empresa_id: e, tipo: s.dataset.attr, codigo: cod, nombre: r.nombre.trim(), orden: 999 }).select('id,tipo,codigo,nombre,orden,activo').single(); if (error) { toast(mensajeError(error), 'error'); s.value = previo; return; }
+        ATR.push(data); s.insertAdjacentHTML('beforeend', ''); const o = document.createElement('option'); o.value = data.id; o.textContent = data.nombre; s.insertBefore(o, s.lastElementChild); s.value = data.id; val = data.id; }
+      const campo = s.dataset.attr === 'talle' ? 'talle_id' : 'color_id';
+      if (!await guardar(sb.from('variantes').update({ [campo]: val || null }).eq('id', s.dataset.v), s)) s.value = previo; }; });
+    $$('[data-pv]', m).forEach(a => a.onclick = ev => { ev.preventDefault(); PRENDA.abrir(a.dataset.pv, { alGuardar: () => { cambio = true; } }); });
+  }
+
+  // ---------------- arranque ----------------
+  $('#btn-act').onclick = () => rehacer('Actualizado');
+  $('#btn-vivo').onclick = async ev => { const b = ev.target; b.disabled = true; b.textContent = 'Leyendo la web…';
+    try { const r = await fn('tn-push', { simular: true, todo: true }); vivo = ((r.resumen || [])[0] || {}).diferencias || []; cat = 'vivo'; revisar(); pintar(); toast(vivo.length ? `${vivo.length} diferencias de stock con la web` : 'El stock de la web coincide con Percha en todo lo visible'); }
+    catch (err) { toast(mensajeError(err), 'error'); }
+    b.disabled = false; b.textContent = 'Comparar stock con la web ahora'; };
+  $('#q').addEventListener('input', () => { clearTimeout(window._rvq); window._rvq = setTimeout(pintar, 200); });
+  $('#ver-ok').onchange = pintar;
+  // al volver de la ficha (otra pestaña) se actualiza sola
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && !document.querySelector('.modal-fondo')) rehacer(); });
+  try { await cargarDatos(); revisar(); pintar(); } catch (err) { $('#lista').innerHTML = `<div class="card"><p>${esc(mensajeError(err))}</p></div>`; }
+});
+</script>
+</body>
+</html>

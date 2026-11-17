@@ -39,6 +39,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="../shared/supabase.js?v=202611122356"></script>
 <script src="../shell/shell.js?v=202611122356"></script>
+<script src="../shared/cruce.js?v=202611172100"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -49,8 +50,8 @@ APP.ready.then(async () => {
   const CANAL = { tiendanube: 'Tienda Nube', mercadolibre: 'Mercado Libre' }[(cx || {}).canal] || 'el canal';
   $('.cab-pagina .sub').textContent = `Lo que hay en el local contra lo publicado en ${CANAL}. El stock local es el que manda.`;
   $('#nopub-canal').textContent = CANAL; $('#nuevos-canal').textContent = CANAL;
-  $('#acciones-pagina').innerHTML = `<a class="btn" href="conexiones.html">← Conexiones</a>`;
-  let filtro = 'todo', pagina = 0, filas = [], variantesPercha = null;
+  $('#acciones-pagina').innerHTML = `<a class="btn" href="conexiones.html">← Conexiones</a> <a class="btn primario" href="revision.html?c=${cxId}">Revisión de la web</a>`;
+  let filtro = 'todo', pagina = 0, filas = [];
   const PAG = 150, puedeEditar = APP.rol !== 'visor';
   // manda al canal lo que quedó en cola (fire-and-forget; el cron lo repite si falla)
   async function empujar() { try { const { data: { session } } = await sb.auth.getSession(); fetch(`${SUPABASE_URL}/functions/v1/tn-push`, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SUPABASE_KEY, Authorization: `Bearer ${session.access_token}` }, body: JSON.stringify({ empresa_id: e }) }); } catch (_) {} }
@@ -159,17 +160,12 @@ APP.ready.then(async () => {
     $('#resumen').textContent = `${fmt.num(filas.length)} filas`;
   }
   async function cruzar(item) {
-    if (!variantesPercha) { let d = 0, t = []; while (true) { const { data } = await sb.from('v_variantes').select('id,producto_nombre,producto_codigo,sku,talle_nombre,color_nombre,stock').eq('empresa_id', e).eq('activa', true).order('producto_nombre').range(d, d + 999); t = t.concat(data || []); if (!data || data.length < 1000) break; d += 1000; } variantesPercha = t; }
-    const m = modal(`<h2>Cruzar con una prenda del local</h2><p class="sub">${esc(item.nombre)} · ${esc(item.valores || '')} · SKU ${esc(item.sku || item.mpn || '—')}</p>
-      <div class="campo" style="margin-top:12px;position:relative"><label>Buscar en el local</label><input id="cz-q" placeholder="Nombre o código" value="${esc(item.sku || '')}"><div class="sugerencias" id="cz-sug" style="display:none"></div></div>
-      <div class="pie">${item.variante_id ? '<button class="btn" data-quitar style="margin-right:auto">Quitar cruce</button>' : ''}<button class="btn" data-no>Cancelar</button></div>`);
-    const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-    const buscar = () => { const t = norm($('#cz-q', m).value.trim()); const pal = t.split(/\s+/).filter(Boolean); const res = pal.length ? variantesPercha.filter(v => pal.every(w => norm(`${v.producto_nombre} ${v.producto_codigo} ${v.sku} ${v.talle_nombre} ${v.color_nombre}`).includes(w))).slice(0, 30) : [];
-      const s = $('#cz-sug', m); s.innerHTML = res.map(v => `<div data-v="${v.id}">${esc(v.producto_nombre)} · ${esc([v.talle_nombre, v.color_nombre].filter(Boolean).join(' · ') || 'único')} <small>${esc(v.sku || '')} · stock ${fmt.num(v.stock)}</small></div>`).join('') || '<div class="vacio">Nada</div>'; s.style.display = 'block';
-      $$('[data-v]', s).forEach(d => d.onclick = async () => { const r = await sb.from('canal_items').update({ variante_id: d.dataset.v, cruce: 'manual' }).eq('id', item.id); if (r.error) { toast(mensajeError(r.error), 'error'); return; } m.cerrar(); toast('Cruzado'); await contar(); cargar(true); const x = aDecidir.find(a => a.variante_id === d.dataset.v); if (x && APP.esAdmin) preguntar(x); }); };
-    $('#cz-q', m).addEventListener('input', buscar); buscar();
-    $('[data-no]', m).onclick = () => m.cerrar();
-    const qt = $('[data-quitar]', m); if (qt) qt.onclick = async () => { if (!await confirmar('¿Quitar el cruce? Esa publicación deja de recibir el stock del local.', 'Quitar')) return; const r = await sb.from('canal_items').update({ variante_id: null, cruce: 'ninguno' }).eq('id', item.id); if (r.error) { toast(mensajeError(r.error), 'error'); return; } m.cerrar(); contar(); cargar(true); };
+    // la misma ventana que «Revisión de la web» (shared/cruce.js)
+    const r = await CRUCE.elegir({ titulo: 'Cruzar con una prenda del local', sub: `${esc(item.nombre)} · ${esc(item.valores || '')} · SKU ${esc(item.sku || item.mpn || '—')}`, q: item.sku || '', quitar: !!item.variante_id });
+    if (!r) return;
+    if (r === 'quitar') { if (await CRUCE.conectar(item.id, null)) { contar(); cargar(true); } return; }
+    if (!await CRUCE.conectar(item.id, r.variante.id)) return;
+    toast('Cruzado'); await contar(); cargar(true); const x = aDecidir.find(a => a.variante_id === r.variante.id); if (x && APP.esAdmin) preguntar(x);
   }
   $$('#pestanas button').forEach(b => b.onclick = () => { $$('#pestanas button').forEach(x => x.classList.toggle('on', x === b)); filtro = b.dataset.f; cargar(true); });
   let t; $('#q').addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => cargar(true), 250); });
