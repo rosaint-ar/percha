@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
     }
     // catálogos de apoyo
     // todas las variantes del canal (PostgREST corta en 1000: se pagina)
-    let items: any[] = []; for (let d = 0; ; d += 1000) { const { data } = await admin.from("canal_items").select("variante_ext,variante_id,producto_ext,talle_canal,color_canal").eq("conexion_id", cx.id).range(d, d + 999); items = items.concat(data || []); if (!data || data.length < 1000) break; }
+    let items: any[] = []; for (let d = 0; ; d += 1000) { const { data } = await admin.from("canal_items").select("variante_ext,variante_id,producto_ext,talle_canal,color_canal").eq("conexion_id", cx.id).order("id").range(d, d + 999); items = items.concat(data || []); if (!data || data.length < 1000) break; }
     const porExt = new Map(items.map((i: any) => [i.variante_ext, i]));
     // todas, también las apagadas (se apagan para que no salgan en la caja, pero los pedidos de la web las siguen usando)
     const { data: formas } = await admin.from("formas_pago").select("id,nombre,tipo,activa").eq("empresa_id", e);

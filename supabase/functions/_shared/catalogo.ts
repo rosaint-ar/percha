@@ -15,7 +15,7 @@ export const nombreClave = (s: unknown) => [...new Set(String(s ?? "").split(/[^
 export async function sincronizarCatalogo(admin: any, cx: any, token: string, op: { simular?: boolean } = {}): Promise<any> {
   // ---- catálogo de Percha para cruzar ----
   const e = cx.empresa_id;
-  const pag = async (tabla: string, sel: string, filtro: (q: any) => any) => { let desde = 0, todo: any[] = []; while (true) { const { data, error } = await filtro(admin.from(tabla).select(sel)).range(desde, desde + 999); if (error) throw error; todo = todo.concat(data || []); if (!data || data.length < 1000) break; desde += 1000; } return todo; };
+  const pag = async (tabla: string, sel: string, filtro: (q: any) => any) => { let desde = 0, todo: any[] = []; while (true) { const { data, error } = await filtro(admin.from(tabla).select(sel)).order("id").range(desde, desde + 999); if (error) throw error; todo = todo.concat(data || []); if (!data || data.length < 1000) break; desde += 1000; } return todo; };
   const productos = await pag("productos", "id,codigo,nombre,tiene_variantes,es_generico,activo", (q: any) => q.eq("empresa_id", e));
   // los modelos por nombre: para no cruzar con un código general (BOMBIS «VARIAS», MEDIAS VARIAS) lo que ya existe como modelo
   const porNombre = new Map<string, any>();   // si dos prendas tienen las mismas palabras, ninguna (no se adivina)

@@ -33,7 +33,7 @@ Deno.serve(async (req) => {
   const simular = !!body.simular;
   const limite = Math.max(1, Math.min(500, +body.limite || 80));
   const soloExt: string[] = Array.isArray(body.solo_ext) ? body.solo_ext.map(String) : [];
-  const pag = async (q: () => any) => { let todo: any[] = []; for (let d = 0; ; d += 1000) { const { data, error } = await q().range(d, d + 999); if (error) throw error; todo = todo.concat(data || []); if (!data || data.length < 1000) break; } return todo; };
+  const pag = async (q: () => any) => { let todo: any[] = []; for (let d = 0; ; d += 1000) { const { data, error } = await q().order("id").range(d, d + 999); if (error) throw error; todo = todo.concat(data || []); if (!data || data.length < 1000) break; } return todo; };
 
   let qc = admin.from("conexiones").select("id,empresa_id,externo_id,canal,config").eq("estado", "activa").eq("canal", "tiendanube");
   if (filtroEmpresa) qc = qc.eq("empresa_id", filtroEmpresa);

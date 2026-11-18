@@ -184,7 +184,7 @@
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="../shared/supabase.js?v=202611122356"></script>
-<script src="../shared/precios.js?v=202611122356"></script>
+<script src="../shared/precios.js?v=202611181300"></script>
 <script src="../shared/prenda.js?v=202611122356"></script>
 <script src="../shell/shell.js?v=202611122356"></script>
 <script>
@@ -303,7 +303,7 @@ APP.ready.then(async () => {
   const nrmB = x => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   function buscadorParecida() {
     const ip = $('#parecida'), sp = $('#sug-par'); let todos = null, res = [], sel = -1;
-    (async () => { let d = 0, t = []; while (true) { const { data, error } = await sb.from('productos').select('id,nombre,codigo,categoria_id,tipo,es_generico').eq('empresa_id', e).eq('activo', true).order('nombre').range(d, d + 999); if (error || !data) break; t = t.concat(data); if (data.length < 1000) break; d += 1000; }
+    (async () => { let d = 0, t = []; while (true) { const { data, error } = await sb.from('productos').select('id,nombre,codigo,categoria_id,tipo,es_generico').eq('empresa_id', e).eq('activo', true).order('nombre').order('id').range(d, d + 999); if (error || !data) break; t = t.concat(data); if (data.length < 1000) break; d += 1000; }
       todos = t.filter(p => !p.es_generico && ['prenda', 'kit', 'varios'].includes(p.tipo)).map(p => Object.assign(p, { _b: nrmB(p.nombre + ' ' + p.codigo) })); if (document.activeElement === ip && ip.value.trim()) pintar(); })();
     const famNom = cid => (familias.find(c => c.id === cid) || {}).nombre || '';
     const elegir = p => { ip.value = p.nombre + ' · ' + p.codigo; sp.hidden = true; usarParecida(p.id); };
@@ -867,7 +867,7 @@ APP.ready.then(async () => {
   const kq = $('#kit-q'), ksug = $('#kit-sug');
   kq.addEventListener('input', async () => {
     const t = kq.value.trim().toLowerCase(); if (!t) { ksug.style.display = 'none'; return; }
-    if (!catalogoKit) { let d = 0, todo = []; while (true) { const { data } = await sb.from('v_variantes').select('id,producto_id,producto_nombre,producto_codigo,producto_tipo,talle_nombre,color_nombre,stock,costo').eq('empresa_id', e).eq('activa', true).neq('producto_tipo', 'kit').order('producto_nombre').range(d, d + 999); todo = todo.concat(data || []); if (!data || data.length < 1000) break; d += 1000; } catalogoKit = todo; }
+    if (!catalogoKit) { let d = 0, todo = []; while (true) { const { data } = await sb.from('v_variantes').select('id,producto_id,producto_nombre,producto_codigo,producto_tipo,talle_nombre,color_nombre,stock,costo').eq('empresa_id', e).eq('activa', true).neq('producto_tipo', 'kit').order('producto_nombre').order('id').range(d, d + 999); todo = todo.concat(data || []); if (!data || data.length < 1000) break; d += 1000; } catalogoKit = todo; }
     const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); const pal = norm(t).split(/\s+/);
     const res = catalogoKit.filter(v => v.producto_id !== id && pal.every(w => norm(`${v.producto_nombre} ${v.producto_codigo} ${v.talle_nombre} ${v.color_nombre}`).includes(w))).slice(0, 25);
     // primero el producto entero ("cualquier talle/color": lo elige la vendedora al cobrar), después sus variantes exactas

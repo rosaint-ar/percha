@@ -51,7 +51,7 @@
   async function cargarCatalogo() {
     if (catalogo) return catalogo; let todo = [], d = 0;
     while (true) {
-      const { data } = await sb.from('v_variantes').select('id,producto_id,producto_codigo,producto_nombre,producto_tipo,talle_nombre,talle_orden,color_nombre,sku,stock,foto').eq('empresa_id', APP.empresa.id).eq('activa', true).neq('producto_tipo', 'kit').not('sku', 'like', '%-SD').order('producto_nombre').range(d, d + 999);
+      const { data } = await sb.from('v_variantes').select('id,producto_id,producto_codigo,producto_nombre,producto_tipo,talle_nombre,talle_orden,color_nombre,sku,stock,foto').eq('empresa_id', APP.empresa.id).eq('activa', true).neq('producto_tipo', 'kit').not('sku', 'like', '%-SD').order('producto_nombre').order('id').range(d, d + 999);
       todo = todo.concat(data || []); if (!data || data.length < 1000) break; d += 1000;
     }
     const { data: ps } = await sb.from('productos').select('id,categoria_id,es_generico,generico_local_id').eq('empresa_id', APP.empresa.id);

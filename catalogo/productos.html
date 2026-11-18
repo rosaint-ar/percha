@@ -133,7 +133,7 @@ APP.ready.then(async () => {
       if (ps.length === 1) { location.href = `producto.html?id=${ps[0]}&ean=${q}`; return; }
       if (ps.length > 1) toast(`Ese código de barras está en ${ps.length} prendas distintas: corregilo en la que no corresponde`, 'error');
     }
-    const { data, error } = await consulta('*').order('nombre').range(desde, desde + PAG - 1);
+    const { data, error } = await consulta('*').order('nombre').order('id').range(desde, desde + PAG - 1);
     if (id !== ultimaConsulta) return;
     if (error) { toast(mensajeError(error), 'error'); return; }
     const tb = $('#tabla tbody');
@@ -175,7 +175,7 @@ APP.ready.then(async () => {
   const todosCb = $('#todos');
   if (todosCb) todosCb.onchange = () => { $$('#tabla tr[data-id]').forEach(tr => { $('[data-sel]', tr).checked = todosCb.checked; elegir(tr.dataset.id, todosCb.checked, tr); }); };
   async function elegirTodoElFiltro() {
-    let d = 0; while (true) { const { data } = await consulta('id').order('nombre').range(d, d + 999); (data || []).forEach(x => elegidos.add(x.id)); if (!data || data.length < 1000) break; d += 1000; }
+    let d = 0; while (true) { const { data } = await consulta('id').order('nombre').order('id').range(d, d + 999); (data || []).forEach(x => elegidos.add(x.id)); if (!data || data.length < 1000) break; d += 1000; }
     $$('#tabla tr[data-id]').forEach(tr => { $('[data-sel]', tr).checked = true; tr.classList.add('marcado'); }); pintarSel();
   }
   function pintarSel() {
@@ -314,9 +314,9 @@ APP.ready.then(async () => {
   const descargar = (X, filas, nombre) => { const ws = X.utils.aoa_to_sheet(filas); ws['!cols'] = filas[0].map((h, i) => ({ wch: i === 1 ? 34 : i === 6 ? 30 : 14 })); const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, ws, 'Catálogo'); X.writeFile(wb, nombre); };
   async function exportar(soloFiltro) {
     const X = await cargarXLSX();
-    let prods = [], d = 0; while (true) { const { data } = await (soloFiltro ? consulta('*') : sb.from('v_productos').select('*').eq('empresa_id', e).eq('activo', true)).order('nombre').range(d, d + 999); prods = prods.concat(data || []); if (!data || data.length < 1000) break; d += 1000; }
+    let prods = [], d = 0; while (true) { const { data } = await (soloFiltro ? consulta('*') : sb.from('v_productos').select('*').eq('empresa_id', e).eq('activo', true)).order('nombre').order('id').range(d, d + 999); prods = prods.concat(data || []); if (!data || data.length < 1000) break; d += 1000; }
     const P = new Map(prods.map(p => [p.id, p])), ids = prods.map(p => p.id);
-    let vars = []; for (let i = 0; i < ids.length; i += 200) { let k = 0; while (true) { const { data } = await sb.from('v_variantes').select('producto_id,talle_nombre,talle_orden,color_nombre,ean,stock,precio,costo').in('producto_id', ids.slice(i, i + 200)).eq('activa', true).range(k, k + 999); vars = vars.concat(data || []); if (!data || data.length < 1000) break; k += 1000; } }
+    let vars = []; for (let i = 0; i < ids.length; i += 200) { let k = 0; while (true) { const { data } = await sb.from('v_variantes').select('producto_id,talle_nombre,talle_orden,color_nombre,ean,stock,precio,costo').in('producto_id', ids.slice(i, i + 200)).eq('activa', true).order('id').range(k, k + 999); vars = vars.concat(data || []); if (!data || data.length < 1000) break; k += 1000; } }
     vars.sort((a, b) => P.get(a.producto_id).nombre.localeCompare(P.get(b.producto_id).nombre) || (a.talle_orden ?? 999) - (b.talle_orden ?? 999) || String(a.color_nombre || '').localeCompare(b.color_nombre || ''));
     const filas = [COLS.map(c => c[1])].concat(vars.map(v => { const p = P.get(v.producto_id); return [p.codigo, p.nombre, p.categoria || '', p.temporada || '', p.marca || '', p.proveedor || '', p.descripcion || '', +p.costo || 0, +p.precio || 0, v.talle_nombre || '', v.color_nombre || '', v.ean || '', +v.stock || 0]; }));
     descargar(X, filas, `catalogo-${APP.empresa.nombre.replace(/\W+/g, '-').toLowerCase()}-${new Date().toISOString().slice(0, 10)}.xlsx`);

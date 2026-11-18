@@ -63,8 +63,8 @@ APP.ready.then(async () => {
   let catalogo = [], productos = {}, categorias = [], porProducto = new Map(), familia = 'todo', bolsa = null, hoy = [];
   async function cargar() {
     const [vars, prods, cats] = await Promise.all([
-      paginar(() => sb.from('v_variantes').select('id,producto_id,producto_codigo,producto_nombre,producto_tipo,talle,talle_nombre,talle_orden,color,color_nombre,stock,activa').eq('empresa_id', e).eq('activa', true).order('producto_nombre').order('talle_orden')),
-      paginar(() => sb.from('productos').select('id,categoria_id,tipo,imagen_url,es_generico,generico_filtro').eq('empresa_id', e).eq('activo', true)),
+      paginar(() => sb.from('v_variantes').select('id,producto_id,producto_codigo,producto_nombre,producto_tipo,talle,talle_nombre,talle_orden,color,color_nombre,stock,activa').eq('empresa_id', e).eq('activa', true).order('producto_nombre').order('talle_orden').order('id')),
+      paginar(() => sb.from('productos').select('id,categoria_id,tipo,imagen_url,es_generico,generico_filtro').eq('empresa_id', e).eq('activo', true).order('id')),
       sb.from('categorias').select('id,nombre,orden').eq('empresa_id', e).eq('activa', true).order('orden').order('nombre')
     ]);
     productos = Object.fromEntries(prods.map(x => [x.id, x])); categorias = cats.data || [];

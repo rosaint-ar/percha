@@ -23,11 +23,11 @@
   // trae todo lo que hace falta para calcular (una vez por pantalla)
   async function cargar(sb, e) {
     const [listas, excep, fijos, rebajas, rp] = await Promise.all([
-      todo(() => sb.from('listas_precios').select('*').eq('empresa_id', e).eq('activa', true).order('orden')),
-      todo(() => sb.from('lista_excepciones').select('id,lista_id,categoria_id,producto_id,porcentaje').eq('empresa_id', e)),
-      todo(() => sb.from('precios').select('lista_id,producto_id,variante_id,precio').eq('empresa_id', e)),
-      todo(() => sb.from('promociones').select('*').eq('empresa_id', e).eq('activa', true).eq('tipo', 'rebaja')),
-      todo(() => sb.from('rebaja_precios').select('promocion_id,producto_id,variante_id,precio').eq('empresa_id', e))]);
+      todo(() => sb.from('listas_precios').select('*').eq('empresa_id', e).eq('activa', true).order('orden').order('id')),
+      todo(() => sb.from('lista_excepciones').select('id,lista_id,categoria_id,producto_id,porcentaje').eq('empresa_id', e).order('id')),
+      todo(() => sb.from('precios').select('lista_id,producto_id,variante_id,precio').eq('empresa_id', e).order('lista_id').order('producto_id').order('variante_id')),
+      todo(() => sb.from('promociones').select('*').eq('empresa_id', e).eq('activa', true).eq('tipo', 'rebaja').order('id')),
+      todo(() => sb.from('rebaja_precios').select('promocion_id,producto_id,variante_id,precio').eq('empresa_id', e).order('id'))]);
     return armar({ listas, excep, fijos, rebajas, rp });
   }
   function armar(d) {

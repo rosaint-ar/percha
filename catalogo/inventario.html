@@ -124,7 +124,7 @@
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="../shared/supabase.js?v=202611122356"></script>
-<script src="../shared/precios.js?v=202611122356"></script>
+<script src="../shared/precios.js?v=202611181300"></script>
 <script src="../shared/prenda.js?v=202611122356"></script>
 <script src="../shell/shell.js?v=202611122356"></script>
 <script>
@@ -280,7 +280,7 @@ APP.ready.then(async () => {
   let catalogo = null;
   async function cargarCatalogo() {
     if (catalogo) return catalogo; let todo = [], d = 0;
-    while (true) { const { data } = await sb.from('v_variantes').select('id,producto_id,producto_codigo,producto_nombre,producto_tipo,talle_nombre,talle_orden,color_nombre,sku,ean,stock,fallas,foto').eq('empresa_id', e).eq('activa', true).neq('producto_tipo', 'kit').order('producto_nombre').range(d, d + 999); todo = todo.concat(data || []); if (!data || data.length < 1000) break; d += 1000; }
+    while (true) { const { data } = await sb.from('v_variantes').select('id,producto_id,producto_codigo,producto_nombre,producto_tipo,talle_nombre,talle_orden,color_nombre,sku,ean,stock,fallas,foto').eq('empresa_id', e).eq('activa', true).neq('producto_tipo', 'kit').order('producto_nombre').order('id').range(d, d + 999); todo = todo.concat(data || []); if (!data || data.length < 1000) break; d += 1000; }
     return catalogo = todo;
   }
   const refrescar = () => { catalogo = null; pintarTiles(); contarFallas(); ir(tab); };

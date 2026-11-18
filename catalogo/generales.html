@@ -64,7 +64,7 @@ APP.ready.then(async () => {
   let productos = [], familias = [], stockGen = {}, busca = {};
   async function cargar() {
     const [ps, { data: cs }] = await Promise.all([
-      paginar(() => sb.from('productos').select('id,codigo,nombre,precio,categoria_id,tipo,es_generico,generico_filtro,generico_local_id,activo').eq('empresa_id', e).eq('activo', true).order('nombre')),
+      paginar(() => sb.from('productos').select('id,codigo,nombre,precio,categoria_id,tipo,es_generico,generico_filtro,generico_local_id,activo').eq('empresa_id', e).eq('activo', true).order('nombre').order('id')),
       sb.from('categorias').select('id,nombre').eq('empresa_id', e).eq('activa', true).order('nombre')]);
     productos = ps; familias = cs || [];
     const gids = productos.filter(p => p.es_generico).map(p => p.id);

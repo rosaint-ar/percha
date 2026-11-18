@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
   if (filtroEmpresa) qc = qc.eq("empresa_id", filtroEmpresa);
   const { data: conexiones } = await qc;
   const resumen: Record<string, unknown>[] = [];
-  const pag = async (q: () => any) => { let todo: any[] = []; for (let d = 0; ; d += 1000) { const { data } = await q().range(d, d + 999); todo = todo.concat(data || []); if (!data || data.length < 1000) break; } return todo; };
+  const pag = async (q: () => any) => { let todo: any[] = []; for (let d = 0; ; d += 1000) { const { data } = await q().order("id").range(d, d + 999); todo = todo.concat(data || []); if (!data || data.length < 1000) break; } return todo; };
   for (const cx of conexiones || []) {
     if (cx.canal !== "tiendanube") continue;
     const { data: sec } = await admin.from("conexion_secretos").select("access_token").eq("conexion_id", cx.id).maybeSingle();

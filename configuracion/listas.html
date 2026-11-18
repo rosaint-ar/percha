@@ -63,7 +63,7 @@
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="../shared/supabase.js?v=202611122356"></script>
-<script src="../shared/precios.js?v=202611122356"></script>
+<script src="../shared/precios.js?v=202611181300"></script>
 <script src="../shell/shell.js?v=202611122356"></script>
 <script>
 APP.ready.then(async () => {
@@ -72,7 +72,7 @@ APP.ready.then(async () => {
   const nice = s => s ? s.charAt(0) + s.slice(1).toLowerCase() : '';
   const [{ data: cats }, prods] = await Promise.all([
     sb.from('categorias').select('id,nombre').eq('empresa_id', e).eq('activa', true).order('orden'),
-    (async () => { let d = 0, t = []; while (true) { const { data } = await sb.from('productos').select('id,codigo,nombre,precio,categoria_id,tipo').eq('empresa_id', e).eq('activo', true).order('nombre').range(d, d + 999); t = t.concat(data || []); if (!data || data.length < 1000) break; d += 1000; } return t; })()]);
+    (async () => { let d = 0, t = []; while (true) { const { data } = await sb.from('productos').select('id,codigo,nombre,precio,categoria_id,tipo').eq('empresa_id', e).eq('activo', true).order('nombre').order('id').range(d, d + 999); t = t.concat(data || []); if (!data || data.length < 1000) break; d += 1000; } return t; })()]);
   let ctx = null, formas = [];
   const EJ = 50000;   // precio de ejemplo para mostrar cada regla
   const num = s => parseFloat(String(s).replace(',', '.').replace('−', '-'));
