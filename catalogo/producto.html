@@ -151,6 +151,7 @@
         <div class="campo"><label>Variantes</label><select name="tiene_variantes"><option value="false">No, es un artículo único</option><option value="true">Sí, por talle y color</option></select></div>
         <div class="campo"><label>Estado</label><select name="activo"><option value="true">Activo</option><option value="false">Inactivo</option></select></div>
         <div class="campo"><label>En la web</label><select name="publicar_web"><option value="true">Sí: se sube sola a Tienda Nube (oculta)</option><option value="false">No: solo en el local</option></select><span class="ayuda" id="web-estado"></span></div>
+        <div class="campo"><label>Cómo va a la web</label><select name="web_por_color"><option value="">Elegí… (se pregunta si tiene 2 o más colores)</option><option value="false">Una publicación con todos los colores</option><option value="true">Una publicación por color (el color va en el título)</option></select><span class="ayuda">Ej. MAGNOLIA va una por color: «MAGNOLIA ROSA», «MAGNOLIA AZUL».</span></div>
         <div class="campo"><label>Código general</label><select name="es_generico" title="Para lo que tiene muchos modelos (ej. BOMBIS «VARIAS»): en la caja y en los remitos pregunta qué modelos son. Todos en Catálogo › Códigos generales"><option value="false">No</option><option value="true">Sí: en la caja y en los remitos pregunta qué modelos son</option></select></div>
       </div>
       <div class="campo"><label>Descripción</label><textarea name="descripcion" rows="2"></textarea></div>
@@ -240,7 +241,7 @@ APP.ready.then(async () => {
     { const vm = $('#ver-movs'); if (vm) vm.href = 'inventario.html?q=' + encodeURIComponent(producto.codigo) + '#movimientos'; }
     document.title = producto.nombre + ' · ' + APP.empresa.nombre;
     ['codigo', 'nombre', 'tipo', 'categoria_id', 'proveedor_id', 'temporada_id', 'marca_id', 'costo', 'precio', 'ean', 'descripcion'].forEach(k => form[k].value = producto[k] ?? '');
-    form.tiene_variantes.value = String(producto.tiene_variantes); form.activo.value = String(producto.activo); form.publicar_web.value = String(producto.publicar_web !== false); estadoWeb(); form.es_generico.value = String(!!producto.es_generico);
+    form.tiene_variantes.value = String(producto.tiene_variantes); form.activo.value = String(producto.activo); form.publicar_web.value = String(producto.publicar_web !== false); form.web_por_color.value = producto.web_por_color == null ? '' : String(producto.web_por_color); estadoWeb(); form.es_generico.value = String(!!producto.es_generico);
     $('#stock-total').value = fmt.num(variantes.reduce((s, x) => s + (+x.stock || 0), 0));
     $('#ayuda-ean').textContent = producto.tiene_variantes ? 'Con variantes, el código de barras va en cada talle y color.' : '';
     pintarPrecios(); pintarAcciones(); pintarMargen(); pintarFotos(); pintarHistorial(); cargarPctx(); pintarCatsWeb();
@@ -360,7 +361,7 @@ APP.ready.then(async () => {
       codigo: form.codigo.value.trim(), nombre: form.nombre.value.trim(), tipo: form.tipo.value,
       categoria_id: form.categoria_id.value || null, proveedor_id: form.proveedor_id.value || null, temporada_id: form.temporada_id.value || null, marca_id: form.marca_id.value || null,
       costo: form.costo.value.trim() ? PRECIOS.num(form.costo.value) : null, precio: PRECIOS.num(form.precio.value), ean: form.ean.value.trim() || null,
-      tiene_variantes: form.tiene_variantes.value === 'true', activo: form.activo.value === 'true', publicar_web: form.publicar_web.value === 'true', es_generico: form.es_generico.value === 'true', descripcion: form.descripcion.value.trim() || null
+      tiene_variantes: form.tiene_variantes.value === 'true', activo: form.activo.value === 'true', publicar_web: form.publicar_web.value === 'true', web_por_color: form.web_por_color.value === '' ? null : form.web_por_color.value === 'true', es_generico: form.es_generico.value === 'true', descripcion: form.descripcion.value.trim() || null
     };
     if (d.tipo === 'kit') { d.tiene_variantes = false; form.tiene_variantes.value = 'false'; }
     return d;
@@ -609,13 +610,41 @@ APP.ready.then(async () => {
     const c = (cola || [])[0], pubs = new Set((ci || []).map(x => x.producto_ext)), visibles = new Set((ci || []).filter(x => x.publicado).map(x => x.producto_ext));
     const faltan = variantes.filter(v => v.activa !== false && !(ci || []).some(x => x.variante_id === v.id)).length;
     let t = '';
-    if (c && c.estado === 'pendiente') t = '⏳ Se sube a Tienda Nube en unos minutos (oculta).';
+    if (c && c.estado === 'pendiente' && c.error) t = '✋ ' + c.error + '. Se sube cuando lo elijas.';
+    else if (c && c.estado === 'pendiente') t = '⏳ Se sube a Tienda Nube en unos minutos (oculta).';
     else if (c && c.estado === 'error') t = '⚠ No se pudo subir: ' + (c.error || '') + ' · se reintenta solo.';
     else if (pubs.size) t = (visibles.size ? '✓ En Tienda Nube: ' + (visibles.size === pubs.size ? 'visible' : visibles.size + ' de ' + pubs.size + ' publicaciones visibles') : '✓ En Tienda Nube, oculta: cargale fotos y mostrala desde allá.') + (faltan ? ` · ${faltan} sin publicar` : '');
     else t = 'Todavía no está en Tienda Nube.';
     el.textContent = t;
   }
   form.publicar_web.addEventListener('change', () => setTimeout(estadoWeb, 1500));
+  form.web_por_color.addEventListener('change', () => setTimeout(estadoWeb, 1500));
+
+  // 18/11 (Diego): una prenda de 2 o más colores que va a la web, sin elegir todavía cómo: se pregunta si va como UNA
+  // publicación con los colores adentro, o una por color con el color en el título (como MAGNOLIA). Hasta elegir, no se sube.
+  async function preguntarWeb() {
+    if (!id || form.publicar_web.value !== 'true' || producto.web_por_color != null) return;
+    const cols = [...new Map(variantes.filter(v => v.activa !== false && v.color_id).map(v => [v.color_id, v.color_nombre])).values()];
+    if (cols.length < 2) return;
+    const nom = producto.nombre, lista = cols.slice(0, 6), mas = cols.length > 6 ? '<br>… y ' + (cols.length - 6) + ' más' : '';
+    const caja = (val, tit, cuerpo) => '<button class="btn" data-op="' + val + '" style="flex:1;min-width:220px;text-align:left;padding:12px 14px;height:auto;white-space:normal;display:block"><b>' + tit + '</b><div style="font-size:12px;color:var(--tinta-3);margin-top:6px;line-height:1.5">' + cuerpo + '</div></button>';
+    const elegido = await new Promise(res => {
+      const m = modal('<h2>¿Cómo va a la web?</h2><p class="sub"><b>' + esc(nom) + '</b> tiene ' + cols.length + ' colores. Elegí cómo se publica en Tienda Nube.</p>'
+        + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">'
+        + caja('false', 'Una sola publicación', '«' + esc(nom) + '»<br>con los colores adentro: ' + lista.map(esc).join(', ') + (cols.length > 6 ? '…' : ''))
+        + caja('true', 'Una publicación por color', lista.map(c => '«' + esc(nom + ' ' + String(c || '').toUpperCase()) + '»').join('<br>') + mas)
+        + '</div><p class="sub" style="margin-top:10px">Se puede cambiar después en «Cómo va a la web»; vale para los colores que se suban de ahí en más.</p>'
+        + '<div class="pie"><button class="btn" data-no>Después</button></div>');
+      m.alCerrar = () => res(null);
+      $$('[data-op]', m).forEach(b => b.onclick = () => { m.cerrar(); res(b.dataset.op === 'true'); });
+      $('[data-no]', m).onclick = () => { m.cerrar(); res(null); };
+    });
+    if (elegido == null) { toast('No se sube a la web hasta que elijas «Cómo va a la web»'); estadoWeb(); return; }
+    const r = await sb.from('productos').update({ web_por_color: elegido }).eq('id', id);
+    if (r.error) { toast(mensajeError(r.error), 'error'); return; }
+    producto.web_por_color = elegido; form.web_por_color.value = String(elegido);
+    toast(elegido ? 'Va a la web una publicación por color' : 'Va a la web en una sola publicación'); estadoWeb();
+  }
 
   // ---------- oferta ----------
   async function cargarOfertas() {
@@ -843,7 +872,7 @@ APP.ready.then(async () => {
         if ((nuevas.length || P.prender.length) && !producto.tiene_variantes) await sb.from('productos').update({ tiene_variantes: true }).eq('id', id);
         m.cerrar();
         toast([nuevas.length + P.prender.length ? (nuevas.length + P.prender.length) + ' agregadas' : '', P.apagar.length ? P.apagar.length + ' sacadas' : ''].filter(Boolean).join(' · ') + (P.conStock.length ? ' · ' + P.conStock.length + ' con stock quedaron (primero sacales el stock)' : ''));
-        await cargar(); presetT = null; avisarRemito();
+        await cargar(); presetT = null; await preguntarWeb(); avisarRemito();
       };
     };
     pintar();

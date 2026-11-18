@@ -198,7 +198,8 @@ Deno.serve(async (req) => {
       try {
         const r = await publicarProducto(q);
         res.publicados.push({ producto_id: q.producto_id, ...r });
-        await marcar(r.omitido ? "omitido" : "hecho", { detalle: { ...(q.detalle || {}), ...r }, error: null });
+        if ((r as any).esperar) await marcar("pendiente", { error: (r as any).esperar });   // queda en la cola hasta que se elija
+        else await marcar(r.omitido ? "omitido" : "hecho", { detalle: { ...(q.detalle || {}), ...r }, error: null });
       } catch (err) {
         const msg = String((err as Error)?.message || err);
         res.publicados.push({ producto_id: q.producto_id, error: msg });
@@ -405,7 +406,7 @@ Deno.serve(async (req) => {
     }
 
     async function publicarProducto(q: any) {
-      const { data: p } = await admin.from("productos").select("id,codigo,nombre,precio,tipo,activo,es_generico,publicar_web,categoria_id").eq("id", q.producto_id).single();
+      const { data: p } = await admin.from("productos").select("id,codigo,nombre,precio,tipo,activo,es_generico,publicar_web,categoria_id,web_por_color").eq("id", q.producto_id).single();
       if (!p) return { omitido: "el producto no existe" };
       if (!p.activo || p.es_generico || !p.publicar_web || !["prenda", "varios"].includes(p.tipo)) return { omitido: "no va a la web (inactivo, genérico, kit o marcado solo local)" };
       const { data: vs } = await admin.from("v_variantes").select("id,producto_id,sku,talle,talle_nombre,talle_orden,color,color_nombre,precio,stock_web,activa").eq("producto_id", p.id).eq("activa", true);
@@ -416,6 +417,10 @@ Deno.serve(async (req) => {
       let nuevas = variantes.filter((v: any) => !cruzadas.has(v.id));
       if (Array.isArray(q.variantes) && q.variantes.length) nuevas = nuevas.filter((v: any) => q.variantes.includes(v.id));   // solo las que se crearon (no las que alguien dejó afuera de la web a propósito)
       if (!nuevas.length) return { omitido: "ya está todo en la web" };
+      // 18/11 (Diego): una prenda nueva de 2 o más colores no se sube hasta elegir en la ficha cómo va a la web
+      // (una publicación con todos los colores, o una por color con el color en el título)
+      const coloresPrenda = new Set(variantes.map((v: any) => v.color).filter(Boolean));
+      if (!(cruces || []).length && coloresPrenda.size >= 2 && p.web_por_color == null) return { esperar: "Falta elegir en la ficha cómo va a la web: una publicación con todos los colores o una por color" };
       // el precio de la lista de la web y su oferta (la misma cuenta que tn-precios: la web sale con su precio tachado)
       await cargarPrecios();
       const op = { canal: "tiendanube", categoria_id: p.categoria_id, tipo: p.tipo };
@@ -452,8 +457,11 @@ Deno.serve(async (req) => {
       };
 
       if (!(cruces || []).length) {
-        // nunca estuvo en la web: una publicación con todos sus colores y talles
-        await crearPublicacion(p.nombre, nuevas);
+        // nunca estuvo en la web: una publicación con todos sus colores y talles, o una por color (el color va en el título)
+        if (p.web_por_color === true) {
+          const grupos = new Map<string, any[]>(); nuevas.forEach((v: any) => { const k = v.color || ""; if (!grupos.has(k)) grupos.set(k, []); grupos.get(k)!.push(v); });
+          for (const [color, grupo] of grupos) await crearPublicacion(color ? `${p.nombre} ${String(grupo[0].color_nombre || "").toUpperCase()}` : p.nombre, grupo);
+        } else await crearPublicacion(p.nombre, nuevas);
       } else {
         // ya está en la web: qué publicaciones tiene y qué colores lleva cada una
         const varPorId = new Map(variantes.map((v: any) => [v.id, v]));
@@ -462,7 +470,8 @@ Deno.serve(async (req) => {
         for (const [pe, x] of pubs) { try { x.info = await tn("GET", `/products/${pe}?fields=id,name,published,attributes,variants`); } catch (_) { /* publicación borrada en la web */ } }
         const vivas = [...pubs.entries()].filter(([, x]) => x.info);
         const porColor = new Map<string, any[]>(); nuevas.forEach((v: any) => { const k = v.color || ""; if (!porColor.has(k)) porColor.set(k, []); porColor.get(k)!.push(v); });
-        const unaPorColor = vivas.length > 1 && vivas.every(([, x]) => x.colores.size <= 1);
+        // lo que se eligió en la ficha manda; si no se eligió, se deduce de cómo está publicada
+        const unaPorColor = p.web_por_color === true || (p.web_por_color !== false && vivas.length > 1 && vivas.every(([, x]) => x.colores.size <= 1));
         for (const [color, grupo] of porColor) {
           // el talle nuevo de un color que ya está publicado: a su publicación (ya tiene fotos: visible)
           let destino = vivas.find(([, x]) => color && x.colores.has(color)) || (!color && vivas.length === 1 ? vivas[0] : null);
