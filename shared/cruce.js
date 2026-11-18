@@ -36,9 +36,10 @@
       pintar(); $('#cz-q', m).focus(); $('#cz-q', m).select();
     });
   }
-  // conectar / desconectar una opción del canal (canal_items.id)
+  // conectar / desconectar una opción del canal (canal_items.id). Desconectar queda «manual» sin talle·color: si no, la
+  // sincronización la vuelve a conectar sola por el código (pasó con JAZMÍN, 18/11)
   async function conectar(itemId, varianteId) {
-    const r = await sb.from('canal_items').update(varianteId ? { variante_id: varianteId, cruce: 'manual' } : { variante_id: null, cruce: 'ninguno' }).eq('id', itemId);
+    const r = await sb.from('canal_items').update(varianteId ? { variante_id: varianteId, cruce: 'manual' } : { variante_id: null, cruce: 'manual' }).eq('id', itemId);
     if (r.error) { APP.toast(APP.mensajeError(r.error), 'error'); return false; }
     return true;
   }
