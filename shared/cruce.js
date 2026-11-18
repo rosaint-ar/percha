@@ -9,7 +9,7 @@
     if (cache) return cache;
     let d = 0, t = [];
     while (true) {
-      const { data } = await sb.from('v_variantes').select('id,producto_id,producto_nombre,producto_codigo,sku,talle_nombre,color_nombre,stock,activa').eq('empresa_id', APP.empresa.id).order('producto_nombre').order('talle_orden').range(d, d + 999);
+      const { data } = await sb.from('v_variantes').select('id,producto_id,producto_nombre,producto_codigo,sku,talle_nombre,color_nombre,stock,activa').eq('empresa_id', APP.empresa.id).order('producto_nombre').order('talle_orden').order('id').range(d, d + 999);
       t = t.concat(data || []); if (!data || data.length < 1000) break; d += 1000;
     }
     return (cache = t);

@@ -129,6 +129,33 @@ Deno.serve(async (req) => {
     const { tn } = clienteTN(cx.externo_id, sec.access_token);
     // 17/11 · Revisión de la web: mostrar (o volver a ocultar) una publicación desde Percha. Al mostrarla, sus opciones
     // conectadas reciben enseguida el stock de Percha (mientras estaba oculta, tn-push no le mandaba nada).
+    // 18/11 · Revisión de la web: «poner el nombre de Percha en la web». Cambia un valor (color o talle) en todas las opciones
+    // de UNA publicación (ej. MIA «Rosa lisa» → «Rosa»). No toca stock ni conexiones. Si alguna combinación nueva ya existe
+    // en la publicación, no hace nada y lo avisa (Tienda Nube no deja repetir opciones).
+    if (body.renombrar) {
+      const pe = String(body.renombrar.publicacion || ""), de = String(body.renombrar.de || "").trim(), a = String(body.renombrar.a || "").trim();
+      if (!pe || !de || !a) { resumen.push({ conexion: cx.id, error: "Falta la publicación o el nombre" }); continue; }
+      const { data: suyos } = await admin.from("canal_items").select("id").eq("conexion_id", cx.id).eq("producto_ext", pe).limit(1);
+      if (!suyos || !suyos.length) { resumen.push({ conexion: cx.id, error: "Esa publicación no es de esta tienda" }); continue; }
+      const prod = await tn("GET", `/products/${pe}?fields=id,variants`);
+      const clave = (vals: any[]) => vals.map((x: any) => norm(es(x))).join("|");
+      const cambiar = (prod.variants || []).filter((v: any) => (v.values || []).some((x: any) => norm(es(x)) === norm(de)));
+      if (!cambiar.length) { resumen.push({ conexion: cx.id, error: `En la web no hay opciones «${de}» en esa publicación` }); continue; }
+      const nuevos = cambiar.map((v: any) => ({ v, values: (v.values || []).map((x: any) => norm(es(x)) === norm(de) ? { es: a } : x) }));
+      const existentes = new Set((prod.variants || []).filter((v: any) => !cambiar.includes(v)).map((v: any) => clave(v.values || [])));
+      const choques = nuevos.filter((n: any) => existentes.has(clave(n.values))).map((n: any) => n.values.map(es).join(" / "));
+      if (choques.length) { resumen.push({ conexion: cx.id, error: `Ya existe en la web: ${choques.join(", ")}` }); continue; }
+      const hechas: string[] = [];
+      if (!simular) for (const n of nuevos) {
+        await tn("PUT", `/products/${pe}/variants/${n.v.id}`, { values: n.values });
+        const valores = n.values.map(es).join(" / ");
+        const { data: it } = await admin.from("canal_items").select("id,color_canal,talle_canal").eq("conexion_id", cx.id).eq("variante_ext", String(n.v.id)).maybeSingle();
+        if (it) await admin.from("canal_items").update({ valores, ...(norm(it.color_canal || "") === norm(de) ? { color_canal: a } : {}), ...(norm(it.talle_canal || "") === norm(de) ? { talle_canal: a } : {}), actualizado: new Date().toISOString() }).eq("id", it.id);
+        hechas.push(valores);
+      }
+      resumen.push({ conexion: cx.id, publicacion: pe, de, a, opciones: nuevos.length, hechas });
+      continue;
+    }
     if (body.mostrar || body.ocultar) {
       const pe = String(body.mostrar || body.ocultar), ver = !!body.mostrar;
       const { data: its } = await admin.from("canal_items").select("id,variante_id").eq("conexion_id", cx.id).eq("producto_ext", pe);
@@ -145,13 +172,13 @@ Deno.serve(async (req) => {
     const ESPERA_MIN = Math.max(1, +cfg.espera_min || 10), DIAS_NUEVOS = Math.max(0, +cfg.nuevos_ingresos_dias || 0);
     const e = cx.empresa_id, res: any = { conexion: cx.id, publicados: [], fotos: null };
     let ctxPrecios: any = null, listaTN: any = null;
-    const pagT = async (q: () => any) => { let todo: any[] = []; for (let d = 0; ; d += 1000) { const { data } = await q().range(d, d + 999); todo = todo.concat(data || []); if (!data || data.length < 1000) break; } return todo; };
+    const pagT = async (q: () => any, orden = "id") => { let todo: any[] = []; for (let d = 0; ; d += 1000) { const { data } = await q().order(orden).range(d, d + 999); todo = todo.concat(data || []); if (!data || data.length < 1000) break; } return todo; };
     const cargarPrecios = async () => {
       if (ctxPrecios) return;
       const [listas, excep, fijos, rebajas, rp] = await Promise.all([
         pagT(() => admin.from("listas_precios").select("*").eq("empresa_id", e).eq("activa", true).order("orden")),
         pagT(() => admin.from("lista_excepciones").select("lista_id,categoria_id,producto_id,porcentaje").eq("empresa_id", e)),
-        pagT(() => admin.from("precios").select("lista_id,producto_id,variante_id,precio").eq("empresa_id", e)),
+        pagT(() => admin.from("precios").select("lista_id,producto_id,variante_id,precio").eq("empresa_id", e).order("lista_id").order("producto_id"), "variante_id"),
         pagT(() => admin.from("promociones").select("*").eq("empresa_id", e).eq("activa", true).eq("tipo", "rebaja")),
         pagT(() => admin.from("rebaja_precios").select("promocion_id,producto_id,variante_id,precio").eq("empresa_id", e))]);
       ctxPrecios = armar({ listas, excep, fijos, rebajas, rp });

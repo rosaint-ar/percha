@@ -14,7 +14,7 @@ export async function fotosDesdeLaWeb(admin: any, cx: any, prods: any[], op: { s
   const out = { revisadas: prods.length, nuevas: 0, cambiadas: 0, quitadas: 0, de_percha_pasadas: 0, portadas: 0, mostradas: 0, ocultadas: 0, cambios: [] as any[] };
   if (!prods.length) return out;
   // la base devuelve de a 1000 filas como máximo: todo se lee por páginas (si no, faltaban fotos y se querían crear de nuevo)
-  const todas = async (q: () => any) => { let r: any[] = []; for (let d = 0; ; d += 1000) { const { data, error } = await q().range(d, d + 999); if (error) throw new Error(error.message); r = r.concat(data || []); if (!data || data.length < 1000) break; } return r; };
+  const todas = async (q: () => any) => { let r: any[] = []; for (let d = 0; ; d += 1000) { const { data, error } = await q().order("id").range(d, d + 999); if (error) throw new Error(error.message); r = r.concat(data || []); if (!data || data.length < 1000) break; } return r; };
   const prodPorId = new Map(prods.map((p: any) => [String(p.id), p]));
   const enLote = new Set(prodPorId.keys());
   const pes = [...enLote];

@@ -49,7 +49,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="../shared/supabase.js?v=202611122356"></script>
 <script src="../shell/shell.js?v=202611122356"></script>
-<script src="../shared/cruce.js?v=202611172100"></script>
+<script src="../shared/cruce.js?v=202611172200"></script>
 <script src="../shared/prenda.js?v=202611122356"></script>
 <script>
 APP.ready.then(async () => {
@@ -65,11 +65,11 @@ APP.ready.then(async () => {
   let P = [], V = [], W = [], OK = new Map(), ATR = [], vivo = null;
   async function cargarDatos() {
     [P, V, W, OK, ATR] = await Promise.all([
-      todo(() => sb.from('productos').select('id,codigo,nombre,tipo,activo,es_generico,publicar_web,precio').eq('empresa_id', e).order('codigo')),
-      todo(() => sb.from('v_variantes').select('id,producto_id,sku,ean,activa,talle,talle_nombre,talle_orden,color,color_nombre,stock,stock_web,fallas,precio').eq('empresa_id', e).order('producto_codigo')),
-      todo(() => sb.from('canal_items').select('id,producto_ext,variante_ext,nombre,valores,sku,mpn,precio,precio_promo,stock,publicado,variante_id,cruce,talle_canal,color_canal,stock_a_decidir').eq('conexion_id', cxId).order('producto_ext')),
-      todo(() => sb.from('canal_revision_ok').select('clave,nota').eq('empresa_id', e)).then(r => new Map(r.map(x => [x.clave, x.nota]))),
-      todo(() => sb.from('atributos').select('id,tipo,codigo,nombre,orden,activo').eq('empresa_id', e).in('tipo', ['talle', 'color']).order('orden'))]);
+      todo(() => sb.from('productos').select('id,codigo,nombre,tipo,activo,es_generico,publicar_web,precio').eq('empresa_id', e).order('codigo').order('id')),
+      todo(() => sb.from('v_variantes').select('id,producto_id,sku,ean,activa,talle,talle_nombre,talle_orden,color,color_nombre,stock,stock_web,fallas,precio').eq('empresa_id', e).order('producto_codigo').order('id')),
+      todo(() => sb.from('canal_items').select('id,producto_ext,variante_ext,nombre,valores,sku,mpn,precio,precio_promo,stock,publicado,variante_id,cruce,talle_canal,color_canal,stock_a_decidir').eq('conexion_id', cxId).order('producto_ext').order('id')),
+      todo(() => sb.from('canal_revision_ok').select('clave,nota').eq('empresa_id', e).order('id')).then(r => new Map(r.map(x => [x.clave, x.nota]))),
+      todo(() => sb.from('atributos').select('id,tipo,codigo,nombre,orden,activo').eq('empresa_id', e).in('tipo', ['talle', 'color']).order('orden').order('id'))]);
     CRUCE.olvidar();
   }
 
@@ -88,7 +88,7 @@ APP.ready.then(async () => {
   const CATS = [
     ['vivo', 'alta', 'Stock distinto ahora', 'Comparación en vivo con la web'],
     ['decidir', 'alta', 'Stock a decidir', 'Se conectó con stock distinto: elegí cuál vale'],
-    ['color', 'alta', 'Conectada a otro color', 'La web dice un color y Percha tiene ese color, pero está conectada a otro'],
+    ['color', 'alta', 'Color con otro nombre', 'La web dice un color y Percha otro: elegí cuál nombre vale'],
     ['dos_pub', 'alta', 'En dos publicaciones', 'Un talle·color de Percha en publicaciones distintas (¿son colores distintos?)'],
     ['general', 'alta', 'Atadas a un código general', 'La venta descuenta de «VARIAS» y no del modelo'],
     ['sin_web', 'alta', 'Stock sin publicación', 'Hay stock en el local y en la web no se puede comprar'],
@@ -126,7 +126,7 @@ APP.ready.then(async () => {
       const enNombre = c => { const t = new Set(norm(w.nombre).split(' ')), pr = new Set(norm(p.nombre).split(' ')); const ws = norm(c).split(' '); return ws.every(x => t.has(x)) && !ws.every(x => pr.has(x)); };   // «MARTHA SOFT AQUA II» ya dice «Aqua II»
       if (w.color_canal && v.color_nombre && colN(w.color_canal) !== colN(v.color_nombre) && !enNombre(v.color_nombre)) {
         const cand = (varsDe.get(v.producto_id) || []).filter(x => x.id !== v.id && x.color_nombre && colN(x.color_nombre) === colN(w.color_canal) && (!v.talle_nombre || norm(x.talle_nombre) === norm(v.talle_nombre)));
-        if (cand.length) add('color', w.id, { producto: p, titulo: p.nombre, que: `En la web es «${w.color_canal}» y está conectada a «${v.color_nombre}».`, filas: [w], sugerida: cand[0] });
+        if (cand.length) add('color', w.id, { producto: p, titulo: p.nombre, que: `La web dice «${w.color_canal}» y en Percha está conectada a «${v.color_nombre}». Elegí cuál nombre vale: el de la web (se conecta a «${cand[0].color_nombre}» de Percha) o el de Percha (se cambia el nombre en la web, sin tocar el stock).`, filas: [w], sugerida: cand[0] });
       }
       // talle
       if (w.talle_canal && v.talle_nombre && !talleIgual(w.talle_canal, v.talle_nombre)) add('talle', w.id, { producto: p, titulo: p.nombre, que: `En la web «${w.talle_canal}», en Percha «${v.talle_nombre}».`, filas: [w] });
@@ -187,7 +187,8 @@ APP.ready.then(async () => {
     return `<div class="rv-fila"><div>${local}</div>
       <div class="web">${esc(w.nombre)}${w.publicado ? '' : ' <span class="chip gris">oculta</span>'}<br><small>#${esc(w.producto_ext)} · «${esc(w.valores || 'única')}» · web <span class="n">${w.stock == null ? 'sin límite' : fmt.num(w.stock)}</span> · ${esc(w.sku || w.mpn || 'sin SKU')}</small></div>
       <div class="rv-acc">
-        ${h.sugerida && h.filas[0] === w ? `<button class="btn chico primario" data-a="conectar" data-w="${w.id}" data-v="${h.sugerida.id}">Conectar a ${esc(nomV(h.sugerida))}</button>` : ''}
+        ${w.variante_id && v && v.color_nombre && w.color_canal && colN(w.color_canal) !== colN(v.color_nombre) ? `<button class="btn chico primario" data-a="renombrar" data-pe="${esc(w.producto_ext)}" data-de="${esc(w.color_canal)}" data-a2="${esc(v.color_nombre)}" title="Cambia el nombre en la web; no toca stock ni conexiones">Poner «${esc(v.color_nombre)}» en la web</button>` : ''}
+        ${h.sugerida && h.filas[0] === w ? `<button class="btn chico" data-a="conectar" data-w="${w.id}" data-v="${h.sugerida.id}" title="Conecta la opción al talle·color de Percha que se llama como en la web">Usar «${esc(h.sugerida.color_nombre)}» de Percha</button>` : ''}
         ${separable ? `<button class="btn chico" data-a="separar" data-w="${w.id}" title="Crea (o usa) ese color en la prenda, le pasa el stock que tiene la web en esa opción y la conecta">Separar${w.color_canal && (!v.color_nombre || colN(w.color_canal) !== colN(v.color_nombre)) ? ' «' + esc(w.color_canal) + '»' : '…'}</button>` : ''}
         <button class="btn chico" data-a="elegir" data-w="${w.id}">${w.variante_id ? 'Conectar a otro…' : 'Conectar…'}</button>
         ${w.publicado ? '' : `<button class="btn chico" data-a="mostrar" data-pe="${esc(w.producto_ext)}" title="Muestra la publicación en la web; recibe el stock de Percha">Mostrar</button>`}
@@ -232,7 +233,14 @@ APP.ready.then(async () => {
         if (a === 'ok') { const nota = await APP.formulario({ titulo: 'Está bien así', sub: 'No vuelve a aparecer como problema. Podés anotar por qué (opcional).', campos: [{ k: 'nota', label: 'Nota', tipo: 'text' }], boton: 'Marcar' }); if (!nota) { b.disabled = false; return; }
           const { error } = await sb.from('canal_revision_ok').upsert({ empresa_id: e, clave: b.dataset.k, nota: nota.nota || null }, { onConflict: 'empresa_id,clave' }); if (error) throw error; return rehacer('Marcada como bien'); }
         if (a === 'desmarcar') { const { error } = await sb.from('canal_revision_ok').delete().eq('empresa_id', e).eq('clave', b.dataset.k); if (error) throw error; return rehacer(); }
-        if (a === 'conectar') { if (await CRUCE.conectar(+b.dataset.w, b.dataset.v)) { empujar(); return rehacer('Conectada'); } }
+        if (a === 'conectar') { const vv = varDe(b.dataset.v), ww = W_(b.dataset.w);
+          if (vv && ww && +ww.stock !== sw(vv) && !await confirmar(`«${nomV(vv)}» tiene ${fmt.num(sw(vv))} para la web y la opción de la web tiene ${fmt.num(ww.stock)}. Si la conectás, queda «a decidir» hasta que elijas cuál vale. ¿Seguimos?`, 'Conectar')) { b.disabled = false; return; }
+          if (await CRUCE.conectar(+b.dataset.w, b.dataset.v)) { empujar(); return rehacer('Conectada'); } }
+        if (a === 'renombrar') { const pe = b.dataset.pe, de = b.dataset.de, nuevo = b.dataset.a2;
+          if (!await confirmar(`En la publicación #${pe} de la web, las opciones «${de}» pasan a llamarse «${nuevo}», como en Percha. No cambia el stock ni las conexiones. ¿Seguimos?`, 'Cambiar en la web')) { b.disabled = false; return; }
+          const r = await fn('tn-publicar', { renombrar: { publicacion: pe, de, a: nuevo } }); const x = (r.resumen || [])[0] || {};
+          if (x.error) { toast(x.error, 'error'); b.disabled = false; return; }
+          return rehacer(`En la web: «${de}» → «${nuevo}» (${x.opciones || 0} opciones)`); }
         if (a === 'elegir') { const w = W_(b.dataset.w), v = w.variante_id && varDe(w.variante_id);
           const r = await CRUCE.elegir({ sub: `${esc(w.nombre)} · «${esc(w.valores || 'única')}» · web ${w.stock == null ? 'sin límite' : fmt.num(w.stock)}`, q: v ? '' : (w.sku || ''), productoId: v ? v.producto_id : null, quitar: !!w.variante_id });
           if (!r) { b.disabled = false; return; }
@@ -286,7 +294,17 @@ APP.ready.then(async () => {
     $('#pr-act', m).onchange = ev => guardar(sb.from('productos').update({ activo: ev.target.checked }).eq('id', id), null, ev.target.checked ? 'Prenda prendida' : 'Prenda apagada');
     $('#pr-web', m).onchange = ev => guardar(sb.from('productos').update({ publicar_web: ev.target.checked }).eq('id', id), null, ev.target.checked ? 'Va a la web' : 'Solo local');
     $$('[data-activa]', m).forEach(c => c.onchange = async () => { const v = varDe(c.dataset.activa);
-      if (!c.checked && enWeb(v).length && !await confirmar(`«${nomV(v)}» está en la web. Si lo apagás, Percha lo saca de la web. ¿Seguimos?`, 'Apagar')) { c.checked = true; return; }
+      // conectado a la web: apagarlo así borraría esas opciones de la web (pasó con MIA «Rosa lisa», 17/11). Primero se pasa la conexión.
+      if (!c.checked && enWeb(v).length) { c.checked = true; const ws = enWeb(v);
+        const mm = modal(`<h2>Primero pasá la conexión</h2><p>«${esc(nomV(v))}» está conectado a ${ws.length === 1 ? 'una opción' : ws.length + ' opciones'} de la web (${ws.map(w => '«' + esc(w.valores || 'única') + '»').join(', ')}). Si lo apagás así, Percha <b>borra esas opciones de la web</b>.</p><p class="sub">Elegí a qué talle·color de Percha pasan (el que tiene el nombre correcto). Después este se apaga y la web queda igual.</p><div class="pie"><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Elegir a cuál pasan…</button></div>`);
+        $('[data-no]', mm).onclick = () => mm.cerrar();
+        $('[data-si]', mm).onclick = async () => { mm.cerrar();
+          const r = await CRUCE.elegir({ titulo: 'Pasar las conexiones a…', sub: esc(prodDe(v.producto_id).nombre) + ' · ' + esc(nomV(v)), productoId: v.producto_id });
+          if (!r || r === 'quitar' || r.variante.id === v.id) return;
+          for (const w of ws) { if (!await CRUCE.conectar(w.id, r.variante.id)) return; w.variante_id = r.variante.id; }
+          if (!await guardar(sb.from('variantes').update({ activa: false }).eq('id', v.id), c.closest('tr'))) return;
+          c.checked = false; c.closest('tr').style.opacity = '.5'; empujar(); toast('Conexiones pasadas a «' + nomV(r.variante) + '» y «' + nomV(v) + '» apagado'); };
+        return; }
       if (await guardar(sb.from('variantes').update({ activa: c.checked }).eq('id', v.id), c.closest('tr'))) { c.closest('tr').style.opacity = c.checked ? '' : '.5'; if (!c.checked || enWeb(v).length) empujar(); } });
     $$('[data-attr]', m).forEach(s => { const previo = s.value; s.onchange = async () => {
       let val = s.value;

@@ -39,7 +39,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="../shared/supabase.js?v=202611122356"></script>
 <script src="../shell/shell.js?v=202611122356"></script>
-<script src="../shared/cruce.js?v=202611172100"></script>
+<script src="../shared/cruce.js?v=202611172200"></script>
 <script>
 APP.ready.then(async () => {
   const { fmt, esc, $, $$, toast, modal, confirmar, mensajeError } = APP, e = APP.empresa.id;
@@ -91,7 +91,7 @@ APP.ready.then(async () => {
     let data;
     if (filtro === 'nuevos') {
       // productos del canal que no tienen producto propio en el local: se crean tal cual (nombre, foto, precio, variantes) con código automático
-      let c = sb.from('v_canal_nuevos').select('*').eq('conexion_id', cxId).order('sku').order('nombre').range(pagina * PAG, pagina * PAG + PAG - 1);
+      let c = sb.from('v_canal_nuevos').select('*').eq('conexion_id', cxId).order('sku').order('nombre').order('producto_ext').range(pagina * PAG, pagina * PAG + PAG - 1);
       if (q) c = c.or(`nombre.ilike.%${q}%,sku.ilike.%${q}%`);
       ({ data } = await c); if (mio !== pedido) return;
       $('#tb thead').innerHTML = `<tr><th>Producto en ${esc(CANAL)}</th><th>SKU</th><th class="num">Variantes</th><th class="num">Stock ${esc(CANAL)}</th><th class="num">Precio</th><th>Hoy en el local</th><th></th></tr>`;
@@ -124,14 +124,14 @@ APP.ready.then(async () => {
       $$('[data-dw]').forEach(b => b.onclick = async () => { b.disabled = true; if (await decidir(filas[+b.dataset.dw], 'web')) { contar(); cargar(true); } else b.disabled = false; });
       $$('[data-dp]').forEach(b => b.onclick = async () => { b.disabled = true; if (await decidir(filas[+b.dataset.dp], 'percha')) { contar(); cargar(true); } else b.disabled = false; });
     } else if (filtro === 'sin_publicar') {
-      let c = sb.from('v_variantes_sin_canal').select('*').eq('conexion_id', cxId).order('producto_nombre').range(pagina * PAG, pagina * PAG + PAG - 1);
+      let c = sb.from('v_variantes_sin_canal').select('*').eq('conexion_id', cxId).order('producto_nombre').order('id').range(pagina * PAG, pagina * PAG + PAG - 1);
       if (q) c = c.or(`producto_nombre.ilike.%${q}%,sku.ilike.%${q}%`);
       ({ data } = await c); if (mio !== pedido) return;
       $('#tb thead').innerHTML = '<tr><th>Prenda en el local</th><th>Talle · color</th><th>SKU</th><th class="num">Stock local</th><th class="num">Precio</th></tr>';
       filas = filas.concat(data || []);
       $('#tb tbody').innerHTML = filas.map(v => `<tr><td>${esc(v.producto_nombre)}</td><td>${esc([v.talle_nombre, v.color_nombre].filter(Boolean).join(' · ') || 'único')}</td><td class="mono">${esc(v.sku || '')}</td><td class="num stock-local"><span class="n">${fmt.num(v.stock)}</span></td><td class="num">${fmt.pesos(v.precio)}</td></tr>`).join('') || `<tr><td colspan="5" class="vacio">Todo lo del local está en ${esc(CANAL)}.</td></tr>`;
     } else {
-      let c = sb.from('v_cruce_canal').select('*').eq('conexion_id', cxId).order('nombre').order('valores').range(pagina * PAG, pagina * PAG + PAG - 1);
+      let c = sb.from('v_cruce_canal').select('*').eq('conexion_id', cxId).order('nombre').order('valores').order('id').range(pagina * PAG, pagina * PAG + PAG - 1);
       if (filtro === 'distinto') c = c.eq('estado_stock', 'distinto'); if (filtro === 'sin_cruzar') c = c.is('variante_id', null);
       if (filtro === 'general') c = c.eq('publicado', true).in('variante_id', generales.length ? generales : ['00000000-0000-0000-0000-000000000000']);
       if (q) c = c.or(`nombre.ilike.%${q}%,sku.ilike.%${q}%,valores.ilike.%${q}%`);
