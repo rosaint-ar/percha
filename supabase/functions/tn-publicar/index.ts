@@ -127,6 +127,52 @@ Deno.serve(async (req) => {
     if (!cx.empujar_stock && !simular) continue;   // la web todavía no la maneja Percha
     const cfg = configDe(cx);
     const { tn } = clienteTN(cx.externo_id, sec.access_token);
+    // 18/11 (Diego) · sacar de las descripciones el renglón viejo «+ Ver más …» (link a la web vieja).
+    // body.limpiar_vermas = { solo?: "pijamas", pagina?: 1 }. Con simular solo cuenta. Corta a los ~100 s y devuelve
+    // «seguir» con la página por la que hay que seguir.
+    if (body.limpiar_vermas) {
+      const opt = body.limpiar_vermas || {}, solo = String(opt.solo || "").toLowerCase(), t0 = Date.now();
+      const texto = (x: string) => x.replace(/<[^>]+>/g, " ").replace(/&nbsp;|&#160;/gi, " ").replace(/\s+/g, " ").trim();
+      const RX = /<a\b[^>]*>(?:(?!<\/a>)[\s\S])*?Ver\s*(?:&nbsp;)?\s*m(?:á|&aacute;)s(?:(?!<\/a>)[\s\S])*?<\/a>/i;
+      const limpiar = (h0: string) => {
+        let h = h0, desde = 0; const vistos: string[] = [];
+        for (let n = 0; n < 10; n++) {
+          const m = RX.exec(h.slice(desde)); if (!m) break;
+          const i = desde + m.index, f = i + m[0].length, lt = texto(m[0]); vistos.push(lt);
+          if (solo && !lt.toLowerCase().includes(solo)) { desde = f; continue; }
+          // el párrafo entero si no tiene otra cosa; si no, solo el link
+          let a = i, b = f;
+          const pS = h.lastIndexOf("<p", i), pE = h.indexOf("</p>", f);
+          if (pS >= 0 && pE >= 0 && !h.slice(pS, i).includes("</p>") && texto(h.slice(pS, pE + 4)) === lt) { a = pS; b = pE + 4; }
+          h = h.slice(0, a) + h.slice(b);
+          // y la fila de la tabla si quedó vacía
+          const tS = h.lastIndexOf("<tr", a), tE = h.indexOf("</tr>", a);
+          if (tS >= 0 && tE >= 0) { const fila = h.slice(tS, tE + 5); if (!/<\/?table|<img/i.test(fila) && !texto(fila)) h = h.slice(0, tS) + h.slice(tE + 5); }
+          desde = a;
+        }
+        return { h, vistos };
+      };
+      const out: any = { conexion: cx.id, revisadas: 0, cambian: 0, textos: {}, ejemplos: [], errores: [] };
+      for (let pg = Math.max(1, +opt.pagina || 1); ; pg++) {
+        if (Date.now() - t0 > 100000) { out.seguir = pg; break; }
+        let lista: any[] = [];
+        try { lista = (await tn("GET", `/products?fields=id,name,description&per_page=50&page=${pg}`)) || []; } catch (err) { if (/ 404/.test(String(err))) lista = []; else throw err; }
+        if (!lista.length) break;
+        for (const pr of lista) {
+          out.revisadas++;
+          const h0 = es(pr.description); if (!h0) continue;
+          const { h, vistos } = limpiar(h0);
+          vistos.forEach((t) => out.textos[t] = (out.textos[t] || 0) + 1);
+          if (h === h0) continue;
+          out.cambian++; if (out.ejemplos.length < 15) out.ejemplos.push({ id: pr.id, nombre: es(pr.name) });
+          if (!simular) { const { error: eR } = await admin.from("tn_descripciones_respaldo").insert({ conexion_id: cx.id, producto_ext: String(pr.id), descripcion: h0, motivo: "sacar Ver más" }); if (eR) { out.errores.push({ id: pr.id, error: "sin copia: " + eR.message }); continue; } }
+          if (!simular) try { await tn("PUT", `/products/${pr.id}`, { description: { ...(typeof pr.description === "object" ? pr.description : {}), es: h } }); }
+            catch (err) { if (out.errores.length < 10) out.errores.push({ id: pr.id, error: String(err).slice(0, 150) }); }
+        }
+        if (lista.length < 50) break;
+      }
+      resumen.push(out); continue;
+    }
     // 17/11 · Revisión de la web: mostrar (o volver a ocultar) una publicación desde Percha. Al mostrarla, sus opciones
     // conectadas reciben enseguida el stock de Percha (mientras estaba oculta, tn-push no le mandaba nada).
     // 18/11 · Revisión de la web: «poner el nombre de Percha en la web». Cambia un valor (color o talle) en todas las opciones
