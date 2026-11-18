@@ -185,29 +185,6 @@ Deno.serve(async (req) => {
       listaTN = listas.find((l: any) => l.canal === "tiendanube") || ctxPrecios.base;
     };
 
-    // ================= 1) publicar lo nuevo =================
-    let cola: any[] = [];
-    if (body.producto_id) cola = [{ id: null, producto_id: body.producto_id, variantes: null, detalle: null, intentos: 0 }];
-    else if (cfg.publicar_nuevos) {   // apagado en Conexiones: lo nuevo queda solo en Percha (la cola espera)
-      const hace = new Date(Date.now() - ESPERA_MIN * 60000).toISOString(), reintento = new Date(Date.now() - 10 * 60000).toISOString();
-      const { data } = await admin.from("canal_publicar").select("*").eq("empresa_id", e).or(`and(estado.eq.pendiente,actualizado.lt.${hace}),and(estado.eq.error,intentos.lt.3,actualizado.lt.${reintento})`).order("actualizado").limit(5);
-      cola = data || [];
-    }
-    for (const q of cola) {
-      const marcar = async (estado: string, extra: Record<string, unknown>) => { if (!simular && q.id) await admin.from("canal_publicar").update({ estado, actualizado: new Date().toISOString(), ...(estado === "hecho" || estado === "omitido" ? { hecho: new Date().toISOString() } : {}), ...extra }).eq("id", q.id); };
-      try {
-        const r = await publicarProducto(q);
-        res.publicados.push({ producto_id: q.producto_id, ...r });
-        if ((r as any).esperar) await marcar("pendiente", { error: (r as any).esperar });   // queda en la cola hasta que se elija
-        else await marcar(r.omitido ? "omitido" : "hecho", { detalle: { ...(q.detalle || {}), ...r }, error: null });
-      } catch (err) {
-        const msg = String((err as Error)?.message || err);
-        res.publicados.push({ producto_id: q.producto_id, error: msg });
-        await marcar("error", { error: msg.slice(0, 500), intentos: (q.intentos || 0) + 1 });
-      }
-    }
-
-
     // ===== completar una publicación nueva como las demás de la tienda (12/11, Diego) =====
     // Categorías: las de la prenda MÁS PARECIDA que ya está publicada (misma familia en Percha, nombre parecido: PIA BORGOÑA
     // copia de PIA BORDÓ), + «Nuevos Ingresos» y la etiqueta «nuevos-ingresos» (para mostrarlas aparte en la web),
@@ -274,6 +251,31 @@ Deno.serve(async (req) => {
       if (mv && (mv.age_group || mv.gender)) for (const v of (info.variants || []).filter((v: any) => !v.age_group || !v.gender)) await tn("PUT", `/products/${pe}/variants/${v.id}`, { age_group: v.age_group || mv.age_group, gender: v.gender || mv.gender }).catch(() => null);
       return { publicacion: pe, modelo: modeloNombre, categorias: [...ids].length };
     }
+
+    // 18/11: va DESPUÉS de completarPublicacion y sus ayudantes (antes, «parecido» todavía no existía y las
+    // publicaciones nuevas quedaban sin categorías)
+    // ================= 1) publicar lo nuevo =================
+    let cola: any[] = [];
+    if (body.producto_id) cola = [{ id: null, producto_id: body.producto_id, variantes: null, detalle: null, intentos: 0 }];
+    else if (cfg.publicar_nuevos) {   // apagado en Conexiones: lo nuevo queda solo en Percha (la cola espera)
+      const hace = new Date(Date.now() - ESPERA_MIN * 60000).toISOString(), reintento = new Date(Date.now() - 10 * 60000).toISOString();
+      const { data } = await admin.from("canal_publicar").select("*").eq("empresa_id", e).or(`and(estado.eq.pendiente,actualizado.lt.${hace}),and(estado.eq.error,intentos.lt.3,actualizado.lt.${reintento})`).order("actualizado").limit(5);
+      cola = data || [];
+    }
+    for (const q of cola) {
+      const marcar = async (estado: string, extra: Record<string, unknown>) => { if (!simular && q.id) await admin.from("canal_publicar").update({ estado, actualizado: new Date().toISOString(), ...(estado === "hecho" || estado === "omitido" ? { hecho: new Date().toISOString() } : {}), ...extra }).eq("id", q.id); };
+      try {
+        const r = await publicarProducto(q);
+        res.publicados.push({ producto_id: q.producto_id, ...r });
+        if ((r as any).esperar) await marcar("pendiente", { error: (r as any).esperar });   // queda en la cola hasta que se elija
+        else await marcar(r.omitido ? "omitido" : "hecho", { detalle: { ...(q.detalle || {}), ...r }, error: null });
+      } catch (err) {
+        const msg = String((err as Error)?.message || err);
+        res.publicados.push({ producto_id: q.producto_id, error: msg });
+        await marcar("error", { error: msg.slice(0, 500), intentos: (q.intentos || 0) + 1 });
+      }
+    }
+
 
     if (body.completar) {
       const { data: dp } = await admin.from("canal_items").select("producto_ext,variantes!inner(producto_id)").eq("conexion_id", cx.id).eq("de_percha", true);
