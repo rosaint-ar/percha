@@ -58,7 +58,7 @@ APP.ready.then(async () => {
   const params = new URLSearchParams(location.search); let cxId = params.get('c');
   if (!cxId) { const { data } = await sb.from('conexiones').select('id').eq('empresa_id', e).eq('estado', 'activa').limit(1).maybeSingle(); cxId = data && data.id; }
   if (!cxId) { $('main').innerHTML = '<div class="card"><p>No hay ningún canal conectado. <a href="conexiones.html">Conectar</a></p></div>'; return; }
-  $('#acciones-pagina').innerHTML = `<a class="btn" href="cruce.html?c=${cxId}">← Cruce de productos</a> <button class="btn" id="btn-vivo" title="Lee la web ahora y compara el stock con Percha (no cambia nada)">Comparar stock con la web ahora</button> <button class="btn" id="btn-act">Actualizar</button>`;
+  $('#acciones-pagina').innerHTML = `<a class="btn" href="cruce.html?c=${cxId}">← Cruce de productos</a> <button class="btn" id="btn-vivo" title="Lee la web ahora y compara el stock con Percha (no cambia nada)">Comparar stock con la web ahora</button> <button class="btn" id="btn-act">Actualizar</button> <button class="btn primario" id="btn-traer" title="Colores, diseños, talles y modelos que la web tiene bien y Percha no">Traer de la web…</button>`;
 
   // ---------------- datos ----------------
   const todo = async (q) => { let t = []; for (let d = 0; ; d += 1000) { const { data, error } = await q().range(d, d + 999); if (error) throw error; t = t.concat(data || []); if (!data || data.length < 1000) break; } return t; };
@@ -299,7 +299,123 @@ APP.ready.then(async () => {
     $$('[data-pv]', m).forEach(a => a.onclick = ev => { ev.preventDefault(); PRENDA.abrir(a.dataset.pv, { alGuardar: () => { cambio = true; } }); });
   }
 
+  // ---------------- traer de la web (17/11, Diego: "traé desde la web las correcciones sin romper nada") ----------------
+  // La web tiene bien el detalle (colores, diseños, talles, modelo) donde la carga inicial de Percha lo juntó o lo nombró
+  // distinto. Se trae SOLO eso; el stock no cambia de total (pasa de un talle·color al otro lo que la web tiene en cada
+  // opción) y nada se borra (lo que queda vacío y sin conexión se apaga). En la web no cambia nada.
+  const tit = s => { s = String(s || '').trim().toLowerCase(); return s.charAt(0).toUpperCase() + s.slice(1); };
+  const sufijoPub = w => { const m = String(w.nombre || '').match(/»\s*([^«»]+)$/); return m ? m[1].trim() : ''; };
+  const VAC2 = new Set('de del la el y con c s'.split(' '));
+  const claveNom = s => [...new Set(norm(s).split(' ').filter(x => x && !VAC2.has(x)))].sort().join(' ');
+  const rangoDe = t => { const par = (String(t || '').match(/\(([^)]+)\)/) || [])[1]; return (par || String(t || '')).replace(/\s+/g, ' ').trim(); };
+  function propuestas() {
+    const prod = new Map(P.map(p => [p.id, p])), vari = new Map(V.map(v => [v.id, v]));
+    const varsDe = new Map(); V.forEach(v => { if (!varsDe.has(v.producto_id)) varsDe.set(v.producto_id, []); varsDe.get(v.producto_id).push(v); });
+    const wPorVar = new Map(); W.forEach(w => { if (!w.variante_id) return; if (!wPorVar.has(w.variante_id)) wPorVar.set(w.variante_id, []); wPorVar.get(w.variante_id).push(w); });
+    const L = [], tocados = new Set();
+    const mismoModelo = (w, p) => { const a = palabras(w.nombre), b = palabras(p.nombre); return [...a].filter(x => b.has(x)).length / Math.max(1, Math.min(a.size, b.size)) >= 0.5; };
+    // 1) la web separa colores, diseños o aromas que en Percha están juntos
+    for (const [vid, ws] of wPorVar) {
+      const v = vari.get(vid), p = v && prod.get(v.producto_id); if (!v || !p || p.es_generico || p.tipo === 'kit' || ws.length < 2) continue;
+      const propias = ws.filter(w => mismoModelo(w, p)); if (propias.length < 2) continue;
+      const pubs = new Set(propias.map(w => w.producto_ext)), sufs = new Set(propias.map(w => norm(sufijoPub(w))));
+      const deValores = w => w.color_canal && norm(w.valores).includes(norm(w.color_canal)) ? w.color_canal : null;
+      const porValor = new Set(propias.map(deValores).filter(Boolean).map(colN)).size > 1;
+      const usaSufijo = !porValor && pubs.size > 1 && sufs.size > 1;
+      const cs = propias.map(w => [w, usaSufijo ? tit(sufijoPub(w)) : deValores(w), usaSufijo]);
+      if (new Set(cs.filter(x => x[1]).map(x => colN(x[1]))).size < 2) continue;
+      for (const [w, c, suf] of cs) { if (!c || (v.color_nombre && colN(c) === colN(v.color_nombre))) continue;
+        L.push({ g: 'colores', w, v, p, valor: c, editable: true, marcado: !suf && w.publicado, txt: `${p.nombre} · ${nomV(v)} → «${c}»`, det: `#${w.producto_ext} «${w.valores || 'única'}»${w.publicado ? '' : ' (oculta)'} · web ${fmt.num(w.stock)}` }); tocados.add(w.id); }
+    }
+    // 2) talles «sin color» conectados, en una prenda que tiene colores: al color (si hay uno solo, ya elegido)
+    for (const p of P) { if (p.es_generico || p.tipo === 'kit') continue; const vs = varsDe.get(p.id) || [];
+      const cols = [...new Set(vs.filter(v => v.color_nombre).map(v => v.color_nombre))]; if (!cols.length) continue;
+      for (const v of vs.filter(v => !v.color && v.activa)) for (const w of (wPorVar.get(v.id) || [])) { if (tocados.has(w.id)) continue;
+        const c = (w.color_canal && norm(w.valores).includes(norm(w.color_canal)) && cols.find(x => colN(x) === colN(w.color_canal))) || (cols.length === 1 ? cols[0] : '');
+        L.push({ g: 'sincolor', w, v, p, valor: c, opciones: cols, marcado: !!c, txt: `${p.nombre} · ${v.talle_nombre || 'sin talle'} sin color → ${c ? `«${c}»` : 'elegí el color'}`, det: `#${w.producto_ext} «${w.valores || 'única'}» · Percha ${fmt.num(v.stock)} · web ${fmt.num(w.stock)}` }); tocados.add(w.id); } }
+    // 3) talles con otro rango en Percha (el mismo talle en todas las publicaciones): se renombra el talle
+    const porT = new Map(); for (const w of W) { const v = w.variante_id && vari.get(w.variante_id); if (!v || !v.talle || !w.talle_canal || talleIgual(w.talle_canal, v.talle_nombre)) continue;
+      const k = v.talle; if (!porT.has(k)) porT.set(k, { nom: v.talle_nombre, web: new Map(), total: 0 }); const r = rangoDe(w.talle_canal); porT.get(k).web.set(r, (porT.get(k).web.get(r) || 0) + 1); }
+    for (const w of W) { const v = w.variante_id && vari.get(w.variante_id); if (v && v.talle && w.talle_canal && porT.has(v.talle)) porT.get(v.talle).total++; }
+    for (const [k, x] of porT) { const [top, n] = [...x.web].sort((a, b) => b[1] - a[1])[0]; const a = ATR.find(t => t.tipo === 'talle' && t.codigo === k);
+      if (!a || n / x.total < 0.85 || !/\d/.test(top) || !/\bal\b|\ba\b|-/.test(top)) continue;   // solo rangos («37 al 40»), y casi todas de acuerdo
+      const usan = V.filter(v => v.talle === k).length;
+      L.push({ g: 'talles', atr: a, valor: top, editable: true, marcado: n >= 5, txt: `Talle «${x.nom}» → «${top}»`, det: `${n} de ${x.total} opciones de la web dicen «${top}» · cambia en los ${usan} talles·colores que lo usan` }); }
+    // 4) un talle·color con un talle que en la web es otro (XL → XL/2XL), si en la prenda no hay ya uno con ese talle
+    const vistos4 = new Set();
+    for (const [vid, ws] of wPorVar) { const v = vari.get(vid), p = v && prod.get(v.producto_id); if (!v || !p || p.es_generico || p.tipo === 'kit' || !v.talle_nombre) continue;
+      const ts = [...new Set(ws.map(w => w.talle_canal).filter(Boolean))]; if (ts.length !== 1 || talleIgual(ts[0], v.talle_nombre)) continue;
+      const afuera = String(ts[0]).replace(/(.*)/, '').trim(), adentro = (String(ts[0]).match(/(([^)]+))/) || [])[1] || '';
+      const dest = [ts[0], afuera, /^(t.?s*d|baby|kids)/i.test(afuera) ? adentro : ''].filter(Boolean).map(n => ATR.find(t => t.tipo === 'talle' && t.activo !== false && norm(t.nombre) === norm(n))).find(Boolean);
+      if (!dest || vistos4.has(vid) || dest.codigo === v.talle) continue;
+      const hermanas = (varsDe.get(p.id) || []).filter(x => x.id !== v.id && x.color === v.color && x.activa);
+      if (hermanas.some(x => x.talle === dest.codigo)) continue;
+      // la web junta dos talles que Percha tiene separados (85 y 90 → 85/90): no se toca, se ve a mano
+      const partes = norm(dest.nombre).split(/[s/]+/).filter(Boolean); if (partes.length > 1 && hermanas.some(x => partes.includes(norm(x.talle_nombre)))) continue;
+      if (porT.has(v.talle) && L.some(x => x.g === 'talles' && x.atr.codigo === v.talle)) continue;
+      vistos4.add(vid); L.push({ g: 'talle1', v, p, atr: dest, marcado: !(+v.stock > 0), txt: `${p.nombre} · ${nomV(v)} → talle «${dest.nombre}»`, det: `en la web: ${ws.map(w => `#${w.producto_ext} «${w.valores}»`).join(', ')} · stock ${fmt.num(v.stock)}` }); }
+    // 5) conectadas a un código general o a otro modelo: a la prenda que tiene el nombre de la publicación
+    const porClave = new Map(); P.filter(p => !p.es_generico && p.activo !== null).forEach(p => { const k = claveNom(p.nombre); porClave.set(k, porClave.has(k) ? null : p); });
+    for (const w of W) { const v = w.variante_id && vari.get(w.variante_id), p = v && prod.get(v.producto_id); if (!p || !(p.es_generico || (p.tipo !== 'kit' && !mismoModelo(w, p)))) continue;
+      const m = String(w.nombre).match(/^(.*»)\s*([^«»]+)$/); const cands = [claveNom(w.nombre), m ? claveNom(m[1]) : null].filter(Boolean);
+      const dest = cands.map(k => porClave.get(k)).find(Boolean); if (!dest || dest.id === p.id) continue;
+      const col = w.color_canal || (m ? m[2] : ''), vs = (varsDe.get(dest.id) || []);
+      const dv = vs.find(x => (!col || !x.color_nombre || colN(x.color_nombre) === colN(col)) && (!w.talle_canal || !x.talle_nombre || talleIgual(w.talle_canal, x.talle_nombre)) && (vs.length === 1 || x.color_nombre || x.talle_nombre));
+      const talleReal = w.talle_canal && !/^unic/.test(norm(w.talle_canal));
+      if (!dv || (talleReal && !dv.talle_nombre && W.filter(x => x.producto_ext === w.producto_ext).length > 1)) continue;   // no juntar varios talles de la web en uno sin talle
+      L.push({ g: 'modelo', w, v: dv, p: dest, marcado: true, txt: `#${w.producto_ext} «${w.nombre}» «${w.valores || ''}» → ${dest.codigo} ${dest.nombre} · ${nomV(dv)}`, det: `hoy conectada a ${p.codigo} ${p.nombre} · web ${fmt.num(w.stock)} · Percha ${fmt.num(dv.stock)}${dv.activa ? '' : ' (se prende)'}` }); }
+    const malas = new Set(L.filter(x => x.g === 'modelo' && x.w.stock != null && sw(x.v) !== +x.w.stock).map(x => x.w.producto_ext));
+    for (let i = L.length - 1; i >= 0; i--) if (L[i].g === 'modelo' && malas.has(L[i].w.producto_ext)) L.splice(i, 1);
+    // 6) nombres (opcional, ninguno marcado): el de la web cuando la prenda tiene una sola publicación visible
+    const pubsDe = new Map(); W.filter(w => w.publicado && w.variante_id && vari.get(w.variante_id)).forEach(w => { const pid = vari.get(w.variante_id).producto_id; if (!pubsDe.has(pid)) pubsDe.set(pid, new Map()); pubsDe.get(pid).set(w.producto_ext, w.nombre); });
+    for (const [pid, ps] of pubsDe) { const p = prod.get(pid); if (!p || p.es_generico || ps.size !== 1) continue; const nom = [...ps.values()][0]; if (claveNom(nom) === claveNom(p.nombre) || !mismoModelo({ nombre: nom }, p)) continue;
+      L.push({ g: 'nombres', p, valor: nom, editable: true, marcado: false, txt: `${p.codigo} «${p.nombre}» → «${nom}»`, det: 'el nombre de su publicación en la web' }); }
+    return L;
+  }
+  const GRUPOS = {
+    colores: ['La web separa colores, diseños o aromas', 'Se crea ese color en la prenda (o se usa el que ya existe), recibe el stock que la web tiene en esa opción y queda conectado. Los que salen del nombre de la publicación vienen sin marcar: revisá el nombre.'],
+    sincolor: ['Talles «sin color» → su color', 'La opción de la web pasa al color de la prenda, con su stock. Si la prenda tiene varios colores, elegilo.'],
+    talles: ['Talles con otro rango', 'Se cambia el nombre del talle en Percha al que dice la web (cambia en todas las prendas que lo usan y en las etiquetas nuevas).'],
+    talle1: ['Talle·color con otro talle', 'Ese talle·color pasa al talle que dice la web. Los que tienen stock vienen sin marcar: confirmá con la etiqueta de la prenda.'],
+    modelo: ['Conectadas a otro modelo o a un código general', 'Se conecta a la prenda que tiene el nombre de la publicación.'],
+    nombres: ['Nombres de la web (opcional)', 'El nombre de la prenda pasa a ser el de su publicación. Ninguno viene marcado: elegí los que estén mejor en la web.']
+  };
+  async function traerDeLaWeb() {
+    const L = propuestas(); if (!L.length) { toast('No hay nada para traer de la web'); return; }
+    const m = modal(`<h2>Traer de la web</h2><p class="sub">Correcciones que salen de lo que dice la web. El stock no cambia de total y no se borra nada; en la web no cambia nada. Marcá lo que querés aplicar.</p>
+      <div id="tw-l" style="max-height:62vh;overflow:auto;margin-top:10px">${Object.entries(GRUPOS).map(([g, [t, d]]) => { const xs = L.map((x, i) => [x, i]).filter(([x]) => x.g === g); if (!xs.length) return '';
+        return `<div style="margin:12px 0 4px"><label style="font-weight:700"><input type="checkbox" data-todo="${g}"> ${esc(t)} (${xs.length})</label><div class="sub" style="font-size:12.5px">${esc(d)}</div></div>` + xs.map(([x, i]) => `<div style="display:grid;grid-template-columns:24px 1fr;gap:6px;padding:6px 4px;border-bottom:1px solid var(--linea);font-size:13px"><input type="checkbox" data-i="${i}"${x.marcado ? ' checked' : ''}><div>${esc(x.txt)}<br><small style="color:var(--tinta-3)">${esc(x.det)}</small>${x.opciones ? `<br><select data-val="${i}"><option value="">elegí el color…</option>${x.opciones.map(c => `<option${c === x.valor ? ' selected' : ''}>${esc(c)}</option>`).join('')}</select>` : x.editable ? `<br><input data-val="${i}" value="${esc(x.valor)}" style="width:100%;max-width:420px;margin-top:3px">` : ''}</div></div>`).join(''); }).join('')}</div>
+      <div class="pie"><span class="sub" id="tw-n" style="margin-right:auto"></span><button class="btn" data-no>Cancelar</button><button class="btn primario" data-si>Aplicar</button></div>`);
+    m.querySelector('.modal').classList.add('rv-ancha');
+    const marcados = () => $$('[data-i]', m).filter(c => c.checked).map(c => +c.dataset.i);
+    const cuenta = () => { $('#tw-n', m).textContent = `${marcados().length} de ${L.length} marcadas`; Object.keys(GRUPOS).forEach(g => { const t = $(`[data-todo="${g}"]`, m); if (!t) return; const cs = L.map((x, i) => x.g === g ? i : -1).filter(i => i >= 0).map(i => $(`[data-i="${i}"]`, m)); t.checked = cs.every(c => c.checked); t.indeterminate = !t.checked && cs.some(c => c.checked); }); };
+    $$('[data-i]', m).forEach(c => c.onchange = cuenta); $$('[data-todo]', m).forEach(t => t.onchange = () => { L.forEach((x, i) => { if (x.g === t.dataset.todo) $(`[data-i="${i}"]`, m).checked = t.checked; }); cuenta(); });
+    $$('[data-val]', m).forEach(el => el.onchange = el.oninput = () => { const x = L[+el.dataset.val]; x.valor = el.value.trim(); if (el.tagName === 'SELECT') $(`[data-i="${el.dataset.val}"]`, m).checked = !!x.valor; cuenta(); });
+    cuenta(); $('[data-no]', m).onclick = () => m.cerrar();
+    $('[data-si]', m).onclick = async () => {
+      const sel = marcados().map(i => L[i]); if (!sel.length) { toast('Marcá al menos una', 'error'); return; }
+      if (sel.some(x => (x.g === 'colores' || x.g === 'sincolor' || x.g === 'talles' || x.g === 'nombres') && !x.valor)) { toast('Hay una marcada sin color o nombre: completala o desmarcala', 'error'); return; }
+      if (!await confirmar(`Se aplican ${sel.length} correcciones. ¿Seguimos?`, 'Aplicar')) return;
+      $('[data-si]', m).disabled = true; let ok = 0; const err = [];
+      const orden = ['talles', 'nombres', 'modelo', 'talle1', 'sincolor', 'colores'];
+      for (const x of sel.sort((a, b) => orden.indexOf(a.g) - orden.indexOf(b.g))) {
+        $('#tw-n', m).textContent = `Aplicando ${ok + err.length + 1} de ${sel.length}…`;
+        let r;
+        if (x.g === 'colores' || x.g === 'sincolor') r = await sb.rpc('canal_separar_color', { p_item: x.w.id, p_color: x.valor });
+        else if (x.g === 'talles') r = await sb.from('atributos').update({ nombre: x.valor }).eq('id', x.atr.id);
+        else if (x.g === 'talle1') r = await sb.from('variantes').update({ talle_id: x.atr.id }).eq('id', x.v.id);
+        else if (x.g === 'nombres') r = await sb.from('productos').update({ nombre: x.valor }).eq('id', x.p.id);
+        else if (x.g === 'modelo') { if (!x.v.activa) await sb.from('variantes').update({ activa: true }).eq('id', x.v.id); r = await sb.from('canal_items').update({ variante_id: x.v.id, cruce: 'manual' }).eq('id', x.w.id); }
+        if (r && r.error) err.push(`${x.txt}: ${mensajeError(r.error)}`); else ok++;
+      }
+      m.cerrar(); empujar();
+      if (err.length) { const me = modal(`<h2>${ok} aplicadas, ${err.length} con error</h2><div style="max-height:50vh;overflow:auto;font-size:13px">${err.map(e => `<p>${esc(e)}</p>`).join('')}</div><div class="pie"><button class="btn primario" data-no>Listo</button></div>`); $('[data-no]', me).onclick = () => me.cerrar(); }
+      rehacer(`${ok} correcciones traídas de la web`);
+    };
+  }
+
   // ---------------- arranque ----------------
+  $('#btn-traer').onclick = traerDeLaWeb;
   $('#btn-act').onclick = () => rehacer('Actualizado');
   $('#btn-vivo').onclick = async ev => { const b = ev.target; b.disabled = true; b.textContent = 'Leyendo la web…';
     try { const r = await fn('tn-push', { simular: true, todo: true }); vivo = ((r.resumen || [])[0] || {}).diferencias || []; cat = 'vivo'; revisar(); pintar(); toast(vivo.length ? `${vivo.length} diferencias de stock con la web` : 'El stock de la web coincide con Percha en todo lo visible'); }
