@@ -133,6 +133,10 @@ Deno.serve(async (req) => {
     const stocks: any[] = [];
     for (let i = 0; i < variantes.length; i += 300) { const { data } = await admin.from("v_variantes").select("id,producto_id,producto_tipo,sku,stock,fallas,producto_nombre,talle_nombre,color_nombre,activa").in("id", variantes.slice(i, i + 300)); stocks.push(...(data || [])); }
     const infoVar = new Map(stocks.map((s: any) => [s.id, s]));
+    // 18/11 · PREVENTA (sql/153): la web vende hasta «cupo» unidades por talle·color sin stock (stock real + cupo)
+    const cupoPreventa = new Map<string, number>();
+    { const pids = [...new Set(stocks.map((s: any) => s.producto_id).filter(Boolean))];
+      for (let i = 0; i < pids.length; i += 300) { const { data } = await admin.from("productos").select("id,preventa_cupo").in("id", pids.slice(i, i + 300)).gt("preventa_cupo", 0); (data || []).forEach((x: any) => cupoPreventa.set(x.id, +x.preventa_cupo)); } }
     // kits: componentes y variantes de los productos componentes (para resolver talle/color)
     const kitsIds = [...new Set(stocks.filter((s: any) => s.producto_tipo === "kit").map((s: any) => s.producto_id))];
     const comps = new Map<string, any[]>(); const varsDe = new Map<string, any[]>();
@@ -149,7 +153,7 @@ Deno.serve(async (req) => {
     const stockPara = (d: any): number => {
       const v = infoVar.get(d.variante_id); if (!v) return 0;
       if (v.producto_tipo !== "kit" && v.activa === false) return 0;   // talle·color sacado en Percha: en la web queda sin stock (antes se seguía vendiendo)
-      if (v.producto_tipo !== "kit") return Math.max(0, Math.floor((+v.stock || 0) - (+v.fallas || 0)));   // las prendas con falla son solo del local
+      if (v.producto_tipo !== "kit") return Math.max(0, Math.floor((+v.stock || 0) - (+v.fallas || 0) + (cupoPreventa.get(v.producto_id) || 0)));   // las prendas con falla son solo del local; en preventa, + el cupo
       const talle = n((d.talle_canal || "").split("/")[0]), color = n(d.color_canal);
       let minimo = Infinity;
       for (const c of comps.get(v.producto_id) || []) {

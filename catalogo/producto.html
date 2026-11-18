@@ -152,6 +152,7 @@
         <div class="campo"><label>Estado</label><select name="activo"><option value="true">Activo</option><option value="false">Inactivo</option></select></div>
         <div class="campo"><label>En la web</label><select name="publicar_web"><option value="true">Sí: se sube sola a Tienda Nube (oculta)</option><option value="false">No: solo en el local</option></select><span class="ayuda" id="web-estado"></span></div>
         <div class="campo"><label>Cómo va a la web</label><select name="web_por_color"><option value="">Elegí… (se pregunta si tiene 2 o más colores)</option><option value="false">Una publicación con todos los colores</option><option value="true">Una publicación por color (el color va en el título)</option></select><span class="ayuda">Ej. MAGNOLIA va una por color: «MAGNOLIA ROSA», «MAGNOLIA AZUL».</span></div>
+        <div class="campo"><label>Preventa en la web</label><div style="display:flex;gap:6px;flex-wrap:wrap"><input name="preventa_cupo" type="number" min="0" max="50" step="1" placeholder="Cupo por talle·color" title="Cuántas unidades de cada talle·color puede vender la web sin tener stock" style="max-width:170px"><input name="preventa_entrega" type="date" title="Fecha estimada de entrega" style="max-width:170px"></div><span class="ayuda" id="preventa-estado"></span></div>
         <div class="campo"><label>Código general</label><select name="es_generico" title="Para lo que tiene muchos modelos (ej. BOMBIS «VARIAS»): en la caja y en los remitos pregunta qué modelos son. Todos en Catálogo › Códigos generales"><option value="false">No</option><option value="true">Sí: en la caja y en los remitos pregunta qué modelos son</option></select></div>
       </div>
       <div class="campo"><label>Descripción</label><textarea name="descripcion" rows="2"></textarea></div>
@@ -241,7 +242,7 @@ APP.ready.then(async () => {
     { const vm = $('#ver-movs'); if (vm) vm.href = 'inventario.html?q=' + encodeURIComponent(producto.codigo) + '#movimientos'; }
     document.title = producto.nombre + ' · ' + APP.empresa.nombre;
     ['codigo', 'nombre', 'tipo', 'categoria_id', 'proveedor_id', 'temporada_id', 'marca_id', 'costo', 'precio', 'ean', 'descripcion'].forEach(k => form[k].value = producto[k] ?? '');
-    form.tiene_variantes.value = String(producto.tiene_variantes); form.activo.value = String(producto.activo); form.publicar_web.value = String(producto.publicar_web !== false); form.web_por_color.value = producto.web_por_color == null ? '' : String(producto.web_por_color); estadoWeb(); form.es_generico.value = String(!!producto.es_generico);
+    form.tiene_variantes.value = String(producto.tiene_variantes); form.activo.value = String(producto.activo); form.publicar_web.value = String(producto.publicar_web !== false); form.web_por_color.value = producto.web_por_color == null ? '' : String(producto.web_por_color); form.preventa_cupo.value = producto.preventa_cupo || ''; form.preventa_entrega.value = producto.preventa_entrega || ''; estadoWeb(); pintarPreventa(); form.es_generico.value = String(!!producto.es_generico);
     $('#stock-total').value = fmt.num(variantes.reduce((s, x) => s + (+x.stock || 0), 0));
     $('#ayuda-ean').textContent = producto.tiene_variantes ? 'Con variantes, el código de barras va en cada talle y color.' : '';
     pintarPrecios(); pintarAcciones(); pintarMargen(); pintarFotos(); pintarHistorial(); cargarPctx(); pintarCatsWeb();
@@ -361,7 +362,7 @@ APP.ready.then(async () => {
       codigo: form.codigo.value.trim(), nombre: form.nombre.value.trim(), tipo: form.tipo.value,
       categoria_id: form.categoria_id.value || null, proveedor_id: form.proveedor_id.value || null, temporada_id: form.temporada_id.value || null, marca_id: form.marca_id.value || null,
       costo: form.costo.value.trim() ? PRECIOS.num(form.costo.value) : null, precio: PRECIOS.num(form.precio.value), ean: form.ean.value.trim() || null,
-      tiene_variantes: form.tiene_variantes.value === 'true', activo: form.activo.value === 'true', publicar_web: form.publicar_web.value === 'true', web_por_color: form.web_por_color.value === '' ? null : form.web_por_color.value === 'true', es_generico: form.es_generico.value === 'true', descripcion: form.descripcion.value.trim() || null
+      tiene_variantes: form.tiene_variantes.value === 'true', activo: form.activo.value === 'true', publicar_web: form.publicar_web.value === 'true', web_por_color: form.web_por_color.value === '' ? null : form.web_por_color.value === 'true', preventa_cupo: parseInt(form.preventa_cupo.value, 10) > 0 ? Math.min(50, parseInt(form.preventa_cupo.value, 10)) : null, preventa_entrega: form.preventa_entrega.value || null, es_generico: form.es_generico.value === 'true', descripcion: form.descripcion.value.trim() || null
     };
     if (d.tipo === 'kit') { d.tiene_variantes = false; form.tiene_variantes.value = 'false'; }
     return d;
@@ -619,6 +620,20 @@ APP.ready.then(async () => {
   }
   form.publicar_web.addEventListener('change', () => setTimeout(estadoWeb, 1500));
   form.web_por_color.addEventListener('change', () => setTimeout(estadoWeb, 1500));
+
+  // 18/11 · PREVENTA (sql/153): la web vende «cupo» unidades por talle·color sin stock. Lo negativo de cada talle·color es lo
+  // vendido a cuenta: lo que hay que pedirle al proveedor. Cuando llega la mercadería, cubre esos pedidos; después se apaga.
+  function pintarPreventa() {
+    const el = $('#preventa-estado'); if (!el) return;
+    const cupo = parseInt(form.preventa_cupo.value, 10) || 0, ent = form.preventa_entrega.value;
+    if (!cupo) { el.title = ''; el.textContent = 'Cupo = cuántas de cada talle·color vende la web sin stock.'; return; }
+    const vend = variantes.filter(v => v.activa !== false && +v.stock < 0), total = vend.reduce((a, v) => a - +v.stock, 0);
+    const nom = v => [v.color_nombre, v.talle_nombre].filter(Boolean).join(' ') || 'única';
+    el.title = 'Cuando llegue la mercadería y la cargues, borrá el cupo para terminar la preventa.';
+    el.innerHTML = '⏳ <b>Preventa</b>: stock + ' + cupo + ' por talle·color' + (ent ? ' · entrega ' + esc(ent.split('-').reverse().slice(0, 2).join('/')) : ' · <b>falta la fecha</b>')
+      + '<br>' + (total ? '<b>Vendidas: ' + total + '</b> · ' + vend.map(v => esc(nom(v)) + ' ' + (-v.stock)).join(' · ') : 'Vendidas: 0');
+  }
+  form.preventa_cupo.addEventListener('input', pintarPreventa); form.preventa_entrega.addEventListener('change', pintarPreventa);
 
   // 18/11 (Diego): una prenda de 2 o más colores que va a la web, sin elegir todavía cómo: se pregunta si va como UNA
   // publicación con los colores adentro, o una por color con el color en el título (como MAGNOLIA). Hasta elegir, no se sube.
