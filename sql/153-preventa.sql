@@ -57,3 +57,14 @@ begin
   end if;
 end $$;
 
+
+-- cambiar el cupo también manda el stock a la web (la cola de tn-push solo se llenaba con cambios de stock)
+create or replace function productos_preventa_encolar() returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if coalesce(new.preventa_cupo, 0) is distinct from coalesce(old.preventa_cupo, 0) then
+    perform encolar_canal(new.empresa_id, v.id) from variantes v where v.producto_id = new.id;
+  end if;
+  return new;
+end $$;
+drop trigger if exists productos_preventa_encolar on productos;
+create trigger productos_preventa_encolar after update of preventa_cupo on productos for each row execute function productos_preventa_encolar();
