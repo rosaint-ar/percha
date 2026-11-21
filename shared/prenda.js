@@ -145,7 +145,7 @@
           <div class="pr-movs">${(d.movimientos || []).map(x => `<div><span>${fmt.fechaHora(x.fecha)}</span><span style="font-family:var(--f-ui);color:var(--tinta-2)">${x.venta_numero ? 'Venta #' + String(x.venta_numero).padStart(6, '0') : esc(TIPOS[x.tipo] || x.tipo)}${x.motivo && x.motivo !== x.tipo ? ' · ' + esc(x.motivo) : ''}${x.usuario ? ' · ' + esc(x.usuario) : ''}</span><b class="${x.cantidad > 0 ? 'pos' : 'neg'}">${x.cantidad > 0 ? '+' : ''}${fmt.num(x.cantidad)}</b></div>`).join('') || '<p class="sub">Sin movimientos.</p>'}
             <p style="margin:8px 0 0"><a href="${raiz}catalogo/inventario.html?q=${encodeURIComponent(pr.codigo)}#movimientos" style="font:600 12px var(--f-ui);color:var(--acento)">Ver todos los movimientos →</a></p></div>
         </details>
-        <div class="pie"><button class="btn" data-cerrar>Cerrar</button>${puede ? '<button class="btn primario" data-guardar>Guardar</button>' : ''}</div>`;
+        <div class="pie">${admin && actual === 0 && !unidades.length && v.activa !== false ? '<button class="btn" data-quitar style="margin-right:auto" title="Ya no existe (p.ej. el «sin talle» que quedó vacío al cargar el talle bien)">Quitar este talle·color</button>' : ''}<button class="btn" data-cerrar>Cerrar</button>${puede ? '<button class="btn primario" data-guardar>Guardar</button>' : ''}</div>`;
       enganchar();
     };
     const leerUnidades = () => $$('.pr-unidad', m).forEach(el => { const u = unidades[+el.dataset.u]; $$('[data-k]', el).forEach(inp => { const k = inp.dataset.k, t = inp.value.trim(); u[k] = k === 'descuento_pct' ? (t === '' ? '' : Math.min(100, Math.max(0, +t.replace(',', '.') || 0))) : k === 'precio' ? (t === '' ? '' : Math.max(0, Math.round(+t.replace(/\./g, '').replace(',', '.') || 0))) : inp.value; }); });
@@ -163,6 +163,23 @@
       $('#pr-etq-b', m).onclick = () => { agregarEtiquetas([{ variante_id: v.id, cantidad: +$('#pr-etq', m).value || 1 }]); toast('Agregado a la cola de etiquetas'); };
       $('[data-cerrar]', m).onclick = () => m.cerrar();
       const g = $('[data-guardar]', m); if (g) g.onclick = guardar;
+      const q = $('[data-quitar]', m); if (q) q.onclick = quitar;
+    }
+    // talle·color en 0 que ya no existe (21/11, sql/154): se apaga, no se borra (ventas y movimientos quedan). Si estaba en la
+    // web, la conexión pasa al talle·color que corresponde (el «sin talle» Blanco → «Único» Blanco) para no borrar esa opción.
+    async function quitar() {
+      const { data: s, error: e1 } = await sb.rpc('variante_quitar', { p_variante: v.id, p_simular: true });
+      if (e1) { toast(mensajeError(e1), 'error'); return; }
+      if (s.nada) { m.cerrar(); if (op.alGuardar) op.alGuardar(); return; }
+      const txt = `Se saca «${nom}» de ${pr.nombre}: deja de ofrecerse en la caja y en la web (sus ventas y movimientos quedan).`
+        + (s.pasa_a ? ` La conexión con la web pasa a «${s.pasa_a}», que ya tiene el stock.` : '')
+        + (s.se_borra_de_la_web ? ' Ojo: está en la web y no hay otro talle·color a quien pasarle la conexión, así que esa opción se borra de la web.' : '');
+      if (!await APP.confirmar(txt, 'Quitar')) return;
+      const { data: r, error } = await sb.rpc('variante_quitar', { p_variante: v.id });
+      if (error) { toast(mensajeError(error), 'error'); return; }
+      m.cerrar(); if (r.web) empujarStock();
+      toast('«' + nom + '» quitado' + (r.pasa_a ? ' · la web pasó a «' + r.pasa_a + '»' : ''));
+      if (op.alGuardar) op.alGuardar();
     }
     async function guardar() {
       leerUnidades();
